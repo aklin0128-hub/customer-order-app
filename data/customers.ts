@@ -1,0 +1,61 @@
+export type CustomerAccount = {
+  accountNo: string;
+  storeName: string;
+  password: string;
+  active: boolean;
+};
+
+export const customers: CustomerAccount[] = [
+  { accountNo: "FL123", storeName: "DEMO DEMO", password: "1234", active: true },
+  { accountNo: "FL393", storeName: "SOUTHEAST ASIA", password: "3938", active: true },
+  { accountNo: "FL429", storeName: "ASIAN SQUARE", password: "4298", active: true },
+  { accountNo: "FL208", storeName: "BLUE BUDDHA EXOTIC", password: "2088", active: true },
+  { accountNo: "FL414", storeName: "DINOSAUR ASIAN", password: "4148", active: true },
+  { accountNo: "FL412", storeName: "MANDALAY", password: "4128", active: true },
+  { accountNo: "FL083", storeName: "WORLD FOOD", password: "0838", active: true },
+  { accountNo: "FL205", storeName: "CARIBBEAN LATINO/Lim", password: "2058", active: true },
+  { accountNo: "FL391", storeName: "DRAGON ASIAN", password: "3918", active: true },
+  { accountNo: "FL287", storeName: "LA SALSA / Paul", password: "2878", active: true },
+  { accountNo: "FL209", storeName: "JAX ORIENATL", password: "2098", active: true },
+  { accountNo: "FL243", storeName: "THRIFTY PROD/MEAT", password: "2438", active: true },
+  { accountNo: "FL061", storeName: "KYUNG SUNG", password: "0618", active: true },
+  { accountNo: "FL431", storeName: "VINA MARKET", password: "4318", active: true },
+  { accountNo: "FL164", storeName: "JASON PRODUCE", password: "1648", active: true },
+  { accountNo: "FL131", storeName: "NEWSTAR ASIA", password: "1318", active: true },
+  { accountNo: "FL366", storeName: "LA RICE", password: "3668", active: true },
+  { accountNo: "FL156", storeName: "EAST SIDE ORIENT", password: "1568", active: true },
+  { accountNo: "FL197", storeName: "FANCY FRUIT", password: "1978", active: true },
+  { accountNo: "FL282", storeName: "IZZIBAN", password: "2828", active: true },
+  { accountNo: "FL078", storeName: "SUPER ORIENATL", password: "0788", active: true },
+  { accountNo: "FL112", storeName: "DONG A CORP", password: "1128", active: true },
+  { accountNo: "FL155", storeName: "ENSON", password: "1558", active: true },
+  { accountNo: "FL168", storeName: "TAN TIEN", password: "1688", active: true },
+  { accountNo: "FL349", storeName: "NEW GARDEN", password: "3498", active: true },
+  { accountNo: "FL182", storeName: "KLS FOOD", password: "1828", active: true },
+  { accountNo: "FL252", storeName: "THRIFTY PROD", password: "2528", active: true },
+  { accountNo: "FL145", storeName: "JASON BEST", password: "1458", active: true },
+  { accountNo: "FL374", storeName: "FIRST ORIENTAL", password: "3748", active: true },
+  //Miami
+  { accountNo: "FL272", storeName: "ASIAN MARKET", password: "2728", active: true },
+  { accountNo: "FL317", storeName: "CANNAN TRADING", password: "3178", active: true },
+  { accountNo: "FL355", storeName: "CARDOZO SEAFOOD", password: "3558", active: true },
+  { accountNo: "FL116", storeName: "KIMCHI MART - MIAMI", password: "1168", active: true },
+  { accountNo: "FL128", storeName: "FOODTOWN - WEST PALM", password: "1288", active: true },
+  { accountNo: "FL129", storeName: "FOODTOWN - DAVIE", password: "1298", active: true },
+  { accountNo: "FL132", storeName: "ORIENTAL FOOD MARKET", password: "1328", active: true },
+  { accountNo: "FL141", storeName: "WELCOME ORIENTAL FOOD", password: "1418", active: true },
+  { accountNo: "FL202", storeName: "SUSHI CAFE", password: "2028", active: true },
+  { accountNo: "FL342", storeName: "KIMCHI MART - PEMBROKE", password: "3428", active: true },
+  { accountNo: "FL345", storeName: "BROWARD - PEMBROKE", password: "3428", active: true },
+  { accountNo: "FL377", storeName: "ASIAM MART - 744", password: "3778", active: true },
+  { accountNo: "FL428", storeName: "ASIAN MART - 2217", password: "4288", active: true },
+  { accountNo: "FL381", storeName: "KIMCHI MART - HOLLYWOOD", password: "3818", active: true },
+  { accountNo: "FL385", storeName: "TRUE WORLD - MIAMI", password: "3858", active: true },
+  { accountNo: "FL395", storeName: "BEIJING MART - 9501", password: "3958", active: true },
+  { accountNo: "FL193", storeName: "BEIJING MART - 316", password: "1938", active: true },
+  { accountNo: "FL427", storeName: "FOODTOWN - HOMESTEAD", password: "4278", active: true },
+  { accountNo: "FL432", storeName: "KIMCHI MART - FT LAUDERDALE", password: "4328", active: true },
+  { accountNo: "FL417", storeName: "KIMCHI MART - CORAL SPRING", password: "4178", active: true },
+  { accountNo: "FL397", storeName: "KOA MART", password: "3978", active: true },
+
+];
