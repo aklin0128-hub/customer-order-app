@@ -903,10 +903,7 @@ export default function OrderPage() {
             ))}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, marginTop: 8 }}>
-            <button type="button" onClick={() => setQtyInput("1/2 PALLET")} style={palletButtonStyle}>{t.halfPallet}</button>
-            <button type="button" onClick={() => setQtyInput("1 PALLET")} style={palletButtonStyle}>{t.onePallet}</button>
-          </div>
+          
 
           <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}>
             <button type="button" onClick={addItem} style={primarySmallButtonStyle}>{t.addItem}</button>
