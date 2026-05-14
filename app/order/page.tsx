@@ -174,7 +174,7 @@ const copy = {
 
 function getImageUrl(sku?: string) {
   if (!sku) return "";
-  return `/product/${sku}.jpg`;
+  return `/product/${sku}.jpg?v=2`;
 }
 
 function isNormalItem(item?: CatalogItem | null) {
@@ -344,7 +344,7 @@ export default function OrderPage() {
       if (recentRes.ok && Array.isArray(recentData.recentItems)) {
         setRecentItems(recentData.recentItems);
       }
-    } catch {}
+    } catch { }
 
     try {
       const historyRes = await fetch(`/api/order-history?accountNo=${encodeURIComponent(acct)}`, {
@@ -354,7 +354,7 @@ export default function OrderPage() {
       if (historyRes.ok && Array.isArray(historyData.history)) {
         setOrderHistory(historyData.history);
       }
-    } catch {}
+    } catch { }
   };
 
   useEffect(() => {
@@ -368,7 +368,7 @@ export default function OrderPage() {
           setPhone(parsed.phone || "");
           setNote(parsed.note || "");
           setCart(Array.isArray(parsed.cart) ? parsed.cart : []);
-        } catch {}
+        } catch { }
       }
 
       try {
@@ -384,7 +384,7 @@ export default function OrderPage() {
           setCart(Array.isArray(data.draft.cart) ? data.draft.cart : []);
           setSubmitMsg(t.loadedDraft);
         }
-      } catch {}
+      } catch { }
 
       await loadRecentAndHistory(accountNo);
 
@@ -413,7 +413,7 @@ export default function OrderPage() {
             cart,
           }),
         });
-      } catch {}
+      } catch { }
     }, 700);
 
     return () => clearTimeout(timer);
@@ -548,7 +548,7 @@ export default function OrderPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accountNo }),
       });
-    } catch {}
+    } catch { }
 
     setTimeout(() => skuInputRef.current?.focus(), 50);
   };
