@@ -32,7 +32,7 @@ type OrderHistoryItem = {
 };
 
 const quickQtyButtons = ["1", "2", "3", "4", "5", "10", "15", "20"];
-const catalog = catalogData as CatalogItem[];
+let catalog = catalogData as CatalogItem[];
 
 const copy = {
   en: {
@@ -174,7 +174,7 @@ const copy = {
 
 function getImageUrl(sku?: string) {
   if (!sku) return "";
-  return `/product/${sku}.jpg?v=2`;
+  return `/product/${sku}.jpg`;
 }
 
 function isNormalItem(item?: CatalogItem | null) {
@@ -307,8 +307,25 @@ export default function OrderPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [recentItems, setRecentItems] = useState<CartItem[]>([]);
   const [orderHistory, setOrderHistory] = useState<OrderHistoryItem[]>([]);
+  const [catalogVersion, setCatalogVersion] = useState(0);
 
   const t = copy[lang];
+
+  useEffect(() => {
+    const loadCatalog = async () => {
+      try {
+        const res = await fetch("/api/catalog", { cache: "no-store" });
+        const data = await res.json();
+
+        if (res.ok && Array.isArray(data.products)) {
+          catalog = data.products;
+          setCatalogVersion((v) => v + 1);
+        }
+      } catch {}
+    };
+
+    loadCatalog();
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem("lang") as Lang | null;
@@ -344,7 +361,7 @@ export default function OrderPage() {
       if (recentRes.ok && Array.isArray(recentData.recentItems)) {
         setRecentItems(recentData.recentItems);
       }
-    } catch { }
+    } catch {}
 
     try {
       const historyRes = await fetch(`/api/order-history?accountNo=${encodeURIComponent(acct)}`, {
@@ -354,7 +371,7 @@ export default function OrderPage() {
       if (historyRes.ok && Array.isArray(historyData.history)) {
         setOrderHistory(historyData.history);
       }
-    } catch { }
+    } catch {}
   };
 
   useEffect(() => {
@@ -368,7 +385,7 @@ export default function OrderPage() {
           setPhone(parsed.phone || "");
           setNote(parsed.note || "");
           setCart(Array.isArray(parsed.cart) ? parsed.cart : []);
-        } catch { }
+        } catch {}
       }
 
       try {
@@ -384,7 +401,7 @@ export default function OrderPage() {
           setCart(Array.isArray(data.draft.cart) ? data.draft.cart : []);
           setSubmitMsg(t.loadedDraft);
         }
-      } catch { }
+      } catch {}
 
       await loadRecentAndHistory(accountNo);
 
@@ -413,7 +430,7 @@ export default function OrderPage() {
             cart,
           }),
         });
-      } catch { }
+      } catch {}
     }, 700);
 
     return () => clearTimeout(timer);
@@ -455,7 +472,7 @@ export default function OrderPage() {
         return (a.item.sku || "").localeCompare(b.item.sku || "");
       })
       .map((x) => x.item);
-  }, [normalizedSkuInput, showAvailableOnly]);
+  }, [normalizedSkuInput, showAvailableOnly, catalogVersion]);
 
   useEffect(() => {
     if (!normalizedSkuInput) {
@@ -548,7 +565,7 @@ export default function OrderPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ accountNo }),
       });
-    } catch { }
+    } catch {}
 
     setTimeout(() => skuInputRef.current?.focus(), 50);
   };
