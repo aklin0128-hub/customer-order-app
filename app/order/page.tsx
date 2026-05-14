@@ -19,6 +19,9 @@ type CatalogItem = {
   barcode?: string;
   upc?: string;
   size?: string;
+  limitedQty?: string;
+  palletSize?: string;
+  imageUrl?: string;
 };
 
 type OrderHistoryItem = {
@@ -219,8 +222,19 @@ function getStatusBadgeStyle(status?: string): React.CSSProperties {
   };
 }
 
-function ProductImage({ sku, alt, size = 56 }: { sku?: string; alt: string; size?: number }) {
+function ProductImage({
+  sku,
+  alt,
+  size = 56,
+  imageUrl,
+}: {
+  sku?: string;
+  alt: string;
+  size?: number;
+  imageUrl?: string;
+}) {
   const [imgError, setImgError] = useState(false);
+  const src = imageUrl || getImageUrl(sku);
 
   if (!sku || imgError) {
     return (
@@ -247,7 +261,7 @@ function ProductImage({ sku, alt, size = 56 }: { sku?: string; alt: string; size
 
   return (
     <img
-      src={getImageUrl(sku)}
+      src={src}
       alt={alt}
       style={{
         width: size,
@@ -743,6 +757,28 @@ export default function OrderPage() {
         </span>
       ) : null}
 
+      {item.palletSize ? (
+        <span style={{ fontSize: 11, color: "#6b7280" }}>
+          Pallet: {item.palletSize}
+        </span>
+      ) : null}
+
+      {item.limitedQty ? (
+        <span
+          style={{
+            padding: "2px 7px",
+            borderRadius: 999,
+            fontSize: 10,
+            fontWeight: 800,
+            background: "#fff7ed",
+            color: "#c2410c",
+            border: "1px solid #fed7aa",
+          }}
+        >
+          Limited: {item.limitedQty}
+        </span>
+      ) : null}
+
       {getDisplayStatus(item.status) ? (
         <span
           style={{
@@ -812,7 +848,7 @@ export default function OrderPage() {
                   const catalogItem = getCatalogItemBySku(item.sku);
                   return (
                     <button key={item.sku} type="button" onClick={() => addSkuToCart(item.sku, item.qty || "1")} style={productSmallButtonStyle}>
-                      <ProductImage sku={item.sku} alt={item.sku} size={42} />
+                      <ProductImage sku={item.sku} alt={item.sku} size={42} imageUrl={catalogItem?.imageUrl} />
                       <div style={{ flex: 1, minWidth: 0, overflow: "visible" }}>
                         <div style={{ fontSize: 13, fontWeight: 900 }}>{item.sku}</div>
                         {catalogItem ? <div style={{ fontSize: 11, color: "#4b5563" }}>{catalogItem.brand ? `${catalogItem.brand} | ` : ""}{catalogItem.name || ""}</div> : null}
@@ -844,7 +880,7 @@ export default function OrderPage() {
                 return (
                   <button key={item.sku} type="button" onClick={() => { setSelectedItem(item); setSkuInput(item.sku); }} style={{ width: "100%", border: isActive ? "2px solid #93c5fd" : "1px solid #e5e7eb", background: isActive ? "#eff6ff" : "#ffffff", borderRadius: 12, padding: 10, textAlign: "left", cursor: "pointer", overflow: "visible", position: "relative" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "56px 1fr", gap: 10, alignItems: "start", overflow: "visible", position: "relative" }}>
-                      <ProductImage sku={item.sku} alt={item.name || item.sku} size={56} />
+                      <ProductImage sku={item.sku} alt={item.name || item.sku} size={56} imageUrl={item.imageUrl} />
                       <div style={{ overflow: "visible" }}>
                         <div style={{ fontSize: 14, fontWeight: 800, color: "#111827" }}>{item.sku}{item.brand ? ` | ${item.brand}` : ""}</div>
                         <div style={{ fontSize: 12, color: "#374151", marginTop: 3, lineHeight: 1.4 }}>{item.name || "-"}</div>
@@ -892,7 +928,7 @@ export default function OrderPage() {
                 return (
                   <div key={`${item.sku}-${index}`} style={cartItemStyle}>
                     <div style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0, flex: 1, overflow: "visible" }}>
-                      <ProductImage sku={item.sku} alt={item.sku} size={48} />
+                      <ProductImage sku={item.sku} alt={item.sku} size={48} imageUrl={catalogItem?.imageUrl} />
                       <div style={{ minWidth: 0, flex: 1, overflow: "visible" }}>
                         <div style={{ fontSize: 15, fontWeight: 800, color: "#111827" }}>{item.sku}</div>
                         {catalogItem ? <div style={{ fontSize: 12, color: "#4b5563", marginTop: 2, lineHeight: 1.35 }}>{catalogItem.brand ? `${catalogItem.brand} | ` : ""}{catalogItem.name || ""}</div> : null}

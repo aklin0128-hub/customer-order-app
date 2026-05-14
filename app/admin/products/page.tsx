@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 type Product = {
   sku: string;
@@ -10,12 +10,32 @@ type Product = {
   size?: string;
   barcode?: string;
   upc?: string;
+  limitedQty?: string;
+  palletSize?: string;
+  imageUrl?: string;
   source?: string;
 };
 
+const ADMIN_PASSWORD = "536678";
+
+const statusOptions = [
+  "NORMAL",
+  "NORMAL_NBR",
+  "TBD",
+  "LIMITED",
+  "SEASONAL",
+  "DISCONTINUED",
+  "INV",
+];
+
 export default function AdminProductsPage() {
+  const [adminAuthed, setAdminAuthed] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminError, setAdminError] = useState("");
+
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
+
   const [sku, setSku] = useState("");
   const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
@@ -23,15 +43,38 @@ export default function AdminProductsPage() {
   const [size, setSize] = useState("");
   const [barcode, setBarcode] = useState("");
   const [upc, setUpc] = useState("");
+  const [limitedQty, setLimitedQty] = useState("");
+  const [palletSize, setPalletSize] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
-  const loadProducts = async () => {
+  const handleAdminLogin = async () => {
+    setAdminError("");
+
+    if (adminPassword.trim() !== ADMIN_PASSWORD) {
+      setAdminError("Invalid admin password.");
+      return;
+    }
+
+    setAdminAuthed(true);
+    await loadProducts(adminPassword.trim());
+  };
+
+  const loadProducts = async (password = adminPassword.trim()) => {
     setLoading(true);
     setMsg("");
 
     try {
-      const res = await fetch("/api/admin/products", { cache: "no-store" });
+      const res = await fetch("/api/admin/products", {
+        cache: "no-store",
+        headers: {
+          "x-admin-password": password,
+        },
+      });
+
       const data = await res.json();
 
       if (!res.ok) throw new Error(data?.error || "Failed to load products.");
@@ -44,13 +87,10 @@ export default function AdminProductsPage() {
     }
   };
 
-  useEffect(() => {
-    loadProducts();
-  }, []);
-
   const filteredProducts = useMemo(() => {
     const q = search.trim().toUpperCase();
-    if (!q) return products.slice(0, 100);
+
+    if (!q) return products.slice(0, 150);
 
     return products
       .filter((p) => {
@@ -62,7 +102,7 @@ export default function AdminProductsPage() {
           p.upc?.toUpperCase().includes(q)
         );
       })
-      .slice(0, 200);
+      .slice(0, 250);
   }, [products, search]);
 
   const selectProduct = (p: Product) => {
@@ -73,6 +113,9 @@ export default function AdminProductsPage() {
     setSize(p.size || "");
     setBarcode(p.barcode || "");
     setUpc(p.upc || "");
+    setLimitedQty(p.limitedQty || "");
+    setPalletSize(p.palletSize || "");
+    setImageUrl(p.imageUrl || "");
     setMsg(`Editing ${p.sku}`);
   };
 
@@ -84,6 +127,9 @@ export default function AdminProductsPage() {
     setSize("");
     setBarcode("");
     setUpc("");
+    setLimitedQty("");
+    setPalletSize("");
+    setImageUrl("");
     setMsg("");
   };
 
@@ -101,6 +147,7 @@ export default function AdminProductsPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-admin-password": adminPassword.trim(),
         },
         body: JSON.stringify({
           sku: finalSku,
@@ -110,6 +157,9 @@ export default function AdminProductsPage() {
           size,
           barcode,
           upc,
+          limitedQty,
+          palletSize,
+          imageUrl,
         }),
       });
 
@@ -126,6 +176,81 @@ export default function AdminProductsPage() {
     }
   };
 
+  const uploadProductImage = async (file: File | null) => {
+    const finalSku = sku.trim().toUpperCase();
+
+    if (!finalSku) {
+      alert("Please enter SKU before uploading image.");
+      return;
+    }
+
+    if (!file) return;
+
+    setUploadingImage(true);
+    setMsg("");
+
+    try {
+      const formData = new FormData();
+      formData.append("sku", finalSku);
+      formData.append("file", file);
+
+      const res = await fetch("/api/admin/upload-product-image", {
+        method: "POST",
+        headers: {
+          "x-admin-password": adminPassword.trim(),
+        },
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data?.error || "Failed to upload image.");
+
+      setImageUrl(data.imageUrl || "");
+      setMsg(`Image uploaded for ${finalSku}`);
+      await loadProducts();
+    } catch (error: any) {
+      setMsg(error?.message || "Failed to upload image.");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  if (!adminAuthed) {
+    return (
+      <main style={loginPageStyle}>
+        <section style={loginCardStyle}>
+          <div style={logoStyle}>SKU</div>
+
+          <h1 style={loginTitleStyle}>Product Admin Login</h1>
+          <p style={loginSubtitleStyle}>
+            Enter admin password to manage SKU settings.
+          </p>
+
+          <input
+            type="password"
+            value={adminPassword}
+            onChange={(e) => {
+              setAdminPassword(e.target.value);
+              setAdminError("");
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleAdminLogin();
+            }}
+            placeholder="Admin password"
+            style={inputStyle}
+          />
+
+          {adminError ? <div style={errorStyle}>{adminError}</div> : null}
+
+          <button type="button" onClick={handleAdminLogin} style={primaryButtonStyle}>
+            Login
+          </button>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main style={mainStyle}>
       <div style={containerStyle}>
@@ -133,26 +258,109 @@ export default function AdminProductsPage() {
           <div>
             <h1 style={titleStyle}>Product SKU Manager</h1>
             <p style={subtitleStyle}>
-              Edit SKU name, brand, status, size, barcode, and UPC online.
+              Edit SKU status, limited qty, pallet size, product image, and item info.
             </p>
           </div>
 
-          <button type="button" onClick={loadProducts} style={secondaryButtonStyle}>
-            Refresh
+          <button
+            type="button"
+            onClick={() => {
+              setAdminAuthed(false);
+              setAdminPassword("");
+            }}
+            style={secondaryButtonStyle}
+          >
+            Log Out
           </button>
         </section>
 
+        <section style={statsGridStyle}>
+          <div style={statCardStyle}>
+            <div style={statNumberStyle}>{products.length}</div>
+            <div style={statLabelStyle}>Total SKUs</div>
+          </div>
+
+          <div style={statCardStyle}>
+            <div style={statNumberStyle}>
+              {products.filter((p) => p.source === "Redis").length}
+            </div>
+            <div style={statLabelStyle}>Redis Updated</div>
+          </div>
+
+          <div style={statCardStyle}>
+            <div style={statNumberStyle}>
+              {
+                products.filter(
+                  (p) =>
+                    p.status === "NORMAL" ||
+                    p.status === "NORMAL_NBR" ||
+                    p.status === "NORMAL_NOBR" ||
+                    p.status === "TBD"
+                ).length
+              }
+            </div>
+            <div style={statLabelStyle}>Orderable</div>
+          </div>
+        </section>
+
         <section style={cardStyle}>
-          <h2 style={sectionTitleStyle}>{sku ? `Edit SKU: ${sku}` : "Add / Update SKU"}</h2>
+          <h2 style={sectionTitleStyle}>
+            {sku ? `Edit SKU: ${sku}` : "Add / Update SKU"}
+          </h2>
 
           <div style={formGridStyle}>
             <Input label="SKU" value={sku} onChange={(v) => setSku(v.toUpperCase())} placeholder="00003D" />
             <Input label="Brand" value={brand} onChange={setBrand} placeholder="ASSI" />
             <Input label="Item Name" value={name} onChange={setName} placeholder="Product name" />
-            <Input label="Status" value={status} onChange={(v) => setStatus(v.toUpperCase())} placeholder="NORMAL" />
+
+            <div>
+              <label style={labelStyle}>Status</label>
+              <select value={status} onChange={(e) => setStatus(e.target.value)} style={inputStyle}>
+                {statusOptions.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+
             <Input label="Size" value={size} onChange={setSize} placeholder="CS 12X10 OZ" />
             <Input label="Barcode" value={barcode} onChange={setBarcode} placeholder="Barcode" />
             <Input label="UPC" value={upc} onChange={setUpc} placeholder="UPC" />
+            <Input label="Limited Qty" value={limitedQty} onChange={setLimitedQty} placeholder="Example: 10" />
+            <Input label="Pallet Size" value={palletSize} onChange={setPalletSize} placeholder="Example: 56" />
+            <Input label="Image URL" value={imageUrl} onChange={setImageUrl} placeholder="Auto-filled after upload" />
+
+            <div>
+              <label style={labelStyle}>Product Image</label>
+
+              {imageUrl ? (
+                <img
+                  src={imageUrl}
+                  alt={sku || "Product Image"}
+                  style={{
+                    width: 90,
+                    height: 90,
+                    objectFit: "contain",
+                    borderRadius: 12,
+                    border: "1px solid #e5e7eb",
+                    background: "#fff",
+                    display: "block",
+                    marginBottom: 8,
+                  }}
+                />
+              ) : null}
+
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => uploadProductImage(e.target.files?.[0] || null)}
+                style={inputStyle}
+                disabled={uploadingImage}
+              />
+
+              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+                {uploadingImage ? "Uploading..." : "PNG / JPG / WEBP"}
+              </div>
+            </div>
           </div>
 
           <div style={buttonRowStyle}>
@@ -163,6 +371,10 @@ export default function AdminProductsPage() {
             <button type="button" onClick={clearForm} style={secondaryButtonStyle}>
               Clear
             </button>
+
+            <button type="button" onClick={() => loadProducts()} style={secondaryButtonStyle}>
+              Refresh
+            </button>
           </div>
 
           {msg ? (
@@ -171,7 +383,11 @@ export default function AdminProductsPage() {
                 marginTop: 12,
                 fontSize: 13,
                 fontWeight: 800,
-                color: msg.toLowerCase().includes("failed") ? "#b91c1c" : "#15803d",
+                color:
+                  msg.toLowerCase().includes("failed") ||
+                  msg.toLowerCase().includes("unauthorized")
+                    ? "#b91c1c"
+                    : "#15803d",
               }}
             >
               {msg}
@@ -180,7 +396,7 @@ export default function AdminProductsPage() {
         </section>
 
         <section style={cardStyle}>
-          <h2 style={sectionTitleStyle}>Products ({products.length})</h2>
+          <h2 style={sectionTitleStyle}>Products ({filteredProducts.length})</h2>
 
           <input
             value={search}
@@ -191,25 +407,37 @@ export default function AdminProductsPage() {
 
           <div style={listStyle}>
             {filteredProducts.map((p) => (
-              <button
-                key={p.sku}
-                type="button"
-                onClick={() => selectProduct(p)}
-                style={productCardStyle}
-              >
-                <div>
-                  <div style={productTitleStyle}>
-                    {p.sku} · {p.brand || "-"}
-                  </div>
-                  <div style={productNameStyle}>{p.name || "-"}</div>
-                  <div style={productMetaStyle}>
-                    {p.size || "-"} · Source: {p.source || "Catalog"}
+              <button key={p.sku} type="button" onClick={() => selectProduct(p)} style={productCardStyle}>
+                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                  {p.imageUrl ? (
+                    <img
+                      src={p.imageUrl}
+                      alt={p.sku}
+                      style={{
+                        width: 48,
+                        height: 48,
+                        objectFit: "contain",
+                        borderRadius: 10,
+                        border: "1px solid #e5e7eb",
+                        background: "#fff",
+                      }}
+                    />
+                  ) : null}
+
+                  <div>
+                    <div style={productTitleStyle}>{p.sku} · {p.brand || "-"}</div>
+                    <div style={productNameStyle}>{p.name || "-"}</div>
+                    <div style={productMetaStyle}>
+                      {p.size || "-"} · Pallet: {p.palletSize || "-"} · Limited: {p.limitedQty || "-"} · Source: {p.source || "Catalog"}
+                    </div>
                   </div>
                 </div>
 
-                <span style={badgeStyle}>{p.status || "-"}</span>
+                <span style={getBadgeStyle(p.status)}>{p.status || "-"}</span>
               </button>
             ))}
+
+            {filteredProducts.length === 0 ? <div style={emptyStyle}>No products found.</div> : null}
           </div>
         </section>
       </div>
@@ -231,22 +459,83 @@ function Input({
   return (
     <div>
       <label style={labelStyle}>{label}</label>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        style={inputStyle}
-      />
+      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} style={inputStyle} />
     </div>
   );
 }
+
+function getBadgeStyle(status?: string): React.CSSProperties {
+  const s = String(status || "").toUpperCase();
+
+  const good = s === "NORMAL" || s === "NORMAL_NBR" || s === "NORMAL_NOBR" || s === "TBD";
+  const limited = s === "LIMITED";
+
+  return {
+    padding: "4px 9px",
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: 900,
+    whiteSpace: "nowrap",
+    background: good ? "#ecfdf5" : limited ? "#fff7ed" : "#fef2f2",
+    color: good ? "#059669" : limited ? "#c2410c" : "#dc2626",
+    border: good ? "1px solid #a7f3d0" : limited ? "1px solid #fed7aa" : "1px solid #fecaca",
+  };
+}
+
+const loginPageStyle: React.CSSProperties = {
+  minHeight: "100vh",
+  background: "linear-gradient(180deg, #f8fafc 0%, #eef4ff 100%)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 18,
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+};
+
+const loginCardStyle: React.CSSProperties = {
+  width: "100%",
+  maxWidth: 420,
+  background: "#ffffff",
+  border: "1px solid #e5e7eb",
+  borderRadius: 22,
+  padding: 22,
+  boxShadow: "0 18px 40px rgba(37,99,235,0.12)",
+};
+
+const logoStyle: React.CSSProperties = {
+  width: 64,
+  height: 64,
+  borderRadius: 18,
+  background: "#2563eb",
+  color: "#ffffff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: 18,
+  fontWeight: 900,
+  margin: "0 auto 14px",
+};
+
+const loginTitleStyle: React.CSSProperties = {
+  margin: 0,
+  textAlign: "center",
+  fontSize: 26,
+  fontWeight: 900,
+  color: "#111827",
+};
+
+const loginSubtitleStyle: React.CSSProperties = {
+  margin: "8px 0 18px",
+  textAlign: "center",
+  fontSize: 13,
+  color: "#6b7280",
+};
 
 const mainStyle: React.CSSProperties = {
   minHeight: "100vh",
   background: "#f8fafc",
   padding: "18px 12px 30px",
-  fontFamily:
-    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
 };
 
 const containerStyle: React.CSSProperties = {
@@ -290,6 +579,32 @@ const subtitleStyle: React.CSSProperties = {
   color: "#6b7280",
 };
 
+const statsGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+  gap: 10,
+};
+
+const statCardStyle: React.CSSProperties = {
+  background: "#ffffff",
+  border: "1px solid #e5e7eb",
+  borderRadius: 16,
+  padding: 14,
+};
+
+const statNumberStyle: React.CSSProperties = {
+  fontSize: 24,
+  fontWeight: 900,
+  color: "#2563eb",
+};
+
+const statLabelStyle: React.CSSProperties = {
+  fontSize: 12,
+  color: "#6b7280",
+  fontWeight: 800,
+  marginTop: 2,
+};
+
 const sectionTitleStyle: React.CSSProperties = {
   margin: 0,
   fontSize: 18,
@@ -320,11 +635,13 @@ const inputStyle: React.CSSProperties = {
   fontSize: 14,
   boxSizing: "border-box",
   outline: "none",
+  background: "#ffffff",
 };
 
 const buttonRowStyle: React.CSSProperties = {
   display: "flex",
   gap: 8,
+  flexWrap: "wrap",
   marginTop: 14,
 };
 
@@ -348,6 +665,15 @@ const secondaryButtonStyle: React.CSSProperties = {
   fontSize: 14,
   fontWeight: 800,
   cursor: "pointer",
+};
+
+const errorStyle: React.CSSProperties = {
+  marginTop: 10,
+  marginBottom: 10,
+  fontSize: 13,
+  fontWeight: 800,
+  color: "#b91c1c",
+  textAlign: "center",
 };
 
 const listStyle: React.CSSProperties = {
@@ -390,13 +716,10 @@ const productMetaStyle: React.CSSProperties = {
   marginTop: 3,
 };
 
-const badgeStyle: React.CSSProperties = {
-  padding: "4px 9px",
-  borderRadius: 999,
-  fontSize: 11,
-  fontWeight: 900,
-  whiteSpace: "nowrap",
-  background: "#ecfdf5",
-  color: "#059669",
-  border: "1px solid #a7f3d0",
+const emptyStyle: React.CSSProperties = {
+  padding: 16,
+  textAlign: "center",
+  color: "#6b7280",
+  background: "#f9fafb",
+  borderRadius: 12,
 };

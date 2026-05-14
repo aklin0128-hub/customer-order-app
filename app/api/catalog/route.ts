@@ -10,9 +10,12 @@ export async function GET() {
 
     for (const item of catalogData as any[]) {
       if (!item.sku) continue;
-      map.set(String(item.sku).toUpperCase(), {
+
+      const sku = String(item.sku).toUpperCase();
+
+      map.set(sku, {
         ...item,
-        sku: String(item.sku).toUpperCase(),
+        sku,
       });
     }
 
@@ -23,6 +26,7 @@ export async function GET() {
       if (!item?.sku) continue;
 
       const sku = String(item.sku).toUpperCase();
+
       map.set(sku, {
         ...(map.get(sku) || {}),
         ...item,

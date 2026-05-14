@@ -17,19 +17,28 @@ export async function POST(req: Request) {
 
   try {
     const formData = await req.formData();
+
     const sku = String(formData.get("sku") || "").trim().toUpperCase();
     const file = formData.get("file") as File | null;
 
-    if (!sku) return NextResponse.json({ error: "Missing SKU." }, { status: 400 });
-    if (!file) return NextResponse.json({ error: "Missing image file." }, { status: 400 });
+    if (!sku) {
+      return NextResponse.json({ error: "Missing SKU." }, { status: 400 });
+    }
+
+    if (!file) {
+      return NextResponse.json({ error: "Missing image file." }, { status: 400 });
+    }
+
     if (!file.type.startsWith("image/")) {
       return NextResponse.json({ error: "Only image files are allowed." }, { status: 400 });
     }
 
     const ext =
-      file.type === "image/png" ? "png" :
-      file.type === "image/webp" ? "webp" :
-      "jpg";
+      file.type === "image/png"
+        ? "png"
+        : file.type === "image/webp"
+        ? "webp"
+        : "jpg";
 
     const blob = await put(`product-images/${sku}.${ext}`, file, {
       access: "public",
