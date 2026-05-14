@@ -253,7 +253,7 @@ function ProductImage({ sku, alt, size = 56, imageUrl }: { sku?: string; alt: st
       alt={alt}
       style={{ width: size, height: size, objectFit: "contain", borderRadius: 10, background: "#fff", border: "1px solid #e5e7eb", flexShrink: 0, transition: "all 0.22s ease", cursor: "zoom-in", transformOrigin: "center center", position: "relative", zIndex: 1 }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "scale(4)";
+        e.currentTarget.style.transform = "scale(1.5)";
         e.currentTarget.style.background = "#fff";
         e.currentTarget.style.border = "2px solid #2563eb";
         e.currentTarget.style.boxShadow = "0 12px 28px rgba(0,0,0,0.25)";
@@ -896,7 +896,7 @@ export default function OrderPage() {
                 <div style={sectionTitleStyle}>{t.allOrderable}</div>
                 <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{t.selected}: {catalogItemsForSubmit.length}</div>
               </div>
-              <button type="button" onClick={() => setCatalogQtyMap({})} style={dangerSmallButtonStyle}>{t.clearAll}</button>
+              
             </div>
 
             <input value={catalogSearch} onChange={(e) => setCatalogSearch(e.target.value)} placeholder={t.catalogSearch} style={{ ...wideInputStyle, marginBottom: 12 }} />
@@ -906,7 +906,14 @@ export default function OrderPage() {
                 const sku = item.sku?.toUpperCase() || "";
                 const qty = catalogQtyMap[sku] || "";
                 return (
-                  <div key={item.sku} style={catalogCardStyle}>
+                  <div
+                    key={item.sku}
+                    style={{
+                      ...catalogCardStyle,
+                      background: qty ? "#ecfdf5" : "#ffffff",
+                      border: qty ? "2px solid #86efac" : "1px solid #e5e7eb",
+                    }}
+                  >
                     <div style={{ minHeight: 62 }}>
                       <div style={{ fontSize: 11, fontWeight: 900, color: "#111827", lineHeight: 1.2 }}>{item.sku}</div>
                       <div style={{ fontSize: 10, fontWeight: 800, color: "#374151", marginTop: 2, lineHeight: 1.2 }}>{item.brand || "-"}</div>
@@ -933,7 +940,7 @@ export default function OrderPage() {
           <section style={cardStyle}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
               <div style={sectionTitleStyle}>{t.orderCart} ({cart.length})</div>
-              {cart.length > 0 ? <button type="button" onClick={clearOrder} style={dangerSmallButtonStyle}>{t.clearAll}</button> : null}
+              
             </div>
 
             {cart.length === 0 ? <div style={emptyStyle}>{t.noItems}</div> : (
@@ -1035,7 +1042,7 @@ const cartItemStyle: React.CSSProperties = { border: "1px solid #e5e7eb", border
 const cartQtyInputStyle: React.CSSProperties = { width: 92, padding: "6px 8px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, fontWeight: 700, background: "#ffffff", outline: "none" };
 const productSmallButtonStyle: React.CSSProperties = { width: "100%", border: "1px solid #e5e7eb", background: "#ffffff", borderRadius: 12, padding: 10, textAlign: "left", cursor: "pointer", display: "flex", gap: 10, alignItems: "center", overflow: "visible", position: "relative" };
 const wideInputStyle: React.CSSProperties = { width: "100%", padding: "11px 12px", borderRadius: 12, border: "1px solid #d1d5db", fontSize: 14, boxSizing: "border-box", outline: "none", background: "#ffffff" };
-const catalogListStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 10, overflow: "visible" };
+const catalogListStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", columnGap: 12, rowGap: 12, overflow: "visible" };
 const catalogCardStyle: React.CSSProperties = { border: "1px solid #e5e7eb", borderRadius: 14, background: "#ffffff", padding: 8, display: "flex", flexDirection: "column", gap: 6, overflow: "visible", position: "relative", minWidth: 0 };
 const stepperStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "30px 1fr 30px", gap: 5, alignItems: "center" };
 const stepButtonStyle: React.CSSProperties = { width: 30, height: 32, borderRadius: 10, border: "1px solid #d1d5db", background: "#f9fafb", fontSize: 18, fontWeight: 900, cursor: "pointer", lineHeight: 1 };
