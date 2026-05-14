@@ -7,7 +7,10 @@ import catalogData from "@/data/catalog_sku_master_extracted.json";
 type Lang = "en" | "zh" | "ko";
 type OrderMode = "search" | "catalog";
 
-type CartItem = { sku: string; qty: string };
+type CartItem = {
+  sku: string;
+  qty: string;
+};
 
 type CatalogItem = {
   sku: string;
@@ -33,6 +36,7 @@ type OrderHistoryItem = {
 };
 
 let catalog = catalogData as CatalogItem[];
+
 const quickQtyButtons = ["1", "2", "3", "4", "5", "10", "15", "20"];
 
 const copy = {
@@ -223,9 +227,11 @@ function getStatusBadgeStyle(status?: string): React.CSSProperties {
   if (value === "NORMAL" || value === "NORMAL_NOBR" || value === "NORMAL_NBR" || value === "TBD") {
     return { background: "#ecfdf5", color: "#059669", border: "1px solid #a7f3d0" };
   }
+
   if (value === "LIMITED") {
     return { background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" };
   }
+
   return { background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" };
 }
 
@@ -247,12 +253,11 @@ function ProductImage({ sku, alt, size = 56, imageUrl }: { sku?: string; alt: st
       alt={alt}
       style={{ width: size, height: size, objectFit: "contain", borderRadius: 10, background: "#fff", border: "1px solid #e5e7eb", flexShrink: 0, transition: "all 0.22s ease", cursor: "zoom-in", transformOrigin: "center center", position: "relative", zIndex: 1 }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "scale(5)";
+        e.currentTarget.style.transform = "scale(4)";
         e.currentTarget.style.background = "#fff";
         e.currentTarget.style.border = "2px solid #2563eb";
         e.currentTarget.style.boxShadow = "0 12px 28px rgba(0,0,0,0.25)";
         e.currentTarget.style.zIndex = "9999";
-        e.currentTarget.style.position = "relative";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = "scale(1)";
@@ -425,6 +430,7 @@ export default function OrderPage() {
       const brand = item.brand?.toUpperCase() || "";
       const barcode = item.barcode?.toUpperCase() || "";
       const upc = item.upc?.toUpperCase() || "";
+
       if (sku === q) return 1000;
       if (sku.startsWith(q)) return 900;
       if (barcode === q || upc === q) return 850;
@@ -448,16 +454,23 @@ export default function OrderPage() {
         return (a.item.sku || "").localeCompare(b.item.sku || "");
       })
       .map((x) => x.item)
-      .slice(0, 40);
+      .slice(0, 60);
   }, [normalizedSkuInput, showAvailableOnly, catalogVersion]);
 
   const orderableCatalogItems = useMemo(() => {
     const q = catalogSearch.trim().toUpperCase();
+
     return catalog
       .filter((item) => isNormalItem(item))
       .filter((item) => {
         if (!q) return true;
-        return item.sku?.toUpperCase().includes(q) || item.name?.toUpperCase().includes(q) || item.brand?.toUpperCase().includes(q) || item.barcode?.toUpperCase().includes(q) || item.upc?.toUpperCase().includes(q);
+        return (
+          item.sku?.toUpperCase().includes(q) ||
+          item.name?.toUpperCase().includes(q) ||
+          item.brand?.toUpperCase().includes(q) ||
+          item.barcode?.toUpperCase().includes(q) ||
+          item.upc?.toUpperCase().includes(q)
+        );
       })
       .sort((a, b) => (a.sku || "").localeCompare(b.sku || ""));
   }, [catalogSearch, catalogVersion]);
@@ -477,26 +490,44 @@ export default function OrderPage() {
       setSelectedItem(null);
       return;
     }
+
     const exactMatch = catalog.find((item) => item.sku?.toUpperCase() === normalizedSkuInput) || null;
     if (exactMatch && (!showAvailableOnly || isNormalItem(exactMatch))) {
       setSelectedItem(exactMatch);
       return;
     }
+
     setSelectedItem(matchedItems.length > 0 ? matchedItems[0] : null);
   }, [normalizedSkuInput, matchedItems, showAvailableOnly]);
+
+  const syncCatalogQty = (sku: string, qty: string) => {
+    const cleanSku = sku.trim().toUpperCase();
+    const qtyNumber = Number(String(qty || "").replace(/[^0-9]/g, ""));
+    if (!cleanSku || !qtyNumber || qtyNumber <= 0) return;
+
+    setCatalogQtyMap((prev) => {
+      const current = Number(prev[cleanSku] || 0);
+      return { ...prev, [cleanSku]: String(current + qtyNumber) };
+    });
+  };
 
   const addSkuToCart = (sku: string, qty = "1") => {
     const finalSku = sku.trim().toUpperCase();
     if (!finalSku) return;
+
     const item = getCatalogItemBySku(finalSku);
     if (item && !isNormalItem(item)) {
       alert(t.unavailable);
       return;
     }
+
     const finalQty = String(qty || "").trim() || "1";
     const duplicated = cart.some((x) => x.sku.toUpperCase() === finalSku);
     if (duplicated && !confirm(`${finalSku} ${t.duplicate}`)) return;
+
     setCart((prev) => [...prev, { sku: finalSku, qty: finalQty }]);
+    syncCatalogQty(finalSku, finalQty);
+
     setSkuInput("");
     setQtyInput("");
     setSelectedItem(null);
@@ -509,16 +540,19 @@ export default function OrderPage() {
     const finalItem = exactMatch || selectedItem;
     const finalSku = finalItem?.sku || typedSku;
     const qty = qtyInput.trim().toUpperCase() || "1";
+
     if (!finalSku) {
       alert(t.enterSku);
       return;
     }
+
     addSkuToCart(finalSku, qty);
   };
 
   const updateCatalogQty = (sku: string, value: string) => {
     const cleanSku = sku.toUpperCase();
     const clean = value.replace(/[^0-9]/g, "");
+
     setCatalogQtyMap((prev) => {
       const next = { ...prev };
       if (!clean || Number(clean) <= 0) delete next[cleanSku];
@@ -538,11 +572,21 @@ export default function OrderPage() {
       const catalogItem = getCatalogItemBySku(item.sku);
       return !catalogItem || isNormalItem(catalogItem);
     });
+
     if (valid.length === 0) {
       alert(t.unavailable);
       return;
     }
+
     setCart((prev) => [...prev, ...valid]);
+    setCatalogQtyMap((prev) => {
+      const next = { ...prev };
+      for (const item of valid) {
+        const qtyNumber = Number(String(item.qty || "").replace(/[^0-9]/g, ""));
+        if (qtyNumber > 0) next[item.sku.toUpperCase()] = String(Number(next[item.sku.toUpperCase()] || 0) + qtyNumber);
+      }
+      return next;
+    });
     setSubmitMsg(`${valid.length} ${t.items} added.`);
     setTimeout(() => skuInputRef.current?.focus(), 50);
   };
@@ -552,6 +596,7 @@ export default function OrderPage() {
 
   const clearOrder = async () => {
     if (!confirm(t.clearConfirm)) return;
+
     setCart([]);
     setCatalogQtyMap({});
     setSkuInput("");
@@ -559,13 +604,22 @@ export default function OrderPage() {
     setSelectedItem(null);
     setSubmitMsg(t.cleared);
     localStorage.removeItem(`draft_${accountNo}`);
+
     try {
-      await fetch("/api/delete-draft", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountNo }) });
+      await fetch("/api/delete-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountNo }),
+      });
     } catch {}
+
     setTimeout(() => skuInputRef.current?.focus(), 50);
   };
 
-  const getCurrentSubmitItems = () => (mode === "catalog" ? catalogItemsForSubmit : cart.filter((item) => item.sku && item.qty));
+  const getCurrentSubmitItems = () => {
+    if (mode === "catalog") return catalogItemsForSubmit;
+    return cart.filter((item) => item.sku && item.qty);
+  };
 
   const downloadCsv = () => {
     const items = getCurrentSubmitItems();
@@ -573,13 +627,16 @@ export default function OrderPage() {
       alert(t.noItems);
       return;
     }
+
     const rows = ["SKU,Qty", ...items.map((item) => `${item.sku},${item.qty}`)];
     const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
+
     const now = new Date();
     const mm = String(now.getMonth() + 1).padStart(2, "0");
     const dd = String(now.getDate()).padStart(2, "0");
     const filename = `${accountNo || "orders"}_orders_${mm}${dd}.csv`;
+
     const link = document.createElement("a");
     link.href = url;
     link.setAttribute("download", filename);
@@ -592,6 +649,7 @@ export default function OrderPage() {
   const handleUploadCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     try {
       const text = await file.text();
       const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
@@ -599,26 +657,34 @@ export default function OrderPage() {
         alert(t.csvEmpty);
         return;
       }
+
       let startIndex = 0;
       const firstLine = lines[0].replace(/\s/g, "").toUpperCase();
       if (firstLine === "SKU,QTY" || firstLine === "SKU,QUANTITY") startIndex = 1;
+
       const parsed: CartItem[] = [];
       const parsedMap: Record<string, string> = {};
+
       for (let i = startIndex; i < lines.length; i++) {
         const parts = lines[i].split(",");
         if (parts.length < 2) continue;
+
         const sku = (parts[0] || "").trim().toUpperCase();
         const qty = parts.slice(1).join(",").trim().toUpperCase();
         if (!sku || !qty) continue;
+
         const catalogItem = getCatalogItemBySku(sku);
         if (catalogItem && !isNormalItem(catalogItem)) continue;
+
         parsed.push({ sku, qty });
         if (Number(qty) > 0) parsedMap[sku] = String(Number(qty));
       }
+
       if (parsed.length === 0) {
         alert(t.noValidRows);
         return;
       }
+
       if (mode === "catalog") setCatalogQtyMap(parsedMap);
       else setCart(parsed);
       setSubmitMsg(`${parsed.length} ${t.items} loaded.`);
@@ -638,29 +704,42 @@ export default function OrderPage() {
 
   const submitOrder = async () => {
     if (submitLockRef.current || submitting) return;
+
     const items = getCurrentSubmitItems();
+
     if (items.length === 0) {
       alert(t.addAtLeast);
       return;
     }
+
     const unavailableItems = items.filter((item) => {
       const catalogItem = getCatalogItemBySku(item.sku);
       return catalogItem && !isNormalItem(catalogItem);
     });
+
     if (unavailableItems.length > 0) {
       alert(`${t.unavailable}\n\n${unavailableItems.map((item) => item.sku).join(", ")}`);
       return;
     }
+
     const ref = generateOrderRef(accountNo);
     const confirmed = confirm(`${t.submitConfirm}\n\n${t.accountNo}: ${accountNo}\n${t.storeName}: ${storeName}\n${t.items}: ${items.length}\n${t.ref}: ${ref}`);
     if (!confirmed) return;
+
     submitLockRef.current = true;
     setSubmitting(true);
     setSubmitMsg("");
+
     try {
-      const res = await fetch("/api/send-order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountNo, storeName, phone: phone.trim(), note: note.trim(), orderRef: ref, items }) });
+      const res = await fetch("/api/send-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountNo, storeName, phone: phone.trim(), note: note.trim(), orderRef: ref, items }),
+      });
+
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || t.failedSubmit);
+
       setSubmitMsg(`${t.orderSuccess} ${t.ref}: ${ref}`);
       setCart([]);
       setCatalogQtyMap({});
@@ -669,8 +748,15 @@ export default function OrderPage() {
       setSelectedItem(null);
       setNote("");
       localStorage.removeItem(`draft_${accountNo}`);
-      await fetch("/api/delete-draft", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountNo }) });
+
+      await fetch("/api/delete-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountNo }),
+      });
+
       await loadRecentAndHistory(accountNo);
+
       setTimeout(() => {
         submitLockRef.current = false;
       }, 5000);
@@ -683,9 +769,9 @@ export default function OrderPage() {
   };
 
   const renderProductMeta = (item: CatalogItem) => (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 5, overflow: "visible" }}>
-      {item.size ? <span style={{ fontSize: 11, color: "#6b7280" }}>{t.size}: {item.size}</span> : null}
-      {item.palletSize ? <span style={{ fontSize: 11, color: "#6b7280" }}>{t.pallet}: {item.palletSize}</span> : null}
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 5, overflow: "visible" }}>
+      {item.size ? <span style={{ fontSize: 10, color: "#6b7280" }}>{t.size}: {item.size}</span> : null}
+      {item.palletSize ? <span style={{ fontSize: 10, color: "#6b7280" }}>{t.pallet}: {item.palletSize}</span> : null}
       {item.limitedQty ? <span style={limitedBadgeStyle}>{t.limited}: {item.limitedQty}</span> : null}
       {getDisplayStatus(item.status) ? <span style={{ padding: "2px 7px", borderRadius: 999, fontSize: 10, fontWeight: 700, ...getStatusBadgeStyle(item.status) }}>{getDisplayStatus(item.status)}</span> : null}
     </div>
@@ -704,6 +790,7 @@ export default function OrderPage() {
               </button>
             ))}
           </div>
+
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <div>
               <div style={{ fontSize: 21, fontWeight: 800, color: "#111827", lineHeight: 1.15 }}>{t.title}</div>
@@ -714,17 +801,11 @@ export default function OrderPage() {
         </section>
 
         <section style={cardStyle}>
-          <div style={modeTabsStyle}>
-            <button type="button" onClick={() => changeMode("search")} style={modeButtonStyle(mode === "search")}>{t.searchMode}</button>
-            <button type="button" onClick={() => changeMode("catalog")} style={modeButtonStyle(mode === "catalog")}>{t.catalogMode}</button>
-          </div>
-        </section>
-
-        <section style={cardStyle}>
           <button type="button" onClick={() => setShowCustomerInfo((prev) => !prev)} style={sectionToggleStyle}>
             <div style={sectionTitleStyle}>{t.customerInfo}</div>
             <div style={toggleTextStyle}>{showCustomerInfo ? t.hide : t.show}</div>
           </button>
+
           {showCustomerInfo ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
               <Input label={t.phone} value={phone} onChange={setPhone} placeholder="" />
@@ -739,6 +820,7 @@ export default function OrderPage() {
               <div style={sectionTitleStyle}>{t.recent}</div>
               <div style={toggleTextStyle}>{showRecent ? t.hide : t.show}</div>
             </button>
+
             {showRecent ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10, overflow: "visible" }}>
                 {recentItems.slice(0, 12).map((item) => {
@@ -759,14 +841,24 @@ export default function OrderPage() {
           </section>
         ) : null}
 
+        <section style={cardStyle}>
+          <div style={modeTabsStyle}>
+            <button type="button" onClick={() => changeMode("search")} style={modeButtonStyle(mode === "search")}>{t.searchMode}</button>
+            <button type="button" onClick={() => changeMode("catalog")} style={modeButtonStyle(mode === "catalog")}>{t.catalogMode}</button>
+          </div>
+        </section>
+
         {mode === "search" ? (
           <section style={cardStyle}>
             <div style={{ ...sectionTitleStyle, textAlign: "center", marginBottom: 10 }}>{t.addItems}</div>
+
             <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 12, fontWeight: 800, color: "#374151", marginBottom: 10 }}>
               <input type="checkbox" checked={showAvailableOnly} onChange={(e) => setShowAvailableOnly(e.target.checked)} />
               {t.availableOnly}
             </label>
+
             <Input label={t.skuItem} value={skuInput} onChange={(v) => setSkuInput(v.toUpperCase())} placeholder="00002D" inputRef={skuInputRef} onEnter={addItem} />
+
             {matchedItems.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10, overflow: "visible" }}>
                 {matchedItems.map((item, index) => {
@@ -786,10 +878,13 @@ export default function OrderPage() {
                 })}
               </div>
             ) : null}
+
             <div style={{ marginTop: 10 }}><Input label={t.qty} value={qtyInput} onChange={setQtyInput} placeholder="2" onEnter={addItem} /></div>
+
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8, marginTop: 10 }}>
               {quickQtyButtons.map((qty) => <button key={qty} type="button" onClick={() => setQtyInput(qty)} style={qtyButtonStyle}>{qty}</button>)}
             </div>
+
             <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}>
               <button type="button" onClick={addItem} style={primarySmallButtonStyle}>{t.addItem}</button>
             </div>
@@ -803,20 +898,25 @@ export default function OrderPage() {
               </div>
               <button type="button" onClick={() => setCatalogQtyMap({})} style={dangerSmallButtonStyle}>{t.clearAll}</button>
             </div>
+
             <input value={catalogSearch} onChange={(e) => setCatalogSearch(e.target.value)} placeholder={t.catalogSearch} style={{ ...wideInputStyle, marginBottom: 12 }} />
+
             <div style={catalogListStyle}>
               {orderableCatalogItems.map((item) => {
-                const qty = catalogQtyMap[item.sku?.toUpperCase() || ""] || "";
+                const sku = item.sku?.toUpperCase() || "";
+                const qty = catalogQtyMap[sku] || "";
                 return (
                   <div key={item.sku} style={catalogCardStyle}>
-                    <div style={{ minHeight: 58 }}>
-                      <div style={{ fontSize: 13, fontWeight: 900, color: "#111827", lineHeight: 1.25 }}>{item.sku}{item.brand ? ` | ${item.brand}` : ""}</div>
-                      <div style={{ fontSize: 12, color: "#374151", marginTop: 3, lineHeight: 1.3 }}>{item.name || "-"}</div>
-                      {renderProductMeta(item)}
+                    <div style={{ minHeight: 62 }}>
+                      <div style={{ fontSize: 11, fontWeight: 900, color: "#111827", lineHeight: 1.2 }}>{item.sku}</div>
+                      <div style={{ fontSize: 10, fontWeight: 800, color: "#374151", marginTop: 2, lineHeight: 1.2 }}>{item.brand || "-"}</div>
+                      <div style={{ fontSize: 10, color: "#4b5563", marginTop: 2, lineHeight: 1.2, height: 24, overflow: "hidden" }}>{item.name || "-"}</div>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "center", overflow: "visible", padding: "8px 0" }}>
-                      <ProductImage sku={item.sku} alt={item.name || item.sku} size={86} imageUrl={item.imageUrl} />
+
+                    <div style={{ display: "flex", justifyContent: "center", overflow: "visible", padding: "4px 0" }}>
+                      <ProductImage sku={item.sku} alt={item.name || item.sku} size={66} imageUrl={item.imageUrl} />
                     </div>
+
                     <div style={stepperStyle}>
                       <button type="button" onClick={() => adjustCatalogQty(item.sku, -1)} style={stepButtonStyle}>−</button>
                       <input value={qty} onChange={(e) => updateCatalogQty(item.sku, e.target.value)} placeholder="0" inputMode="numeric" style={stepInputStyle} />
@@ -835,6 +935,7 @@ export default function OrderPage() {
               <div style={sectionTitleStyle}>{t.orderCart} ({cart.length})</div>
               {cart.length > 0 ? <button type="button" onClick={clearOrder} style={dangerSmallButtonStyle}>{t.clearAll}</button> : null}
             </div>
+
             {cart.length === 0 ? <div style={emptyStyle}>{t.noItems}</div> : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8, overflow: "visible" }}>
                 {cart.map((item, index) => {
@@ -882,6 +983,7 @@ export default function OrderPage() {
               <div style={sectionTitleStyle}>{t.history}</div>
               <div style={toggleTextStyle}>{showHistory ? t.hide : t.show}</div>
             </button>
+
             {showHistory ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10, overflow: "visible" }}>
                 {orderHistory.slice(0, 8).map((order) => (
@@ -913,7 +1015,7 @@ function Input({ label, value, onChange, placeholder, inputRef, onEnter }: { lab
 }
 
 const mainStyle: React.CSSProperties = { minHeight: "100vh", background: "#f8fafc", padding: "14px 10px 24px", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', overflow: "visible" };
-const containerStyle: React.CSSProperties = { width: "100%", maxWidth: 430, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12, overflow: "visible" };
+const containerStyle: React.CSSProperties = { width: "100%", maxWidth: 980, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12, overflow: "visible" };
 const cardStyle: React.CSSProperties = { background: "#ffffff", borderRadius: 14, padding: 14, border: "1px solid #e5e7eb", boxShadow: "0 1px 2px rgba(0,0,0,0.04)", overflow: "visible" };
 const sectionTitleStyle: React.CSSProperties = { fontSize: 17, fontWeight: 800, color: "#111827" };
 const sectionToggleStyle: React.CSSProperties = { width: "100%", border: "none", background: "transparent", padding: 0, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" };
@@ -933,9 +1035,9 @@ const cartItemStyle: React.CSSProperties = { border: "1px solid #e5e7eb", border
 const cartQtyInputStyle: React.CSSProperties = { width: 92, padding: "6px 8px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, fontWeight: 700, background: "#ffffff", outline: "none" };
 const productSmallButtonStyle: React.CSSProperties = { width: "100%", border: "1px solid #e5e7eb", background: "#ffffff", borderRadius: 12, padding: 10, textAlign: "left", cursor: "pointer", display: "flex", gap: 10, alignItems: "center", overflow: "visible", position: "relative" };
 const wideInputStyle: React.CSSProperties = { width: "100%", padding: "11px 12px", borderRadius: 12, border: "1px solid #d1d5db", fontSize: 14, boxSizing: "border-box", outline: "none", background: "#ffffff" };
-const catalogListStyle: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 10, overflow: "visible" };
-const catalogCardStyle: React.CSSProperties = { border: "1px solid #e5e7eb", borderRadius: 14, background: "#ffffff", padding: 12, display: "flex", flexDirection: "column", gap: 8, overflow: "visible", position: "relative" };
-const stepperStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "42px 1fr 42px", gap: 8, alignItems: "center" };
-const stepButtonStyle: React.CSSProperties = { width: 42, height: 38, borderRadius: 12, border: "1px solid #d1d5db", background: "#f9fafb", fontSize: 22, fontWeight: 900, cursor: "pointer", lineHeight: 1 };
-const stepInputStyle: React.CSSProperties = { width: "100%", height: 38, borderRadius: 12, border: "1px solid #d1d5db", textAlign: "center", fontSize: 16, fontWeight: 900, outline: "none", boxSizing: "border-box" };
+const catalogListStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 10, overflow: "visible" };
+const catalogCardStyle: React.CSSProperties = { border: "1px solid #e5e7eb", borderRadius: 14, background: "#ffffff", padding: 8, display: "flex", flexDirection: "column", gap: 6, overflow: "visible", position: "relative", minWidth: 0 };
+const stepperStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "30px 1fr 30px", gap: 5, alignItems: "center" };
+const stepButtonStyle: React.CSSProperties = { width: 30, height: 32, borderRadius: 10, border: "1px solid #d1d5db", background: "#f9fafb", fontSize: 18, fontWeight: 900, cursor: "pointer", lineHeight: 1 };
+const stepInputStyle: React.CSSProperties = { width: "100%", height: 32, borderRadius: 10, border: "1px solid #d1d5db", textAlign: "center", fontSize: 14, fontWeight: 900, outline: "none", boxSizing: "border-box" };
 const limitedBadgeStyle: React.CSSProperties = { padding: "2px 7px", borderRadius: 999, fontSize: 10, fontWeight: 800, background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" };
