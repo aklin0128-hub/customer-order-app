@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const products = await getPromotionProducts();
+    const products = await getPromotionProducts({ activeOnly: true });
 
     return NextResponse.json({
       success: true,

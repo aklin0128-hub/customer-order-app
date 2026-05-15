@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Lang = "en" | "zh" | "ko";
@@ -8,54 +8,98 @@ type Lang = "en" | "zh" | "ko";
 const copy = {
   en: {
     title: "Customer Order",
-    subtitle:
-      "Sign in with your account number and password to start or continue your saved order.",
-    accountNumber: "Account Number",
+    subtitle: "Sign in to browse products, use promotions, and submit your order.",
+    accountNumber: "Account number",
     password: "Password",
     accountPlaceholder: "e.g. FL111",
-    passwordPlaceholder: "Enter password",
-    signIn: "Sign In",
-    signingIn: "Signing In...",
+    passwordPlaceholder: "Enter your password",
+    signIn: "Sign in",
+    signingIn: "Signing in…",
     invalid: "Invalid account number or password.",
-    footer: "Online order portal · Save draft supported",
+    emptyAccount: "Please enter your account number.",
+    emptyPassword: "Please enter your password.",
+    showPassword: "Show",
+    hidePassword: "Hide",
+    welcomeBack: "Welcome back",
+    lastAccountHint: "Last signed-in account loaded.",
+    footer: "Online order portal · Draft auto-save · EN / 中文 / 한국어",
+    featSearch: "Quick search",
+    featCatalog: "Full catalog",
+    featPromo: "Promotions",
+    featDraft: "Save draft",
   },
   zh: {
     title: "客户订单",
-    subtitle: "请输入客户账号和密码，开始下单或继续之前保存的订单。",
+    subtitle: "登录后可浏览商品、查看促销并提交订单。",
     accountNumber: "客户账号",
     password: "密码",
     accountPlaceholder: "例如 FL111",
     passwordPlaceholder: "请输入密码",
     signIn: "登录",
-    signingIn: "登录中...",
+    signingIn: "登录中…",
     invalid: "客户账号或密码错误。",
-    footer: "在线下单系统 · 支持保存草稿",
+    emptyAccount: "请输入客户账号。",
+    emptyPassword: "请输入密码。",
+    showPassword: "显示",
+    hidePassword: "隐藏",
+    welcomeBack: "欢迎回来",
+    lastAccountHint: "已填入上次登录的账号。",
+    footer: "在线下单系统 · 自动保存草稿 · 支持多语言",
+    featSearch: "快速搜索",
+    featCatalog: "商品目录",
+    featPromo: "促销推荐",
+    featDraft: "保存草稿",
   },
   ko: {
     title: "고객 주문",
-    subtitle:
-      "거래처 번호와 비밀번호로 로그인하여 주문을 시작하거나 저장된 주문을 이어서 진행하세요.",
+    subtitle: "로그인 후 상품 검색, 프로모션 확인 및 주문 제출이 가능합니다.",
     accountNumber: "거래처 번호",
     password: "비밀번호",
     accountPlaceholder: "예: FL111",
     passwordPlaceholder: "비밀번호 입력",
     signIn: "로그인",
-    signingIn: "로그인 중...",
+    signingIn: "로그인 중…",
     invalid: "거래처 번호 또는 비밀번호가 올바르지 않습니다.",
-    footer: "온라인 주문 포털 · 임시 저장 지원",
+    emptyAccount: "거래처 번호를 입력하세요.",
+    emptyPassword: "비밀번호를 입력하세요.",
+    showPassword: "표시",
+    hidePassword: "숨기기",
+    welcomeBack: "다시 오신 것을 환영합니다",
+    lastAccountHint: "마지막 로그인 계정이 입력되었습니다.",
+    footer: "온라인 주문 포털 · 임시 저장 · 다국어 지원",
+    featSearch: "빠른 검색",
+    featCatalog: "전체 카탈로그",
+    featPromo: "프로모션",
+    featDraft: "임시 저장",
   },
+};
+
+const langLabels: Record<Lang, string> = {
+  en: "EN",
+  zh: "中文",
+  ko: "한국어",
 };
 
 export default function LoginPage() {
   const router = useRouter();
+  const accountRef = useRef<HTMLInputElement>(null);
 
   const [lang, setLang] = useState<Lang>("en");
   const [accountNo, setAccountNo] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [hadSavedAccount, setHadSavedAccount] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
+    if (sessionStorage.getItem("customer_logged_in") === "true") {
+      router.replace("/order");
+      return;
+    }
+    setCheckingSession(false);
+
     const savedLang = localStorage.getItem("lang") as Lang | null;
     if (savedLang === "en" || savedLang === "zh" || savedLang === "ko") {
       setLang(savedLang);
@@ -64,8 +108,15 @@ export default function LoginPage() {
     const savedAccount = localStorage.getItem("last_account_no");
     if (savedAccount) {
       setAccountNo(savedAccount.toUpperCase());
+      setHadSavedAccount(true);
     }
-  }, []);
+  }, [router]);
+
+  useEffect(() => {
+    if (!checkingSession) {
+      accountRef.current?.focus();
+    }
+  }, [checkingSession]);
 
   const t = copy[lang];
 
@@ -73,6 +124,8 @@ export default function LoginPage() {
     () => accountNo.trim().toUpperCase(),
     [accountNo]
   );
+
+  const canSubmit = normalizedAccount.length > 0 && password.trim().length > 0 && !loading;
 
   const changeLang = (next: Lang) => {
     setLang(next);
@@ -84,8 +137,14 @@ export default function LoginPage() {
 
     setError("");
 
-    if (!normalizedAccount || !password.trim()) {
-      setError(t.invalid);
+    if (!normalizedAccount) {
+      setError(t.emptyAccount);
+      accountRef.current?.focus();
+      return;
+    }
+
+    if (!password.trim()) {
+      setError(t.emptyPassword);
       return;
     }
 
@@ -94,9 +153,7 @@ export default function LoginPage() {
 
       const res = await fetch("/api/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
         body: JSON.stringify({
           accountNo: normalizedAccount,
@@ -125,270 +182,384 @@ export default function LoginPage() {
     }
   };
 
+  if (checkingSession) {
+    return (
+      <main style={pageStyle}>
+        <div style={{ ...cardStyle, padding: 32, textAlign: "center", color: "#6b7280", fontSize: 14, fontWeight: 700 }}>
+          …
+        </div>
+      </main>
+    );
+  }
+
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background:
-          "linear-gradient(180deg, #f8fafc 0%, #eef4ff 55%, #f8fafc 100%)",
-        padding: "20px 12px 28px",
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 430,
-          display: "flex",
-          flexDirection: "column",
-          gap: 14,
-        }}
-      >
-        <section
-          style={{
-            background: "#ffffff",
-            borderRadius: 20,
-            padding: "22px 18px",
-            border: "1px solid #e5e7eb",
-            boxShadow: "0 18px 40px rgba(37,99,235,0.10)",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: 6,
-              marginBottom: 16,
-            }}
-          >
+    <main style={pageStyle}>
+      <div style={shellStyle}>
+        <header style={topBarStyle}>
+          <div style={brandRowStyle}>
+            <div style={logoMarkStyle}>CO</div>
+            <span style={brandTextStyle}>Order Portal</span>
+          </div>
+          <div style={langRowStyle} role="group" aria-label="Language">
             {(["en", "zh", "ko"] as Lang[]).map((item) => (
               <button
                 key={item}
                 type="button"
                 onClick={() => changeLang(item)}
-                style={{
-                  border:
-                    lang === item ? "1px solid #2563eb" : "1px solid #d1d5db",
-                  background: lang === item ? "#eff6ff" : "#ffffff",
-                  color: lang === item ? "#2563eb" : "#374151",
-                  borderRadius: 999,
-                  padding: "6px 10px",
-                  fontSize: 12,
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
+                aria-pressed={lang === item}
+                style={langBtnStyle(lang === item)}
               >
-                {item === "en" ? "EN" : item === "zh" ? "中文" : "한국어"}
+                {langLabels[item]}
               </button>
             ))}
           </div>
+        </header>
 
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              textAlign: "center",
-              marginBottom: 18,
-            }}
-          >
-            <div
-              style={{
-                width: 62,
-                height: 62,
-                borderRadius: 18,
-                background: "#2563eb",
-                color: "#ffffff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 900,
-                fontSize: 21,
-                boxShadow: "0 10px 24px rgba(37,99,235,0.25)",
-                marginBottom: 12,
-              }}
-            >
-              CO
-            </div>
-
-            <h1
-              style={{
-                margin: 0,
-                fontSize: 27,
-                fontWeight: 900,
-                color: "#111827",
-                lineHeight: 1.15,
-                letterSpacing: "-0.02em",
-              }}
-            >
-              {t.title}
-            </h1>
-
-            <p
-              style={{
-                marginTop: 8,
-                marginBottom: 0,
-                fontSize: 13,
-                lineHeight: 1.45,
-                color: "#6b7280",
-                maxWidth: 320,
-              }}
-            >
-              {t.subtitle}
-            </p>
+        <section style={cardStyle}>
+          <div style={heroStyle}>
+            <h1 style={titleStyle}>{t.title}</h1>
+            <p style={subtitleStyle}>{t.subtitle}</p>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: 12,
-                  fontWeight: 800,
-                  color: "#374151",
-                  marginBottom: 6,
-                  textAlign: "center",
-                }}
-              >
-                {t.accountNumber}
-              </label>
+          <div style={featuresStyle}>
+            {[
+              { label: t.featSearch, icon: "⌕" },
+              { label: t.featCatalog, icon: "▦" },
+              { label: t.featPromo, icon: "★" },
+              { label: t.featDraft, icon: "✓" },
+            ].map((f) => (
+              <div key={f.label} style={featureChipStyle}>
+                <span style={featureIconStyle} aria-hidden>
+                  {f.icon}
+                </span>
+                <span>{f.label}</span>
+              </div>
+            ))}
+          </div>
 
-              <div style={{ display: "flex", justifyContent: "center" }}>
-                <input
-                  value={accountNo}
-                  onChange={(e) => {
-                    setAccountNo(e.target.value.toUpperCase());
-                    setError("");
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleLogin();
-                  }}
-                  placeholder={t.accountPlaceholder}
-                  autoCapitalize="characters"
-                  autoComplete="username"
-                  style={{
-                    width: "78%",
-                    minWidth: 230,
-                    maxWidth: 330,
-                    padding: "12px 13px",
-                    borderRadius: 13,
-                    border: error ? "1px solid #fca5a5" : "1px solid #d1d5db",
-                    fontSize: 15,
-                    outline: "none",
-                    boxSizing: "border-box",
-                    textAlign: "center",
-                    background: "#ffffff",
-                    fontWeight: 700,
-                  }}
-                />
+          {hadSavedAccount && normalizedAccount ? (
+            <div style={welcomeBannerStyle}>
+              <strong>{t.welcomeBack}</strong>
+              <span style={{ opacity: 0.85 }}> · {normalizedAccount}</span>
+              <div style={{ display: "block", fontSize: 11, fontWeight: 600, marginTop: 2, opacity: 0.75 }}>
+                {t.lastAccountHint}
               </div>
             </div>
+          ) : null}
 
-            <div>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: 12,
-                  fontWeight: 800,
-                  color: "#374151",
-                  marginBottom: 6,
-                  textAlign: "center",
+          <form
+            style={formStyle}
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleLogin();
+            }}
+          >
+            <div style={fieldStyle}>
+              <label htmlFor="account-no" style={labelStyle}>
+                {t.accountNumber}
+              </label>
+              <input
+                id="account-no"
+                ref={accountRef}
+                value={accountNo}
+                onChange={(e) => {
+                  setAccountNo(e.target.value.toUpperCase());
+                  setError("");
                 }}
-              >
+                placeholder={t.accountPlaceholder}
+                autoCapitalize="characters"
+                autoComplete="username"
+                enterKeyHint="next"
+                style={inputStyle(Boolean(error && !normalizedAccount))}
+              />
+            </div>
+
+            <div style={fieldStyle}>
+              <label htmlFor="password" style={labelStyle}>
                 {t.password}
               </label>
-
-              <div style={{ display: "flex", justifyContent: "center" }}>
+              <div style={passwordWrapStyle}>
                 <input
-                  type="password"
+                  id="password"
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
                     setError("");
                   }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleLogin();
-                  }}
                   placeholder={t.passwordPlaceholder}
                   autoComplete="current-password"
-                  style={{
-                    width: "78%",
-                    minWidth: 230,
-                    maxWidth: 330,
-                    padding: "12px 13px",
-                    borderRadius: 13,
-                    border: error ? "1px solid #fca5a5" : "1px solid #d1d5db",
-                    fontSize: 15,
-                    outline: "none",
-                    boxSizing: "border-box",
-                    textAlign: "center",
-                    background: "#ffffff",
-                    fontWeight: 700,
-                  }}
+                  enterKeyHint="go"
+                  style={{ ...inputStyle(Boolean(error && normalizedAccount)), paddingRight: 72 }}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  style={togglePasswordStyle}
+                  aria-label={showPassword ? t.hidePassword : t.showPassword}
+                >
+                  {showPassword ? t.hidePassword : t.showPassword}
+                </button>
               </div>
             </div>
 
             {error ? (
-              <div
-                style={{
-                  textAlign: "center",
-                  fontSize: 13,
-                  fontWeight: 800,
-                  color: "#b91c1c",
-                }}
-              >
+              <div style={errorBoxStyle} role="alert">
                 {error}
               </div>
             ) : null}
 
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                marginTop: 2,
-              }}
-            >
-              <button
-                type="button"
-                onClick={handleLogin}
-                disabled={loading}
-                style={{
-                  width: "46%",
-                  minWidth: 140,
-                  maxWidth: 190,
-                  padding: "11px 0",
-                  borderRadius: 13,
-                  border: "none",
-                  background: loading ? "#93c5fd" : "#2563eb",
-                  color: "#ffffff",
-                  fontSize: 15,
-                  fontWeight: 900,
-                  cursor: loading ? "not-allowed" : "pointer",
-                  boxShadow: "0 8px 18px rgba(37,99,235,0.25)",
-                }}
-              >
-                {loading ? t.signingIn : t.signIn}
-              </button>
-            </div>
-          </div>
+            <button type="submit" disabled={!canSubmit} style={submitBtnStyle(!canSubmit)}>
+              {loading ? t.signingIn : t.signIn}
+            </button>
+          </form>
         </section>
 
-        <div
-          style={{
-            textAlign: "center",
-            fontSize: 11,
-            color: "#9ca3af",
-            lineHeight: 1.45,
-          }}
-        >
-          {t.footer}
-        </div>
+        <p style={footerStyle}>{t.footer}</p>
       </div>
     </main>
   );
 }
+
+const pageStyle: React.CSSProperties = {
+  minHeight: "100vh",
+  background:
+    "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(37,99,235,0.12), transparent), linear-gradient(180deg, #f8fafc 0%, #eef2ff 48%, #f8fafc 100%)",
+  padding: "max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom))",
+  fontFamily:
+    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  boxSizing: "border-box",
+};
+
+const shellStyle: React.CSSProperties = {
+  width: "100%",
+  maxWidth: 440,
+  display: "flex",
+  flexDirection: "column",
+  gap: 14,
+};
+
+const topBarStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 12,
+  padding: "0 2px",
+};
+
+const brandRowStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+};
+
+const logoMarkStyle: React.CSSProperties = {
+  width: 40,
+  height: 40,
+  borderRadius: 12,
+  background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+  color: "#fff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontWeight: 900,
+  fontSize: 14,
+  boxShadow: "0 6px 16px rgba(37,99,235,0.28)",
+  flexShrink: 0,
+};
+
+const brandTextStyle: React.CSSProperties = {
+  fontSize: 13,
+  fontWeight: 800,
+  color: "#374151",
+  letterSpacing: "-0.01em",
+};
+
+const langRowStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 4,
+  padding: 3,
+  background: "#ffffff",
+  borderRadius: 999,
+  border: "1px solid #e5e7eb",
+  boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+};
+
+function langBtnStyle(active: boolean): React.CSSProperties {
+  return {
+    border: "none",
+    background: active ? "#2563eb" : "transparent",
+    color: active ? "#ffffff" : "#6b7280",
+    borderRadius: 999,
+    padding: "6px 10px",
+    fontSize: 11,
+    fontWeight: 800,
+    cursor: "pointer",
+    transition: "background 0.15s, color 0.15s",
+  };
+}
+
+const cardStyle: React.CSSProperties = {
+  background: "#ffffff",
+  borderRadius: 22,
+  padding: "22px 20px 20px",
+  border: "1px solid #e5e7eb",
+  boxShadow: "0 20px 48px rgba(15,23,42,0.08), 0 4px 12px rgba(37,99,235,0.06)",
+};
+
+const heroStyle: React.CSSProperties = {
+  marginBottom: 16,
+};
+
+const titleStyle: React.CSSProperties = {
+  margin: 0,
+  fontSize: 26,
+  fontWeight: 900,
+  color: "#111827",
+  lineHeight: 1.15,
+  letterSpacing: "-0.03em",
+};
+
+const subtitleStyle: React.CSSProperties = {
+  margin: "8px 0 0",
+  fontSize: 14,
+  lineHeight: 1.5,
+  color: "#6b7280",
+};
+
+const featuresStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: 8,
+  marginBottom: 18,
+};
+
+const featureChipStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "9px 10px",
+  borderRadius: 12,
+  background: "#f8fafc",
+  border: "1px solid #eef2f7",
+  fontSize: 12,
+  fontWeight: 700,
+  color: "#374151",
+};
+
+const featureIconStyle: React.CSSProperties = {
+  width: 22,
+  height: 22,
+  borderRadius: 8,
+  background: "#eff6ff",
+  color: "#2563eb",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: 12,
+  flexShrink: 0,
+};
+
+const welcomeBannerStyle: React.CSSProperties = {
+  marginBottom: 14,
+  padding: "10px 12px",
+  borderRadius: 12,
+  background: "#eff6ff",
+  border: "1px solid #bfdbfe",
+  fontSize: 13,
+  fontWeight: 700,
+  color: "#1e40af",
+  lineHeight: 1.4,
+};
+
+const formStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 14,
+};
+
+const fieldStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 6,
+};
+
+const labelStyle: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 800,
+  color: "#374151",
+};
+
+function inputStyle(hasError: boolean): React.CSSProperties {
+  return {
+    width: "100%",
+    padding: "13px 14px",
+    borderRadius: 12,
+    border: hasError ? "1px solid #f87171" : "1px solid #d1d5db",
+    fontSize: 16,
+    outline: "none",
+    boxSizing: "border-box",
+    background: "#ffffff",
+    fontWeight: 600,
+    color: "#111827",
+    transition: "border-color 0.15s, box-shadow 0.15s",
+  };
+}
+
+const passwordWrapStyle: React.CSSProperties = {
+  position: "relative",
+};
+
+const togglePasswordStyle: React.CSSProperties = {
+  position: "absolute",
+  right: 8,
+  top: "50%",
+  transform: "translateY(-50%)",
+  border: "none",
+  background: "#f3f4f6",
+  color: "#4b5563",
+  borderRadius: 8,
+  padding: "6px 10px",
+  fontSize: 11,
+  fontWeight: 800,
+  cursor: "pointer",
+};
+
+const errorBoxStyle: React.CSSProperties = {
+  padding: "10px 12px",
+  borderRadius: 12,
+  background: "#fef2f2",
+  border: "1px solid #fecaca",
+  fontSize: 13,
+  fontWeight: 700,
+  color: "#b91c1c",
+  lineHeight: 1.4,
+};
+
+function submitBtnStyle(disabled: boolean): React.CSSProperties {
+  return {
+    width: "100%",
+    marginTop: 4,
+    padding: "14px 16px",
+    borderRadius: 14,
+    border: "none",
+    background: disabled ? "#cbd5e1" : "linear-gradient(180deg, #3b82f6 0%, #2563eb 100%)",
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: 900,
+    cursor: disabled ? "not-allowed" : "pointer",
+    boxShadow: disabled ? "none" : "0 10px 22px rgba(37,99,235,0.28)",
+    letterSpacing: "-0.01em",
+  };
+}
+
+const footerStyle: React.CSSProperties = {
+  textAlign: "center",
+  fontSize: 11,
+  color: "#9ca3af",
+  lineHeight: 1.5,
+  padding: "0 8px",
+};

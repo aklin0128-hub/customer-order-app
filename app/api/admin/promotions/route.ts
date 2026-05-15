@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import {
   getPromotionProducts,
   getPromotionRecords,
+  getPromotionStatus,
   savePromotionRecords,
+  validatePromotionInput,
   type PromotionRecord,
 } from "@/lib/promotions";
 
@@ -23,9 +25,14 @@ export async function GET(req: Request) {
     const promotions = await getPromotionRecords();
     const products = await getPromotionProducts();
 
+    const enriched = promotions.map((record) => ({
+      ...record,
+      promoStatus: getPromotionStatus(record),
+    }));
+
     return NextResponse.json({
       success: true,
-      promotions,
+      promotions: enriched,
       products,
     });
   } catch (error: any) {
@@ -43,27 +50,53 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const sku = String(body?.sku || "")
-      .trim()
-      .toUpperCase();
-    const note = String(body?.note || "").trim();
 
-    if (!sku) {
-      return NextResponse.json({ error: "Missing SKU." }, { status: 400 });
+    const validated = validatePromotionInput({
+      sku: body?.sku,
+      startDate: body?.startDate,
+      endDate: body?.endDate,
+      promoQty: body?.promoQty,
+      promoPrice: body?.promoPrice,
+    });
+
+    if ("error" in validated && validated.error) {
+      return NextResponse.json({ error: validated.error }, { status: 400 });
     }
 
+    const sku = validated.record!.sku!;
+    const note = String(body?.note || "").trim();
+    const startDate = validated.record!.startDate;
+    const endDate = validated.record!.endDate;
+    const promoQty = validated.record!.promoQty;
+    const promoPrice = validated.record!.promoPrice;
+
     const current = await getPromotionRecords();
+    const existing = current.find((p) => p.sku === sku);
+
+    const resetSoldQty = Boolean(body?.resetSoldQty);
+
+    const nextRecord: PromotionRecord = {
+      sku,
+      note: note || undefined,
+      startDate,
+      endDate,
+      promoQty,
+      promoPrice,
+      soldQty: resetSoldQty ? 0 : existing?.soldQty || 0,
+      updatedAt: new Date().toISOString(),
+    };
+
     const without = current.filter((p) => p.sku !== sku);
-    const next: PromotionRecord[] = [
-      { sku, note, updatedAt: new Date().toISOString() },
-      ...without,
-    ];
+    const next: PromotionRecord[] = [nextRecord, ...without];
 
     await savePromotionRecords(next);
 
     return NextResponse.json({
       success: true,
-      promotions: next,
+      promotions: next.map((record) => ({
+        ...record,
+        promoStatus: getPromotionStatus(record),
+      })),
     });
   } catch (error: any) {
     return NextResponse.json(

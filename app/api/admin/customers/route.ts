@@ -1,27 +1,18 @@
 import { NextResponse } from "next/server";
+import {
+  getAllCustomers,
+  normalizeAccountNo,
+  type CustomerRecord,
+} from "@/lib/customers";
+import { loadCustomers } from "@/lib/loadCustomers";
 import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "536678";
 
-type Customer = {
-  accountNo: string;
-  storeName: string;
-  password: string;
-  active?: boolean;
-  email?: string;
-  phone?: string;
-  note?: string;
-  updatedAt?: string;
-};
-
 function checkAdmin(req: Request) {
   return (req.headers.get("x-admin-password") || "") === ADMIN_PASSWORD;
-}
-
-function normalizeAccount(accountNo: string) {
-  return String(accountNo || "").trim().toUpperCase();
 }
 
 export async function GET(req: Request) {
@@ -30,26 +21,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const keys = await redis.keys("customer:*");
-    const customers: Customer[] = [];
-
-    for (const key of keys) {
-      const item = await redis.get<Customer>(key);
-      if (!item?.accountNo) continue;
-
-      customers.push({
-        accountNo: normalizeAccount(item.accountNo),
-        storeName: item.storeName || "",
-        password: item.password || "",
-        active: item.active !== false,
-        email: item.email || "",
-        phone: item.phone || "",
-        note: item.note || "",
-        updatedAt: item.updatedAt || "",
-      });
-    }
-
-    customers.sort((a, b) => a.accountNo.localeCompare(b.accountNo));
+    const customers = await getAllCustomers();
 
     return NextResponse.json({
       success: true,
@@ -71,7 +43,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    const accountNo = normalizeAccount(body?.accountNo);
+    const accountNo = normalizeAccountNo(body?.accountNo);
     const storeName = String(body?.storeName || "").trim();
     const password = String(body?.password || "").trim();
     const active = body?.active !== false;
@@ -91,15 +63,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing customer password." }, { status: 400 });
     }
 
-    const customer: Customer = {
+    const customer: CustomerRecord = {
       accountNo,
       storeName,
       password,
       active,
-      email,
-      phone,
-      note,
+      email: email || undefined,
+      phone: phone || undefined,
+      note: note || undefined,
       updatedAt: new Date().toISOString(),
+      source: "redis",
     };
 
     await redis.set(`customer:${accountNo}`, customer);
@@ -123,13 +96,32 @@ export async function DELETE(req: Request) {
 
   try {
     const url = new URL(req.url);
-    const accountNo = normalizeAccount(url.searchParams.get("accountNo") || "");
+    const accountNo = normalizeAccountNo(url.searchParams.get("accountNo") || "");
 
     if (!accountNo) {
       return NextResponse.json({ error: "Missing account number." }, { status: 400 });
     }
 
-    await redis.del(`customer:${accountNo}`);
+    const existingRedis = await redis.get<CustomerRecord>(`customer:${accountNo}`);
+
+    if (existingRedis) {
+      await redis.del(`customer:${accountNo}`);
+    } else {
+      const local = loadCustomers().find((c) => normalizeAccountNo(c.accountNo) === accountNo);
+      if (!local) {
+        return NextResponse.json({ error: "Customer not found." }, { status: 404 });
+      }
+
+      await redis.set(`customer:${accountNo}`, {
+        accountNo,
+        storeName: local.storeName,
+        password: local.password,
+        active: false,
+        note: "Disabled in admin (CSV account)",
+        updatedAt: new Date().toISOString(),
+        source: "redis",
+      });
+    }
 
     return NextResponse.json({
       success: true,

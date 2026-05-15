@@ -16,7 +16,7 @@ export function loadCustomers() {
     const [accountNo, storeName, password, active] = row.split(",");
 
     return {
-      accountNo: accountNo.trim(),
+      accountNo: accountNo.trim().toUpperCase(),
       storeName: storeName.replace(/"/g, "").trim(),
       password: password.trim(),
       active: active.trim().toUpperCase() === "TRUE",

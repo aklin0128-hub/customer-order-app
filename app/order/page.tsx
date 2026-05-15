@@ -7,7 +7,15 @@ import catalogData from "@/data/catalog_sku_master_extracted.json";
 type Lang = "en" | "zh" | "ko";
 type OrderMode = "search" | "catalog" | "promotion";
 
-type PromotionItem = CatalogItem & { promoNote?: string };
+type PromotionItem = CatalogItem & {
+  promoNote?: string;
+  promoPrice?: string;
+  promoQty?: number;
+  soldQty?: number;
+  remainingQty?: number | null;
+  startDate?: string;
+  endDate?: string;
+};
 
 type CartItem = {
   sku: string;
@@ -57,6 +65,12 @@ const copy = {
     promotionHint: "Featured items — add qty and they go to your cart.",
     noPromotions: "No promotions configured yet.",
     promoBadge: "SALE",
+    promoPrice: "Promo price",
+    promoRemaining: "Left",
+    promoSoldOut: "Sold out",
+    promoDateRange: "Valid",
+    promoQtyLimit: "Promo limit",
+    promoLimitAlert: "Only {qty} promo cases left for {sku}.",
     addItems: "Add Items",
     availableOnly: "Show available items only",
     skuItem: "SKU / Item",
@@ -133,6 +147,12 @@ const copy = {
     promotionHint: "精选促销商品，输入数量即可加入购物车。",
     noPromotions: "暂无促销活动。",
     promoBadge: "促销",
+    promoPrice: "促销价",
+    promoRemaining: "剩余",
+    promoSoldOut: "已售罄",
+    promoDateRange: "有效期",
+    promoQtyLimit: "促销限量",
+    promoLimitAlert: "{sku} 促销仅剩 {qty} 箱。",
     addItems: "添加商品",
     availableOnly: "只显示可下单商品",
     skuItem: "SKU / 商品",
@@ -209,6 +229,12 @@ const copy = {
     promotionHint: "추천 상품 — 수량 입력 시 카트에 추가됩니다.",
     noPromotions: "등록된 프로모션이 없습니다.",
     promoBadge: "할인",
+    promoPrice: "프로모션 가격",
+    promoRemaining: "남음",
+    promoSoldOut: "품절",
+    promoDateRange: "유효기간",
+    promoQtyLimit: "프로모션 한정",
+    promoLimitAlert: "{sku} 프로모션 {qty}박스만 남았습니다.",
     addItems: "상품 추가",
     availableOnly: "주문 가능 상품만 보기",
     skuItem: "SKU / 상품",
@@ -272,6 +298,24 @@ const copy = {
     back: "뒤로",
   },
 };
+
+function formatPromoDetails(item: PromotionItem, t: (typeof copy)["en"]) {
+  const parts: string[] = [];
+
+  if (item.startDate || item.endDate) {
+    parts.push(`${t.promoDateRange}: ${item.startDate || "—"} → ${item.endDate || "—"}`);
+  }
+
+  if (item.promoQty && item.promoQty > 0) {
+    const left =
+      item.remainingQty ?? Math.max(0, item.promoQty - (item.soldQty || 0));
+    parts.push(
+      `${t.promoQtyLimit}: ${item.soldQty || 0}/${item.promoQty} (${t.promoRemaining} ${left})`
+    );
+  }
+
+  return parts.join(" · ");
+}
 
 const categoryOptions = [
   "ALL",
@@ -388,20 +432,26 @@ function CatalogQtyCard({
   item,
   qty,
   promoNote,
+  promoPrice,
+  promoDetails,
   inCartLabel,
   promoBadgeLabel,
   onAdjust,
   onUpdateQty,
   highlight,
+  disabled,
 }: {
   item: CatalogItem;
   qty: string;
   promoNote?: string;
+  promoPrice?: string;
+  promoDetails?: string;
   inCartLabel: string;
   promoBadgeLabel: string;
   onAdjust: (sku: string, delta: number) => void;
   onUpdateQty: (sku: string, value: string) => void;
   highlight?: boolean;
+  disabled?: boolean;
 }) {
   const hasQty = Number(qty) > 0;
 
@@ -425,10 +475,12 @@ function CatalogQtyCard({
       <div style={{ fontSize: 11, fontWeight: 800, color: "#374151" }}>{item.brand || "-"}</div>
       <div style={catalogNameStyle}>{item.name || "-"}</div>
       {item.size ? <div style={{ fontSize: 10, color: "#6b7280" }}>{item.size}</div> : null}
+      {promoPrice ? <div style={promoPriceStyle}>{promoPrice}</div> : null}
+      {promoDetails ? <div style={promoDetailsStyle}>{promoDetails}</div> : null}
       {hasQty ? <div style={inCartTagStyle}>{inCartLabel}: {qty}</div> : null}
 
       <div style={catalogStepperStyle}>
-        <button type="button" onClick={() => onAdjust(item.sku, -1)} style={catalogStepBtnStyle}>
+        <button type="button" onClick={() => onAdjust(item.sku, -1)} disabled={disabled} style={catalogStepBtnStyle}>
           −
         </button>
         <input
@@ -436,9 +488,10 @@ function CatalogQtyCard({
           onChange={(e) => onUpdateQty(item.sku, e.target.value)}
           placeholder="0"
           inputMode="numeric"
-          style={catalogStepInputStyle}
+          disabled={disabled}
+          style={{ ...catalogStepInputStyle, opacity: disabled ? 0.5 : 1 }}
         />
-        <button type="button" onClick={() => onAdjust(item.sku, 1)} style={catalogStepBtnStyle}>
+        <button type="button" onClick={() => onAdjust(item.sku, 1)} disabled={disabled} style={catalogStepBtnStyle}>
           +
         </button>
       </div>
@@ -682,12 +735,7 @@ export default function OrderPage() {
           item.upc?.toUpperCase().includes(q)
         );
       })
-      .sort((a, b) => {
-        const aSelected = Number(catalogQtyMap[(a.sku || "").toUpperCase()] || 0) > 0;
-        const bSelected = Number(catalogQtyMap[(b.sku || "").toUpperCase()] || 0) > 0;
-        if (aSelected !== bSelected) return aSelected ? -1 : 1;
-        return (a.sku || "").localeCompare(b.sku || "");
-      });
+      .sort((a, b) => (a.sku || "").localeCompare(b.sku || ""));
   }, [catalogSearch, categoryFilter, catalogQtyMap, catalogVersion, catalogShowSelectedOnly]);
 
   const displayCatalogItems = useMemo(() => {
@@ -720,11 +768,6 @@ export default function OrderPage() {
     const cleanSku = sku.trim().toUpperCase();
     const cleanQty = String(value || "").replace(/[^0-9]/g, "");
 
-    // Keep the current screen position when qty changes.
-    // This prevents the page from jumping to the top when Selected First re-sorts items.
-    const scrollX = typeof window !== "undefined" ? window.scrollX : 0;
-    const scrollY = typeof window !== "undefined" ? window.scrollY : 0;
-
     setCatalogQtyMap((prev) => {
       const next = { ...prev };
       if (!cleanQty || Number(cleanQty) <= 0) delete next[cleanSku];
@@ -737,18 +780,31 @@ export default function OrderPage() {
       if (!cleanQty || Number(cleanQty) <= 0) return withoutSku;
       return [...withoutSku, { sku: cleanSku, qty: String(Number(cleanQty)) }];
     });
+  };
 
-    if (typeof window !== "undefined") {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => window.scrollTo(scrollX, scrollY));
-      });
+  const getPromoRemainingForSku = (cleanSku: string) => {
+    const promo = promotionItems.find((p) => p.sku?.toUpperCase() === cleanSku);
+    if (!promo) return null;
+    if (promo.remainingQty === null || promo.remainingQty === undefined) {
+      if (promo.promoQty && promo.promoQty > 0) {
+        return Math.max(0, promo.promoQty - (promo.soldQty || 0));
+      }
+      return null;
     }
+    return promo.remainingQty;
   };
 
   const adjustQtyForSku = (sku: string, delta: number) => {
     const cleanSku = sku.trim().toUpperCase();
     const current = Number(catalogQtyMap[cleanSku] || 0);
-    const next = Math.max(0, current + delta);
+    let next = Math.max(0, current + delta);
+
+    const promoRemaining = getPromoRemainingForSku(cleanSku);
+    if (delta > 0 && promoRemaining !== null && next > promoRemaining) {
+      alert(t.promoLimitAlert.replace("{sku}", cleanSku).replace("{qty}", String(promoRemaining)));
+      next = promoRemaining;
+    }
+
     setQtyForSku(cleanSku, next ? String(next) : "");
   };
 
@@ -837,6 +893,13 @@ export default function OrderPage() {
     const limitedQty = Number(String(catalogItem?.limitedQty || "").replace(/[^0-9]/g, ""));
     if (clean && limitedQty > 0 && Number(clean) > limitedQty) {
       alert(`${cleanSku} limited qty is ${limitedQty}.`);
+      return;
+    }
+
+    const promoRemaining = getPromoRemainingForSku(cleanSku);
+    if (clean && promoRemaining !== null && Number(clean) > promoRemaining) {
+      alert(t.promoLimitAlert.replace("{sku}", cleanSku).replace("{qty}", String(promoRemaining)));
+      setQtyForSku(cleanSku, promoRemaining ? String(promoRemaining) : "");
       return;
     }
 
@@ -1057,6 +1120,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
       });
 
       await loadRecentAndHistory(accountNo);
+      setCatalogVersion((v) => v + 1);
 
       setTimeout(() => {
         submitLockRef.current = false;
@@ -1270,15 +1334,25 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                 {promotionItems.map((item) => {
                   const sku = item.sku?.toUpperCase() || "";
                   const qty = catalogQtyMap[sku] || "";
+                  const soldOut = item.remainingQty === 0;
+                  const promoPriceLabel = item.promoPrice
+                    ? `${t.promoPrice}: ${item.promoPrice}`
+                    : undefined;
+                  const promoDetailsLabel = soldOut
+                    ? t.promoSoldOut
+                    : formatPromoDetails(item, t);
                   return (
                     <CatalogQtyCard
                       key={item.sku}
                       item={item}
                       qty={qty}
                       promoNote={item.promoNote}
+                      promoPrice={promoPriceLabel}
+                      promoDetails={promoDetailsLabel}
                       inCartLabel={t.inCart}
                       promoBadgeLabel={t.promoBadge}
                       highlight
+                      disabled={soldOut}
                       onAdjust={adjustCatalogQty}
                       onUpdateQty={updateCatalogQty}
                     />
@@ -1631,6 +1705,16 @@ const promoTagStyle: React.CSSProperties = {
   background: "#ffedd5",
   color: "#c2410c",
   border: "1px solid #fdba74",
+};
+const promoPriceStyle: React.CSSProperties = {
+  fontSize: 13,
+  fontWeight: 900,
+  color: "#b45309",
+};
+const promoDetailsStyle: React.CSSProperties = {
+  fontSize: 10,
+  color: "#6b7280",
+  lineHeight: 1.35,
 };
 const inCartTagStyle: React.CSSProperties = {
   fontSize: 11,

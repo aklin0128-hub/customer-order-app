@@ -27,6 +27,7 @@ type Customer = {
   phone?: string;
   note?: string;
   updatedAt?: string;
+  source?: "local" | "redis";
 };
 
 type StatusFilter = "all" | "active" | "inactive";
@@ -191,7 +192,7 @@ export default function AdminCustomersPage() {
     <AdminShell
       active="customers"
       title="Customers"
-      subtitle="Create and manage store login accounts stored in Redis."
+      subtitle="Shows accounts from data/customers.csv and Redis. Saving writes to Redis and overrides CSV for that account."
       onLogout={logout}
       actions={
         <BtnSecondary onClick={() => { clearForm(); notify("New customer form ready."); }}>
@@ -202,8 +203,9 @@ export default function AdminCustomersPage() {
       <StatGrid
         items={[
           { label: "Total", value: customers.length },
+          { label: "From CSV", value: customers.filter((c) => c.source === "local").length },
+          { label: "In Redis", value: customers.filter((c) => c.source === "redis").length },
           { label: "Active", value: customers.filter((c) => c.active !== false).length },
-          { label: "Inactive", value: customers.filter((c) => c.active === false).length },
         ]}
       />
 
@@ -241,18 +243,32 @@ export default function AdminCustomersPage() {
                       </div>
                     ) : null}
                   </div>
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 900,
-                      padding: "3px 8px",
-                      borderRadius: 999,
-                      background: c.active !== false ? "#ecfdf5" : "#fef2f2",
-                      color: c.active !== false ? "#059669" : "#dc2626",
-                    }}
-                  >
-                    {c.active !== false ? "ACTIVE" : "OFF"}
-                  </span>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 900,
+                        padding: "3px 8px",
+                        borderRadius: 999,
+                        background: c.source === "redis" ? "#eff6ff" : "#f3f4f6",
+                        color: c.source === "redis" ? "#1d4ed8" : "#4b5563",
+                      }}
+                    >
+                      {c.source === "redis" ? "REDIS" : "CSV"}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 900,
+                        padding: "3px 8px",
+                        borderRadius: 999,
+                        background: c.active !== false ? "#ecfdf5" : "#fef2f2",
+                        color: c.active !== false ? "#059669" : "#dc2626",
+                      }}
+                    >
+                      {c.active !== false ? "ACTIVE" : "OFF"}
+                    </span>
+                  </div>
                 </div>
               </ListItemButton>
             ))}
