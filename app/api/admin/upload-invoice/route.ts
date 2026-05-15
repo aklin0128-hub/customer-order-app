@@ -79,7 +79,7 @@ export async function POST(req: Request) {
     const ext = extFromMime(mime);
     const acctSlug = accountNo || "UNKNOWN";
     const blob = await put(`invoices/${acctSlug}-${id}.${ext}`, file, {
-      access: "public",
+      access: "private",
       addRandomSuffix: false,
     });
 
@@ -126,6 +126,7 @@ export async function POST(req: Request) {
       supplierOrderNo: parsed.supplierOrderNo,
       invoiceDate: parsed.invoiceDate,
       blobUrl: blob.url,
+      blobPathname: blob.pathname,
       mimeType: mime,
       extractMethod: method,
       lineCount: linesWithFlags.length,

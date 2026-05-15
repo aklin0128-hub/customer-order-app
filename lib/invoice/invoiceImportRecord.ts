@@ -12,6 +12,7 @@ export type InvoiceImportRecord = {
   supplierOrderNo: string | null;
   invoiceDate: string | null;
   blobUrl: string;
+  blobPathname?: string;
   mimeType: string;
   extractMethod: "pdf" | "ocr";
   lineCount: number;

@@ -12,13 +12,26 @@ export async function extractInvoiceText(
 
   if (mt === "application/pdf" || mt === "application/x-pdf") {
     const mod = (await import("pdf-parse")) as {
-      default?: (b: Buffer) => Promise<{ text?: string }>;
+      PDFParse?: new (options: { data: Uint8Array }) => {
+        getText: () => Promise<{ text?: string }>;
+        destroy?: () => Promise<void>;
+      };
     };
-    const pdfParse = mod.default;
-    if (!pdfParse) throw new Error("pdf-parse failed to load.");
+    const PDFParse = mod.PDFParse;
+    if (!PDFParse) {
+      throw new Error(
+        `pdf-parse failed to load. Available exports: ${Object.keys(mod).join(", ") || "(none)"}`
+      );
+    }
 
-    const result = await pdfParse(buffer);
-    return { text: String(result.text ?? ""), method: "pdf" };
+    // Copy the Buffer into a standalone Uint8Array; pdf.js may take ownership of TypedArrays.
+    const parser = new PDFParse({ data: new Uint8Array(buffer) });
+    try {
+      const result = await parser.getText();
+      return { text: String(result.text ?? ""), method: "pdf" };
+    } finally {
+      await parser.destroy?.();
+    }
   }
 
   if (

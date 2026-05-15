@@ -5,10 +5,8 @@ import { createPortal } from "react-dom";
 
 import { getImageUrl } from "../catalogUtils";
 
-const PREVIEW_SIDE = 248;
 const Z_PREVIEW = 10050;
-/** Grace period so cursor can cross the gap onto the enlarged preview without flicker. */
-const LEAVE_HIDE_MS = 160;
+const HOVER_SCALE = 3;
 
 function getScrollableAncestors(el: HTMLElement): HTMLElement[] {
   const out: HTMLElement[] = [];
@@ -27,16 +25,6 @@ function getScrollableAncestors(el: HTMLElement): HTMLElement[] {
   return out;
 }
 
-function clampToViewport(left: number, top: number, width: number, height: number) {
-  const margin = 10;
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  return {
-    left: Math.min(Math.max(margin, left), vw - width - margin),
-    top: Math.min(Math.max(margin, top), vh - height - margin),
-  };
-}
-
 export function ProductImage({
   sku,
   alt,
@@ -50,9 +38,8 @@ export function ProductImage({
 }) {
   const [imgError, setImgError] = useState(false);
   const thumbWrapRef = useRef<HTMLDivElement>(null);
-  const hideTimerRef = useRef<number | null>(null);
 
-  /** Fixed-position preview escapes overflow + transformed ancestors (virtual catalog rows). */
+  /** Fixed-position scaled clone escapes overflow + transformed ancestors (virtual catalog rows). */
   const [preview, setPreview] = useState<null | {
     src: string;
     altText: string;
@@ -64,27 +51,9 @@ export function ProductImage({
 
   const src = imageUrl || getImageUrl(sku);
 
-  const cancelHidePreview = () => {
-    if (hideTimerRef.current != null) {
-      window.clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-  };
-
-  const scheduleHidePreview = () => {
-    cancelHidePreview();
-    hideTimerRef.current = window.setTimeout(() => {
-      setPreview(null);
-      hideTimerRef.current = null;
-    }, LEAVE_HIDE_MS);
-  };
-
-  useEffect(() => () => cancelHidePreview(), []);
-
   useEffect(() => {
     if (!preview || !thumbWrapRef.current) return;
     const close = () => {
-      cancelHidePreview();
       setPreview(null);
     };
     const ancestors = getScrollableAncestors(thumbWrapRef.current);
@@ -123,26 +92,15 @@ export function ProductImage({
     const el = thumbWrapRef.current;
     if (!el) return;
 
-    cancelHidePreview();
     const r = el.getBoundingClientRect();
-    const pw = PREVIEW_SIDE;
-    const ph = PREVIEW_SIDE;
-    let left = r.left + r.width / 2 - pw / 2;
-    // Pull up slightly so the preview overlaps the thumb — easier hover handoff without flicker
-    let top = r.bottom - Math.min(28, r.height * 0.35);
-    if (top + ph > window.innerHeight - 10) {
-      top = r.top - ph + Math.min(28, r.height * 0.35);
-    }
-
-    ({ left, top } = clampToViewport(left, top, pw, ph));
 
     setPreview({
       src,
       altText: alt,
-      left,
-      top,
-      width: pw,
-      height: ph,
+      left: r.left,
+      top: r.top,
+      width: r.width,
+      height: r.height,
     });
   };
 
@@ -150,7 +108,9 @@ export function ProductImage({
     preview &&
     typeof document !== "undefined" &&
     createPortal(
-      <div
+      <img
+        src={preview.src}
+        alt={preview.altText}
         style={{
           position: "fixed",
           left: preview.left,
@@ -159,33 +119,18 @@ export function ProductImage({
           height: preview.height,
           boxSizing: "border-box",
           zIndex: Z_PREVIEW,
-          borderRadius: 12,
-          overflow: "hidden",
-          cursor: "zoom-out",
+          borderRadius: 10,
           background: "#fff",
           border: "2px solid #2563eb",
-          boxShadow: "0 16px 40px rgba(0,0,0,0.28)",
-          padding: 6,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          boxShadow: "0 12px 28px rgba(0,0,0,0.25)",
+          objectFit: "contain",
+          transform: `scale(${HOVER_SCALE})`,
+          transformOrigin: "center center",
+          transition: "transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease",
+          pointerEvents: "none",
         }}
-        onMouseEnter={() => cancelHidePreview()}
-        onMouseLeave={() => scheduleHidePreview()}
-      >
-        <img
-          src={preview.src}
-          alt={preview.altText}
-          draggable={false}
-          style={{
-            width: "100%",
-            height: "100%",
-            maxWidth: "min(236px, 88vw)",
-            maxHeight: "min(236px, 52vh)",
-            objectFit: "contain",
-          }}
-        />
-      </div>,
+        draggable={false}
+      />,
       document.body,
     );
 
@@ -196,7 +141,7 @@ export function ProductImage({
         ref={thumbWrapRef}
         style={{ display: "inline-flex", lineHeight: 0, position: "relative" }}
         onMouseEnter={() => openPreview()}
-        onMouseLeave={() => scheduleHidePreview()}
+        onMouseLeave={() => setPreview(null)}
       >
         <img
           src={src}

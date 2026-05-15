@@ -32,23 +32,26 @@ export async function POST(req: Request) {
       "jpg";
 
     const blob = await put(`product-images/${sku}.${ext}`, file, {
-      access: "public",
+      access: "private",
       addRandomSuffix: true,
     });
+    const imageUrl = `/api/blob?pathname=${encodeURIComponent(blob.pathname)}`;
 
     const existing = (await redis.get<any>(`product:${sku}`)) || {};
 
     await redis.set(`product:${sku}`, {
       ...existing,
       sku,
-      imageUrl: blob.url,
+      imageUrl,
+      blobUrl: blob.url,
+      blobPathname: blob.pathname,
       source: "Redis",
       updatedAt: new Date().toISOString(),
     });
 
     return NextResponse.json({
       success: true,
-      imageUrl: blob.url,
+      imageUrl,
     });
   } catch (error: any) {
     return NextResponse.json(

@@ -24,6 +24,7 @@ type ImportRecord = {
   supplierOrderNo: string | null;
   invoiceDate: string | null;
   blobUrl: string;
+  blobPathname?: string;
   extractMethod: "pdf" | "ocr";
   lineCount: number;
   lines: ImportLine[];
@@ -32,6 +33,10 @@ type ImportRecord = {
 };
 
 const labelStyle = { display: "block" as const, fontSize: 12, fontWeight: 700, marginBottom: 6, color: "#374151" };
+
+function invoiceFileHref(row: Pick<ImportRecord, "id" | "blobUrl" | "blobPathname">) {
+  return row.blobPathname ? `/api/admin/invoice-file?id=${encodeURIComponent(row.id)}` : row.blobUrl;
+}
 
 export default function AdminInvoicesPage() {
   const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
@@ -188,7 +193,7 @@ export default function AdminInvoicesPage() {
             <strong>{lastRecord.invoiceNo || "(none)"}</strong> · Method:{" "}
             <strong>{lastRecord.extractMethod}</strong> · Chars extracted:{" "}
             <strong>{parsedChars}</strong> · Blob:{" "}
-            <a href={lastRecord.blobUrl} target="_blank" rel="noreferrer">
+            <a href={invoiceFileHref(lastRecord)} target="_blank" rel="noreferrer">
               open
             </a>
           </p>
@@ -250,7 +255,7 @@ export default function AdminInvoicesPage() {
                 </div>
                 <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
                   {new Date(row.uploadedAt).toLocaleString()} · {row.extractMethod} ·{" "}
-                  <a href={row.blobUrl} target="_blank" rel="noreferrer">
+                  <a href={invoiceFileHref(row)} target="_blank" rel="noreferrer">
                     file
                   </a>
                 </div>
