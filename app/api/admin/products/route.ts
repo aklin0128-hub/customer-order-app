@@ -18,6 +18,7 @@ type Product = {
   palletSize?: string;
   imageUrl?: string;
   category?: string;
+  isNew?: boolean;
   source?: string;
   updatedAt?: string;
 };
@@ -95,6 +96,7 @@ export async function POST(req: Request) {
     const palletSize = String(body?.palletSize || "").trim();
     const imageUrl = String(body?.imageUrl || "").trim();
     const category = String(body?.category || "").trim().toUpperCase();
+    const isNew = Boolean(body?.isNew);
 
     if (!sku) {
       return NextResponse.json({ error: "Missing SKU." }, { status: 400 });
@@ -112,6 +114,7 @@ export async function POST(req: Request) {
       palletSize,
       imageUrl,
       category,
+      isNew,
       source: "Redis",
       updatedAt: new Date().toISOString(),
     };

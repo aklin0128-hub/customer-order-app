@@ -347,6 +347,19 @@ export const categoryButtonStyle = (active: boolean): CSSProperties => ({
   whiteSpace: "nowrap",
 });
 
+export const newItemsButtonStyle = (active: boolean): CSSProperties => ({
+  padding: "9px 14px",
+  borderRadius: 999,
+  border: active ? "1px solid #ea580c" : "1px solid #fdba74",
+  background: active ? "#ea580c" : "#fff7ed",
+  color: active ? "#ffffff" : "#c2410c",
+  fontSize: 12,
+  fontWeight: 950,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+  boxShadow: active ? "0 8px 18px rgba(234,88,12,0.25)" : "0 1px 2px rgba(251,146,60,0.18)",
+});
+
 export const brandSelectStyle: CSSProperties = {
   padding: "8px 10px",
   borderRadius: 999,

@@ -13,6 +13,7 @@ export type CatalogItem = {
   palletSize?: string;
   imageUrl?: string;
   category?: string;
+  isNew?: boolean;
 };
 
 export type PromotionItem = CatalogItem & {

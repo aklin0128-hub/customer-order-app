@@ -42,6 +42,7 @@ import {
   mainStyle,
   modeButtonStyle,
   modeTabsStyle,
+  newItemsButtonStyle,
   primarySmallButtonStyle,
   productSmallButtonStyle,
   promoGridStyle,
@@ -965,7 +966,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                 <button
                   type="button"
                   onClick={() => setCatalogShowNewOnly((prev) => !prev)}
-                  style={categoryButtonStyle(catalogShowNewOnly)}
+                  style={newItemsButtonStyle(catalogShowNewOnly)}
                 >
                   {t.newItems} ({newItemCount})
                 </button>

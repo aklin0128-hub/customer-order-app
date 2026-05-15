@@ -55,6 +55,8 @@ export function isNormalItem(item?: CatalogItem | null) {
 }
 
 export function isNewItem(item?: CatalogItem | null) {
+  if (typeof item?.isNew === "boolean") return item.isNew;
+
   const text = [
     item?.name,
     item?.size,

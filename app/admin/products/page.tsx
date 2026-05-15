@@ -30,10 +30,11 @@ type Product = {
   palletSize?: string;
   imageUrl?: string;
   category?: string;
+  isNew?: boolean;
   source?: string;
 };
 
-type ProductFilter = "all" | "redis" | "customized";
+type ProductFilter = "all" | "redis" | "customized" | "new";
 
 const statusOptions = [
   "NORMAL",
@@ -52,6 +53,17 @@ function productImageSrc(sku: string, imageUrl?: string) {
   if (imageUrl) return imageUrl;
   if (sku) return `/product/${sku}.jpg`;
   return "";
+}
+
+function isNewProduct(p?: Product | null) {
+  if (typeof p?.isNew === "boolean") return p.isNew;
+
+  const text = [p?.name, p?.size, p?.status]
+    .filter(Boolean)
+    .join(" ")
+    .toUpperCase()
+    .replace(/[_-]+/g, " ");
+  return /(^|\s)NEW(\s|$)/.test(text);
 }
 
 export default function AdminProductsPage() {
@@ -73,6 +85,7 @@ export default function AdminProductsPage() {
   const [limitedQty, setLimitedQty] = useState("");
   const [palletSize, setPalletSize] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [isNew, setIsNew] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -114,7 +127,9 @@ export default function AdminProductsPage() {
     if (listFilter === "redis") {
       list = list.filter((p) => p.source === "Redis");
     } else if (listFilter === "customized") {
-      list = list.filter((p) => p.source === "Redis" || p.category || p.imageUrl || p.limitedQty || p.palletSize);
+      list = list.filter((p) => p.source === "Redis" || p.category || p.imageUrl || p.limitedQty || p.palletSize || typeof p.isNew === "boolean");
+    } else if (listFilter === "new") {
+      list = list.filter((p) => isNewProduct(p));
     }
 
     if (!q) return list.slice(0, 120);
@@ -145,6 +160,7 @@ export default function AdminProductsPage() {
     setLimitedQty(p.limitedQty || "");
     setPalletSize(p.palletSize || "");
     setImageUrl(p.imageUrl || "");
+    setIsNew(isNewProduct(p));
     notify(`Editing ${p.sku}`);
   };
 
@@ -160,6 +176,7 @@ export default function AdminProductsPage() {
     setLimitedQty("");
     setPalletSize("");
     setImageUrl("");
+    setIsNew(false);
     setMsg("");
   };
 
@@ -185,6 +202,7 @@ export default function AdminProductsPage() {
           limitedQty,
           palletSize,
           imageUrl,
+          isNew,
         }),
       });
       const data = await res.json();
@@ -261,6 +279,7 @@ export default function AdminProductsPage() {
           { label: "Catalog SKUs", value: products.length },
           { label: "Redis overrides", value: products.filter((p) => p.source === "Redis").length },
           { label: "With category", value: products.filter((p) => p.category).length },
+          { label: "New items", value: products.filter((p) => isNewProduct(p)).length },
         ]}
       />
 
@@ -277,6 +296,7 @@ export default function AdminProductsPage() {
             onChange={setListFilter}
             options={[
               { id: "all", label: "Browse" },
+              { id: "new", label: "New items" },
               { id: "redis", label: "Redis only" },
               { id: "customized", label: "Customized" },
             ]}
@@ -324,7 +344,10 @@ export default function AdminProductsPage() {
                       {p.brand || "—"} · {p.source || "Catalog"}
                     </div>
                   </div>
-                  <StatusBadge status={p.status} />
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    {isNewProduct(p) ? <NewBadge /> : null}
+                    <StatusBadge status={p.status} />
+                  </div>
                 </div>
               </ListItemButton>
             ))}
@@ -393,6 +416,25 @@ export default function AdminProductsPage() {
                   Saved in Redis overrides the spreadsheet category for this SKU on the customer order page.
                 </div>
               </div>
+              <label
+                style={{
+                  gridColumn: "1 / -1",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  border: "1px solid #fed7aa",
+                  borderRadius: 12,
+                  padding: 12,
+                  background: isNew ? "#fff7ed" : "#fff",
+                  color: "#9a3412",
+                  fontSize: 13,
+                  fontWeight: 900,
+                  cursor: "pointer",
+                }}
+              >
+                <input type="checkbox" checked={isNew} onChange={(e) => setIsNew(e.target.checked)} />
+                Show this SKU in customer “New items”
+              </label>
               <div>
                 <label style={labelStyle}>Size</label>
                 <input value={size} onChange={(e) => setSize(e.target.value)} style={inputStyle} />
@@ -467,6 +509,25 @@ function StatusBadge({ status }: { status?: string }) {
       }}
     >
       {s || "—"}
+    </span>
+  );
+}
+
+function NewBadge() {
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        fontWeight: 950,
+        padding: "3px 8px",
+        borderRadius: 999,
+        whiteSpace: "nowrap",
+        background: "#fff7ed",
+        color: "#c2410c",
+        border: "1px solid #fdba74",
+      }}
+    >
+      NEW
     </span>
   );
 }
