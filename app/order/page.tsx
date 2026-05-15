@@ -103,6 +103,7 @@ export default function OrderPage() {
   const [showCustomerInfo, setShowCustomerInfo] = useState(false);
   const [showRecent, setShowRecent] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [expandedHistoryKey, setExpandedHistoryKey] = useState("");
   const [showCart, setShowCart] = useState(true);
   const [catalogShowSelectedOnly, setCatalogShowSelectedOnly] = useState(false);
   const [catalogShowNewOnly, setCatalogShowNewOnly] = useState(false);
@@ -1138,14 +1139,86 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
 
             {showHistory ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10, overflow: "visible" }}>
-                {orderHistory.slice(0, 8).map((order) => (
-                  <div key={order.orderRef || order.createdAt} style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 10, background: "#f9fafb", overflow: "visible" }}>
-                    <div style={{ fontSize: 13, fontWeight: 900, color: "#111827" }}>{order.orderRef || "-"}</div>
-                    <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>{order.createdAt ? new Date(order.createdAt).toLocaleString() : ""} · {order.items?.length || 0} {t.items}</div>
-                    <div style={{ fontSize: 12, color: "#374151", marginTop: 6 }}>{(order.items || []).slice(0, 5).map((item) => `${item.sku}(${item.qty})`).join(", ")}{(order.items || []).length > 5 ? "..." : ""}</div>
-                    <button type="button" onClick={() => reorderItems(order.items || [])} style={{ ...secondaryButtonStyle, marginTop: 8, padding: "8px 10px" }}>{t.reorder}</button>
-                  </div>
-                ))}
+                {orderHistory.slice(0, 8).map((order, index) => {
+                  const key = order.orderRef || order.createdAt || String(index);
+                  const items = order.items || [];
+                  const expanded = expandedHistoryKey === key;
+                  const totalHistoryCases = items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+
+                  return (
+                    <div key={key} style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 10, background: "#f9fafb", overflow: "visible" }}>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedHistoryKey((prev) => (prev === key ? "" : key))}
+                        style={{
+                          width: "100%",
+                          border: "none",
+                          background: "transparent",
+                          padding: 0,
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
+                          gap: 10,
+                          textAlign: "left",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 900, color: "#111827" }}>{order.orderRef || "-"}</div>
+                          <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                            {order.createdAt ? new Date(order.createdAt).toLocaleString() : ""} · {items.length} {t.items} · {totalHistoryCases} {t.cases}
+                          </div>
+                          {!expanded ? (
+                            <div style={{ fontSize: 12, color: "#374151", marginTop: 6 }}>
+                              {items.slice(0, 5).map((item) => `${item.sku}(${item.qty})`).join(", ")}
+                              {items.length > 5 ? "..." : ""}
+                            </div>
+                          ) : null}
+                        </div>
+                        <div style={{ ...toggleTextStyle, flexShrink: 0 }}>{expanded ? t.hideDetails : t.viewDetails}</div>
+                      </button>
+
+                      {expanded ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+                          {items.map((item, itemIndex) => {
+                            const catalogItem = getCatalogItemBySku(item.sku);
+                            return (
+                              <div
+                                key={`${item.sku}-${itemIndex}`}
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  gap: 10,
+                                  border: "1px solid #e5e7eb",
+                                  borderRadius: 10,
+                                  padding: 8,
+                                  background: "#ffffff",
+                                  overflow: "visible",
+                                }}
+                              >
+                                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                                  <ProductImage sku={item.sku} alt={item.sku} size={40} imageUrl={catalogItem?.imageUrl} />
+                                  <div style={{ minWidth: 0 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 900, color: "#111827" }}>{item.sku}</div>
+                                    <div style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.35, overflow: "hidden", textOverflow: "ellipsis" }}>
+                                      {catalogItem?.brand ? `${catalogItem.brand} | ` : ""}{catalogItem?.name || "-"}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div style={{ fontSize: 13, fontWeight: 900, color: "#16a34a", flexShrink: 0 }}>
+                                  {t.qty}: {item.qty}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+
+                      <button type="button" onClick={() => reorderItems(items)} style={{ ...secondaryButtonStyle, marginTop: 8, padding: "8px 10px" }}>{t.reorder}</button>
+                    </div>
+                  );
+                })}
               </div>
             ) : null}
           </section>

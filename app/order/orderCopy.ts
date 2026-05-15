@@ -84,6 +84,8 @@ export const copy = {
     allBrands: "All brands",
     category: "Category",
     newItems: "New items",
+    viewDetails: "View",
+    hideDetails: "Hide",
     moreBrandsPick: "More brands…",
   },
   zh: {
@@ -171,6 +173,8 @@ export const copy = {
     allBrands: "全部品牌",
     category: "分类",
     newItems: "新品",
+    viewDetails: "查看",
+    hideDetails: "收起",
     moreBrandsPick: "更多品牌…",
   },
   ko: {
@@ -258,6 +262,8 @@ export const copy = {
     allBrands: "전체 브랜드",
     category: "카테고리",
     newItems: "신상품",
+    viewDetails: "보기",
+    hideDetails: "숨기기",
     moreBrandsPick: "다른 브랜드…",
   },
   vi: {
@@ -345,6 +351,8 @@ export const copy = {
     allBrands: "Tất cả thương hiệu",
     category: "Danh mục",
     newItems: "Hàng mới",
+    viewDetails: "Xem",
+    hideDetails: "Ẩn",
     moreBrandsPick: "Thương hiệu khác…",
   },
 } as const;
