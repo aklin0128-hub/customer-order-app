@@ -16,6 +16,7 @@ import {
   Toast,
 } from "../_components/admin-utils";
 import { useAdminAuth } from "../_components/useAdminAuth";
+import { CATEGORY_OPTIONS } from "@/lib/inferCategory";
 
 type Product = {
   sku: string;
@@ -45,18 +46,7 @@ const statusOptions = [
   "INV",
 ];
 
-const categoryOptions = [
-  "",
-  "RICE",
-  "NOODLES",
-  "SAUCE",
-  "SEASONING",
-  "FROZEN",
-  "REFRIGERATED",
-  "SNACK",
-  "PROCESSED",
-  "NON-FOOD",
-];
+const categoryOptions = ["", ...CATEGORY_OPTIONS.filter((c) => c !== "ALL")];
 
 function productImageSrc(sku: string, imageUrl?: string) {
   if (imageUrl) return imageUrl;

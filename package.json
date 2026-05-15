@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:nongshim-promo": "node scripts/seed-nongshim-promotions.mjs",
+    "assign-categories": "npx tsx scripts/assign-catalog-categories.ts"
   },
   "dependencies": {
     "@upstash/redis": "^1.37.0",

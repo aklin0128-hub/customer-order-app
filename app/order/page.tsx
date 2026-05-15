@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
+import { brandMatchesFilter, getAvailableFeaturedBrands } from "@/lib/catalogBrands";
+import { CATEGORY_OPTIONS, inferCategory } from "@/lib/inferCategory";
 
 type Lang = "en" | "zh" | "ko";
 type OrderMode = "search" | "catalog" | "promotion";
@@ -132,6 +134,9 @@ const copy = {
     quickAdd: "Quick add",
     close: "Close",
     back: "Back",
+    brand: "Brand",
+    allBrands: "All brands",
+    category: "Category",
   },
   zh: {
     title: "客户订单",
@@ -214,6 +219,9 @@ const copy = {
     quickAdd: "快速添加",
     close: "关闭",
     back: "返回",
+    brand: "品牌",
+    allBrands: "全部品牌",
+    category: "分类",
   },
   ko: {
     title: "고객 주문",
@@ -296,8 +304,20 @@ const copy = {
     quickAdd: "빠른 추가",
     close: "닫기",
     back: "뒤로",
+    brand: "브랜드",
+    allBrands: "전체 브랜드",
+    category: "카테고리",
   },
 };
+
+function formatBrandLabel(brand: string) {
+  if (!brand) return brand;
+  return brand
+    .toLowerCase()
+    .split(/\s+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
 
 function formatPromoDetails(item: PromotionItem, t: (typeof copy)["en"]) {
   const parts: string[] = [];
@@ -317,38 +337,7 @@ function formatPromoDetails(item: PromotionItem, t: (typeof copy)["en"]) {
   return parts.join(" · ");
 }
 
-const categoryOptions = [
-  "ALL",
-  "RICE",
-  "SAUCE",
-  "SEASONING",
-  "NOODLES",
-  "PROCESSED",
-  "FROZEN",
-  "REFRIGERATED",
-  "SNACK",
-  "NON-FOOD",
-];
-
-function inferCategory(item: CatalogItem) {
-  const category = String(item.category || "").trim().toUpperCase();
-  if (category) return category;
-
-  const sku = String(item.sku || "").toUpperCase();
-  const text = `${item.brand || ""} ${item.name || ""}`.toUpperCase();
-
-  if (text.includes("RICE") || sku.endsWith("D") && sku.startsWith("000")) return "RICE";
-  if (text.includes("RAMEN") || text.includes("NOODLE") || text.includes("UDON") || text.includes("SOBA") || text.includes("JAPCHAE")) return "NOODLES";
-  if (text.includes("SAUCE") || text.includes("PASTE") || text.includes("GOCHUJANG") || text.includes("DOENJANG") || text.includes("SSAMJANG") || text.includes("CURRY") || text.includes("COCONUT MILK")) return "SAUCE";
-  if (text.includes("OIL") || text.includes("VINEGAR") || text.includes("POWDER") || text.includes("SALT") || text.includes("BROTH") || text.includes("STOCK") || text.includes("SEASONING") || text.includes("SUGAR") || text.includes("SYRUP") || text.includes("HONEY")) return "SEASONING";
-  if (text.includes("DUMPLING") || text.includes("KIMCHI") || text.includes("TOFU") || text.includes("FROZEN")) return "FROZEN";
-  if (text.includes("REFRIGERATED") || text.includes("FRESH")) return "REFRIGERATED";
-  if (text.includes("CHIP") || text.includes("SNACK") || text.includes("COOKIE") || text.includes("CRACKER") || text.includes("CANDY")) return "SNACK";
-  if (text.includes("TOFU") || text.includes("DRIED") || text.includes("PICKLED") || text.includes("BAMBOO") || text.includes("CHESTNUT") || text.includes("FRUIT") || text.includes("LUNCHEON") || text.includes("EGG")) return "PROCESSED";
-  if (text.includes("CHOPSTICK") || text.includes("BOWL") || text.includes("GLOVE") || text.includes("BAG") || text.includes("CONTAINER")) return "NON-FOOD";
-
-  return "OTHER";
-}
+const categoryOptions = CATEGORY_OPTIONS;
 
 function getImageUrl(sku?: string) {
   if (!sku) return "";
@@ -518,6 +507,7 @@ export default function OrderPage() {
   const [catalogQtyMap, setCatalogQtyMap] = useState<Record<string, string>>({});
   const [catalogSearch, setCatalogSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
+  const [brandFilter, setBrandFilter] = useState("ALL");
   const [submitting, setSubmitting] = useState(false);
   const [submitMsg, setSubmitMsg] = useState("");
   const [showReview, setShowReview] = useState(false);
@@ -712,17 +702,25 @@ export default function OrderPage() {
       .slice(0, 60);
   }, [normalizedSkuInput, showAvailableOnly, catalogVersion]);
 
+  const orderableBaseItems = useMemo(() => {
+    return catalog.filter((item) => isNormalItem(item));
+  }, [catalogVersion]);
+
+  const brandFilterOptions = useMemo(() => {
+    return getAvailableFeaturedBrands(orderableBaseItems);
+  }, [orderableBaseItems]);
+
   const orderableCatalogItems = useMemo(() => {
     const q = catalogSearch.trim().toUpperCase();
 
-    return catalog
-      .filter((item) => isNormalItem(item))
+    return orderableBaseItems
       .filter((item) => {
         if (catalogShowSelectedOnly) {
           const sku = (item.sku || "").toUpperCase();
           if (Number(catalogQtyMap[sku] || 0) <= 0) return false;
         }
         if (categoryFilter !== "ALL" && inferCategory(item) !== categoryFilter) return false;
+        if (brandFilter !== "ALL" && !brandMatchesFilter(item.brand, brandFilter)) return false;
         return true;
       })
       .filter((item) => {
@@ -736,17 +734,27 @@ export default function OrderPage() {
         );
       })
       .sort((a, b) => (a.sku || "").localeCompare(b.sku || ""));
-  }, [catalogSearch, categoryFilter, catalogQtyMap, catalogVersion, catalogShowSelectedOnly]);
+  }, [catalogSearch, categoryFilter, brandFilter, catalogQtyMap, orderableBaseItems, catalogShowSelectedOnly]);
 
   const displayCatalogItems = useMemo(() => {
-    const hasFilter = Boolean(catalogSearch.trim()) || categoryFilter !== "ALL" || catalogShowSelectedOnly;
+    const hasFilter =
+      Boolean(catalogSearch.trim()) ||
+      categoryFilter !== "ALL" ||
+      brandFilter !== "ALL" ||
+      catalogShowSelectedOnly;
     const cap = hasFilter ? 250 : catalogListLimit;
     return orderableCatalogItems.slice(0, cap);
-  }, [orderableCatalogItems, catalogSearch, categoryFilter, catalogShowSelectedOnly, catalogListLimit]);
+  }, [orderableCatalogItems, catalogSearch, categoryFilter, brandFilter, catalogShowSelectedOnly, catalogListLimit]);
 
   useEffect(() => {
     setCatalogListLimit(80);
-  }, [categoryFilter, catalogSearch, catalogShowSelectedOnly]);
+  }, [categoryFilter, brandFilter, catalogSearch, catalogShowSelectedOnly]);
+
+  useEffect(() => {
+    if (brandFilter !== "ALL" && !brandFilterOptions.includes(brandFilter)) {
+      setBrandFilter("ALL");
+    }
+  }, [brandFilter, brandFilterOptions]);
 
   const catalogItemsForSubmit = useMemo(() => {
     return Object.entries(catalogQtyMap)
@@ -1381,18 +1389,46 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
             </div>
 
             <div style={stickyCatalogToolsStyle}>
-              <div style={categoryBarStyle}>
-                {categoryOptions.map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setCategoryFilter(cat)}
-                    style={categoryButtonStyle(categoryFilter === cat)}
-                  >
-                    {cat}
-                  </button>
-                ))}
+              <div style={filterBlockStyle}>
+                <div style={filterLabelStyle}>{t.category}</div>
+                <div style={categoryBarStyle}>
+                  {categoryOptions.map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setCategoryFilter(cat)}
+                      style={categoryButtonStyle(categoryFilter === cat)}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {brandFilterOptions.length > 0 ? (
+                <div style={filterBlockStyle}>
+                  <div style={filterLabelStyle}>{t.brand}</div>
+                  <div style={categoryBarStyle}>
+                    <button
+                      type="button"
+                      onClick={() => setBrandFilter("ALL")}
+                      style={categoryButtonStyle(brandFilter === "ALL")}
+                    >
+                      {t.allBrands}
+                    </button>
+                    {brandFilterOptions.map((brand) => (
+                      <button
+                        key={brand}
+                        type="button"
+                        onClick={() => setBrandFilter(brand)}
+                        style={categoryButtonStyle(brandFilter === brand)}
+                      >
+                        {formatBrandLabel(brand)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               <input
                 value={catalogSearch}
@@ -1425,7 +1461,11 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
               })}
             </div>
 
-            {displayCatalogItems.length < orderableCatalogItems.length && !catalogSearch.trim() && categoryFilter === "ALL" && !catalogShowSelectedOnly ? (
+            {displayCatalogItems.length < orderableCatalogItems.length &&
+            !catalogSearch.trim() &&
+            categoryFilter === "ALL" &&
+            brandFilter === "ALL" &&
+            !catalogShowSelectedOnly ? (
               <button
                 type="button"
                 onClick={() => setCatalogListLimit((n) => n + 80)}
@@ -1754,7 +1794,22 @@ const stepperStyle: React.CSSProperties = { display: "grid", gridTemplateColumns
 const stepButtonStyle: React.CSSProperties = { width: 30, height: 32, borderRadius: 10, border: "1px solid #d1d5db", background: "#f9fafb", fontSize: 18, fontWeight: 900, cursor: "pointer", lineHeight: 1 };
 const stepInputStyle: React.CSSProperties = { width: "100%", height: 32, borderRadius: 10, border: "1px solid #d1d5db", textAlign: "center", fontSize: 14, fontWeight: 900, outline: "none", boxSizing: "border-box" };
 const limitedBadgeStyle: React.CSSProperties = { padding: "2px 7px", borderRadius: 999, fontSize: 10, fontWeight: 800, background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" };
-const categoryBarStyle: React.CSSProperties = { display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 10 };
+const filterBlockStyle: React.CSSProperties = { marginBottom: 10 };
+const filterLabelStyle: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 900,
+  color: "#6b7280",
+  marginBottom: 6,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
+};
+const categoryBarStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+  overflowX: "auto",
+  paddingBottom: 4,
+  WebkitOverflowScrolling: "touch",
+};
 const categoryButtonStyle = (active: boolean): React.CSSProperties => ({ padding: "8px 12px", borderRadius: 999, border: active ? "1px solid #2563eb" : "1px solid #d1d5db", background: active ? "#eff6ff" : "#ffffff", color: active ? "#2563eb" : "#374151", fontSize: 12, fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" });
 const fixedSubmitBarStyle: React.CSSProperties = { position: "fixed", left: "50%", bottom: 14, transform: "translateX(-50%)", width: "calc(100% - 24px)", maxWidth: 980, background: "rgba(255,255,255,0.96)", border: "1px solid #d1d5db", borderRadius: 16, padding: 10, boxShadow: "0 12px 32px rgba(0,0,0,0.18)", zIndex: 8000 };
 const reviewOverlayStyle: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(17,24,39,0.48)", display: "flex", alignItems: "center", justifyContent: "center", padding: 14, zIndex: 9000 };

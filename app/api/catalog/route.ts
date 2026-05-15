@@ -9,9 +9,10 @@ export async function GET() {
     const map = new Map<string, any>();
 
     for (const item of catalogData as any[]) {
-      if (!item.sku) continue;
-
-      const sku = String(item.sku).toUpperCase();
+      const sku = String(item.sku || "")
+        .trim()
+        .toUpperCase();
+      if (!sku || sku.includes(" ")) continue;
 
       map.set(sku, {
         ...item,

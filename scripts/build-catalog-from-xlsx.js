@@ -47,7 +47,7 @@ function main() {
     .map((row) => {
       const sku = safeString(row["PID"]).toUpperCase();
 
-      if (!sku) return null;
+      if (!sku || sku.includes(" ")) return null;
 
       return {
         sku,
