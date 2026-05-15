@@ -514,8 +514,13 @@ export default function OrderPage() {
           item.upc?.toUpperCase().includes(q)
         );
       })
-      .sort((a, b) => (a.sku || "").localeCompare(b.sku || ""));
-  }, [catalogSearch, categoryFilter, catalogVersion]);
+      .sort((a, b) => {
+        const aSelected = Number(catalogQtyMap[(a.sku || "").toUpperCase()] || 0) > 0;
+        const bSelected = Number(catalogQtyMap[(b.sku || "").toUpperCase()] || 0) > 0;
+        if (aSelected !== bSelected) return aSelected ? -1 : 1;
+        return (a.sku || "").localeCompare(b.sku || "");
+      });
+  }, [catalogSearch, categoryFilter, catalogQtyMap, catalogVersion]);
 
   const catalogItemsForSubmit = useMemo(() => {
     return Object.entries(catalogQtyMap)
@@ -526,6 +531,39 @@ export default function OrderPage() {
         return !catalogItem || isNormalItem(catalogItem);
       });
   }, [catalogQtyMap, catalogVersion]);
+
+  const totalCases = useMemo(() => {
+    return catalogItemsForSubmit.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+  }, [catalogItemsForSubmit]);
+
+  const setQtyForSku = (sku: string, value: string) => {
+    const cleanSku = sku.trim().toUpperCase();
+    const cleanQty = String(value || "").replace(/[^0-9]/g, "");
+
+    setCatalogQtyMap((prev) => {
+      const next = { ...prev };
+      if (!cleanQty || Number(cleanQty) <= 0) delete next[cleanSku];
+      else next[cleanSku] = String(Number(cleanQty));
+      return next;
+    });
+
+    setCart((prev) => {
+      const withoutSku = prev.filter((item) => item.sku.toUpperCase() !== cleanSku);
+      if (!cleanQty || Number(cleanQty) <= 0) return withoutSku;
+      return [...withoutSku, { sku: cleanSku, qty: String(Number(cleanQty)) }];
+    });
+  };
+
+  const adjustQtyForSku = (sku: string, delta: number) => {
+    const cleanSku = sku.trim().toUpperCase();
+    const current = Number(catalogQtyMap[cleanSku] || 0);
+    const next = Math.max(0, current + delta);
+    setQtyForSku(cleanSku, next ? String(next) : "");
+  };
+
+  const removeSkuFromOrder = (sku: string) => {
+    setQtyForSku(sku, "");
+  };
 
   useEffect(() => {
     if (!normalizedSkuInput) {
@@ -567,8 +605,9 @@ export default function OrderPage() {
     const duplicated = cart.some((x) => x.sku.toUpperCase() === finalSku);
     if (duplicated && !confirm(`${finalSku} ${t.duplicate}`)) return;
 
-    setCart((prev) => [...prev, { sku: finalSku, qty: finalQty }]);
-    syncCatalogQty(finalSku, finalQty);
+    const currentQty = Number(catalogQtyMap[finalSku] || 0);
+    const nextQty = currentQty + (Number(String(finalQty).replace(/[^0-9]/g, "")) || 1);
+    setQtyForSku(finalSku, String(nextQty));
 
     setSkuInput("");
     setQtyInput("");
@@ -591,17 +630,6 @@ export default function OrderPage() {
     addSkuToCart(finalSku, qty);
   };
 
-  const syncCartFromCatalogQty = (sku: string, qty: string) => {
-    const cleanSku = sku.trim().toUpperCase();
-    const cleanQty = String(qty || "").replace(/[^0-9]/g, "");
-
-    setCart((prev) => {
-      const withoutSku = prev.filter((item) => item.sku.toUpperCase() !== cleanSku);
-      if (!cleanQty || Number(cleanQty) <= 0) return withoutSku;
-      return [...withoutSku, { sku: cleanSku, qty: String(Number(cleanQty)) }];
-    });
-  };
-
   const updateCatalogQty = (sku: string, value: string) => {
     const cleanSku = sku.toUpperCase();
     const clean = value.replace(/[^0-9]/g, "");
@@ -613,20 +641,11 @@ export default function OrderPage() {
       return;
     }
 
-    setCatalogQtyMap((prev) => {
-      const next = { ...prev };
-      if (!clean || Number(clean) <= 0) delete next[cleanSku];
-      else next[cleanSku] = String(Number(clean));
-      return next;
-    });
-
-    syncCartFromCatalogQty(cleanSku, clean);
+    setQtyForSku(cleanSku, clean);
   };
 
   const adjustCatalogQty = (sku: string, delta: number) => {
-    const current = Number(catalogQtyMap[sku.toUpperCase()] || 0);
-    const next = Math.max(0, current + delta);
-    updateCatalogQty(sku, next ? String(next) : "");
+    adjustQtyForSku(sku, delta);
   };
 
   const reorderItems = (items: CartItem[]) => {
@@ -653,8 +672,16 @@ export default function OrderPage() {
     setTimeout(() => skuInputRef.current?.focus(), 50);
   };
 
-  const removeItem = (index: number) => setCart((prev) => prev.filter((_, i) => i !== index));
-  const updateCartQty = (index: number, qty: string) => setCart((prev) => prev.map((item, i) => (i === index ? { ...item, qty } : item)));
+  const removeItem = (index: number) => {
+    const target = cart[index];
+    if (target?.sku) removeSkuFromOrder(target.sku);
+  };
+
+  const updateCartQty = (index: number, qty: string) => {
+    const target = cart[index];
+    if (!target?.sku) return;
+    setQtyForSku(target.sku, qty);
+  };
 
   const clearOrder = async () => {
     if (!confirm(t.clearConfirm)) return;
@@ -679,8 +706,7 @@ export default function OrderPage() {
   };
 
   const getCurrentSubmitItems = () => {
-    if (mode === "catalog") return catalogItemsForSubmit;
-    return cart.filter((item) => item.sku && item.qty);
+    return catalogItemsForSubmit;
   };
 
   const downloadCsv = () => {
@@ -747,8 +773,8 @@ export default function OrderPage() {
         return;
       }
 
-      if (mode === "catalog") setCatalogQtyMap(parsedMap);
-      else setCart(parsed);
+      setCatalogQtyMap(parsedMap);
+      setCart(parsed);
       setSubmitMsg(`${parsed.length} ${t.items} loaded.`);
     } catch (error: any) {
       alert(error?.message || "Failed to read CSV.");
@@ -957,7 +983,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
 
             <div style={{ marginTop: 10 }}><Input label={t.qty} value={qtyInput} onChange={setQtyInput} placeholder="1" onEnter={addItem} /></div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8, marginTop: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8, marginTop: 10 }}>
               {quickQtyButtons.map((qty) => <button key={qty} type="button" onClick={() => setQtyInput(qty)} style={qtyButtonStyle}>{qty}</button>)}
             </div>
 
@@ -975,20 +1001,22 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
               
             </div>
 
-            <div style={categoryBarStyle}>
-              {categoryOptions.map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setCategoryFilter(cat)}
-                  style={categoryButtonStyle(categoryFilter === cat)}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
+            <div style={stickyCatalogToolsStyle}>
+              <div style={categoryBarStyle}>
+                {categoryOptions.map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategoryFilter(cat)}
+                    style={categoryButtonStyle(categoryFilter === cat)}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
 
-            <input value={catalogSearch} onChange={(e) => setCatalogSearch(e.target.value)} placeholder={t.catalogSearch} style={{ ...wideInputStyle, marginBottom: 12 }} />
+              <input value={catalogSearch} onChange={(e) => setCatalogSearch(e.target.value)} placeholder={t.catalogSearch} style={{ ...wideInputStyle, marginBottom: 0 }} />
+            </div>
 
             <div style={catalogListStyle}>
               {orderableCatalogItems.map((item) => {
@@ -1073,12 +1101,15 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
         </section>
 
         <div style={fixedSubmitBarStyle}>
-          <div style={{ display: "grid", gridTemplateColumns: "0.8fr 1.2fr", gap: 8 }}>
+          <div style={cartSummaryTextStyle}>
+            Cart: {getCurrentSubmitItems().length} items / {totalCases} cases
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "0.9fr 1.1fr", gap: 8 }}>
             <button type="button" onClick={openReview} disabled={submitting} style={secondaryButtonStyle}>
-              Cart ({getCurrentSubmitItems().length})
+              Review Cart
             </button>
             <button type="button" onClick={openReview} disabled={submitting} style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}>
-              {submitting ? t.submitting : `${t.submitOrder} (${getCurrentSubmitItems().length})`}
+              {submitting ? t.submitting : `${t.submitOrder}`}
             </button>
           </div>
         </div>
@@ -1099,16 +1130,25 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                   const catalogItem = getCatalogItemBySku(item.sku);
                   return (
                     <div key={`${item.sku}-${index}`} style={reviewItemStyle}>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0, flex: 1 }}>
                         <ProductImage sku={item.sku} alt={item.sku} size={42} imageUrl={catalogItem?.imageUrl} />
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: 14, fontWeight: 900, color: "#111827" }}>{item.sku}</div>
-                          <div style={{ fontSize: 12, color: "#4b5563", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 520 }}>
+                          <div style={{ fontSize: 12, color: "#4b5563", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 420 }}>
                             {catalogItem?.brand ? `${catalogItem.brand} | ` : ""}{catalogItem?.name || "-"}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                            {catalogItem?.palletSize ? `Pallet: ${catalogItem.palletSize}` : ""}{catalogItem?.limitedQty ? `  Limited: ${catalogItem.limitedQty}` : ""}
                           </div>
                         </div>
                       </div>
-                      <div style={{ fontSize: 16, fontWeight: 900, color: "#16a34a" }}>Qty: {item.qty}</div>
+
+                      <div style={reviewQtyControlStyle}>
+                        <button type="button" onClick={() => adjustQtyForSku(item.sku, -1)} style={reviewQtyButtonStyle}>−</button>
+                        <input value={item.qty} onChange={(e) => setQtyForSku(item.sku, e.target.value)} inputMode="numeric" style={reviewQtyInputStyle} />
+                        <button type="button" onClick={() => adjustQtyForSku(item.sku, 1)} style={reviewQtyButtonStyle}>+</button>
+                        <button type="button" onClick={() => removeSkuFromOrder(item.sku)} style={reviewRemoveButtonStyle}>Remove</button>
+                      </div>
                     </div>
                   );
                 })}
@@ -1190,14 +1230,7 @@ function Input({ label, value, onChange, placeholder, inputRef, onEnter }: { lab
   );
 }
 
-const mainStyle: React.CSSProperties = {
-  minHeight: "100vh",
-  background: "#f8fafc",
-  padding: "14px 10px 110px",
-  fontFamily:
-    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-  overflow: "visible",
-};
+const mainStyle: React.CSSProperties = { minHeight: "100vh", background: "#f8fafc", padding: "14px 10px 24px", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', overflow: "visible" };
 const containerStyle: React.CSSProperties = { width: "100%", maxWidth: 980, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12, overflow: "visible" };
 const cardStyle: React.CSSProperties = { background: "#ffffff", borderRadius: 14, padding: 14, border: "1px solid #e5e7eb", boxShadow: "0 1px 2px rgba(0,0,0,0.04)", overflow: "visible" };
 const sectionTitleStyle: React.CSSProperties = { fontSize: 17, fontWeight: 800, color: "#111827" };
@@ -1218,13 +1251,7 @@ const cartItemStyle: React.CSSProperties = { border: "1px solid #e5e7eb", border
 const cartQtyInputStyle: React.CSSProperties = { width: 92, padding: "6px 8px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, fontWeight: 700, background: "#ffffff", outline: "none" };
 const productSmallButtonStyle: React.CSSProperties = { width: "100%", border: "1px solid #e5e7eb", background: "#ffffff", borderRadius: 12, padding: 10, textAlign: "left", cursor: "pointer", display: "flex", gap: 10, alignItems: "center", overflow: "visible", position: "relative" };
 const wideInputStyle: React.CSSProperties = { width: "100%", padding: "11px 12px", borderRadius: 12, border: "1px solid #d1d5db", fontSize: 14, boxSizing: "border-box", outline: "none", background: "#ffffff" };
-const catalogListStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-  columnGap: 12,
-  rowGap: 12,
-  overflow: "visible",
-};
+const catalogListStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", columnGap: 12, rowGap: 12, overflow: "visible" };
 const catalogCardStyle: React.CSSProperties = { border: "1px solid #e5e7eb", borderRadius: 14, background: "#ffffff", padding: 8, display: "flex", flexDirection: "column", gap: 6, overflow: "visible", position: "relative", minWidth: 0 };
 const stepperStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "30px 1fr 30px", gap: 5, alignItems: "center" };
 const stepButtonStyle: React.CSSProperties = { width: 30, height: 32, borderRadius: 10, border: "1px solid #d1d5db", background: "#f9fafb", fontSize: 18, fontWeight: 900, cursor: "pointer", lineHeight: 1 };
@@ -1234,6 +1261,65 @@ const categoryBarStyle: React.CSSProperties = { display: "flex", gap: 8, overflo
 const categoryButtonStyle = (active: boolean): React.CSSProperties => ({ padding: "8px 12px", borderRadius: 999, border: active ? "1px solid #2563eb" : "1px solid #d1d5db", background: active ? "#eff6ff" : "#ffffff", color: active ? "#2563eb" : "#374151", fontSize: 12, fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" });
 const fixedSubmitBarStyle: React.CSSProperties = { position: "fixed", left: "50%", bottom: 14, transform: "translateX(-50%)", width: "calc(100% - 24px)", maxWidth: 980, background: "rgba(255,255,255,0.96)", border: "1px solid #d1d5db", borderRadius: 16, padding: 10, boxShadow: "0 12px 32px rgba(0,0,0,0.18)", zIndex: 8000 };
 const reviewOverlayStyle: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(17,24,39,0.48)", display: "flex", alignItems: "center", justifyContent: "center", padding: 14, zIndex: 9000 };
-const reviewModalStyle: React.CSSProperties = { width: "100%", maxWidth: 760, maxHeight: "82vh", background: "#ffffff", borderRadius: 18, border: "1px solid #e5e7eb", padding: 16, boxShadow: "0 24px 60px rgba(0,0,0,0.28)", overflow: "hidden", display: "flex", flexDirection: "column" };
+const reviewModalStyle: React.CSSProperties = { width: "100%", maxWidth: 760, maxHeight: "90vh", background: "#ffffff", borderRadius: 18, border: "1px solid #e5e7eb", padding: 16, boxShadow: "0 24px 60px rgba(0,0,0,0.28)", overflow: "hidden", display: "flex", flexDirection: "column" };
 const reviewListStyle: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 8, overflowY: "auto", paddingRight: 4 };
-const reviewItemStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, border: "1px solid #e5e7eb", borderRadius: 12, background: "#f9fafb", padding: 10 };
+const stickyCatalogToolsStyle: React.CSSProperties = {
+  position: "sticky",
+  top: 0,
+  zIndex: 50,
+  background: "rgba(255,255,255,0.97)",
+  padding: "8px 0 10px",
+  marginBottom: 12,
+  borderBottom: "1px solid #eef2f7",
+};
+
+const cartSummaryTextStyle: React.CSSProperties = {
+  textAlign: "center",
+  fontSize: 13,
+  fontWeight: 900,
+  color: "#111827",
+  marginBottom: 8,
+};
+
+const reviewQtyControlStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "34px 58px 34px auto",
+  gap: 6,
+  alignItems: "center",
+};
+
+const reviewQtyButtonStyle: React.CSSProperties = {
+  width: 34,
+  height: 34,
+  borderRadius: 10,
+  border: "1px solid #d1d5db",
+  background: "#ffffff",
+  fontSize: 18,
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+const reviewQtyInputStyle: React.CSSProperties = {
+  width: 58,
+  height: 34,
+  borderRadius: 10,
+  border: "1px solid #d1d5db",
+  textAlign: "center",
+  fontSize: 14,
+  fontWeight: 900,
+  outline: "none",
+};
+
+const reviewRemoveButtonStyle: React.CSSProperties = {
+  height: 34,
+  borderRadius: 10,
+  border: "1px solid #fecaca",
+  background: "#fef2f2",
+  color: "#dc2626",
+  fontSize: 12,
+  fontWeight: 900,
+  cursor: "pointer",
+  padding: "0 9px",
+};
+
+const reviewItemStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, border: "1px solid #e5e7eb", borderRadius: 12, background: "#f9fafb", padding: 10, flexWrap: "wrap" };
