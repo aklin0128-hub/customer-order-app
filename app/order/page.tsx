@@ -291,6 +291,8 @@ export default function OrderPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitMsg, setSubmitMsg] = useState("");
   const [showReview, setShowReview] = useState(false);
+  const [lastSubmittedRef, setLastSubmittedRef] = useState("");
+  const [lastSubmittedItems, setLastSubmittedItems] = useState<CartItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [autoLoaded, setAutoLoaded] = useState(false);
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
@@ -565,6 +567,13 @@ export default function OrderPage() {
     const cleanSku = sku.toUpperCase();
     const clean = value.replace(/[^0-9]/g, "");
 
+    const catalogItem = getCatalogItemBySku(cleanSku);
+    const limitedQty = Number(String(catalogItem?.limitedQty || "").replace(/[^0-9]/g, ""));
+    if (clean && limitedQty > 0 && Number(clean) > limitedQty) {
+      alert(`${cleanSku} limited qty is ${limitedQty}.`);
+      return;
+    }
+
     setCatalogQtyMap((prev) => {
       const next = { ...prev };
       if (!clean || Number(clean) <= 0) delete next[cleanSku];
@@ -766,6 +775,8 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
       if (!res.ok) throw new Error(data?.error || t.failedSubmit);
 
       setSubmitMsg(`${t.orderSuccess} ${t.ref}: ${ref}`);
+      setLastSubmittedRef(ref);
+      setLastSubmittedItems(items);
       setShowReview(false);
       setCart([]);
       setCatalogQtyMap({});
@@ -1009,9 +1020,14 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
         </section>
 
         <div style={fixedSubmitBarStyle}>
-          <button type="button" onClick={openReview} disabled={submitting} style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}>
-            {submitting ? t.submitting : `${t.submitOrder} (${getCurrentSubmitItems().length})`}
-          </button>
+          <div style={{ display: "grid", gridTemplateColumns: "0.8fr 1.2fr", gap: 8 }}>
+            <button type="button" onClick={openReview} disabled={submitting} style={secondaryButtonStyle}>
+              Cart ({getCurrentSubmitItems().length})
+            </button>
+            <button type="button" onClick={openReview} disabled={submitting} style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}>
+              {submitting ? t.submitting : `${t.submitOrder} (${getCurrentSubmitItems().length})`}
+            </button>
+          </div>
         </div>
 
         {showReview ? (
@@ -1051,6 +1067,35 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                   {submitting ? t.submitting : "Confirm Submit"}
                 </button>
               </div>
+            </div>
+          </div>
+        ) : null}
+
+        {lastSubmittedRef ? (
+          <div style={reviewOverlayStyle}>
+            <div style={reviewModalStyle}>
+              <div style={{ fontSize: 22, fontWeight: 900, color: "#16a34a", textAlign: "center" }}>Order Submitted</div>
+              <div style={{ fontSize: 14, color: "#374151", textAlign: "center", marginTop: 6 }}>{t.ref}: {lastSubmittedRef}</div>
+              <div style={{ fontSize: 13, color: "#6b7280", textAlign: "center", marginTop: 4 }}>{lastSubmittedItems.length} {t.items}</div>
+
+              <div style={{ ...reviewListStyle, marginTop: 12 }}>
+                {lastSubmittedItems.map((item, index) => {
+                  const catalogItem = getCatalogItemBySku(item.sku);
+                  return (
+                    <div key={`${item.sku}-${index}`} style={reviewItemStyle}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 900 }}>{item.sku}</div>
+                        <div style={{ fontSize: 12, color: "#6b7280" }}>{catalogItem?.brand ? `${catalogItem.brand} | ` : ""}{catalogItem?.name || "-"}</div>
+                      </div>
+                      <div style={{ fontSize: 15, fontWeight: 900, color: "#16a34a" }}>Qty: {item.qty}</div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <button type="button" onClick={() => setLastSubmittedRef("")} style={{ ...submitButtonStyle, background: "#2563eb", marginTop: 12 }}>
+                Done
+              </button>
             </div>
           </div>
         ) : null}
