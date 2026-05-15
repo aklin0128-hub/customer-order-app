@@ -550,6 +550,17 @@ export default function OrderPage() {
     addSkuToCart(finalSku, qty);
   };
 
+  const syncCartFromCatalogQty = (sku: string, qty: string) => {
+    const cleanSku = sku.trim().toUpperCase();
+    const cleanQty = String(qty || "").replace(/[^0-9]/g, "");
+
+    setCart((prev) => {
+      const withoutSku = prev.filter((item) => item.sku.toUpperCase() !== cleanSku);
+      if (!cleanQty || Number(cleanQty) <= 0) return withoutSku;
+      return [...withoutSku, { sku: cleanSku, qty: String(Number(cleanQty)) }];
+    });
+  };
+
   const updateCatalogQty = (sku: string, value: string) => {
     const cleanSku = sku.toUpperCase();
     const clean = value.replace(/[^0-9]/g, "");
@@ -560,6 +571,8 @@ export default function OrderPage() {
       else next[cleanSku] = String(Number(clean));
       return next;
     });
+
+    syncCartFromCatalogQty(cleanSku, clean);
   };
 
   const adjustCatalogQty = (sku: string, delta: number) => {
