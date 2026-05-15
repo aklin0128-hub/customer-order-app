@@ -13,6 +13,7 @@ type Product = {
   limitedQty?: string;
   palletSize?: string;
   imageUrl?: string;
+  category?: string;
   source?: string;
 };
 
@@ -21,11 +22,25 @@ const ADMIN_PASSWORD = "536678";
 const statusOptions = [
   "NORMAL",
   "NORMAL_NBR",
+  "NORMAL_NOBR",
   "TBD",
   "LIMITED",
   "SEASONAL",
   "DISCONTINUED",
   "INV",
+];
+
+const categoryOptions = [
+  "",
+  "RICE",
+  "NOODLES",
+  "SAUCE",
+  "SEASONING",
+  "FROZEN",
+  "REFRIGERATED",
+  "SNACK",
+  "PROCESSED",
+  "NON-FOOD",
 ];
 
 export default function AdminProductsPage() {
@@ -40,6 +55,7 @@ export default function AdminProductsPage() {
   const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
   const [status, setStatus] = useState("NORMAL");
+  const [category, setCategory] = useState("");
   const [size, setSize] = useState("");
   const [barcode, setBarcode] = useState("");
   const [upc, setUpc] = useState("");
@@ -98,6 +114,7 @@ export default function AdminProductsPage() {
           p.sku?.toUpperCase().includes(q) ||
           p.name?.toUpperCase().includes(q) ||
           p.brand?.toUpperCase().includes(q) ||
+          p.category?.toUpperCase().includes(q) ||
           p.barcode?.toUpperCase().includes(q) ||
           p.upc?.toUpperCase().includes(q)
         );
@@ -110,6 +127,7 @@ export default function AdminProductsPage() {
     setName(p.name || "");
     setBrand(p.brand || "");
     setStatus((p.status || "NORMAL").toUpperCase());
+    setCategory((p.category || "").toUpperCase());
     setSize(p.size || "");
     setBarcode(p.barcode || "");
     setUpc(p.upc || "");
@@ -124,6 +142,7 @@ export default function AdminProductsPage() {
     setName("");
     setBrand("");
     setStatus("NORMAL");
+    setCategory("");
     setSize("");
     setBarcode("");
     setUpc("");
@@ -154,6 +173,7 @@ export default function AdminProductsPage() {
           name,
           brand,
           status,
+          category,
           size,
           barcode,
           upc,
@@ -258,7 +278,7 @@ export default function AdminProductsPage() {
           <div>
             <h1 style={titleStyle}>Product SKU Manager</h1>
             <p style={subtitleStyle}>
-              Edit SKU status, limited qty, pallet size, product image, and item info.
+              Edit SKU status, category, limited qty, pallet size, product image, and item info.
             </p>
           </div>
 
@@ -289,17 +309,9 @@ export default function AdminProductsPage() {
 
           <div style={statCardStyle}>
             <div style={statNumberStyle}>
-              {
-                products.filter(
-                  (p) =>
-                    p.status === "NORMAL" ||
-                    p.status === "NORMAL_NBR" ||
-                    p.status === "NORMAL_NOBR" ||
-                    p.status === "TBD"
-                ).length
-              }
+              {products.filter((p) => p.category).length}
             </div>
-            <div style={statLabelStyle}>Orderable</div>
+            <div style={statLabelStyle}>Manual Category</div>
           </div>
         </section>
 
@@ -318,6 +330,17 @@ export default function AdminProductsPage() {
               <select value={status} onChange={(e) => setStatus(e.target.value)} style={inputStyle}>
                 {statusOptions.map((s) => (
                   <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label style={labelStyle}>Category</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle}>
+                {categoryOptions.map((c) => (
+                  <option key={c || "AUTO"} value={c}>
+                    {c || "AUTO"}
+                  </option>
                 ))}
               </select>
             </div>
@@ -401,7 +424,7 @@ export default function AdminProductsPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search SKU, name, brand, barcode..."
+            placeholder="Search SKU, name, brand, category, barcode..."
             style={{ ...inputStyle, marginTop: 12, marginBottom: 12 }}
           />
 
@@ -428,7 +451,7 @@ export default function AdminProductsPage() {
                     <div style={productTitleStyle}>{p.sku} · {p.brand || "-"}</div>
                     <div style={productNameStyle}>{p.name || "-"}</div>
                     <div style={productMetaStyle}>
-                      {p.size || "-"} · Pallet: {p.palletSize || "-"} · Limited: {p.limitedQty || "-"} · Source: {p.source || "Catalog"}
+                      Category: {p.category || "AUTO"} · Pallet: {p.palletSize || "-"} · Limited: {p.limitedQty || "-"} · Source: {p.source || "Catalog"}
                     </div>
                   </div>
                 </div>
