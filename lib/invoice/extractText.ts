@@ -1,5 +1,7 @@
 import { Buffer } from "node:buffer";
 
+import "@/lib/invoice/registerPdfNodePolyfills";
+
 export type ExtractMethod = "pdf" | "ocr";
 
 export async function extractInvoiceText(
