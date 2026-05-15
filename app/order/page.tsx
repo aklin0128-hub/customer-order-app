@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
 
 type Lang = "en" | "zh" | "ko";
-type OrderMode = "search" | "catalog";
+type OrderMode = "search" | "catalog" | "promotion";
+
+type PromotionItem = CatalogItem & { promoNote?: string };
 
 type CartItem = {
   sku: string;
@@ -51,6 +53,10 @@ const copy = {
     note: "Note (Optional)",
     searchMode: "Search Order",
     catalogMode: "Catalog Order",
+    promotionMode: "Promotions",
+    promotionHint: "Featured items — add qty and they go to your cart.",
+    noPromotions: "No promotions configured yet.",
+    promoBadge: "SALE",
     addItems: "Add Items",
     availableOnly: "Show available items only",
     skuItem: "SKU / Item",
@@ -123,6 +129,10 @@ const copy = {
     note: "备注（可选）",
     searchMode: "搜索下单",
     catalogMode: "商品目录下单",
+    promotionMode: "促销推荐",
+    promotionHint: "精选促销商品，输入数量即可加入购物车。",
+    noPromotions: "暂无促销活动。",
+    promoBadge: "促销",
     addItems: "添加商品",
     availableOnly: "只显示可下单商品",
     skuItem: "SKU / 商品",
@@ -195,6 +205,10 @@ const copy = {
     note: "메모 (선택)",
     searchMode: "검색 주문",
     catalogMode: "카탈로그 주문",
+    promotionMode: "프로모션",
+    promotionHint: "추천 상품 — 수량 입력 시 카트에 추가됩니다.",
+    noPromotions: "등록된 프로모션이 없습니다.",
+    promoBadge: "할인",
     addItems: "상품 추가",
     availableOnly: "주문 가능 상품만 보기",
     skuItem: "SKU / 상품",
@@ -370,6 +384,68 @@ function ProductImage({ sku, alt, size = 56, imageUrl }: { sku?: string; alt: st
   );
 }
 
+function CatalogQtyCard({
+  item,
+  qty,
+  promoNote,
+  inCartLabel,
+  promoBadgeLabel,
+  onAdjust,
+  onUpdateQty,
+  highlight,
+}: {
+  item: CatalogItem;
+  qty: string;
+  promoNote?: string;
+  inCartLabel: string;
+  promoBadgeLabel: string;
+  onAdjust: (sku: string, delta: number) => void;
+  onUpdateQty: (sku: string, value: string) => void;
+  highlight?: boolean;
+}) {
+  const hasQty = Number(qty) > 0;
+
+  return (
+    <div
+      style={{
+        ...catalogCardStyle,
+        background: hasQty ? "#ecfdf5" : highlight ? "#fffbeb" : "#ffffff",
+        border: hasQty ? "2px solid #86efac" : highlight ? "2px solid #fdba74" : "1px solid #e5e7eb",
+      }}
+    >
+      {promoNote || highlight ? (
+        <div style={promoTagStyle}>{promoNote || promoBadgeLabel}</div>
+      ) : null}
+
+      <div style={{ textAlign: "center", paddingTop: promoNote || highlight ? 4 : 0 }}>
+        <ProductImage sku={item.sku} alt={item.name || item.sku} size={84} imageUrl={item.imageUrl} />
+      </div>
+
+      <div style={{ fontSize: 12, fontWeight: 900, color: "#111827", lineHeight: 1.2 }}>{item.sku}</div>
+      <div style={{ fontSize: 11, fontWeight: 800, color: "#374151" }}>{item.brand || "-"}</div>
+      <div style={catalogNameStyle}>{item.name || "-"}</div>
+      {item.size ? <div style={{ fontSize: 10, color: "#6b7280" }}>{item.size}</div> : null}
+      {hasQty ? <div style={inCartTagStyle}>{inCartLabel}: {qty}</div> : null}
+
+      <div style={catalogStepperStyle}>
+        <button type="button" onClick={() => onAdjust(item.sku, -1)} style={catalogStepBtnStyle}>
+          −
+        </button>
+        <input
+          value={qty}
+          onChange={(e) => onUpdateQty(item.sku, e.target.value)}
+          placeholder="0"
+          inputMode="numeric"
+          style={catalogStepInputStyle}
+        />
+        <button type="button" onClick={() => onAdjust(item.sku, 1)} style={catalogStepBtnStyle}>
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function OrderPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -406,6 +482,7 @@ export default function OrderPage() {
   const [recentItems, setRecentItems] = useState<CartItem[]>([]);
   const [orderHistory, setOrderHistory] = useState<OrderHistoryItem[]>([]);
   const [catalogVersion, setCatalogVersion] = useState(0);
+  const [promotionItems, setPromotionItems] = useState<PromotionItem[]>([]);
 
   const t = copy[lang];
 
@@ -424,11 +501,29 @@ export default function OrderPage() {
   }, []);
 
   useEffect(() => {
+    if (!ready) return;
+
+    const loadPromotions = async () => {
+      try {
+        const res = await fetch("/api/promotions", { cache: "no-store" });
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.products)) {
+          setPromotionItems(
+            data.products.filter((item: PromotionItem) => isNormalItem(item))
+          );
+        }
+      } catch {}
+    };
+
+    loadPromotions();
+  }, [ready, catalogVersion]);
+
+  useEffect(() => {
     const saved = localStorage.getItem("lang") as Lang | null;
     if (saved === "en" || saved === "zh" || saved === "ko") setLang(saved);
 
     const savedMode = localStorage.getItem("order_mode") as OrderMode | null;
-    if (savedMode === "search" || savedMode === "catalog") setMode(savedMode);
+    if (savedMode === "search" || savedMode === "catalog" || savedMode === "promotion") setMode(savedMode);
   }, []);
 
   const changeLang = (next: Lang) => {
@@ -1014,6 +1109,14 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
             <button type="button" onClick={() => changeMode("catalog")} style={modeButtonStyle(mode === "catalog")}>
               {t.catalogMode}
             </button>
+            <button
+              type="button"
+              onClick={() => changeMode("promotion")}
+              style={promoModeButtonStyle(mode === "promotion")}
+            >
+              {t.promotionMode}
+              {promotionItems.length > 0 ? ` (${promotionItems.length})` : ""}
+            </button>
           </div>
         </section>
 
@@ -1155,6 +1258,35 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
               </button>
             </div>
           </section>
+        ) : mode === "promotion" ? (
+          <section style={{ ...cardStyle, border: "1px solid #fed7aa", background: "linear-gradient(180deg, #fffbeb 0%, #ffffff 40%)" }}>
+            <div style={sectionTitleStyle}>{t.promotionMode}</div>
+            <p style={{ fontSize: 13, color: "#9a3412", margin: "4px 0 14px", lineHeight: 1.45 }}>{t.promotionHint}</p>
+
+            {promotionItems.length === 0 ? (
+              <div style={emptyStyle}>{t.noPromotions}</div>
+            ) : (
+              <div style={promoGridStyle}>
+                {promotionItems.map((item) => {
+                  const sku = item.sku?.toUpperCase() || "";
+                  const qty = catalogQtyMap[sku] || "";
+                  return (
+                    <CatalogQtyCard
+                      key={item.sku}
+                      item={item}
+                      qty={qty}
+                      promoNote={item.promoNote}
+                      inCartLabel={t.inCart}
+                      promoBadgeLabel={t.promoBadge}
+                      highlight
+                      onAdjust={adjustCatalogQty}
+                      onUpdateQty={updateCatalogQty}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </section>
         ) : (
           <section style={cardStyle}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
@@ -1206,35 +1338,15 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                 const sku = item.sku?.toUpperCase() || "";
                 const qty = catalogQtyMap[sku] || "";
                 return (
-                  <div
+                  <CatalogQtyCard
                     key={item.sku}
-                    style={{
-                      ...catalogCardStyle,
-                      background: qty ? "#ecfdf5" : "#ffffff",
-                      border: qty ? "2px solid #86efac" : "1px solid #e5e7eb",
-                    }}
-                  >
-                    <div style={{ minHeight: 56 }}>
-                      <div style={{ fontSize: 11, fontWeight: 900, color: "#111827", lineHeight: 1.2 }}>{item.sku}</div>
-                      <div style={{ fontSize: 10, fontWeight: 800, color: "#374151", marginTop: 2, lineHeight: 1.2 }}>{item.brand || "-"}</div>
-                      <div style={{ fontSize: 10, color: "#4b5563", marginTop: 2, lineHeight: 1.25, maxHeight: 36, overflow: "hidden" }}>{item.name || "-"}</div>
-                      {qty ? <div style={{ fontSize: 9, color: "#059669", fontWeight: 900, marginTop: 4 }}>{t.inCart}: {qty}</div> : null}
-                    </div>
-
-                    <div style={{ display: "flex", justifyContent: "center", overflow: "visible", padding: "2px 0" }}>
-                      <ProductImage sku={item.sku} alt={item.name || item.sku} size={72} imageUrl={item.imageUrl} />
-                    </div>
-
-                    <div style={stepperStyle}>
-                      <button type="button" onClick={() => adjustCatalogQty(item.sku, -1)} style={stepButtonStyle}>−</button>
-                      <input value={qty} onChange={(e) => updateCatalogQty(item.sku, e.target.value)} placeholder="0" inputMode="numeric" style={stepInputStyle} />
-                      <button type="button" onClick={() => adjustCatalogQty(item.sku, 1)} style={stepButtonStyle}>+</button>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-                      <button type="button" onClick={() => adjustCatalogQty(item.sku, 1)} style={catalogQuickBtnStyle}>+1</button>
-                      <button type="button" onClick={() => adjustCatalogQty(item.sku, 5)} style={catalogQuickBtnStyle}>+5</button>
-                    </div>
-                  </div>
+                    item={item}
+                    qty={qty}
+                    inCartLabel={t.inCart}
+                    promoBadgeLabel={t.promoBadge}
+                    onAdjust={adjustCatalogQty}
+                    onUpdateQty={updateCatalogQty}
+                  />
                 );
               })}
             </div>
@@ -1452,8 +1564,24 @@ const toggleTextStyle: React.CSSProperties = { fontSize: 13, fontWeight: 800, co
 const smallButtonStyle: React.CSSProperties = { border: "1px solid #d1d5db", background: "#ffffff", borderRadius: 10, padding: "7px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" };
 const dangerSmallButtonStyle: React.CSSProperties = { border: "1px solid #fecaca", background: "#ffffff", color: "#dc2626", borderRadius: 10, padding: "7px 9px", fontSize: 12, fontWeight: 700, cursor: "pointer", flexShrink: 0 };
 const langButtonStyle = (active: boolean): React.CSSProperties => ({ border: active ? "1px solid #2563eb" : "1px solid #d1d5db", background: active ? "#eff6ff" : "#ffffff", color: active ? "#2563eb" : "#374151", borderRadius: 999, padding: "6px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer" });
-const modeTabsStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 };
-const modeButtonStyle = (active: boolean): React.CSSProperties => ({ padding: "10px 8px", borderRadius: 12, border: active ? "1px solid #2563eb" : "1px solid #d1d5db", background: active ? "#eff6ff" : "#ffffff", color: active ? "#1d4ed8" : "#374151", fontSize: 13, fontWeight: 900, cursor: "pointer" });
+const modeTabsStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 };
+const modeButtonStyle = (active: boolean): React.CSSProperties => ({
+  padding: "10px 6px",
+  borderRadius: 12,
+  border: active ? "1px solid #2563eb" : "1px solid #d1d5db",
+  background: active ? "#eff6ff" : "#ffffff",
+  color: active ? "#1d4ed8" : "#374151",
+  fontSize: 12,
+  fontWeight: 900,
+  cursor: "pointer",
+  lineHeight: 1.25,
+});
+const promoModeButtonStyle = (active: boolean): React.CSSProperties => ({
+  ...modeButtonStyle(active),
+  border: active ? "1px solid #ea580c" : "1px solid #fdba74",
+  background: active ? "#fff7ed" : "#fffbeb",
+  color: active ? "#c2410c" : "#9a3412",
+});
 const qtyButtonStyle: React.CSSProperties = { padding: "6px 0", borderRadius: 10, border: "1px solid #d1d5db", background: "#f9fafb", fontWeight: 700, fontSize: 13, cursor: "pointer" };
 const primarySmallButtonStyle: React.CSSProperties = { width: "35%", minWidth: 110, maxWidth: 150, padding: "8px 0", borderRadius: 10, border: "none", background: "#2563eb", color: "#ffffff", fontSize: 14, fontWeight: 800, cursor: "pointer" };
 const secondaryButtonStyle: React.CSSProperties = { width: "100%", padding: "11px 16px", borderRadius: 12, border: "1px solid #d1d5db", background: "#ffffff", color: "#111827", fontSize: 14, fontWeight: 800, cursor: "pointer" };
@@ -1464,9 +1592,80 @@ const cartItemStyle: React.CSSProperties = { border: "1px solid #e5e7eb", border
 const cartQtyInputStyle: React.CSSProperties = { width: 92, padding: "6px 8px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, fontWeight: 700, background: "#ffffff", outline: "none" };
 const productSmallButtonStyle: React.CSSProperties = { width: "100%", border: "1px solid #e5e7eb", background: "#ffffff", borderRadius: 12, padding: 10, textAlign: "left", cursor: "pointer", display: "flex", gap: 10, alignItems: "center", overflow: "visible", position: "relative" };
 const wideInputStyle: React.CSSProperties = { width: "100%", padding: "11px 12px", borderRadius: 12, border: "1px solid #d1d5db", fontSize: 14, boxSizing: "border-box", outline: "none", background: "#ffffff" };
-const catalogListStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(132px, 1fr))", columnGap: 10, rowGap: 10, overflow: "visible" };
-const catalogQuickBtnStyle: React.CSSProperties = { padding: "5px 0", borderRadius: 8, border: "1px solid #d1d5db", background: "#f9fafb", fontSize: 11, fontWeight: 800, cursor: "pointer" };
-const catalogCardStyle: React.CSSProperties = { border: "1px solid #e5e7eb", borderRadius: 14, background: "#ffffff", padding: 8, display: "flex", flexDirection: "column", gap: 6, overflow: "visible", position: "relative", minWidth: 0 };
+const catalogListStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))",
+  columnGap: 12,
+  rowGap: 12,
+  overflow: "visible",
+};
+const promoGridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+  gap: 12,
+};
+const catalogCardStyle: React.CSSProperties = {
+  borderRadius: 16,
+  padding: 10,
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+  overflow: "visible",
+  position: "relative",
+  minWidth: 0,
+  boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+};
+const catalogNameStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: "#4b5563",
+  lineHeight: 1.35,
+  maxHeight: 40,
+  overflow: "hidden",
+};
+const promoTagStyle: React.CSSProperties = {
+  alignSelf: "flex-start",
+  padding: "3px 8px",
+  borderRadius: 999,
+  fontSize: 10,
+  fontWeight: 900,
+  background: "#ffedd5",
+  color: "#c2410c",
+  border: "1px solid #fdba74",
+};
+const inCartTagStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: "#059669",
+  fontWeight: 900,
+};
+const catalogStepperStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "36px 1fr 36px",
+  gap: 6,
+  alignItems: "center",
+  marginTop: "auto",
+};
+const catalogStepBtnStyle: React.CSSProperties = {
+  width: 36,
+  height: 36,
+  borderRadius: 10,
+  border: "1px solid #d1d5db",
+  background: "#f9fafb",
+  fontSize: 20,
+  fontWeight: 900,
+  cursor: "pointer",
+  lineHeight: 1,
+};
+const catalogStepInputStyle: React.CSSProperties = {
+  width: "100%",
+  height: 36,
+  borderRadius: 10,
+  border: "1px solid #d1d5db",
+  textAlign: "center",
+  fontSize: 15,
+  fontWeight: 900,
+  outline: "none",
+  boxSizing: "border-box",
+};
 const stepperStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "30px 1fr 30px", gap: 5, alignItems: "center" };
 const stepButtonStyle: React.CSSProperties = { width: 30, height: 32, borderRadius: 10, border: "1px solid #d1d5db", background: "#f9fafb", fontSize: 18, fontWeight: 900, cursor: "pointer", lineHeight: 1 };
 const stepInputStyle: React.CSSProperties = { width: "100%", height: 32, borderRadius: 10, border: "1px solid #d1d5db", textAlign: "center", fontSize: 14, fontWeight: 900, outline: "none", boxSizing: "border-box" };

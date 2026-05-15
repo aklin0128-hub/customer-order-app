@@ -22,12 +22,13 @@ import {
   topBar,
 } from "./admin-styles";
 
-export type AdminNav = "home" | "customers" | "products" | "orders";
+export type AdminNav = "home" | "customers" | "products" | "promotions" | "orders";
 
 const NAV: { id: AdminNav; label: string; href: string; hint: string }[] = [
   { id: "home", label: "Dashboard", href: "/admin", hint: "Overview" },
   { id: "customers", label: "Customers", href: "/admin/customers", hint: "Login accounts" },
   { id: "products", label: "Products", href: "/admin/products", hint: "SKU settings" },
+  { id: "promotions", label: "Promotions", href: "/admin/promotions", hint: "Featured sales" },
   { id: "orders", label: "Orders", href: "/admin/orders", hint: "Order history" },
 ];
 

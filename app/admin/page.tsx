@@ -21,6 +21,12 @@ const QUICK_LINKS = [
     emoji: "📦",
   },
   {
+    title: "Promotions",
+    description: "Feature sales SKUs on the customer Promotions tab.",
+    href: "/admin/promotions",
+    emoji: "🏷️",
+  },
+  {
     title: "Orders",
     description: "Browse recent submitted orders and download CSV files.",
     href: "/admin/orders",
