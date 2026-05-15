@@ -253,7 +253,7 @@ function ProductImage({ sku, alt, size = 56, imageUrl }: { sku?: string; alt: st
       alt={alt}
       style={{ width: size, height: size, objectFit: "contain", borderRadius: 10, background: "#fff", border: "1px solid #e5e7eb", flexShrink: 0, transition: "all 0.22s ease", cursor: "zoom-in", transformOrigin: "center center", position: "relative", zIndex: 1 }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "scale(1.5)";
+        e.currentTarget.style.transform = "scale(3)";
         e.currentTarget.style.background = "#fff";
         e.currentTarget.style.border = "2px solid #2563eb";
         e.currentTarget.style.boxShadow = "0 12px 28px rgba(0,0,0,0.25)";
@@ -290,6 +290,7 @@ export default function OrderPage() {
   const [catalogSearch, setCatalogSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitMsg, setSubmitMsg] = useState("");
+  const [showReview, setShowReview] = useState(false);
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [autoLoaded, setAutoLoaded] = useState(false);
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
@@ -702,9 +703,7 @@ export default function OrderPage() {
     router.replace("/");
   };
 
-  const submitOrder = async () => {
-    if (submitLockRef.current || submitting) return;
-
+  const openReview = () => {
     const items = getCurrentSubmitItems();
 
     if (items.length === 0) {
@@ -718,13 +717,26 @@ export default function OrderPage() {
     });
 
     if (unavailableItems.length > 0) {
-      alert(`${t.unavailable}\n\n${unavailableItems.map((item) => item.sku).join(", ")}`);
+      alert(`${t.unavailable}
+
+${unavailableItems.map((item) => item.sku).join(", ")}`);
+      return;
+    }
+
+    setShowReview(true);
+  };
+
+  const submitOrder = async () => {
+    if (submitLockRef.current || submitting) return;
+
+    const items = getCurrentSubmitItems();
+
+    if (items.length === 0) {
+      alert(t.addAtLeast);
       return;
     }
 
     const ref = generateOrderRef(accountNo);
-    const confirmed = confirm(`${t.submitConfirm}\n\n${t.accountNo}: ${accountNo}\n${t.storeName}: ${storeName}\n${t.items}: ${items.length}\n${t.ref}: ${ref}`);
-    if (!confirmed) return;
 
     submitLockRef.current = true;
     setSubmitting(true);
@@ -741,6 +753,7 @@ export default function OrderPage() {
       if (!res.ok) throw new Error(data?.error || t.failedSubmit);
 
       setSubmitMsg(`${t.orderSuccess} ${t.ref}: ${ref}`);
+      setShowReview(false);
       setCart([]);
       setCatalogQtyMap({});
       setSkuInput("");
@@ -921,7 +934,7 @@ export default function OrderPage() {
                     </div>
 
                     <div style={{ display: "flex", justifyContent: "center", overflow: "visible", padding: "4px 0" }}>
-                      <ProductImage sku={item.sku} alt={item.name || item.sku} size={66} imageUrl={item.imageUrl} />
+                      <ProductImage sku={item.sku} alt={item.name || item.sku} size={100} imageUrl={item.imageUrl} />
                     </div>
 
                     <div style={stepperStyle}>
@@ -977,12 +990,57 @@ export default function OrderPage() {
               <input ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleUploadCsv} />
             </div>
             <button type="button" onClick={clearOrder} style={dangerButtonStyle}>{t.clearOrder}</button>
-            <button type="button" onClick={submitOrder} disabled={submitting} style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}>
-              {submitting ? t.submitting : `${t.submitOrder} (${getCurrentSubmitItems().length})`}
-            </button>
+            
             {submitMsg ? <div style={{ marginTop: 4, fontSize: 13, fontWeight: 700, color: submitMsg.toLowerCase().includes("failed") ? "#b91c1c" : "#15803d", textAlign: "center" }}>{submitMsg}</div> : null}
           </div>
         </section>
+
+        <div style={fixedSubmitBarStyle}>
+          <button type="button" onClick={openReview} disabled={submitting} style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}>
+            {submitting ? t.submitting : `${t.submitOrder} (${getCurrentSubmitItems().length})`}
+          </button>
+        </div>
+
+        {showReview ? (
+          <div style={reviewOverlayStyle}>
+            <div style={reviewModalStyle}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#111827" }}>Review Order</div>
+                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>{accountNo} | {storeName} | {getCurrentSubmitItems().length} {t.items}</div>
+                </div>
+                <button type="button" onClick={() => setShowReview(false)} style={dangerSmallButtonStyle}>Close</button>
+              </div>
+
+              <div style={reviewListStyle}>
+                {getCurrentSubmitItems().map((item, index) => {
+                  const catalogItem = getCatalogItemBySku(item.sku);
+                  return (
+                    <div key={`${item.sku}-${index}`} style={reviewItemStyle}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0 }}>
+                        <ProductImage sku={item.sku} alt={item.sku} size={42} imageUrl={catalogItem?.imageUrl} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 900, color: "#111827" }}>{item.sku}</div>
+                          <div style={{ fontSize: 12, color: "#4b5563", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 520 }}>
+                            {catalogItem?.brand ? `${catalogItem.brand} | ` : ""}{catalogItem?.name || "-"}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 900, color: "#16a34a" }}>Qty: {item.qty}</div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
+                <button type="button" onClick={() => setShowReview(false)} style={secondaryButtonStyle}>Back</button>
+                <button type="button" onClick={submitOrder} disabled={submitting} style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}>
+                  {submitting ? t.submitting : "Confirm Submit"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null]},{
 
         {orderHistory.length > 0 ? (
           <section style={cardStyle}>
@@ -1048,3 +1106,8 @@ const stepperStyle: React.CSSProperties = { display: "grid", gridTemplateColumns
 const stepButtonStyle: React.CSSProperties = { width: 30, height: 32, borderRadius: 10, border: "1px solid #d1d5db", background: "#f9fafb", fontSize: 18, fontWeight: 900, cursor: "pointer", lineHeight: 1 };
 const stepInputStyle: React.CSSProperties = { width: "100%", height: 32, borderRadius: 10, border: "1px solid #d1d5db", textAlign: "center", fontSize: 14, fontWeight: 900, outline: "none", boxSizing: "border-box" };
 const limitedBadgeStyle: React.CSSProperties = { padding: "2px 7px", borderRadius: 999, fontSize: 10, fontWeight: 800, background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" };
+const fixedSubmitBarStyle: React.CSSProperties = { position: "fixed", left: "50%", bottom: 14, transform: "translateX(-50%)", width: "calc(100% - 24px)", maxWidth: 980, background: "rgba(255,255,255,0.96)", border: "1px solid #d1d5db", borderRadius: 16, padding: 10, boxShadow: "0 12px 32px rgba(0,0,0,0.18)", zIndex: 8000 };
+const reviewOverlayStyle: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(17,24,39,0.48)", display: "flex", alignItems: "center", justifyContent: "center", padding: 14, zIndex: 9000 };
+const reviewModalStyle: React.CSSProperties = { width: "100%", maxWidth: 760, maxHeight: "82vh", background: "#ffffff", borderRadius: 18, border: "1px solid #e5e7eb", padding: 16, boxShadow: "0 24px 60px rgba(0,0,0,0.28)", overflow: "hidden", display: "flex", flexDirection: "column" };
+const reviewListStyle: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 8, overflowY: "auto", paddingRight: 4 };
+const reviewItemStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, border: "1px solid #e5e7eb", borderRadius: 12, background: "#f9fafb", padding: 10 };
