@@ -83,6 +83,7 @@ export const copy = {
     brand: "Brand",
     allBrands: "All brands",
     category: "Category",
+    newItems: "New items",
     moreBrandsPick: "More brands…",
   },
   zh: {
@@ -169,6 +170,7 @@ export const copy = {
     brand: "品牌",
     allBrands: "全部品牌",
     category: "分类",
+    newItems: "新品",
     moreBrandsPick: "更多品牌…",
   },
   ko: {
@@ -255,6 +257,7 @@ export const copy = {
     brand: "브랜드",
     allBrands: "전체 브랜드",
     category: "카테고리",
+    newItems: "신상품",
     moreBrandsPick: "다른 브랜드…",
   },
   vi: {
@@ -341,6 +344,7 @@ export const copy = {
     brand: "Thương hiệu",
     allBrands: "Tất cả thương hiệu",
     category: "Danh mục",
+    newItems: "Hàng mới",
     moreBrandsPick: "Thương hiệu khác…",
   },
 } as const;

@@ -21,6 +21,7 @@ import {
   getCatalogItemBySku,
   getDisplayStatus,
   getStatusBadgeStyle,
+  isNewItem,
   isNormalItem,
 } from "./catalogUtils";
 import { copy } from "./orderCopy";
@@ -103,6 +104,7 @@ export default function OrderPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [showCart, setShowCart] = useState(true);
   const [catalogShowSelectedOnly, setCatalogShowSelectedOnly] = useState(false);
+  const [catalogShowNewOnly, setCatalogShowNewOnly] = useState(false);
   const [recentItems, setRecentItems] = useState<CartItem[]>([]);
   const [orderHistory, setOrderHistory] = useState<OrderHistoryItem[]>([]);
   const [catalogVersion, setCatalogVersion] = useState(0);
@@ -292,6 +294,11 @@ export default function OrderPage() {
     [orderableBaseItems]
   );
 
+  const newItemCount = useMemo(
+    () => orderableBaseItems.filter((item) => isNewItem(item)).length,
+    [orderableBaseItems]
+  );
+
   const orderableCatalogItems = useMemo(() => {
     const q = catalogSearch.trim().toUpperCase();
 
@@ -303,6 +310,7 @@ export default function OrderPage() {
         }
         if (categoryFilter !== "ALL" && inferCategory(item) !== categoryFilter) return false;
         if (brandFilter !== "ALL" && !brandMatchesFilter(item.brand, brandFilter)) return false;
+        if (catalogShowNewOnly && !isNewItem(item)) return false;
         return true;
       })
       .filter((item) => {
@@ -316,7 +324,7 @@ export default function OrderPage() {
         );
       })
       .sort((a, b) => (a.sku || "").localeCompare(b.sku || ""));
-  }, [catalogSearch, categoryFilter, brandFilter, catalogQtyMap, orderableBaseItems, catalogShowSelectedOnly]);
+  }, [catalogSearch, categoryFilter, brandFilter, catalogQtyMap, orderableBaseItems, catalogShowSelectedOnly, catalogShowNewOnly]);
 
   useEffect(() => {
     if (brandFilter !== "ALL" && !isKnownBrandFilter(brandSplit, brandFilter)) {
@@ -953,14 +961,23 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                   {t.selected}: {cartItemCount} · {orderableCatalogItems.length} {t.catalogCount}
                 </div>
               </div>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: "#374151", cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={catalogShowSelectedOnly}
-                  onChange={(e) => setCatalogShowSelectedOnly(e.target.checked)}
-                />
-                {t.selectedOnly} ({cartItemCount})
-              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  onClick={() => setCatalogShowNewOnly((prev) => !prev)}
+                  style={categoryButtonStyle(catalogShowNewOnly)}
+                >
+                  {t.newItems} ({newItemCount})
+                </button>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: "#374151", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={catalogShowSelectedOnly}
+                    onChange={(e) => setCatalogShowSelectedOnly(e.target.checked)}
+                  />
+                  {t.selectedOnly} ({cartItemCount})
+                </label>
+              </div>
             </div>
 
             <div style={stickyCatalogToolsStyle}>

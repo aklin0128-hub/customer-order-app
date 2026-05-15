@@ -54,6 +54,21 @@ export function isNormalItem(item?: CatalogItem | null) {
   );
 }
 
+export function isNewItem(item?: CatalogItem | null) {
+  const text = [
+    item?.name,
+    item?.size,
+    item?.status,
+    (item as CatalogItem & { name_k?: string })?.name_k,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toUpperCase()
+    .replace(/[_-]+/g, " ");
+
+  return /(^|\s)NEW(\s|$)/.test(text);
+}
+
 export function getDisplayStatus(status?: string) {
   const s = String(status || "").trim().toUpperCase();
   if (!s || s === "INV") return "";
