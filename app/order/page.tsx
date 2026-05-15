@@ -90,6 +90,28 @@ const copy = {
     pallet: "Pallet",
     selected: "Selected",
     allOrderable: "All Orderable Items",
+    noMatches: "No items match your search.",
+    tapAdd: "Tap Add or press Enter",
+    add: "Add",
+    inCart: "In cart",
+    selectedOnly: "In cart only",
+    showing: "Showing",
+    loadMore: "Load more",
+    cartSummary: "Cart",
+    cases: "cases",
+    lines: "lines",
+    reviewCart: "Review",
+    reviewOrder: "Review order",
+    confirmSubmit: "Confirm & submit",
+    orderSubmitted: "Order submitted",
+    done: "Done",
+    showCart: "Show cart",
+    hideCart: "Hide cart",
+    searchPlaceholder: "SKU, name, brand, or barcode",
+    catalogCount: "orderable items",
+    quickAdd: "Quick add",
+    close: "Close",
+    back: "Back",
   },
   zh: {
     title: "客户订单",
@@ -140,6 +162,28 @@ const copy = {
     pallet: "板数",
     selected: "已选",
     allOrderable: "全部可下单商品",
+    noMatches: "没有找到匹配的商品。",
+    tapAdd: "点「添加」或按回车",
+    add: "添加",
+    inCart: "已选",
+    selectedOnly: "只看已选",
+    showing: "显示",
+    loadMore: "加载更多",
+    cartSummary: "购物车",
+    cases: "箱",
+    lines: "项",
+    reviewCart: "核对",
+    reviewOrder: "核对订单",
+    confirmSubmit: "确认提交",
+    orderSubmitted: "订单已提交",
+    done: "完成",
+    showCart: "展开购物车",
+    hideCart: "收起购物车",
+    searchPlaceholder: "SKU、品名、品牌或条码",
+    catalogCount: "个可下单商品",
+    quickAdd: "快速添加",
+    close: "关闭",
+    back: "返回",
   },
   ko: {
     title: "고객 주문",
@@ -190,6 +234,28 @@ const copy = {
     pallet: "팔레트",
     selected: "선택됨",
     allOrderable: "전체 주문 가능 상품",
+    noMatches: "검색 결과가 없습니다.",
+    tapAdd: "추가 버튼 또는 Enter",
+    add: "추가",
+    inCart: "선택됨",
+    selectedOnly: "선택 상품만",
+    showing: "표시",
+    loadMore: "더 보기",
+    cartSummary: "카트",
+    cases: "박스",
+    lines: "항목",
+    reviewCart: "검토",
+    reviewOrder: "주문 검토",
+    confirmSubmit: "확인 후 제출",
+    orderSubmitted: "주문 완료",
+    done: "완료",
+    showCart: "카트 보기",
+    hideCart: "카트 숨기기",
+    searchPlaceholder: "SKU, 상품명, 브랜드, 바코드",
+    catalogCount: "개 주문 가능",
+    quickAdd: "빠른 추가",
+    close: "닫기",
+    back: "뒤로",
   },
 };
 
@@ -334,6 +400,9 @@ export default function OrderPage() {
   const [showCustomerInfo, setShowCustomerInfo] = useState(false);
   const [showRecent, setShowRecent] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showCart, setShowCart] = useState(true);
+  const [catalogShowSelectedOnly, setCatalogShowSelectedOnly] = useState(false);
+  const [catalogListLimit, setCatalogListLimit] = useState(80);
   const [recentItems, setRecentItems] = useState<CartItem[]>([]);
   const [orderHistory, setOrderHistory] = useState<OrderHistoryItem[]>([]);
   const [catalogVersion, setCatalogVersion] = useState(0);
@@ -501,6 +570,10 @@ export default function OrderPage() {
     return catalog
       .filter((item) => isNormalItem(item))
       .filter((item) => {
+        if (catalogShowSelectedOnly) {
+          const sku = (item.sku || "").toUpperCase();
+          if (Number(catalogQtyMap[sku] || 0) <= 0) return false;
+        }
         if (categoryFilter !== "ALL" && inferCategory(item) !== categoryFilter) return false;
         return true;
       })
@@ -520,7 +593,17 @@ export default function OrderPage() {
         if (aSelected !== bSelected) return aSelected ? -1 : 1;
         return (a.sku || "").localeCompare(b.sku || "");
       });
-  }, [catalogSearch, categoryFilter, catalogQtyMap, catalogVersion]);
+  }, [catalogSearch, categoryFilter, catalogQtyMap, catalogVersion, catalogShowSelectedOnly]);
+
+  const displayCatalogItems = useMemo(() => {
+    const hasFilter = Boolean(catalogSearch.trim()) || categoryFilter !== "ALL" || catalogShowSelectedOnly;
+    const cap = hasFilter ? 250 : catalogListLimit;
+    return orderableCatalogItems.slice(0, cap);
+  }, [orderableCatalogItems, catalogSearch, categoryFilter, catalogShowSelectedOnly, catalogListLimit]);
+
+  useEffect(() => {
+    setCatalogListLimit(80);
+  }, [categoryFilter, catalogSearch, catalogShowSelectedOnly]);
 
   const catalogItemsForSubmit = useMemo(() => {
     return Object.entries(catalogQtyMap)
@@ -531,6 +614,8 @@ export default function OrderPage() {
         return !catalogItem || isNormalItem(catalogItem);
       });
   }, [catalogQtyMap, catalogVersion]);
+
+  const cartItemCount = catalogItemsForSubmit.length;
 
   const totalCases = useMemo(() => {
     return catalogItemsForSubmit.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
@@ -629,7 +714,7 @@ export default function OrderPage() {
   const addItem = () => {
     const typedSku = skuInput.trim().toUpperCase();
     const exactMatch = catalog.find((item) => item.sku?.toUpperCase() === typedSku) || null;
-    const finalItem = exactMatch || selectedItem;
+    const finalItem = exactMatch || selectedItem || matchedItems[0] || null;
     const finalSku = finalItem?.sku || typedSku;
     const qty = qtyInput.trim().toUpperCase() || "1";
 
@@ -639,6 +724,14 @@ export default function OrderPage() {
     }
 
     addSkuToCart(finalSku, qty);
+  };
+
+  const addSkuFromSearch = (item: CatalogItem, qty = "1") => {
+    if (!isNormalItem(item)) {
+      alert(t.unavailable);
+      return;
+    }
+    addSkuToCart(item.sku, qty);
   };
 
   const updateCatalogQty = (sku: string, value: string) => {
@@ -914,6 +1007,17 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
         </section>
 
         <section style={cardStyle}>
+          <div style={modeTabsStyle}>
+            <button type="button" onClick={() => changeMode("search")} style={modeButtonStyle(mode === "search")}>
+              {t.searchMode}
+            </button>
+            <button type="button" onClick={() => changeMode("catalog")} style={modeButtonStyle(mode === "catalog")}>
+              {t.catalogMode}
+            </button>
+          </div>
+        </section>
+
+        <section style={cardStyle}>
           <button type="button" onClick={() => setShowCustomerInfo((prev) => !prev)} style={sectionToggleStyle}>
             <div style={sectionTitleStyle}>{t.customerInfo}</div>
             <div style={toggleTextStyle}>{showCustomerInfo ? t.hide : t.show}</div>
@@ -927,7 +1031,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
           ) : null}
         </section>
 
-        {recentItems.length > 0 && mode === "search" ? (
+        {recentItems.length > 0 ? (
           <section style={cardStyle}>
             <button type="button" onClick={() => setShowRecent((prev) => !prev)} style={sectionToggleStyle}>
               <div style={sectionTitleStyle}>{t.recent}</div>
@@ -954,62 +1058,120 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
           </section>
         ) : null}
 
-        <section style={cardStyle}>
-          <div style={modeTabsStyle}>
-            <button type="button" onClick={() => changeMode("search")} style={modeButtonStyle(mode === "search")}>{t.searchMode}</button>
-            <button type="button" onClick={() => changeMode("catalog")} style={modeButtonStyle(mode === "catalog")}>{t.catalogMode}</button>
-          </div>
-        </section>
-
         {mode === "search" ? (
           <section style={cardStyle}>
-            <div style={{ ...sectionTitleStyle, textAlign: "center", marginBottom: 10 }}>{t.addItems}</div>
+            <div style={{ ...sectionTitleStyle, marginBottom: 8 }}>{t.addItems}</div>
+            <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 10px" }}>{t.tapAdd}</p>
 
-            <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 12, fontWeight: 800, color: "#374151", marginBottom: 10 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 800, color: "#374151", marginBottom: 10 }}>
               <input type="checkbox" checked={showAvailableOnly} onChange={(e) => setShowAvailableOnly(e.target.checked)} />
               {t.availableOnly}
             </label>
 
-            <Input label={t.skuItem} value={skuInput} onChange={(v) => setSkuInput(v.toUpperCase())} placeholder="00002D" inputRef={skuInputRef} onEnter={addItem} />
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>{t.skuItem}</label>
+            <input
+              ref={skuInputRef}
+              value={skuInput}
+              onChange={(e) => setSkuInput(e.target.value.toUpperCase())}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addItem(); } }}
+              placeholder={t.searchPlaceholder}
+              autoCapitalize="characters"
+              style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "1px solid #d1d5db", fontSize: 16, fontWeight: 700, boxSizing: "border-box" }}
+            />
+
+            {normalizedSkuInput && matchedItems.length === 0 ? (
+              <div style={{ marginTop: 10, padding: 12, borderRadius: 10, background: "#f9fafb", color: "#6b7280", fontSize: 13, textAlign: "center" }}>
+                {t.noMatches}
+              </div>
+            ) : null}
 
             {matchedItems.length > 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10, overflow: "visible" }}>
-                {matchedItems.map((item, index) => {
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+                {matchedItems.slice(0, 40).map((item, index) => {
                   const isActive = selectedItem?.sku === item.sku || (!selectedItem && index === 0);
+                  const inCart = Number(catalogQtyMap[(item.sku || "").toUpperCase()] || 0) > 0;
                   return (
-                    <button key={item.sku} type="button" onClick={() => { setSelectedItem(item); setSkuInput(item.sku); setQtyInput(""); }} style={{ width: "100%", border: isActive ? "2px solid #93c5fd" : "1px solid #e5e7eb", background: isActive ? "#eff6ff" : "#ffffff", borderRadius: 12, padding: 10, textAlign: "left", cursor: "pointer", overflow: "visible", position: "relative" }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "56px 1fr", gap: 10, alignItems: "start", overflow: "visible", position: "relative" }}>
-                        <ProductImage sku={item.sku} alt={item.name || item.sku} size={56} imageUrl={item.imageUrl} />
-                        <div style={{ overflow: "visible" }}>
-                          <div style={{ fontSize: 14, fontWeight: 800, color: "#111827" }}>{item.sku}{item.brand ? ` | ${item.brand}` : ""}</div>
-                          <div style={{ fontSize: 12, color: "#374151", marginTop: 3, lineHeight: 1.4 }}>{item.name || "-"}</div>
-                          {renderProductMeta(item)}
+                    <div
+                      key={item.sku}
+                      style={{
+                        border: isActive ? "2px solid #2563eb" : "1px solid #e5e7eb",
+                        background: inCart ? "#ecfdf5" : isActive ? "#eff6ff" : "#ffffff",
+                        borderRadius: 12,
+                        padding: 10,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedItem(item); setSkuInput(item.sku); }}
+                        style={{ width: "100%", border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer" }}
+                      >
+                        <div style={{ display: "grid", gridTemplateColumns: "52px 1fr", gap: 10, alignItems: "start" }}>
+                          <ProductImage sku={item.sku} alt={item.name || item.sku} size={52} imageUrl={item.imageUrl} />
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 800, color: "#111827" }}>
+                              {item.sku}{item.brand ? ` | ${item.brand}` : ""}
+                              {inCart ? <span style={{ marginLeft: 6, fontSize: 10, color: "#059669" }}>· {t.inCart}</span> : null}
+                            </div>
+                            <div style={{ fontSize: 12, color: "#374151", marginTop: 3, lineHeight: 1.4 }}>{item.name || "-"}</div>
+                            {renderProductMeta(item)}
+                          </div>
                         </div>
+                      </button>
+                      <div style={{ display: "flex", gap: 6, marginTop: 8, alignItems: "center" }}>
+                        <button type="button" onClick={() => adjustCatalogQty(item.sku, -1)} style={{ ...stepButtonStyle, width: 36 }}>−</button>
+                        <input
+                          value={catalogQtyMap[(item.sku || "").toUpperCase()] || ""}
+                          onChange={(e) => updateCatalogQty(item.sku, e.target.value)}
+                          placeholder="0"
+                          inputMode="numeric"
+                          style={{ ...stepInputStyle, flex: 1 }}
+                        />
+                        <button type="button" onClick={() => adjustCatalogQty(item.sku, 1)} style={{ ...stepButtonStyle, width: 36 }}>+</button>
+                        <button
+                          type="button"
+                          onClick={() => addSkuFromSearch(item, qtyInput || "1")}
+                          style={{ flex: 1, border: "none", borderRadius: 10, background: "#2563eb", color: "#fff", fontWeight: 800, padding: "8px 10px", cursor: "pointer" }}
+                        >
+                          {t.add}
+                        </button>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
             ) : null}
 
-            <div style={{ marginTop: 10 }}><Input label={t.qty} value={qtyInput} onChange={setQtyInput} placeholder="1" onEnter={addItem} /></div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8, marginTop: 10 }}>
-              {quickQtyButtons.map((qty) => <button key={qty} type="button" onClick={() => setQtyInput(qty)} style={qtyButtonStyle}>{qty}</button>)}
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "center", marginTop: 10 }}>
-              <button type="button" onClick={addItem} style={primarySmallButtonStyle}>{t.addItem}</button>
+            <div style={{ marginTop: 12 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>{t.qty} ({t.quickAdd})</label>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
+                {quickQtyButtons.map((qty) => (
+                  <button key={qty} type="button" onClick={() => setQtyInput(qty)} style={qtyButtonStyle}>
+                    {qty}
+                  </button>
+                ))}
+              </div>
+              <button type="button" onClick={addItem} style={{ ...primarySmallButtonStyle, width: "100%", marginTop: 10, maxWidth: "none" }}>
+                {t.addItem}
+              </button>
             </div>
           </section>
         ) : (
           <section style={cardStyle}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
               <div>
                 <div style={sectionTitleStyle}>{t.allOrderable}</div>
-                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{t.selected}: {catalogItemsForSubmit.length}</div>
+                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                  {t.selected}: {cartItemCount} · {orderableCatalogItems.length} {t.catalogCount}
+                </div>
               </div>
-              
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: "#374151", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={catalogShowSelectedOnly}
+                  onChange={(e) => setCatalogShowSelectedOnly(e.target.checked)}
+                />
+                {t.selectedOnly} ({cartItemCount})
+              </label>
             </div>
 
             <div style={stickyCatalogToolsStyle}>
@@ -1026,11 +1188,21 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                 ))}
               </div>
 
-              <input value={catalogSearch} onChange={(e) => setCatalogSearch(e.target.value)} placeholder={t.catalogSearch} style={{ ...wideInputStyle, marginBottom: 0 }} />
+              <input
+                value={catalogSearch}
+                onChange={(e) => setCatalogSearch(e.target.value)}
+                placeholder={t.catalogSearch}
+                style={{ ...wideInputStyle, marginBottom: 0 }}
+              />
             </div>
 
+            <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 10px" }}>
+              {t.showing} {displayCatalogItems.length}
+              {displayCatalogItems.length < orderableCatalogItems.length ? ` / ${orderableCatalogItems.length}` : ""}
+            </p>
+
             <div style={catalogListStyle}>
-              {orderableCatalogItems.map((item) => {
+              {displayCatalogItems.map((item) => {
                 const sku = item.sku?.toUpperCase() || "";
                 const qty = catalogQtyMap[sku] || "";
                 return (
@@ -1042,15 +1214,15 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                       border: qty ? "2px solid #86efac" : "1px solid #e5e7eb",
                     }}
                   >
-                    <div style={{ minHeight: 62 }}>
+                    <div style={{ minHeight: 56 }}>
                       <div style={{ fontSize: 11, fontWeight: 900, color: "#111827", lineHeight: 1.2 }}>{item.sku}</div>
                       <div style={{ fontSize: 10, fontWeight: 800, color: "#374151", marginTop: 2, lineHeight: 1.2 }}>{item.brand || "-"}</div>
-                      <div style={{ fontSize: 10, color: "#4b5563", marginTop: 2, lineHeight: 1.2, height: 24, overflow: "hidden" }}>{item.name || "-"}</div>
-                      <div style={{ fontSize: 9, color: "#2563eb", fontWeight: 900, marginTop: 3 }}>{inferCategory(item)}</div>
+                      <div style={{ fontSize: 10, color: "#4b5563", marginTop: 2, lineHeight: 1.25, maxHeight: 36, overflow: "hidden" }}>{item.name || "-"}</div>
+                      {qty ? <div style={{ fontSize: 9, color: "#059669", fontWeight: 900, marginTop: 4 }}>{t.inCart}: {qty}</div> : null}
                     </div>
 
-                    <div style={{ display: "flex", justifyContent: "center", overflow: "visible", padding: "4px 0" }}>
-                      <ProductImage sku={item.sku} alt={item.name || item.sku} size={100} imageUrl={item.imageUrl} />
+                    <div style={{ display: "flex", justifyContent: "center", overflow: "visible", padding: "2px 0" }}>
+                      <ProductImage sku={item.sku} alt={item.name || item.sku} size={72} imageUrl={item.imageUrl} />
                     </div>
 
                     <div style={stepperStyle}>
@@ -1058,45 +1230,75 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                       <input value={qty} onChange={(e) => updateCatalogQty(item.sku, e.target.value)} placeholder="0" inputMode="numeric" style={stepInputStyle} />
                       <button type="button" onClick={() => adjustCatalogQty(item.sku, 1)} style={stepButtonStyle}>+</button>
                     </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+                      <button type="button" onClick={() => adjustCatalogQty(item.sku, 1)} style={catalogQuickBtnStyle}>+1</button>
+                      <button type="button" onClick={() => adjustCatalogQty(item.sku, 5)} style={catalogQuickBtnStyle}>+5</button>
+                    </div>
                   </div>
                 );
               })}
             </div>
+
+            {displayCatalogItems.length < orderableCatalogItems.length && !catalogSearch.trim() && categoryFilter === "ALL" && !catalogShowSelectedOnly ? (
+              <button
+                type="button"
+                onClick={() => setCatalogListLimit((n) => n + 80)}
+                style={{ ...secondaryButtonStyle, marginTop: 12 }}
+              >
+                {t.loadMore} (+80)
+              </button>
+            ) : null}
+
+            {displayCatalogItems.length === 0 ? (
+              <div style={{ ...emptyStyle, marginTop: 10 }}>{catalogShowSelectedOnly ? t.noItems : t.noMatches}</div>
+            ) : null}
           </section>
         )}
+        <section style={cardStyle}>
+          <button type="button" onClick={() => setShowCart((prev) => !prev)} style={sectionToggleStyle}>
+            <div style={sectionTitleStyle}>{t.orderCart} ({cartItemCount}) · {totalCases} {t.cases}</div>
+            <div style={toggleTextStyle}>{showCart ? t.hideCart : t.showCart}</div>
+          </button>
 
-        {mode === "search" ? (
-          <section style={cardStyle}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <div style={sectionTitleStyle}>{t.orderCart} ({cart.length})</div>
-              
-            </div>
-
-            {cart.length === 0 ? <div style={emptyStyle}>{t.noItems}</div> : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, overflow: "visible" }}>
-                {cart.map((item, index) => {
+          {showCart ? (
+            catalogItemsForSubmit.length === 0 ? (
+              <div style={emptyStyle}>{t.noItems}</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+                {catalogItemsForSubmit.map((item) => {
                   const catalogItem = getCatalogItemBySku(item.sku);
                   return (
-                    <div key={`${item.sku}-${index}`} style={cartItemStyle}>
-                      <div style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0, flex: 1, overflow: "visible" }}>
+                    <div key={item.sku} style={cartItemStyle}>
+                      <div style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0, flex: 1 }}>
                         <ProductImage sku={item.sku} alt={item.sku} size={48} imageUrl={catalogItem?.imageUrl} />
-                        <div style={{ minWidth: 0, flex: 1, overflow: "visible" }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
                           <div style={{ fontSize: 15, fontWeight: 800, color: "#111827" }}>{item.sku}</div>
-                          {catalogItem ? <div style={{ fontSize: 12, color: "#4b5563", marginTop: 2, lineHeight: 1.35 }}>{catalogItem.brand ? `${catalogItem.brand} | ` : ""}{catalogItem.name || ""}</div> : null}
+                          {catalogItem ? (
+                            <div style={{ fontSize: 12, color: "#4b5563", marginTop: 2, lineHeight: 1.35 }}>
+                              {catalogItem.brand ? `${catalogItem.brand} | ` : ""}{catalogItem.name || ""}
+                            </div>
+                          ) : null}
                           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
                             <span style={{ fontSize: 12, fontWeight: 800, color: "#4b5563" }}>{t.qty}:</span>
-                            <input value={item.qty} onChange={(e) => updateCartQty(index, e.target.value)} style={cartQtyInputStyle} />
+                            <input
+                              value={item.qty}
+                              onChange={(e) => setQtyForSku(item.sku, e.target.value)}
+                              style={cartQtyInputStyle}
+                              inputMode="numeric"
+                            />
                           </div>
                         </div>
                       </div>
-                      <button type="button" onClick={() => removeItem(index)} style={dangerSmallButtonStyle}>{t.remove}</button>
+                      <button type="button" onClick={() => removeSkuFromOrder(item.sku)} style={dangerSmallButtonStyle}>
+                        {t.remove}
+                      </button>
                     </div>
                   );
                 })}
               </div>
-            )}
-          </section>
-        ) : null}
+            )
+          ) : null}
+        </section>
 
         <section style={cardStyle}>
           <div style={{ display: "grid", gap: 8 }}>
@@ -1113,11 +1315,11 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
 
         <div style={fixedSubmitBarStyle}>
           <div style={cartSummaryTextStyle}>
-            Cart: {getCurrentSubmitItems().length} items / {totalCases} cases
+            {t.cartSummary}: {cartItemCount} {t.lines} / {totalCases} {t.cases}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "0.9fr 1.1fr", gap: 8 }}>
             <button type="button" onClick={openReview} disabled={submitting} style={secondaryButtonStyle}>
-              Review Cart
+              {t.reviewCart}
             </button>
             <button type="button" onClick={openReview} disabled={submitting} style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}>
               {submitting ? t.submitting : `${t.submitOrder}`}
@@ -1130,10 +1332,10 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
             <div style={reviewModalStyle}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 10 }}>
                 <div>
-                  <div style={{ fontSize: 18, fontWeight: 900, color: "#111827" }}>Review Order</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, color: "#111827" }}>{t.reviewOrder}</div>
                   <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>{accountNo} | {storeName} | {getCurrentSubmitItems().length} {t.items}</div>
                 </div>
-                <button type="button" onClick={() => setShowReview(false)} style={dangerSmallButtonStyle}>Close</button>
+                <button type="button" onClick={() => setShowReview(false)} style={dangerSmallButtonStyle}>{t.close}</button>
               </div>
 
               <div style={reviewListStyle}>
@@ -1158,7 +1360,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                         <button type="button" onClick={() => adjustQtyForSku(item.sku, -1)} style={reviewQtyButtonStyle}>−</button>
                         <input value={item.qty} onChange={(e) => setQtyForSku(item.sku, e.target.value)} inputMode="numeric" style={reviewQtyInputStyle} />
                         <button type="button" onClick={() => adjustQtyForSku(item.sku, 1)} style={reviewQtyButtonStyle}>+</button>
-                        <button type="button" onClick={() => removeSkuFromOrder(item.sku)} style={reviewRemoveButtonStyle}>Remove</button>
+                        <button type="button" onClick={() => removeSkuFromOrder(item.sku)} style={reviewRemoveButtonStyle}>{t.remove}</button>
                       </div>
                     </div>
                   );
@@ -1166,9 +1368,9 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
-                <button type="button" onClick={() => setShowReview(false)} style={secondaryButtonStyle}>Back</button>
+                <button type="button" onClick={() => setShowReview(false)} style={secondaryButtonStyle}>{t.back}</button>
                 <button type="button" onClick={submitOrder} disabled={submitting} style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}>
-                  {submitting ? t.submitting : "Confirm Submit"}
+                  {submitting ? t.submitting : t.confirmSubmit}
                 </button>
               </div>
             </div>
@@ -1178,7 +1380,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
         {lastSubmittedRef ? (
           <div style={reviewOverlayStyle}>
             <div style={reviewModalStyle}>
-              <div style={{ fontSize: 22, fontWeight: 900, color: "#16a34a", textAlign: "center" }}>Order Submitted</div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: "#16a34a", textAlign: "center" }}>{t.orderSubmitted}</div>
               <div style={{ fontSize: 14, color: "#374151", textAlign: "center", marginTop: 6 }}>{t.ref}: {lastSubmittedRef}</div>
               <div style={{ fontSize: 13, color: "#6b7280", textAlign: "center", marginTop: 4 }}>{lastSubmittedItems.length} {t.items}</div>
 
@@ -1198,7 +1400,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
               </div>
 
               <button type="button" onClick={() => setLastSubmittedRef("")} style={{ ...submitButtonStyle, background: "#2563eb", marginTop: 12 }}>
-                Done
+                {t.done}
               </button>
             </div>
           </div>
@@ -1241,7 +1443,7 @@ function Input({ label, value, onChange, placeholder, inputRef, onEnter }: { lab
   );
 }
 
-const mainStyle: React.CSSProperties = { minHeight: "100vh", background: "#f8fafc", padding: "14px 10px 24px", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', overflow: "visible" };
+const mainStyle: React.CSSProperties = { minHeight: "100vh", background: "#f8fafc", padding: "14px 10px 120px", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', overflow: "visible" };
 const containerStyle: React.CSSProperties = { width: "100%", maxWidth: 980, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12, overflow: "visible" };
 const cardStyle: React.CSSProperties = { background: "#ffffff", borderRadius: 14, padding: 14, border: "1px solid #e5e7eb", boxShadow: "0 1px 2px rgba(0,0,0,0.04)", overflow: "visible" };
 const sectionTitleStyle: React.CSSProperties = { fontSize: 17, fontWeight: 800, color: "#111827" };
@@ -1262,7 +1464,8 @@ const cartItemStyle: React.CSSProperties = { border: "1px solid #e5e7eb", border
 const cartQtyInputStyle: React.CSSProperties = { width: 92, padding: "6px 8px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, fontWeight: 700, background: "#ffffff", outline: "none" };
 const productSmallButtonStyle: React.CSSProperties = { width: "100%", border: "1px solid #e5e7eb", background: "#ffffff", borderRadius: 12, padding: 10, textAlign: "left", cursor: "pointer", display: "flex", gap: 10, alignItems: "center", overflow: "visible", position: "relative" };
 const wideInputStyle: React.CSSProperties = { width: "100%", padding: "11px 12px", borderRadius: 12, border: "1px solid #d1d5db", fontSize: 14, boxSizing: "border-box", outline: "none", background: "#ffffff" };
-const catalogListStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", columnGap: 12, rowGap: 12, overflow: "visible" };
+const catalogListStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(132px, 1fr))", columnGap: 10, rowGap: 10, overflow: "visible" };
+const catalogQuickBtnStyle: React.CSSProperties = { padding: "5px 0", borderRadius: 8, border: "1px solid #d1d5db", background: "#f9fafb", fontSize: 11, fontWeight: 800, cursor: "pointer" };
 const catalogCardStyle: React.CSSProperties = { border: "1px solid #e5e7eb", borderRadius: 14, background: "#ffffff", padding: 8, display: "flex", flexDirection: "column", gap: 6, overflow: "visible", position: "relative", minWidth: 0 };
 const stepperStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "30px 1fr 30px", gap: 5, alignItems: "center" };
 const stepButtonStyle: React.CSSProperties = { width: 30, height: 32, borderRadius: 10, border: "1px solid #d1d5db", background: "#f9fafb", fontSize: 18, fontWeight: 900, cursor: "pointer", lineHeight: 1 };
