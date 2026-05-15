@@ -23,6 +23,7 @@ type CatalogItem = {
   limitedQty?: string;
   palletSize?: string;
   imageUrl?: string;
+  category?: string;
 };
 
 type OrderHistoryItem = {
@@ -192,6 +193,39 @@ const copy = {
   },
 };
 
+const categoryOptions = [
+  "ALL",
+  "RICE",
+  "SAUCE",
+  "SEASONING",
+  "NOODLES",
+  "PROCESSED",
+  "FROZEN",
+  "REFRIGERATED",
+  "SNACK",
+  "NON-FOOD",
+];
+
+function inferCategory(item: CatalogItem) {
+  const category = String(item.category || "").trim().toUpperCase();
+  if (category) return category;
+
+  const sku = String(item.sku || "").toUpperCase();
+  const text = `${item.brand || ""} ${item.name || ""}`.toUpperCase();
+
+  if (text.includes("RICE") || sku.endsWith("D") && sku.startsWith("000")) return "RICE";
+  if (text.includes("RAMEN") || text.includes("NOODLE") || text.includes("UDON") || text.includes("SOBA") || text.includes("JAPCHAE")) return "NOODLES";
+  if (text.includes("SAUCE") || text.includes("PASTE") || text.includes("GOCHUJANG") || text.includes("DOENJANG") || text.includes("SSAMJANG") || text.includes("CURRY") || text.includes("COCONUT MILK")) return "SAUCE";
+  if (text.includes("OIL") || text.includes("VINEGAR") || text.includes("POWDER") || text.includes("SALT") || text.includes("BROTH") || text.includes("STOCK") || text.includes("SEASONING") || text.includes("SUGAR") || text.includes("SYRUP") || text.includes("HONEY")) return "SEASONING";
+  if (text.includes("DUMPLING") || text.includes("KIMCHI") || text.includes("TOFU") || text.includes("FROZEN")) return "FROZEN";
+  if (text.includes("REFRIGERATED") || text.includes("FRESH")) return "REFRIGERATED";
+  if (text.includes("CHIP") || text.includes("SNACK") || text.includes("COOKIE") || text.includes("CRACKER") || text.includes("CANDY")) return "SNACK";
+  if (text.includes("TOFU") || text.includes("DRIED") || text.includes("PICKLED") || text.includes("BAMBOO") || text.includes("CHESTNUT") || text.includes("FRUIT") || text.includes("LUNCHEON") || text.includes("EGG")) return "PROCESSED";
+  if (text.includes("CHOPSTICK") || text.includes("BOWL") || text.includes("GLOVE") || text.includes("BAG") || text.includes("CONTAINER")) return "NON-FOOD";
+
+  return "OTHER";
+}
+
 function getImageUrl(sku?: string) {
   if (!sku) return "";
   return `/product/${sku}.jpg`;
@@ -288,6 +322,7 @@ export default function OrderPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [catalogQtyMap, setCatalogQtyMap] = useState<Record<string, string>>({});
   const [catalogSearch, setCatalogSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [submitting, setSubmitting] = useState(false);
   const [submitMsg, setSubmitMsg] = useState("");
   const [showReview, setShowReview] = useState(false);
@@ -466,6 +501,10 @@ export default function OrderPage() {
     return catalog
       .filter((item) => isNormalItem(item))
       .filter((item) => {
+        if (categoryFilter !== "ALL" && inferCategory(item) !== categoryFilter) return false;
+        return true;
+      })
+      .filter((item) => {
         if (!q) return true;
         return (
           item.sku?.toUpperCase().includes(q) ||
@@ -476,7 +515,7 @@ export default function OrderPage() {
         );
       })
       .sort((a, b) => (a.sku || "").localeCompare(b.sku || ""));
-  }, [catalogSearch, catalogVersion]);
+  }, [catalogSearch, categoryFilter, catalogVersion]);
 
   const catalogItemsForSubmit = useMemo(() => {
     return Object.entries(catalogQtyMap)
@@ -916,7 +955,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
               </div>
             ) : null}
 
-            <div style={{ marginTop: 10 }}><Input label={t.qty} value={qtyInput} onChange={setQtyInput} placeholder="2" onEnter={addItem} /></div>
+            <div style={{ marginTop: 10 }}><Input label={t.qty} value={qtyInput} onChange={setQtyInput} placeholder="1" onEnter={addItem} /></div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8, marginTop: 10 }}>
               {quickQtyButtons.map((qty) => <button key={qty} type="button" onClick={() => setQtyInput(qty)} style={qtyButtonStyle}>{qty}</button>)}
@@ -934,6 +973,19 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                 <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{t.selected}: {catalogItemsForSubmit.length}</div>
               </div>
               
+            </div>
+
+            <div style={categoryBarStyle}>
+              {categoryOptions.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setCategoryFilter(cat)}
+                  style={categoryButtonStyle(categoryFilter === cat)}
+                >
+                  {cat}
+                </button>
+              ))}
             </div>
 
             <input value={catalogSearch} onChange={(e) => setCatalogSearch(e.target.value)} placeholder={t.catalogSearch} style={{ ...wideInputStyle, marginBottom: 12 }} />
@@ -955,6 +1007,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                       <div style={{ fontSize: 11, fontWeight: 900, color: "#111827", lineHeight: 1.2 }}>{item.sku}</div>
                       <div style={{ fontSize: 10, fontWeight: 800, color: "#374151", marginTop: 2, lineHeight: 1.2 }}>{item.brand || "-"}</div>
                       <div style={{ fontSize: 10, color: "#4b5563", marginTop: 2, lineHeight: 1.2, height: 24, overflow: "hidden" }}>{item.name || "-"}</div>
+                      <div style={{ fontSize: 9, color: "#2563eb", fontWeight: 900, marginTop: 3 }}>{inferCategory(item)}</div>
                     </div>
 
                     <div style={{ display: "flex", justifyContent: "center", overflow: "visible", padding: "4px 0" }}>
@@ -1164,6 +1217,8 @@ const stepperStyle: React.CSSProperties = { display: "grid", gridTemplateColumns
 const stepButtonStyle: React.CSSProperties = { width: 30, height: 32, borderRadius: 10, border: "1px solid #d1d5db", background: "#f9fafb", fontSize: 18, fontWeight: 900, cursor: "pointer", lineHeight: 1 };
 const stepInputStyle: React.CSSProperties = { width: "100%", height: 32, borderRadius: 10, border: "1px solid #d1d5db", textAlign: "center", fontSize: 14, fontWeight: 900, outline: "none", boxSizing: "border-box" };
 const limitedBadgeStyle: React.CSSProperties = { padding: "2px 7px", borderRadius: 999, fontSize: 10, fontWeight: 800, background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" };
+const categoryBarStyle: React.CSSProperties = { display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8, marginBottom: 10 };
+const categoryButtonStyle = (active: boolean): React.CSSProperties => ({ padding: "8px 12px", borderRadius: 999, border: active ? "1px solid #2563eb" : "1px solid #d1d5db", background: active ? "#eff6ff" : "#ffffff", color: active ? "#2563eb" : "#374151", fontSize: 12, fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" });
 const fixedSubmitBarStyle: React.CSSProperties = { position: "fixed", left: "50%", bottom: 14, transform: "translateX(-50%)", width: "calc(100% - 24px)", maxWidth: 980, background: "rgba(255,255,255,0.96)", border: "1px solid #d1d5db", borderRadius: 16, padding: 10, boxShadow: "0 12px 32px rgba(0,0,0,0.18)", zIndex: 8000 };
 const reviewOverlayStyle: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(17,24,39,0.48)", display: "flex", alignItems: "center", justifyContent: "center", padding: 14, zIndex: 9000 };
 const reviewModalStyle: React.CSSProperties = { width: "100%", maxWidth: 760, maxHeight: "82vh", background: "#ffffff", borderRadius: 18, border: "1px solid #e5e7eb", padding: 16, boxShadow: "0 24px 60px rgba(0,0,0,0.28)", overflow: "hidden", display: "flex", flexDirection: "column" };
