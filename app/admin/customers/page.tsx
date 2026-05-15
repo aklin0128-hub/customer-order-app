@@ -1,6 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { AdminLogin } from "../_components/AdminLogin";
+import { AdminShell } from "../_components/AdminShell";
+import { formGrid, inputStyle, labelStyle, splitForm, splitLayout, splitList } from "../_components/admin-styles";
+import {
+  BtnDanger,
+  BtnPrimary,
+  BtnRow,
+  BtnSecondary,
+  EmptyState,
+  FilterChips,
+  ListItemButton,
+  Panel,
+  StatGrid,
+  Toast,
+} from "../_components/admin-utils";
+import { useAdminAuth } from "../_components/useAdminAuth";
 
 type Customer = {
   accountNo: string;
@@ -13,15 +29,15 @@ type Customer = {
   updatedAt?: string;
 };
 
-const ADMIN_PASSWORD = "536678";
+type StatusFilter = "all" | "active" | "inactive";
 
 export default function AdminCustomersPage() {
-  const [adminAuthed, setAdminAuthed] = useState(false);
-  const [adminPassword, setAdminPassword] = useState("");
-  const [adminError, setAdminError] = useState("");
+  const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
+  const [passwordInput, setPasswordInput] = useState("");
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const [accountNo, setAccountNo] = useState("");
   const [storeName, setStoreName] = useState("");
@@ -30,52 +46,45 @@ export default function AdminCustomersPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
-  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [msgTone, setMsgTone] = useState<"success" | "error">("success");
 
-  const handleAdminLogin = async () => {
-    setAdminError("");
-
-    if (adminPassword.trim() !== ADMIN_PASSWORD) {
-      setAdminError("Invalid admin password.");
-      return;
-    }
-
-    setAdminAuthed(true);
-    await loadCustomers(adminPassword.trim());
+  const notify = (text: string, tone: "success" | "error" = "success") => {
+    setMsg(text);
+    setMsgTone(tone);
   };
 
-  const loadCustomers = async (passwordValue = adminPassword.trim()) => {
-    setLoading(true);
-    setMsg("");
-
+  const loadCustomers = async () => {
+    setBusy(true);
     try {
       const res = await fetch("/api/admin/customers", {
         cache: "no-store",
-        headers: {
-          "x-admin-password": passwordValue,
-        },
+        headers: adminHeaders(),
       });
-
       const data = await res.json();
-
       if (!res.ok) throw new Error(data?.error || "Failed to load customers.");
-
       setCustomers(Array.isArray(data.customers) ? data.customers : []);
-    } catch (error: any) {
-      setMsg(error?.message || "Failed to load customers.");
+    } catch (err: any) {
+      notify(err?.message || "Failed to load customers.", "error");
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
+  useEffect(() => {
+    if (authed) loadCustomers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed]);
+
   const filteredCustomers = useMemo(() => {
     const q = search.trim().toUpperCase();
-
-    if (!q) return customers;
-
     return customers.filter((c) => {
+      if (statusFilter === "active" && c.active === false) return false;
+      if (statusFilter === "inactive" && c.active !== false) return false;
+      if (!q) return true;
       return (
         c.accountNo?.toUpperCase().includes(q) ||
         c.storeName?.toUpperCase().includes(q) ||
@@ -83,7 +92,7 @@ export default function AdminCustomersPage() {
         c.phone?.toUpperCase().includes(q)
       );
     });
-  }, [customers, search]);
+  }, [customers, search, statusFilter]);
 
   const selectCustomer = (c: Customer) => {
     setAccountNo(c.accountNo || "");
@@ -93,7 +102,7 @@ export default function AdminCustomersPage() {
     setEmail(c.email || "");
     setPhone(c.phone || "");
     setNote(c.note || "");
-    setMsg(`Editing ${c.accountNo}`);
+    notify(`Editing ${c.accountNo}`);
   };
 
   const clearForm = () => {
@@ -109,21 +118,15 @@ export default function AdminCustomersPage() {
 
   const saveCustomer = async () => {
     const finalAccount = accountNo.trim().toUpperCase();
+    if (!finalAccount) return notify("Please enter account number.", "error");
+    if (!storeName.trim()) return notify("Please enter store name.", "error");
+    if (!password.trim()) return notify("Please enter customer password.", "error");
 
-    if (!finalAccount) return alert("Please enter account number.");
-    if (!storeName.trim()) return alert("Please enter store name.");
-    if (!password.trim()) return alert("Please enter customer password.");
-
-    setLoading(true);
-    setMsg("");
-
+    setBusy(true);
     try {
       const res = await fetch("/api/admin/customers", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-password": adminPassword.trim(),
-        },
+        headers: adminHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           accountNo: finalAccount,
           storeName,
@@ -134,502 +137,207 @@ export default function AdminCustomersPage() {
           note,
         }),
       });
-
       const data = await res.json();
-
       if (!res.ok) throw new Error(data?.error || "Failed to save customer.");
-
-      setMsg(`Saved ${finalAccount}`);
+      notify(`Saved ${finalAccount}`);
       await loadCustomers();
-    } catch (error: any) {
-      setMsg(error?.message || "Failed to save customer.");
+    } catch (err: any) {
+      notify(err?.message || "Failed to save customer.", "error");
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
-  const deleteCustomer = async (targetAccount: string) => {
-    const finalAccount = targetAccount.trim().toUpperCase();
-
+  const deleteCustomer = async () => {
+    const finalAccount = accountNo.trim().toUpperCase();
     if (!finalAccount) return;
+    if (!confirm(`Delete customer ${finalAccount}? They will no longer be able to log in.`)) return;
 
-    if (!confirm(`Delete customer ${finalAccount}?`)) return;
-
-    setLoading(true);
-    setMsg("");
-
+    setBusy(true);
     try {
       const res = await fetch(`/api/admin/customers?accountNo=${encodeURIComponent(finalAccount)}`, {
         method: "DELETE",
-        headers: {
-          "x-admin-password": adminPassword.trim(),
-        },
+        headers: adminHeaders(),
       });
-
       const data = await res.json();
-
       if (!res.ok) throw new Error(data?.error || "Failed to delete customer.");
-
-      setMsg(`Deleted ${finalAccount}`);
+      notify(`Deleted ${finalAccount}`);
       clearForm();
       await loadCustomers();
-    } catch (error: any) {
-      setMsg(error?.message || "Failed to delete customer.");
+    } catch (err: any) {
+      notify(err?.message || "Failed to delete customer.", "error");
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
-  if (!adminAuthed) {
+  if (!ready) return null;
+
+  if (!authed) {
     return (
-      <main style={loginPageStyle}>
-        <section style={loginCardStyle}>
-          <div style={logoStyle}>CUS</div>
-
-          <h1 style={loginTitleStyle}>Customer Admin Login</h1>
-          <p style={loginSubtitleStyle}>Enter admin password to manage customer login accounts.</p>
-
-          <input
-            type="password"
-            value={adminPassword}
-            onChange={(e) => {
-              setAdminPassword(e.target.value);
-              setAdminError("");
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleAdminLogin();
-            }}
-            placeholder="Admin password"
-            style={inputStyle}
-          />
-
-          {adminError ? <div style={errorStyle}>{adminError}</div> : null}
-
-          <button type="button" onClick={handleAdminLogin} style={primaryButtonStyle}>
-            Login
-          </button>
-        </section>
-      </main>
+      <AdminLogin
+        title="Customers"
+        subtitle="Sign in to manage customer login accounts."
+        password={passwordInput}
+        onPasswordChange={setPasswordInput}
+        error={error}
+        loading={loading}
+        onSubmit={() => login(passwordInput)}
+      />
     );
   }
 
   return (
-    <main style={mainStyle}>
-      <div style={containerStyle}>
-        <section style={headerStyle}>
-          <div>
-            <h1 style={titleStyle}>Customer Account Manager</h1>
-            <p style={subtitleStyle}>Create, edit, activate/deactivate, and delete customer login accounts.</p>
-          </div>
+    <AdminShell
+      active="customers"
+      title="Customers"
+      subtitle="Create and manage store login accounts stored in Redis."
+      onLogout={logout}
+      actions={
+        <BtnSecondary onClick={() => { clearForm(); notify("New customer form ready."); }}>
+          + New customer
+        </BtnSecondary>
+      }
+    >
+      <StatGrid
+        items={[
+          { label: "Total", value: customers.length },
+          { label: "Active", value: customers.filter((c) => c.active !== false).length },
+          { label: "Inactive", value: customers.filter((c) => c.active === false).length },
+        ]}
+      />
 
-          <button
-            type="button"
-            onClick={() => {
-              setAdminAuthed(false);
-              setAdminPassword("");
-            }}
-            style={secondaryButtonStyle}
-          >
-            Log Out
-          </button>
-        </section>
-
-        <section style={statsGridStyle}>
-          <div style={statCardStyle}>
-            <div style={statNumberStyle}>{customers.length}</div>
-            <div style={statLabelStyle}>Total Customers</div>
-          </div>
-
-          <div style={statCardStyle}>
-            <div style={statNumberStyle}>{customers.filter((c) => c.active !== false).length}</div>
-            <div style={statLabelStyle}>Active</div>
-          </div>
-
-          <div style={statCardStyle}>
-            <div style={statNumberStyle}>{customers.filter((c) => c.active === false).length}</div>
-            <div style={statLabelStyle}>Inactive</div>
-          </div>
-        </section>
-
-        <section style={cardStyle}>
-          <h2 style={sectionTitleStyle}>{accountNo ? `Edit Customer: ${accountNo}` : "Add / Update Customer"}</h2>
-
-          <div style={formGridStyle}>
-            <Input label="Account No" value={accountNo} onChange={(v) => setAccountNo(v.toUpperCase())} placeholder="FL111" />
-            <Input label="Store Name" value={storeName} onChange={setStoreName} placeholder="Kim Lee" />
-            <Input label="Password" value={password} onChange={setPassword} placeholder="1118" />
-            <Input label="Email" value={email} onChange={setEmail} placeholder="Optional" />
-            <Input label="Phone" value={phone} onChange={setPhone} placeholder="Optional" />
-
-            <div>
-              <label style={labelStyle}>Status</label>
-              <select value={active ? "active" : "inactive"} onChange={(e) => setActive(e.target.value === "active")} style={inputStyle}>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
-
-            <div style={{ gridColumn: "1 / -1" }}>
-              <label style={labelStyle}>Note</label>
-              <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional internal note" style={{ ...inputStyle, minHeight: 76 }} />
-            </div>
-          </div>
-
-          <div style={buttonRowStyle}>
-            <button type="button" onClick={saveCustomer} disabled={loading} style={primaryButtonStyle}>
-              {loading ? "Saving..." : "Save Customer"}
-            </button>
-
-            <button type="button" onClick={clearForm} style={secondaryButtonStyle}>
-              Clear
-            </button>
-
-            <button type="button" onClick={() => loadCustomers()} style={secondaryButtonStyle}>
-              Refresh
-            </button>
-
-            {accountNo ? (
-              <button type="button" onClick={() => deleteCustomer(accountNo)} style={dangerButtonStyle}>
-                Delete
-              </button>
-            ) : null}
-          </div>
-
-          {msg ? (
-            <div
-              style={{
-                marginTop: 12,
-                fontSize: 13,
-                fontWeight: 800,
-                color:
-                  msg.toLowerCase().includes("failed") ||
-                  msg.toLowerCase().includes("unauthorized") ||
-                  msg.toLowerCase().includes("invalid")
-                    ? "#b91c1c"
-                    : "#15803d",
-              }}
-            >
-              {msg}
-            </div>
-          ) : null}
-        </section>
-
-        <section style={cardStyle}>
-          <h2 style={sectionTitleStyle}>Customers ({filteredCustomers.length})</h2>
-
+      <div style={splitLayout} className="admin-split">
+        <Panel title={`Customer list (${filteredCustomers.length})`}>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search account, store, email, phone..."
-            style={{ ...inputStyle, marginTop: 12, marginBottom: 12 }}
+            style={{ ...inputStyle, marginBottom: 8 }}
           />
-
-          <div style={listStyle}>
+          <FilterChips
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[
+              { id: "all", label: "All" },
+              { id: "active", label: "Active" },
+              { id: "inactive", label: "Inactive" },
+            ]}
+          />
+          <div style={splitList}>
             {filteredCustomers.map((c) => (
-              <button key={c.accountNo} type="button" onClick={() => selectCustomer(c)} style={customerCardStyle}>
-                <div>
-                  <div style={customerTitleStyle}>{c.accountNo} · {c.storeName || "-"}</div>
-                  <div style={customerMetaStyle}>Password: {c.password || "-"}</div>
-                  <div style={customerMetaStyle}>Email: {c.email || "-"} · Phone: {c.phone || "-"}</div>
-                  {c.note ? <div style={customerNoteStyle}>{c.note}</div> : null}
+              <ListItemButton
+                key={c.accountNo}
+                selected={accountNo.toUpperCase() === c.accountNo?.toUpperCase()}
+                onClick={() => selectCustomer(c)}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                  <div>
+                    <strong>{c.accountNo}</strong>
+                    <div style={{ fontSize: 13, color: "#374151", marginTop: 2 }}>{c.storeName || "—"}</div>
+                    {c.phone || c.email ? (
+                      <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
+                        {[c.phone, c.email].filter(Boolean).join(" · ")}
+                      </div>
+                    ) : null}
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 900,
+                      padding: "3px 8px",
+                      borderRadius: 999,
+                      background: c.active !== false ? "#ecfdf5" : "#fef2f2",
+                      color: c.active !== false ? "#059669" : "#dc2626",
+                    }}
+                  >
+                    {c.active !== false ? "ACTIVE" : "OFF"}
+                  </span>
                 </div>
-
-                <span style={getStatusBadgeStyle(c.active !== false)}>{c.active !== false ? "ACTIVE" : "INACTIVE"}</span>
-              </button>
+              </ListItemButton>
             ))}
-
-            {filteredCustomers.length === 0 ? <div style={emptyStyle}>No customers found.</div> : null}
+            {filteredCustomers.length === 0 ? (
+              <EmptyState title="No customers found" detail="Try a different search or add a new account." />
+            ) : null}
           </div>
-        </section>
+        </Panel>
+
+        <div style={splitForm}>
+          <Panel title={accountNo ? `Edit ${accountNo}` : "New customer"}>
+            <div style={formGrid}>
+              <Field label="Account No" hint="e.g. FL111">
+                <input
+                  value={accountNo}
+                  onChange={(e) => setAccountNo(e.target.value.toUpperCase())}
+                  placeholder="FL111"
+                  style={inputStyle}
+                  disabled={customers.some(
+                    (c) => c.accountNo?.toUpperCase() === accountNo.trim().toUpperCase() && accountNo.trim()
+                  )}
+                />
+              </Field>
+              <Field label="Store name">
+                <input value={storeName} onChange={(e) => setStoreName(e.target.value)} style={inputStyle} />
+              </Field>
+              <Field label="Password">
+                <div style={{ display: "flex", gap: 6 }}>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  <BtnSecondary onClick={() => setShowPassword((v) => !v)}>
+                    {showPassword ? "Hide" : "Show"}
+                  </BtnSecondary>
+                </div>
+              </Field>
+              <Field label="Status">
+                <select
+                  value={active ? "active" : "inactive"}
+                  onChange={(e) => setActive(e.target.value === "active")}
+                  style={inputStyle}
+                >
+                  <option value="active">Active — can log in</option>
+                  <option value="inactive">Inactive — blocked</option>
+                </select>
+              </Field>
+              <Field label="Email (optional)">
+                <input value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
+              </Field>
+              <Field label="Phone (optional)">
+                <input value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} />
+              </Field>
+              <Field label="Internal note">
+                <textarea value={note} onChange={(e) => setNote(e.target.value)} style={{ ...inputStyle, minHeight: 72 }} />
+              </Field>
+            </div>
+
+            <BtnRow>
+              <BtnPrimary onClick={saveCustomer} disabled={busy}>
+                {busy ? "Saving..." : "Save customer"}
+              </BtnPrimary>
+              <BtnSecondary onClick={clearForm}>Clear form</BtnSecondary>
+              <BtnSecondary onClick={loadCustomers} disabled={busy}>
+                Refresh
+              </BtnSecondary>
+              {accountNo ? <BtnDanger onClick={deleteCustomer} disabled={busy}>Delete</BtnDanger> : null}
+            </BtnRow>
+
+            <Toast message={msg} tone={msgTone} />
+          </Panel>
+        </div>
       </div>
-    </main>
+    </AdminShell>
   );
 }
 
-function Input({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-}) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div>
       <label style={labelStyle}>{label}</label>
-      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} style={inputStyle} />
+      {children}
+      {hint ? <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>{hint}</div> : null}
     </div>
   );
 }
-
-function getStatusBadgeStyle(active: boolean): React.CSSProperties {
-  return {
-    padding: "4px 9px",
-    borderRadius: 999,
-    fontSize: 11,
-    fontWeight: 900,
-    whiteSpace: "nowrap",
-    background: active ? "#ecfdf5" : "#fef2f2",
-    color: active ? "#059669" : "#dc2626",
-    border: active ? "1px solid #a7f3d0" : "1px solid #fecaca",
-  };
-}
-
-const loginPageStyle: React.CSSProperties = {
-  minHeight: "100vh",
-  background: "linear-gradient(180deg, #f8fafc 0%, #eef4ff 100%)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: 18,
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-};
-
-const loginCardStyle: React.CSSProperties = {
-  width: "100%",
-  maxWidth: 420,
-  background: "#ffffff",
-  border: "1px solid #e5e7eb",
-  borderRadius: 22,
-  padding: 22,
-  boxShadow: "0 18px 40px rgba(37,99,235,0.12)",
-};
-
-const logoStyle: React.CSSProperties = {
-  width: 64,
-  height: 64,
-  borderRadius: 18,
-  background: "#2563eb",
-  color: "#ffffff",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: 18,
-  fontWeight: 900,
-  margin: "0 auto 14px",
-};
-
-const loginTitleStyle: React.CSSProperties = {
-  margin: 0,
-  textAlign: "center",
-  fontSize: 26,
-  fontWeight: 900,
-  color: "#111827",
-};
-
-const loginSubtitleStyle: React.CSSProperties = {
-  margin: "8px 0 18px",
-  textAlign: "center",
-  fontSize: 13,
-  color: "#6b7280",
-};
-
-const mainStyle: React.CSSProperties = {
-  minHeight: "100vh",
-  background: "#f8fafc",
-  padding: "18px 12px 30px",
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-};
-
-const containerStyle: React.CSSProperties = {
-  width: "100%",
-  maxWidth: 980,
-  margin: "0 auto",
-  display: "flex",
-  flexDirection: "column",
-  gap: 14,
-};
-
-const headerStyle: React.CSSProperties = {
-  background: "#ffffff",
-  border: "1px solid #e5e7eb",
-  borderRadius: 18,
-  padding: 18,
-  display: "flex",
-  justifyContent: "space-between",
-  gap: 12,
-  alignItems: "center",
-  flexWrap: "wrap",
-};
-
-const cardStyle: React.CSSProperties = {
-  background: "#ffffff",
-  border: "1px solid #e5e7eb",
-  borderRadius: 18,
-  padding: 18,
-};
-
-const titleStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 26,
-  fontWeight: 900,
-  color: "#111827",
-};
-
-const subtitleStyle: React.CSSProperties = {
-  margin: "6px 0 0",
-  fontSize: 13,
-  color: "#6b7280",
-};
-
-const statsGridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-  gap: 10,
-};
-
-const statCardStyle: React.CSSProperties = {
-  background: "#ffffff",
-  border: "1px solid #e5e7eb",
-  borderRadius: 16,
-  padding: 14,
-};
-
-const statNumberStyle: React.CSSProperties = {
-  fontSize: 24,
-  fontWeight: 900,
-  color: "#2563eb",
-};
-
-const statLabelStyle: React.CSSProperties = {
-  fontSize: 12,
-  color: "#6b7280",
-  fontWeight: 800,
-  marginTop: 2,
-};
-
-const sectionTitleStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 18,
-  fontWeight: 900,
-  color: "#111827",
-};
-
-const formGridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-  gap: 12,
-  marginTop: 14,
-};
-
-const labelStyle: React.CSSProperties = {
-  display: "block",
-  fontSize: 12,
-  fontWeight: 800,
-  color: "#374151",
-  marginBottom: 6,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "11px 12px",
-  borderRadius: 12,
-  border: "1px solid #d1d5db",
-  fontSize: 14,
-  boxSizing: "border-box",
-  outline: "none",
-  background: "#ffffff",
-};
-
-const buttonRowStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 8,
-  flexWrap: "wrap",
-  marginTop: 14,
-};
-
-const primaryButtonStyle: React.CSSProperties = {
-  border: "none",
-  background: "#2563eb",
-  color: "#ffffff",
-  borderRadius: 12,
-  padding: "11px 15px",
-  fontSize: 14,
-  fontWeight: 900,
-  cursor: "pointer",
-};
-
-const secondaryButtonStyle: React.CSSProperties = {
-  border: "1px solid #d1d5db",
-  background: "#ffffff",
-  color: "#111827",
-  borderRadius: 12,
-  padding: "11px 15px",
-  fontSize: 14,
-  fontWeight: 800,
-  cursor: "pointer",
-};
-
-const dangerButtonStyle: React.CSSProperties = {
-  border: "1px solid #fecaca",
-  background: "#fef2f2",
-  color: "#b91c1c",
-  borderRadius: 12,
-  padding: "11px 15px",
-  fontSize: 14,
-  fontWeight: 900,
-  cursor: "pointer",
-};
-
-const errorStyle: React.CSSProperties = {
-  marginTop: 10,
-  marginBottom: 10,
-  fontSize: 13,
-  fontWeight: 800,
-  color: "#b91c1c",
-  textAlign: "center",
-};
-
-const listStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-  maxHeight: 620,
-  overflowY: "auto",
-};
-
-const customerCardStyle: React.CSSProperties = {
-  width: "100%",
-  border: "1px solid #e5e7eb",
-  background: "#ffffff",
-  borderRadius: 14,
-  padding: 13,
-  textAlign: "left",
-  cursor: "pointer",
-  display: "flex",
-  justifyContent: "space-between",
-  gap: 12,
-  alignItems: "center",
-};
-
-const customerTitleStyle: React.CSSProperties = {
-  fontSize: 15,
-  fontWeight: 900,
-  color: "#111827",
-};
-
-const customerMetaStyle: React.CSSProperties = {
-  fontSize: 12,
-  color: "#6b7280",
-  marginTop: 3,
-};
-
-const customerNoteStyle: React.CSSProperties = {
-  fontSize: 12,
-  color: "#374151",
-  marginTop: 6,
-  background: "#f9fafb",
-  borderRadius: 10,
-  padding: 8,
-};
-
-const emptyStyle: React.CSSProperties = {
-  padding: 16,
-  textAlign: "center",
-  color: "#6b7280",
-  background: "#f9fafb",
-  borderRadius: 12,
-};

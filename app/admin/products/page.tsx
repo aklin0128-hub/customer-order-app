@@ -1,6 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { AdminLogin } from "../_components/AdminLogin";
+import { AdminShell } from "../_components/AdminShell";
+import { formGrid, inputStyle, labelStyle, splitForm, splitLayout, splitList } from "../_components/admin-styles";
+import {
+  BtnPrimary,
+  BtnRow,
+  BtnSecondary,
+  EmptyState,
+  FilterChips,
+  ListItemButton,
+  Panel,
+  StatGrid,
+  Toast,
+} from "../_components/admin-utils";
+import { useAdminAuth } from "../_components/useAdminAuth";
 
 type Product = {
   sku: string;
@@ -17,7 +32,7 @@ type Product = {
   source?: string;
 };
 
-const ADMIN_PASSWORD = "536678";
+type ProductFilter = "all" | "redis" | "customized";
 
 const statusOptions = [
   "NORMAL",
@@ -43,13 +58,19 @@ const categoryOptions = [
   "NON-FOOD",
 ];
 
+function productImageSrc(sku: string, imageUrl?: string) {
+  if (imageUrl) return imageUrl;
+  if (sku) return `/product/${sku}.jpg`;
+  return "";
+}
+
 export default function AdminProductsPage() {
-  const [adminAuthed, setAdminAuthed] = useState(false);
-  const [adminPassword, setAdminPassword] = useState("");
-  const [adminError, setAdminError] = useState("");
+  const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
+  const [passwordInput, setPasswordInput] = useState("");
 
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
+  const [listFilter, setListFilter] = useState<ProductFilter>("all");
 
   const [sku, setSku] = useState("");
   const [name, setName] = useState("");
@@ -63,52 +84,52 @@ export default function AdminProductsPage() {
   const [palletSize, setPalletSize] = useState("");
   const [imageUrl, setImageUrl] = useState("");
 
-  const [msg, setMsg] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [msgTone, setMsgTone] = useState<"success" | "error">("success");
 
-  const handleAdminLogin = async () => {
-    setAdminError("");
-
-    if (adminPassword.trim() !== ADMIN_PASSWORD) {
-      setAdminError("Invalid admin password.");
-      return;
-    }
-
-    setAdminAuthed(true);
-    await loadProducts(adminPassword.trim());
+  const notify = (text: string, tone: "success" | "error" = "success") => {
+    setMsg(text);
+    setMsgTone(tone);
   };
 
-  const loadProducts = async (password = adminPassword.trim()) => {
-    setLoading(true);
-    setMsg("");
-
+  const loadProducts = async () => {
+    setBusy(true);
     try {
       const res = await fetch("/api/admin/products", {
         cache: "no-store",
-        headers: {
-          "x-admin-password": password,
-        },
+        headers: adminHeaders(),
       });
-
       const data = await res.json();
-
       if (!res.ok) throw new Error(data?.error || "Failed to load products.");
-
       setProducts(Array.isArray(data.products) ? data.products : []);
-    } catch (error: any) {
-      setMsg(error?.message || "Failed to load products.");
+    } catch (err: any) {
+      notify(err?.message || "Failed to load products.", "error");
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (authed) loadProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed]);
 
   const filteredProducts = useMemo(() => {
     const q = search.trim().toUpperCase();
 
-    if (!q) return products.slice(0, 150);
+    let list = products;
 
-    return products
+    if (listFilter === "redis") {
+      list = list.filter((p) => p.source === "Redis");
+    } else if (listFilter === "customized") {
+      list = list.filter((p) => p.source === "Redis" || p.category || p.imageUrl || p.limitedQty || p.palletSize);
+    }
+
+    if (!q) return list.slice(0, 120);
+
+    return list
       .filter((p) => {
         return (
           p.sku?.toUpperCase().includes(q) ||
@@ -119,8 +140,8 @@ export default function AdminProductsPage() {
           p.upc?.toUpperCase().includes(q)
         );
       })
-      .slice(0, 250);
-  }, [products, search]);
+      .slice(0, 200);
+  }, [products, search, listFilter]);
 
   const selectProduct = (p: Product) => {
     setSku(p.sku || "");
@@ -134,7 +155,7 @@ export default function AdminProductsPage() {
     setLimitedQty(p.limitedQty || "");
     setPalletSize(p.palletSize || "");
     setImageUrl(p.imageUrl || "");
-    setMsg(`Editing ${p.sku}`);
+    notify(`Editing ${p.sku}`);
   };
 
   const clearForm = () => {
@@ -154,20 +175,14 @@ export default function AdminProductsPage() {
 
   const saveProduct = async () => {
     const finalSku = sku.trim().toUpperCase();
+    if (!finalSku) return notify("Please enter SKU.", "error");
+    if (!name.trim()) return notify("Please enter item name.", "error");
 
-    if (!finalSku) return alert("Please enter SKU.");
-    if (!name.trim()) return alert("Please enter item name.");
-
-    setLoading(true);
-    setMsg("");
-
+    setBusy(true);
     try {
       const res = await fetch("/api/admin/products", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-admin-password": adminPassword.trim(),
-        },
+        headers: adminHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
           sku: finalSku,
           name,
@@ -182,33 +197,23 @@ export default function AdminProductsPage() {
           imageUrl,
         }),
       });
-
       const data = await res.json();
-
       if (!res.ok) throw new Error(data?.error || "Failed to save product.");
-
-      setMsg(`Saved ${finalSku}`);
+      notify(`Saved ${finalSku}`);
       await loadProducts();
-    } catch (error: any) {
-      setMsg(error?.message || "Failed to save product.");
+    } catch (err: any) {
+      notify(err?.message || "Failed to save product.", "error");
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
   const uploadProductImage = async (file: File | null) => {
     const finalSku = sku.trim().toUpperCase();
-
-    if (!finalSku) {
-      alert("Please enter SKU before uploading image.");
-      return;
-    }
-
+    if (!finalSku) return notify("Enter SKU first, then upload an image.", "error");
     if (!file) return;
 
     setUploadingImage(true);
-    setMsg("");
-
     try {
       const formData = new FormData();
       formData.append("sku", finalSku);
@@ -216,533 +221,259 @@ export default function AdminProductsPage() {
 
       const res = await fetch("/api/admin/upload-product-image", {
         method: "POST",
-        headers: {
-          "x-admin-password": adminPassword.trim(),
-        },
+        headers: adminHeaders(),
         body: formData,
       });
-
       const data = await res.json();
-
       if (!res.ok) throw new Error(data?.error || "Failed to upload image.");
-
       setImageUrl(data.imageUrl || "");
-      setMsg(`Image uploaded for ${finalSku}`);
+      notify(`Image uploaded for ${finalSku}`);
       await loadProducts();
-    } catch (error: any) {
-      setMsg(error?.message || "Failed to upload image.");
+    } catch (err: any) {
+      notify(err?.message || "Failed to upload image.", "error");
     } finally {
       setUploadingImage(false);
     }
   };
 
-  if (!adminAuthed) {
+  if (!ready) return null;
+
+  if (!authed) {
     return (
-      <main style={loginPageStyle}>
-        <section style={loginCardStyle}>
-          <div style={logoStyle}>SKU</div>
-
-          <h1 style={loginTitleStyle}>Product Admin Login</h1>
-          <p style={loginSubtitleStyle}>
-            Enter admin password to manage SKU settings.
-          </p>
-
-          <input
-            type="password"
-            value={adminPassword}
-            onChange={(e) => {
-              setAdminPassword(e.target.value);
-              setAdminError("");
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleAdminLogin();
-            }}
-            placeholder="Admin password"
-            style={inputStyle}
-          />
-
-          {adminError ? <div style={errorStyle}>{adminError}</div> : null}
-
-          <button type="button" onClick={handleAdminLogin} style={primaryButtonStyle}>
-            Login
-          </button>
-        </section>
-      </main>
+      <AdminLogin
+        title="Products"
+        subtitle="Sign in to manage SKU settings and photos."
+        password={passwordInput}
+        onPasswordChange={setPasswordInput}
+        error={error}
+        loading={loading}
+        onSubmit={() => login(passwordInput)}
+      />
     );
   }
 
+  const previewSrc = productImageSrc(sku.trim().toUpperCase(), imageUrl);
+
   return (
-    <main style={mainStyle}>
-      <div style={containerStyle}>
-        <section style={headerStyle}>
-          <div>
-            <h1 style={titleStyle}>Product SKU Manager</h1>
-            <p style={subtitleStyle}>
-              Edit SKU status, category, limited qty, pallet size, product image, and item info.
-            </p>
-          </div>
+    <AdminShell
+      active="products"
+      title="Products"
+      subtitle="Search a SKU, edit details, and save overrides to Redis."
+      onLogout={logout}
+      actions={
+        <BtnSecondary onClick={() => { clearForm(); notify("Enter a SKU to add or edit."); }}>
+          + Find / edit SKU
+        </BtnSecondary>
+      }
+    >
+      <StatGrid
+        items={[
+          { label: "Catalog SKUs", value: products.length },
+          { label: "Redis overrides", value: products.filter((p) => p.source === "Redis").length },
+          { label: "With category", value: products.filter((p) => p.category).length },
+        ]}
+      />
 
-          <button
-            type="button"
-            onClick={() => {
-              setAdminAuthed(false);
-              setAdminPassword("");
-            }}
-            style={secondaryButtonStyle}
-          >
-            Log Out
-          </button>
-        </section>
-
-        <section style={statsGridStyle}>
-          <div style={statCardStyle}>
-            <div style={statNumberStyle}>{products.length}</div>
-            <div style={statLabelStyle}>Total SKUs</div>
-          </div>
-
-          <div style={statCardStyle}>
-            <div style={statNumberStyle}>
-              {products.filter((p) => p.source === "Redis").length}
-            </div>
-            <div style={statLabelStyle}>Redis Updated</div>
-          </div>
-
-          <div style={statCardStyle}>
-            <div style={statNumberStyle}>
-              {products.filter((p) => p.category).length}
-            </div>
-            <div style={statLabelStyle}>Manual Category</div>
-          </div>
-        </section>
-
-        <section style={cardStyle}>
-          <h2 style={sectionTitleStyle}>
-            {sku ? `Edit SKU: ${sku}` : "Add / Update SKU"}
-          </h2>
-
-          <div style={formGridStyle}>
-            <Input label="SKU" value={sku} onChange={(v) => setSku(v.toUpperCase())} placeholder="00003D" />
-            <Input label="Brand" value={brand} onChange={setBrand} placeholder="ASSI" />
-            <Input label="Item Name" value={name} onChange={setName} placeholder="Product name" />
-
-            <div>
-              <label style={labelStyle}>Status</label>
-              <select value={status} onChange={(e) => setStatus(e.target.value)} style={inputStyle}>
-                {statusOptions.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={labelStyle}>Category</label>
-              <select value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle}>
-                {categoryOptions.map((c) => (
-                  <option key={c || "AUTO"} value={c}>
-                    {c || "AUTO"}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <Input label="Size" value={size} onChange={setSize} placeholder="CS 12X10 OZ" />
-            <Input label="Barcode" value={barcode} onChange={setBarcode} placeholder="Barcode" />
-            <Input label="UPC" value={upc} onChange={setUpc} placeholder="UPC" />
-            <Input label="Limited Qty" value={limitedQty} onChange={setLimitedQty} placeholder="Example: 10" />
-            <Input label="Pallet Size" value={palletSize} onChange={setPalletSize} placeholder="Example: 56" />
-            <Input label="Image URL" value={imageUrl} onChange={setImageUrl} placeholder="Auto-filled after upload" />
-
-            <div>
-              <label style={labelStyle}>Product Image</label>
-
-              {imageUrl ? (
-                <img
-                  src={imageUrl}
-                  alt={sku || "Product Image"}
-                  style={{
-                    width: 90,
-                    height: 90,
-                    objectFit: "contain",
-                    borderRadius: 12,
-                    border: "1px solid #e5e7eb",
-                    background: "#fff",
-                    display: "block",
-                    marginBottom: 8,
-                  }}
-                />
-              ) : null}
-
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(e) => uploadProductImage(e.target.files?.[0] || null)}
-                style={inputStyle}
-                disabled={uploadingImage}
-              />
-
-              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
-                {uploadingImage ? "Uploading..." : "PNG / JPG / WEBP"}
-              </div>
-            </div>
-          </div>
-
-          <div style={buttonRowStyle}>
-            <button type="button" onClick={saveProduct} disabled={loading} style={primaryButtonStyle}>
-              {loading ? "Saving..." : "Save SKU"}
-            </button>
-
-            <button type="button" onClick={clearForm} style={secondaryButtonStyle}>
-              Clear
-            </button>
-
-            <button type="button" onClick={() => loadProducts()} style={secondaryButtonStyle}>
-              Refresh
-            </button>
-          </div>
-
-          {msg ? (
-            <div
-              style={{
-                marginTop: 12,
-                fontSize: 13,
-                fontWeight: 800,
-                color:
-                  msg.toLowerCase().includes("failed") ||
-                  msg.toLowerCase().includes("unauthorized")
-                    ? "#b91c1c"
-                    : "#15803d",
-              }}
-            >
-              {msg}
-            </div>
-          ) : null}
-        </section>
-
-        <section style={cardStyle}>
-          <h2 style={sectionTitleStyle}>Products ({filteredProducts.length})</h2>
-
+      <div style={splitLayout} className="admin-split">
+        <Panel title={`SKU list (${filteredProducts.length}${search ? "" : ", search for more"})`}>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search SKU, name, brand, category, barcode..."
-            style={{ ...inputStyle, marginTop: 12, marginBottom: 12 }}
+            placeholder="Type SKU, name, brand, or barcode..."
+            style={{ ...inputStyle, marginBottom: 8 }}
           />
-
-          <div style={listStyle}>
+          <FilterChips
+            value={listFilter}
+            onChange={setListFilter}
+            options={[
+              { id: "all", label: "Browse" },
+              { id: "redis", label: "Redis only" },
+              { id: "customized", label: "Customized" },
+            ]}
+          />
+          {!search.trim() && listFilter === "all" ? (
+            <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 8px" }}>
+              Tip: search by SKU to find items quickly. Showing first 120 without a search.
+            </p>
+          ) : null}
+          <div style={splitList}>
             {filteredProducts.map((p) => (
-              <button key={p.sku} type="button" onClick={() => selectProduct(p)} style={productCardStyle}>
-                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                  {p.imageUrl ? (
+              <ListItemButton
+                key={p.sku}
+                selected={sku.toUpperCase() === p.sku?.toUpperCase()}
+                onClick={() => selectProduct(p)}
+              >
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  {productImageSrc(p.sku, p.imageUrl) ? (
                     <img
-                      src={p.imageUrl}
-                      alt={p.sku}
-                      style={{
-                        width: 48,
-                        height: 48,
-                        objectFit: "contain",
-                        borderRadius: 10,
-                        border: "1px solid #e5e7eb",
-                        background: "#fff",
-                      }}
+                      src={productImageSrc(p.sku, p.imageUrl)}
+                      alt=""
+                      style={{ width: 44, height: 44, objectFit: "contain", borderRadius: 8, border: "1px solid #e5e7eb" }}
                     />
-                  ) : null}
-
-                  <div>
-                    <div style={productTitleStyle}>{p.sku} · {p.brand || "-"}</div>
-                    <div style={productNameStyle}>{p.name || "-"}</div>
-                    <div style={productMetaStyle}>
-                      Category: {p.category || "AUTO"} · Pallet: {p.palletSize || "-"} · Limited: {p.limitedQty || "-"} · Source: {p.source || "Catalog"}
+                  ) : (
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 8,
+                        background: "#f3f4f6",
+                        fontSize: 9,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#9ca3af",
+                      }}
+                    >
+                      No img
+                    </div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <strong>{p.sku}</strong>
+                    <div style={{ fontSize: 12, color: "#374151" }}>{p.name || "—"}</div>
+                    <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                      {p.brand || "—"} · {p.source || "Catalog"}
                     </div>
                   </div>
+                  <StatusBadge status={p.status} />
                 </div>
-
-                <span style={getBadgeStyle(p.status)}>{p.status || "-"}</span>
-              </button>
+              </ListItemButton>
             ))}
-
-            {filteredProducts.length === 0 ? <div style={emptyStyle}>No products found.</div> : null}
+            {filteredProducts.length === 0 ? (
+              <EmptyState title="No SKUs found" detail="Try another search term or filter." />
+            ) : null}
           </div>
-        </section>
+        </Panel>
+
+        <div style={splitForm}>
+          <Panel title={sku ? `Edit ${sku}` : "SKU details"}>
+            {previewSrc ? (
+              <img
+                src={previewSrc}
+                alt=""
+                style={{
+                  width: 96,
+                  height: 96,
+                  objectFit: "contain",
+                  borderRadius: 12,
+                  border: "1px solid #e5e7eb",
+                  marginBottom: 12,
+                  background: "#fff",
+                }}
+              />
+            ) : null}
+
+            <div style={formGrid}>
+              <div>
+                <label style={labelStyle}>SKU</label>
+                <input
+                  value={sku}
+                  onChange={(e) => setSku(e.target.value.toUpperCase())}
+                  placeholder="00003D"
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Brand</label>
+                <input value={brand} onChange={(e) => setBrand(e.target.value)} style={inputStyle} />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={labelStyle}>Item name</label>
+                <input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Status</label>
+                <select value={status} onChange={(e) => setStatus(e.target.value)} style={inputStyle}>
+                  {statusOptions.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Category</label>
+                <select value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle}>
+                  {categoryOptions.map((c) => (
+                    <option key={c || "AUTO"} value={c}>
+                      {c || "AUTO (from catalog)"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Size</label>
+                <input value={size} onChange={(e) => setSize(e.target.value)} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Limited qty</label>
+                <input value={limitedQty} onChange={(e) => setLimitedQty(e.target.value)} style={inputStyle} placeholder="e.g. 10" />
+              </div>
+              <div>
+                <label style={labelStyle}>Pallet size</label>
+                <input value={palletSize} onChange={(e) => setPalletSize(e.target.value)} style={inputStyle} placeholder="e.g. 56" />
+              </div>
+              <div>
+                <label style={labelStyle}>Barcode</label>
+                <input value={barcode} onChange={(e) => setBarcode(e.target.value)} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>UPC</label>
+                <input value={upc} onChange={(e) => setUpc(e.target.value)} style={inputStyle} />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={labelStyle}>Image URL</label>
+                <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} style={inputStyle} placeholder="Filled after upload" />
+              </div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={labelStyle}>Upload photo</label>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(e) => uploadProductImage(e.target.files?.[0] || null)}
+                  style={inputStyle}
+                  disabled={uploadingImage}
+                />
+                <p style={{ fontSize: 11, color: "#9ca3af", margin: "4px 0 0" }}>
+                  {uploadingImage ? "Uploading..." : "PNG, JPG, or WEBP"}
+                </p>
+              </div>
+            </div>
+
+            <BtnRow>
+              <BtnPrimary onClick={saveProduct} disabled={busy}>
+                {busy ? "Saving..." : "Save SKU"}
+              </BtnPrimary>
+              <BtnSecondary onClick={clearForm}>Clear</BtnSecondary>
+              <BtnSecondary onClick={loadProducts} disabled={busy}>
+                Refresh
+              </BtnSecondary>
+            </BtnRow>
+
+            <Toast message={msg} tone={msgTone} />
+          </Panel>
+        </div>
       </div>
-    </main>
+    </AdminShell>
   );
 }
 
-function Input({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-}) {
-  return (
-    <div>
-      <label style={labelStyle}>{label}</label>
-      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} style={inputStyle} />
-    </div>
-  );
-}
-
-function getBadgeStyle(status?: string): React.CSSProperties {
+function StatusBadge({ status }: { status?: string }) {
   const s = String(status || "").toUpperCase();
-
   const good = s === "NORMAL" || s === "NORMAL_NBR" || s === "NORMAL_NOBR" || s === "TBD";
   const limited = s === "LIMITED";
-
-  return {
-    padding: "4px 9px",
-    borderRadius: 999,
-    fontSize: 11,
-    fontWeight: 900,
-    whiteSpace: "nowrap",
-    background: good ? "#ecfdf5" : limited ? "#fff7ed" : "#fef2f2",
-    color: good ? "#059669" : limited ? "#c2410c" : "#dc2626",
-    border: good ? "1px solid #a7f3d0" : limited ? "1px solid #fed7aa" : "1px solid #fecaca",
-  };
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        fontWeight: 900,
+        padding: "3px 8px",
+        borderRadius: 999,
+        whiteSpace: "nowrap",
+        background: good ? "#ecfdf5" : limited ? "#fff7ed" : "#fef2f2",
+        color: good ? "#059669" : limited ? "#c2410c" : "#dc2626",
+      }}
+    >
+      {s || "—"}
+    </span>
+  );
 }
-
-const loginPageStyle: React.CSSProperties = {
-  minHeight: "100vh",
-  background: "linear-gradient(180deg, #f8fafc 0%, #eef4ff 100%)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: 18,
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-};
-
-const loginCardStyle: React.CSSProperties = {
-  width: "100%",
-  maxWidth: 420,
-  background: "#ffffff",
-  border: "1px solid #e5e7eb",
-  borderRadius: 22,
-  padding: 22,
-  boxShadow: "0 18px 40px rgba(37,99,235,0.12)",
-};
-
-const logoStyle: React.CSSProperties = {
-  width: 64,
-  height: 64,
-  borderRadius: 18,
-  background: "#2563eb",
-  color: "#ffffff",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: 18,
-  fontWeight: 900,
-  margin: "0 auto 14px",
-};
-
-const loginTitleStyle: React.CSSProperties = {
-  margin: 0,
-  textAlign: "center",
-  fontSize: 26,
-  fontWeight: 900,
-  color: "#111827",
-};
-
-const loginSubtitleStyle: React.CSSProperties = {
-  margin: "8px 0 18px",
-  textAlign: "center",
-  fontSize: 13,
-  color: "#6b7280",
-};
-
-const mainStyle: React.CSSProperties = {
-  minHeight: "100vh",
-  background: "#f8fafc",
-  padding: "18px 12px 30px",
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-};
-
-const containerStyle: React.CSSProperties = {
-  width: "100%",
-  maxWidth: 980,
-  margin: "0 auto",
-  display: "flex",
-  flexDirection: "column",
-  gap: 14,
-};
-
-const headerStyle: React.CSSProperties = {
-  background: "#ffffff",
-  border: "1px solid #e5e7eb",
-  borderRadius: 18,
-  padding: 18,
-  display: "flex",
-  justifyContent: "space-between",
-  gap: 12,
-  alignItems: "center",
-  flexWrap: "wrap",
-};
-
-const cardStyle: React.CSSProperties = {
-  background: "#ffffff",
-  border: "1px solid #e5e7eb",
-  borderRadius: 18,
-  padding: 18,
-};
-
-const titleStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 26,
-  fontWeight: 900,
-  color: "#111827",
-};
-
-const subtitleStyle: React.CSSProperties = {
-  margin: "6px 0 0",
-  fontSize: 13,
-  color: "#6b7280",
-};
-
-const statsGridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-  gap: 10,
-};
-
-const statCardStyle: React.CSSProperties = {
-  background: "#ffffff",
-  border: "1px solid #e5e7eb",
-  borderRadius: 16,
-  padding: 14,
-};
-
-const statNumberStyle: React.CSSProperties = {
-  fontSize: 24,
-  fontWeight: 900,
-  color: "#2563eb",
-};
-
-const statLabelStyle: React.CSSProperties = {
-  fontSize: 12,
-  color: "#6b7280",
-  fontWeight: 800,
-  marginTop: 2,
-};
-
-const sectionTitleStyle: React.CSSProperties = {
-  margin: 0,
-  fontSize: 18,
-  fontWeight: 900,
-  color: "#111827",
-};
-
-const formGridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-  gap: 12,
-  marginTop: 14,
-};
-
-const labelStyle: React.CSSProperties = {
-  display: "block",
-  fontSize: 12,
-  fontWeight: 800,
-  color: "#374151",
-  marginBottom: 6,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "11px 12px",
-  borderRadius: 12,
-  border: "1px solid #d1d5db",
-  fontSize: 14,
-  boxSizing: "border-box",
-  outline: "none",
-  background: "#ffffff",
-};
-
-const buttonRowStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 8,
-  flexWrap: "wrap",
-  marginTop: 14,
-};
-
-const primaryButtonStyle: React.CSSProperties = {
-  border: "none",
-  background: "#2563eb",
-  color: "#ffffff",
-  borderRadius: 12,
-  padding: "11px 15px",
-  fontSize: 14,
-  fontWeight: 900,
-  cursor: "pointer",
-};
-
-const secondaryButtonStyle: React.CSSProperties = {
-  border: "1px solid #d1d5db",
-  background: "#ffffff",
-  color: "#111827",
-  borderRadius: 12,
-  padding: "11px 15px",
-  fontSize: 14,
-  fontWeight: 800,
-  cursor: "pointer",
-};
-
-const errorStyle: React.CSSProperties = {
-  marginTop: 10,
-  marginBottom: 10,
-  fontSize: 13,
-  fontWeight: 800,
-  color: "#b91c1c",
-  textAlign: "center",
-};
-
-const listStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-  maxHeight: 620,
-  overflowY: "auto",
-};
-
-const productCardStyle: React.CSSProperties = {
-  width: "100%",
-  border: "1px solid #e5e7eb",
-  background: "#ffffff",
-  borderRadius: 14,
-  padding: 13,
-  textAlign: "left",
-  cursor: "pointer",
-  display: "flex",
-  justifyContent: "space-between",
-  gap: 12,
-  alignItems: "center",
-};
-
-const productTitleStyle: React.CSSProperties = {
-  fontSize: 15,
-  fontWeight: 900,
-  color: "#111827",
-};
-
-const productNameStyle: React.CSSProperties = {
-  fontSize: 13,
-  color: "#374151",
-  marginTop: 3,
-};
-
-const productMetaStyle: React.CSSProperties = {
-  fontSize: 12,
-  color: "#6b7280",
-  marginTop: 3,
-};
-
-const emptyStyle: React.CSSProperties = {
-  padding: 16,
-  textAlign: "center",
-  color: "#6b7280",
-  background: "#f9fafb",
-  borderRadius: 12,
-};
