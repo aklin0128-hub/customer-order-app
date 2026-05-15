@@ -1040,7 +1040,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
               </div>
             </div>
           </div>
-        ) : null]},{
+        ) : null}
 
         {orderHistory.length > 0 ? (
           <section style={cardStyle}>
