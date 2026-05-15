@@ -431,7 +431,7 @@ export default function OrderPage() {
 
       await loadRecentAndHistory(accountNo);
       setAutoLoaded(true);
-      setTimeout(() => skuInputRef.current?.focus(), 250);
+      // Do not auto-focus SKU input on mobile; prevents page from jumping.
     };
 
     loadDrafts();
@@ -540,6 +540,11 @@ export default function OrderPage() {
     const cleanSku = sku.trim().toUpperCase();
     const cleanQty = String(value || "").replace(/[^0-9]/g, "");
 
+    // Keep the current screen position when qty changes.
+    // This prevents the page from jumping to the top when Selected First re-sorts items.
+    const scrollX = typeof window !== "undefined" ? window.scrollX : 0;
+    const scrollY = typeof window !== "undefined" ? window.scrollY : 0;
+
     setCatalogQtyMap((prev) => {
       const next = { ...prev };
       if (!cleanQty || Number(cleanQty) <= 0) delete next[cleanSku];
@@ -552,6 +557,12 @@ export default function OrderPage() {
       if (!cleanQty || Number(cleanQty) <= 0) return withoutSku;
       return [...withoutSku, { sku: cleanSku, qty: String(Number(cleanQty)) }];
     });
+
+    if (typeof window !== "undefined") {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => window.scrollTo(scrollX, scrollY));
+      });
+    }
   };
 
   const adjustQtyForSku = (sku: string, delta: number) => {
@@ -612,7 +623,7 @@ export default function OrderPage() {
     setSkuInput("");
     setQtyInput("");
     setSelectedItem(null);
-    setTimeout(() => skuInputRef.current?.focus(), 50);
+    // Do not auto-focus SKU input; prevents page from jumping.
   };
 
   const addItem = () => {
@@ -669,7 +680,7 @@ export default function OrderPage() {
       return next;
     });
     setSubmitMsg(`${valid.length} ${t.items} added.`);
-    setTimeout(() => skuInputRef.current?.focus(), 50);
+    // Do not auto-focus SKU input; prevents page from jumping.
   };
 
   const removeItem = (index: number) => {
@@ -702,7 +713,7 @@ export default function OrderPage() {
       });
     } catch {}
 
-    setTimeout(() => skuInputRef.current?.focus(), 50);
+    // Do not auto-focus SKU input; prevents page from jumping.
   };
 
   const getCurrentSubmitItems = () => {
