@@ -472,6 +472,14 @@ function inferFromSkuPrefix(prefix: string, text: string): ProductCategory | nul
   return base;
 }
 
+/**
+ * Computes the customer-visible category for filtering.
+ *
+ * **Override:** When `item.category` is set (usually from merging Redis `product:*` overrides from Admin → Products),
+ * that value wins and skips all heuristics. Use Admin to fix individual SKUs without changing `catalog_sku_master_extracted.json`.
+ *
+ * Batch JSON defaults: run `npm run assign-categories` after re-exporting the catalog spreadsheet.
+ */
 export function inferCategory(item: CategoryItem): ProductCategory | "OTHER" {
   const explicit = String(item.category || "").trim().toUpperCase();
   if (explicit && explicit !== "OTHER" && explicit !== "ALL") {

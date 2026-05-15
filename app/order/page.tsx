@@ -2,491 +2,74 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import catalogData from "@/data/catalog_sku_master_extracted.json";
-import { brandMatchesFilter, getAvailableFeaturedBrands } from "@/lib/catalogBrands";
+
+import { brandMatchesFilter, isKnownBrandFilter, splitBrandFilters } from "@/lib/catalogBrands";
 import { CATEGORY_OPTIONS, inferCategory } from "@/lib/inferCategory";
 
-type Lang = "en" | "zh" | "ko";
-type OrderMode = "search" | "catalog" | "promotion";
-
-type PromotionItem = CatalogItem & {
-  promoNote?: string;
-  promoPrice?: string;
-  promoQty?: number;
-  soldQty?: number;
-  remainingQty?: number | null;
-  startDate?: string;
-  endDate?: string;
-};
-
-type CartItem = {
-  sku: string;
-  qty: string;
-};
-
-type CatalogItem = {
-  sku: string;
-  name?: string;
-  brand?: string;
-  status?: string;
-  barcode?: string;
-  upc?: string;
-  size?: string;
-  limitedQty?: string;
-  palletSize?: string;
-  imageUrl?: string;
-  category?: string;
-};
-
-type OrderHistoryItem = {
-  accountNo: string;
-  storeName: string;
-  orderRef: string;
-  items: CartItem[];
-  note?: string;
-  phone?: string;
-  createdAt: string;
-};
-
-let catalog = catalogData as CatalogItem[];
+import { CatalogVirtualGrid } from "./components/CatalogVirtualGrid";
+import { CatalogQtyCard } from "./components/CatalogQtyCard";
+import { OrderInput } from "./components/OrderInput";
+import { ProductImage } from "./components/ProductImage";
+import { replaceCatalog, catalog } from "./catalogState";
+import {
+  formatBrandLabel,
+  formatPromoDetails,
+  generateOrderRef,
+  getCatalogItemBySku,
+  getDisplayStatus,
+  getStatusBadgeStyle,
+  isNormalItem,
+} from "./catalogUtils";
+import { copy } from "./orderCopy";
+import {
+  brandSelectStyle,
+  cardStyle,
+  cartItemStyle,
+  cartQtyInputStyle,
+  cartSummaryTextStyle,
+  categoryBarStyle,
+  categoryButtonStyle,
+  containerStyle,
+  dangerButtonStyle,
+  dangerSmallButtonStyle,
+  emptyStyle,
+  filterBlockStyle,
+  filterLabelStyle,
+  fixedSubmitBarStyle,
+  langButtonStyle,
+  limitedBadgeStyle,
+  mainStyle,
+  modeButtonStyle,
+  modeTabsStyle,
+  primarySmallButtonStyle,
+  productSmallButtonStyle,
+  promoGridStyle,
+  promoModeButtonStyle,
+  qtyButtonStyle,
+  reviewItemStyle,
+  reviewListStyle,
+  reviewModalStyle,
+  reviewOverlayStyle,
+  reviewQtyButtonStyle,
+  reviewQtyControlStyle,
+  reviewQtyInputStyle,
+  reviewRemoveButtonStyle,
+  secondaryButtonStyle,
+  sectionTitleStyle,
+  sectionToggleStyle,
+  smallButtonStyle,
+  stepButtonStyle,
+  stepInputStyle,
+  stickyCatalogToolsStyle,
+  submitButtonStyle,
+  toggleTextStyle,
+  wideInputStyle,
+} from "./orderStyles";
+import type { CartItem, CatalogItem, Lang, OrderHistoryItem, OrderMode, PromotionItem } from "./types";
 
 const quickQtyButtons = ["1", "2", "3", "4", "5", "10", "15", "20"];
 
-const copy = {
-  en: {
-    title: "Customer Order",
-    logout: "Logout",
-    customerInfo: "Customer Info",
-    show: "Show",
-    hide: "Hide",
-    phone: "Phone (Optional)",
-    note: "Note (Optional)",
-    searchMode: "Search Order",
-    catalogMode: "Catalog Order",
-    promotionMode: "Promotions",
-    promotionHint: "Featured items — add qty and they go to your cart.",
-    noPromotions: "No promotions configured yet.",
-    promoBadge: "SALE",
-    promoPrice: "Promo price",
-    promoRemaining: "Left",
-    promoSoldOut: "Sold out",
-    promoDateRange: "Valid",
-    promoQtyLimit: "Promo limit",
-    promoLimitAlert: "Only {qty} promo cases left for {sku}.",
-    addItems: "Add Items",
-    availableOnly: "Show available items only",
-    skuItem: "SKU / Item",
-    qty: "Qty",
-    addItem: "Add Item",
-    catalogSearch: "Search all orderable items...",
-    recent: "Recently Ordered",
-    history: "Order History",
-    reorder: "Reorder",
-    orderCart: "Order Cart",
-    noItems: "No items added yet.",
-    clearAll: "Clear All",
-    clearOrder: "Clear Order",
-    remove: "Remove",
-    downloadCsv: "Download CSV",
-    uploadCsv: "Upload CSV",
-    submitOrder: "Submit Order",
-    submitting: "Submitting...",
-    unavailable: "This item is currently unavailable",
-    enterSku: "Please enter SKU.",
-    duplicate: "is already in cart.\n\nDo you want to add it again?",
-    clearConfirm: "Please confirm clear current order.",
-    cleared: "Current order cleared.",
-    addAtLeast: "Please add at least one item.",
-    submitConfirm: "Submit this order?",
-    accountNo: "Account",
-    storeName: "Store",
-    items: "Items",
-    ref: "Ref",
-    loadedDraft: "Last saved draft loaded.",
-    csvEmpty: "CSV is empty.",
-    noValidRows: "No valid orderable SKU/Qty rows found.",
-    orderSuccess: "Order submitted successfully.",
-    failedSubmit: "Failed to submit order.",
-    size: "Size",
-    limited: "Limited",
-    pallet: "Pallet",
-    selected: "Selected",
-    allOrderable: "All Orderable Items",
-    noMatches: "No items match your search.",
-    tapAdd: "Tap Add or press Enter",
-    add: "Add",
-    inCart: "In cart",
-    selectedOnly: "In cart only",
-    showing: "Showing",
-    loadMore: "Load more",
-    cartSummary: "Cart",
-    cases: "cases",
-    lines: "lines",
-    reviewCart: "Review",
-    reviewOrder: "Review order",
-    confirmSubmit: "Confirm & submit",
-    orderSubmitted: "Order submitted",
-    done: "Done",
-    showCart: "Show cart",
-    hideCart: "Hide cart",
-    searchPlaceholder: "SKU, name, brand, or barcode",
-    catalogCount: "orderable items",
-    quickAdd: "Quick add",
-    close: "Close",
-    back: "Back",
-    brand: "Brand",
-    allBrands: "All brands",
-    category: "Category",
-  },
-  zh: {
-    title: "客户订单",
-    logout: "登出",
-    customerInfo: "客户信息",
-    show: "展开",
-    hide: "收起",
-    phone: "电话（可选）",
-    note: "备注（可选）",
-    searchMode: "搜索下单",
-    catalogMode: "商品目录下单",
-    promotionMode: "促销推荐",
-    promotionHint: "精选促销商品，输入数量即可加入购物车。",
-    noPromotions: "暂无促销活动。",
-    promoBadge: "促销",
-    promoPrice: "促销价",
-    promoRemaining: "剩余",
-    promoSoldOut: "已售罄",
-    promoDateRange: "有效期",
-    promoQtyLimit: "促销限量",
-    promoLimitAlert: "{sku} 促销仅剩 {qty} 箱。",
-    addItems: "添加商品",
-    availableOnly: "只显示可下单商品",
-    skuItem: "SKU / 商品",
-    qty: "数量",
-    addItem: "添加",
-    catalogSearch: "搜索全部可下单商品...",
-    recent: "最近常订",
-    history: "订单历史",
-    reorder: "再次下单",
-    orderCart: "订单购物车",
-    noItems: "还没有添加商品。",
-    clearAll: "清空",
-    clearOrder: "清空订单",
-    remove: "删除",
-    downloadCsv: "下载 CSV",
-    uploadCsv: "上传 CSV",
-    submitOrder: "提交订单",
-    submitting: "提交中...",
-    unavailable: "此商品目前无法下单",
-    enterSku: "请输入 SKU。",
-    duplicate: "已经在购物车里。\n\n是否还要再添加一次？",
-    clearConfirm: "请确认是否清空当前订单？",
-    cleared: "当前订单已清空。",
-    addAtLeast: "请至少添加一个商品。",
-    submitConfirm: "确定提交这个订单吗？",
-    accountNo: "客户账号",
-    storeName: "店名",
-    items: "商品数",
-    ref: "编号",
-    loadedDraft: "已载入上次保存的草稿。",
-    csvEmpty: "CSV 是空的。",
-    noValidRows: "没有找到可下单的有效 SKU/Qty。",
-    orderSuccess: "订单提交成功。",
-    failedSubmit: "订单提交失败。",
-    size: "规格",
-    limited: "限量",
-    pallet: "板数",
-    selected: "已选",
-    allOrderable: "全部可下单商品",
-    noMatches: "没有找到匹配的商品。",
-    tapAdd: "点「添加」或按回车",
-    add: "添加",
-    inCart: "已选",
-    selectedOnly: "只看已选",
-    showing: "显示",
-    loadMore: "加载更多",
-    cartSummary: "购物车",
-    cases: "箱",
-    lines: "项",
-    reviewCart: "核对",
-    reviewOrder: "核对订单",
-    confirmSubmit: "确认提交",
-    orderSubmitted: "订单已提交",
-    done: "完成",
-    showCart: "展开购物车",
-    hideCart: "收起购物车",
-    searchPlaceholder: "SKU、品名、品牌或条码",
-    catalogCount: "个可下单商品",
-    quickAdd: "快速添加",
-    close: "关闭",
-    back: "返回",
-    brand: "品牌",
-    allBrands: "全部品牌",
-    category: "分类",
-  },
-  ko: {
-    title: "고객 주문",
-    logout: "로그아웃",
-    customerInfo: "고객 정보",
-    show: "보기",
-    hide: "숨기기",
-    phone: "전화번호 (선택)",
-    note: "메모 (선택)",
-    searchMode: "검색 주문",
-    catalogMode: "카탈로그 주문",
-    promotionMode: "프로모션",
-    promotionHint: "추천 상품 — 수량 입력 시 카트에 추가됩니다.",
-    noPromotions: "등록된 프로모션이 없습니다.",
-    promoBadge: "할인",
-    promoPrice: "프로모션 가격",
-    promoRemaining: "남음",
-    promoSoldOut: "품절",
-    promoDateRange: "유효기간",
-    promoQtyLimit: "프로모션 한정",
-    promoLimitAlert: "{sku} 프로모션 {qty}박스만 남았습니다.",
-    addItems: "상품 추가",
-    availableOnly: "주문 가능 상품만 보기",
-    skuItem: "SKU / 상품",
-    qty: "수량",
-    addItem: "추가",
-    catalogSearch: "주문 가능 상품 검색...",
-    recent: "최근 주문 상품",
-    history: "주문 내역",
-    reorder: "다시 주문",
-    orderCart: "주문 카트",
-    noItems: "아직 추가된 상품이 없습니다.",
-    clearAll: "전체 삭제",
-    clearOrder: "주문 삭제",
-    remove: "삭제",
-    downloadCsv: "CSV 다운로드",
-    uploadCsv: "CSV 업로드",
-    submitOrder: "주문 제출",
-    submitting: "제출 중...",
-    unavailable: "현재 주문할 수 없는 상품입니다",
-    enterSku: "SKU를 입력해 주세요.",
-    duplicate: "이미 카트에 있습니다.\n\n다시 추가하시겠습니까?",
-    clearConfirm: "현재 주문을 모두 삭제하시겠습니까?",
-    cleared: "현재 주문이 삭제되었습니다.",
-    addAtLeast: "상품을 최소 1개 추가해 주세요.",
-    submitConfirm: "이 주문을 제출하시겠습니까?",
-    accountNo: "거래처 번호",
-    storeName: "매장명",
-    items: "상품 수",
-    ref: "주문번호",
-    loadedDraft: "마지막 저장된 주문을 불러왔습니다.",
-    csvEmpty: "CSV가 비어 있습니다.",
-    noValidRows: "주문 가능한 유효한 SKU/Qty 행이 없습니다.",
-    orderSuccess: "주문이 성공적으로 제출되었습니다.",
-    failedSubmit: "주문 제출 실패.",
-    size: "규격",
-    limited: "한정",
-    pallet: "팔레트",
-    selected: "선택됨",
-    allOrderable: "전체 주문 가능 상품",
-    noMatches: "검색 결과가 없습니다.",
-    tapAdd: "추가 버튼 또는 Enter",
-    add: "추가",
-    inCart: "선택됨",
-    selectedOnly: "선택 상품만",
-    showing: "표시",
-    loadMore: "더 보기",
-    cartSummary: "카트",
-    cases: "박스",
-    lines: "항목",
-    reviewCart: "검토",
-    reviewOrder: "주문 검토",
-    confirmSubmit: "확인 후 제출",
-    orderSubmitted: "주문 완료",
-    done: "완료",
-    showCart: "카트 보기",
-    hideCart: "카트 숨기기",
-    searchPlaceholder: "SKU, 상품명, 브랜드, 바코드",
-    catalogCount: "개 주문 가능",
-    quickAdd: "빠른 추가",
-    close: "닫기",
-    back: "뒤로",
-    brand: "브랜드",
-    allBrands: "전체 브랜드",
-    category: "카테고리",
-  },
-};
-
-function formatBrandLabel(brand: string) {
-  if (!brand) return brand;
-  return brand
-    .toLowerCase()
-    .split(/\s+/)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function formatPromoDetails(item: PromotionItem, t: (typeof copy)["en"]) {
-  const parts: string[] = [];
-
-  if (item.startDate || item.endDate) {
-    parts.push(`${t.promoDateRange}: ${item.startDate || "—"} → ${item.endDate || "—"}`);
-  }
-
-  if (item.promoQty && item.promoQty > 0) {
-    const left =
-      item.remainingQty ?? Math.max(0, item.promoQty - (item.soldQty || 0));
-    parts.push(
-      `${t.promoQtyLimit}: ${item.soldQty || 0}/${item.promoQty} (${t.promoRemaining} ${left})`
-    );
-  }
-
-  return parts.join(" · ");
-}
-
 const categoryOptions = CATEGORY_OPTIONS;
-
-function getImageUrl(sku?: string) {
-  if (!sku) return "";
-  return `/product/${sku}.jpg`;
-}
-
-function isNormalItem(item?: CatalogItem | null) {
-  const s = String(item?.status || "").trim().toUpperCase();
-  return s === "NORMAL" || s === "NORMAL_NOBR" || s === "NORMAL_NBR" || s === "TBD" || s === "LIMITED";
-}
-
-function getDisplayStatus(status?: string) {
-  const s = String(status || "").trim().toUpperCase();
-  if (!s || s === "INV") return "";
-  return s;
-}
-
-function getCatalogItemBySku(sku: string) {
-  return catalog.find((item) => item.sku?.toUpperCase() === sku.toUpperCase());
-}
-
-function generateOrderRef(accountNo: string) {
-  const now = new Date();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  const hh = String(now.getHours()).padStart(2, "0");
-  const min = String(now.getMinutes()).padStart(2, "0");
-  return `${accountNo}-${mm}${dd}-${hh}${min}`;
-}
-
-function getStatusBadgeStyle(status?: string): React.CSSProperties {
-  const value = String(status || "").trim().toUpperCase();
-
-  if (value === "NORMAL" || value === "NORMAL_NOBR" || value === "NORMAL_NBR" || value === "TBD") {
-    return { background: "#ecfdf5", color: "#059669", border: "1px solid #a7f3d0" };
-  }
-
-  if (value === "LIMITED") {
-    return { background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" };
-  }
-
-  return { background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" };
-}
-
-function ProductImage({ sku, alt, size = 56, imageUrl }: { sku?: string; alt: string; size?: number; imageUrl?: string }) {
-  const [imgError, setImgError] = useState(false);
-  const src = imageUrl || getImageUrl(sku);
-
-  if (!sku || imgError) {
-    return (
-      <div style={{ width: size, height: size, borderRadius: 10, background: "#f3f4f6", border: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-        No Image
-      </div>
-    );
-  }
-
-  return (
-    <img
-      src={src}
-      alt={alt}
-      style={{ width: size, height: size, objectFit: "contain", borderRadius: 10, background: "#fff", border: "1px solid #e5e7eb", flexShrink: 0, transition: "all 0.22s ease", cursor: "zoom-in", transformOrigin: "center center", position: "relative", zIndex: 1 }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "scale(3)";
-        e.currentTarget.style.background = "#fff";
-        e.currentTarget.style.border = "2px solid #2563eb";
-        e.currentTarget.style.boxShadow = "0 12px 28px rgba(0,0,0,0.25)";
-        e.currentTarget.style.zIndex = "9999";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = "scale(1)";
-        e.currentTarget.style.border = "1px solid #e5e7eb";
-        e.currentTarget.style.boxShadow = "none";
-        e.currentTarget.style.zIndex = "1";
-      }}
-      onError={() => setImgError(true)}
-    />
-  );
-}
-
-function CatalogQtyCard({
-  item,
-  qty,
-  promoNote,
-  promoPrice,
-  promoDetails,
-  inCartLabel,
-  promoBadgeLabel,
-  onAdjust,
-  onUpdateQty,
-  highlight,
-  disabled,
-}: {
-  item: CatalogItem;
-  qty: string;
-  promoNote?: string;
-  promoPrice?: string;
-  promoDetails?: string;
-  inCartLabel: string;
-  promoBadgeLabel: string;
-  onAdjust: (sku: string, delta: number) => void;
-  onUpdateQty: (sku: string, value: string) => void;
-  highlight?: boolean;
-  disabled?: boolean;
-}) {
-  const hasQty = Number(qty) > 0;
-
-  return (
-    <div
-      style={{
-        ...catalogCardStyle,
-        background: hasQty ? "#ecfdf5" : highlight ? "#fffbeb" : "#ffffff",
-        border: hasQty ? "2px solid #86efac" : highlight ? "2px solid #fdba74" : "1px solid #e5e7eb",
-      }}
-    >
-      {promoNote || highlight ? (
-        <div style={promoTagStyle}>{promoNote || promoBadgeLabel}</div>
-      ) : null}
-
-      <div style={{ textAlign: "center", paddingTop: promoNote || highlight ? 4 : 0 }}>
-        <ProductImage sku={item.sku} alt={item.name || item.sku} size={84} imageUrl={item.imageUrl} />
-      </div>
-
-      <div style={{ fontSize: 12, fontWeight: 900, color: "#111827", lineHeight: 1.2 }}>{item.sku}</div>
-      <div style={{ fontSize: 11, fontWeight: 800, color: "#374151" }}>{item.brand || "-"}</div>
-      <div style={catalogNameStyle}>{item.name || "-"}</div>
-      {item.size ? <div style={{ fontSize: 10, color: "#6b7280" }}>{item.size}</div> : null}
-      {promoPrice ? <div style={promoPriceStyle}>{promoPrice}</div> : null}
-      {promoDetails ? <div style={promoDetailsStyle}>{promoDetails}</div> : null}
-      {hasQty ? <div style={inCartTagStyle}>{inCartLabel}: {qty}</div> : null}
-
-      <div style={catalogStepperStyle}>
-        <button type="button" onClick={() => onAdjust(item.sku, -1)} disabled={disabled} style={catalogStepBtnStyle}>
-          −
-        </button>
-        <input
-          value={qty}
-          onChange={(e) => onUpdateQty(item.sku, e.target.value)}
-          placeholder="0"
-          inputMode="numeric"
-          disabled={disabled}
-          style={{ ...catalogStepInputStyle, opacity: disabled ? 0.5 : 1 }}
-        />
-        <button type="button" onClick={() => onAdjust(item.sku, 1)} disabled={disabled} style={catalogStepBtnStyle}>
-          +
-        </button>
-      </div>
-    </div>
-  );
-}
 
 export default function OrderPage() {
   const router = useRouter();
@@ -521,7 +104,6 @@ export default function OrderPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [showCart, setShowCart] = useState(true);
   const [catalogShowSelectedOnly, setCatalogShowSelectedOnly] = useState(false);
-  const [catalogListLimit, setCatalogListLimit] = useState(80);
   const [recentItems, setRecentItems] = useState<CartItem[]>([]);
   const [orderHistory, setOrderHistory] = useState<OrderHistoryItem[]>([]);
   const [catalogVersion, setCatalogVersion] = useState(0);
@@ -535,7 +117,7 @@ export default function OrderPage() {
         const res = await fetch("/api/catalog", { cache: "no-store" });
         const data = await res.json();
         if (res.ok && Array.isArray(data.products)) {
-          catalog = data.products;
+          replaceCatalog(data.products);
           setCatalogVersion((v) => v + 1);
         }
       } catch {}
@@ -706,9 +288,10 @@ export default function OrderPage() {
     return catalog.filter((item) => isNormalItem(item));
   }, [catalogVersion]);
 
-  const brandFilterOptions = useMemo(() => {
-    return getAvailableFeaturedBrands(orderableBaseItems);
-  }, [orderableBaseItems]);
+  const brandSplit = useMemo(
+    () => splitBrandFilters(orderableBaseItems),
+    [orderableBaseItems]
+  );
 
   const orderableCatalogItems = useMemo(() => {
     const q = catalogSearch.trim().toUpperCase();
@@ -736,25 +319,11 @@ export default function OrderPage() {
       .sort((a, b) => (a.sku || "").localeCompare(b.sku || ""));
   }, [catalogSearch, categoryFilter, brandFilter, catalogQtyMap, orderableBaseItems, catalogShowSelectedOnly]);
 
-  const displayCatalogItems = useMemo(() => {
-    const hasFilter =
-      Boolean(catalogSearch.trim()) ||
-      categoryFilter !== "ALL" ||
-      brandFilter !== "ALL" ||
-      catalogShowSelectedOnly;
-    const cap = hasFilter ? 250 : catalogListLimit;
-    return orderableCatalogItems.slice(0, cap);
-  }, [orderableCatalogItems, catalogSearch, categoryFilter, brandFilter, catalogShowSelectedOnly, catalogListLimit]);
-
   useEffect(() => {
-    setCatalogListLimit(80);
-  }, [categoryFilter, brandFilter, catalogSearch, catalogShowSelectedOnly]);
-
-  useEffect(() => {
-    if (brandFilter !== "ALL" && !brandFilterOptions.includes(brandFilter)) {
+    if (brandFilter !== "ALL" && !isKnownBrandFilter(brandSplit, brandFilter)) {
       setBrandFilter("ALL");
     }
-  }, [brandFilter, brandFilterOptions]);
+  }, [brandFilter, brandSplit]);
 
   const catalogItemsForSubmit = useMemo(() => {
     return Object.entries(catalogQtyMap)
@@ -1200,8 +769,8 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
 
           {showCustomerInfo ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
-              <Input label={t.phone} value={phone} onChange={setPhone} placeholder="" />
-              <Input label={t.note} value={note} onChange={setNote} placeholder="" />
+              <OrderInput label={t.phone} value={phone} onChange={setPhone} placeholder="" />
+              <OrderInput label={t.note} value={note} onChange={setNote} placeholder="" />
             </div>
           ) : null}
         </section>
@@ -1405,7 +974,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                 </div>
               </div>
 
-              {brandFilterOptions.length > 0 ? (
+              {(brandSplit.topBrands.length > 0 || brandSplit.moreBrands.length > 0) ? (
                 <div style={filterBlockStyle}>
                   <div style={filterLabelStyle}>{t.brand}</div>
                   <div style={categoryBarStyle}>
@@ -1416,7 +985,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                     >
                       {t.allBrands}
                     </button>
-                    {brandFilterOptions.map((brand) => (
+                    {brandSplit.topBrands.map((brand) => (
                       <button
                         key={brand}
                         type="button"
@@ -1426,6 +995,25 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                         {formatBrandLabel(brand)}
                       </button>
                     ))}
+                    {brandSplit.moreBrands.length > 0 ? (
+                      <select
+                        aria-label={t.moreBrandsPick}
+                        value={
+                          brandFilter !== "ALL" && brandSplit.moreBrands.includes(brandFilter)
+                            ? brandFilter
+                            : ""
+                        }
+                        onChange={(e) => setBrandFilter(e.target.value ? e.target.value : "ALL")}
+                        style={brandSelectStyle}
+                      >
+                        <option value="">{t.moreBrandsPick}</option>
+                        {brandSplit.moreBrands.map((brand) => (
+                          <option key={brand} value={brand}>
+                            {formatBrandLabel(brand)}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
                   </div>
                 </div>
               ) : null}
@@ -1439,43 +1027,19 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
             </div>
 
             <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 10px" }}>
-              {t.showing} {displayCatalogItems.length}
-              {displayCatalogItems.length < orderableCatalogItems.length ? ` / ${orderableCatalogItems.length}` : ""}
+              {t.showing} {orderableCatalogItems.length} {t.catalogCount}
             </p>
 
-            <div style={catalogListStyle}>
-              {displayCatalogItems.map((item) => {
-                const sku = item.sku?.toUpperCase() || "";
-                const qty = catalogQtyMap[sku] || "";
-                return (
-                  <CatalogQtyCard
-                    key={item.sku}
-                    item={item}
-                    qty={qty}
-                    inCartLabel={t.inCart}
-                    promoBadgeLabel={t.promoBadge}
-                    onAdjust={adjustCatalogQty}
-                    onUpdateQty={updateCatalogQty}
-                  />
-                );
-              })}
-            </div>
+            <CatalogVirtualGrid
+              items={orderableCatalogItems}
+              catalogQtyMap={catalogQtyMap}
+              inCartLabel={t.inCart}
+              promoBadgeLabel={t.promoBadge}
+              onAdjust={adjustCatalogQty}
+              onUpdateQty={updateCatalogQty}
+            />
 
-            {displayCatalogItems.length < orderableCatalogItems.length &&
-            !catalogSearch.trim() &&
-            categoryFilter === "ALL" &&
-            brandFilter === "ALL" &&
-            !catalogShowSelectedOnly ? (
-              <button
-                type="button"
-                onClick={() => setCatalogListLimit((n) => n + 80)}
-                style={{ ...secondaryButtonStyle, marginTop: 12 }}
-              >
-                {t.loadMore} (+80)
-              </button>
-            ) : null}
-
-            {displayCatalogItems.length === 0 ? (
+            {orderableCatalogItems.length === 0 ? (
               <div style={{ ...emptyStyle, marginTop: 10 }}>{catalogShowSelectedOnly ? t.noItems : t.noMatches}</div>
             ) : null}
           </section>
@@ -1658,220 +1222,3 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
   );
 }
 
-function Input({ label, value, onChange, placeholder, inputRef, onEnter }: { label: string; value: string; onChange: (value: string) => void; placeholder: string; inputRef?: React.RefObject<HTMLInputElement | null>; onEnter?: () => void }) {
-  return (
-    <div>
-      <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6, textAlign: "center" }}>{label}</label>
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <input ref={inputRef} value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && onEnter) { e.preventDefault(); onEnter(); } }} placeholder={placeholder} style={{ width: "70%", minWidth: 220, maxWidth: 320, padding: "10px 12px", borderRadius: 10, border: "1px solid #d1d5db", fontSize: 15, background: "#ffffff", outline: "none", boxSizing: "border-box", textAlign: "center" }} />
-      </div>
-    </div>
-  );
-}
-
-const mainStyle: React.CSSProperties = { minHeight: "100vh", background: "#f8fafc", padding: "14px 10px 120px", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', overflow: "visible" };
-const containerStyle: React.CSSProperties = { width: "100%", maxWidth: 980, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12, overflow: "visible" };
-const cardStyle: React.CSSProperties = { background: "#ffffff", borderRadius: 14, padding: 14, border: "1px solid #e5e7eb", boxShadow: "0 1px 2px rgba(0,0,0,0.04)", overflow: "visible" };
-const sectionTitleStyle: React.CSSProperties = { fontSize: 17, fontWeight: 800, color: "#111827" };
-const sectionToggleStyle: React.CSSProperties = { width: "100%", border: "none", background: "transparent", padding: 0, display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" };
-const toggleTextStyle: React.CSSProperties = { fontSize: 13, fontWeight: 800, color: "#2563eb" };
-const smallButtonStyle: React.CSSProperties = { border: "1px solid #d1d5db", background: "#ffffff", borderRadius: 10, padding: "7px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" };
-const dangerSmallButtonStyle: React.CSSProperties = { border: "1px solid #fecaca", background: "#ffffff", color: "#dc2626", borderRadius: 10, padding: "7px 9px", fontSize: 12, fontWeight: 700, cursor: "pointer", flexShrink: 0 };
-const langButtonStyle = (active: boolean): React.CSSProperties => ({ border: active ? "1px solid #2563eb" : "1px solid #d1d5db", background: active ? "#eff6ff" : "#ffffff", color: active ? "#2563eb" : "#374151", borderRadius: 999, padding: "6px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer" });
-const modeTabsStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 };
-const modeButtonStyle = (active: boolean): React.CSSProperties => ({
-  padding: "10px 6px",
-  borderRadius: 12,
-  border: active ? "1px solid #2563eb" : "1px solid #d1d5db",
-  background: active ? "#eff6ff" : "#ffffff",
-  color: active ? "#1d4ed8" : "#374151",
-  fontSize: 12,
-  fontWeight: 900,
-  cursor: "pointer",
-  lineHeight: 1.25,
-});
-const promoModeButtonStyle = (active: boolean): React.CSSProperties => ({
-  ...modeButtonStyle(active),
-  border: active ? "1px solid #ea580c" : "1px solid #fdba74",
-  background: active ? "#fff7ed" : "#fffbeb",
-  color: active ? "#c2410c" : "#9a3412",
-});
-const qtyButtonStyle: React.CSSProperties = { padding: "6px 0", borderRadius: 10, border: "1px solid #d1d5db", background: "#f9fafb", fontWeight: 700, fontSize: 13, cursor: "pointer" };
-const primarySmallButtonStyle: React.CSSProperties = { width: "35%", minWidth: 110, maxWidth: 150, padding: "8px 0", borderRadius: 10, border: "none", background: "#2563eb", color: "#ffffff", fontSize: 14, fontWeight: 800, cursor: "pointer" };
-const secondaryButtonStyle: React.CSSProperties = { width: "100%", padding: "11px 16px", borderRadius: 12, border: "1px solid #d1d5db", background: "#ffffff", color: "#111827", fontSize: 14, fontWeight: 800, cursor: "pointer" };
-const dangerButtonStyle: React.CSSProperties = { width: "100%", padding: "11px 16px", borderRadius: 12, border: "1px solid #fecaca", background: "#fef2f2", color: "#b91c1c", fontSize: 14, fontWeight: 800, cursor: "pointer" };
-const submitButtonStyle: React.CSSProperties = { width: "100%", padding: "13px 16px", borderRadius: 12, border: "none", color: "#ffffff", fontSize: 15, fontWeight: 800, cursor: "pointer" };
-const emptyStyle: React.CSSProperties = { padding: "14px 12px", borderRadius: 12, background: "#f9fafb", color: "#6b7280", fontSize: 14, textAlign: "center" };
-const cartItemStyle: React.CSSProperties = { border: "1px solid #e5e7eb", borderRadius: 12, padding: 10, background: "#f9fafb", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, overflow: "visible" };
-const cartQtyInputStyle: React.CSSProperties = { width: 92, padding: "6px 8px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, fontWeight: 700, background: "#ffffff", outline: "none" };
-const productSmallButtonStyle: React.CSSProperties = { width: "100%", border: "1px solid #e5e7eb", background: "#ffffff", borderRadius: 12, padding: 10, textAlign: "left", cursor: "pointer", display: "flex", gap: 10, alignItems: "center", overflow: "visible", position: "relative" };
-const wideInputStyle: React.CSSProperties = { width: "100%", padding: "11px 12px", borderRadius: 12, border: "1px solid #d1d5db", fontSize: 14, boxSizing: "border-box", outline: "none", background: "#ffffff" };
-const catalogListStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))",
-  columnGap: 12,
-  rowGap: 12,
-  overflow: "visible",
-};
-const promoGridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-  gap: 12,
-};
-const catalogCardStyle: React.CSSProperties = {
-  borderRadius: 16,
-  padding: 10,
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-  overflow: "visible",
-  position: "relative",
-  minWidth: 0,
-  boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-};
-const catalogNameStyle: React.CSSProperties = {
-  fontSize: 11,
-  color: "#4b5563",
-  lineHeight: 1.35,
-  maxHeight: 40,
-  overflow: "hidden",
-};
-const promoTagStyle: React.CSSProperties = {
-  alignSelf: "flex-start",
-  padding: "3px 8px",
-  borderRadius: 999,
-  fontSize: 10,
-  fontWeight: 900,
-  background: "#ffedd5",
-  color: "#c2410c",
-  border: "1px solid #fdba74",
-};
-const promoPriceStyle: React.CSSProperties = {
-  fontSize: 13,
-  fontWeight: 900,
-  color: "#b45309",
-};
-const promoDetailsStyle: React.CSSProperties = {
-  fontSize: 10,
-  color: "#6b7280",
-  lineHeight: 1.35,
-};
-const inCartTagStyle: React.CSSProperties = {
-  fontSize: 11,
-  color: "#059669",
-  fontWeight: 900,
-};
-const catalogStepperStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "36px 1fr 36px",
-  gap: 6,
-  alignItems: "center",
-  marginTop: "auto",
-};
-const catalogStepBtnStyle: React.CSSProperties = {
-  width: 36,
-  height: 36,
-  borderRadius: 10,
-  border: "1px solid #d1d5db",
-  background: "#f9fafb",
-  fontSize: 20,
-  fontWeight: 900,
-  cursor: "pointer",
-  lineHeight: 1,
-};
-const catalogStepInputStyle: React.CSSProperties = {
-  width: "100%",
-  height: 36,
-  borderRadius: 10,
-  border: "1px solid #d1d5db",
-  textAlign: "center",
-  fontSize: 15,
-  fontWeight: 900,
-  outline: "none",
-  boxSizing: "border-box",
-};
-const stepperStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "30px 1fr 30px", gap: 5, alignItems: "center" };
-const stepButtonStyle: React.CSSProperties = { width: 30, height: 32, borderRadius: 10, border: "1px solid #d1d5db", background: "#f9fafb", fontSize: 18, fontWeight: 900, cursor: "pointer", lineHeight: 1 };
-const stepInputStyle: React.CSSProperties = { width: "100%", height: 32, borderRadius: 10, border: "1px solid #d1d5db", textAlign: "center", fontSize: 14, fontWeight: 900, outline: "none", boxSizing: "border-box" };
-const limitedBadgeStyle: React.CSSProperties = { padding: "2px 7px", borderRadius: 999, fontSize: 10, fontWeight: 800, background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa" };
-const filterBlockStyle: React.CSSProperties = { marginBottom: 10 };
-const filterLabelStyle: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 900,
-  color: "#6b7280",
-  marginBottom: 6,
-  letterSpacing: "0.04em",
-  textTransform: "uppercase",
-};
-const categoryBarStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 8,
-  overflowX: "auto",
-  paddingBottom: 4,
-  WebkitOverflowScrolling: "touch",
-};
-const categoryButtonStyle = (active: boolean): React.CSSProperties => ({ padding: "8px 12px", borderRadius: 999, border: active ? "1px solid #2563eb" : "1px solid #d1d5db", background: active ? "#eff6ff" : "#ffffff", color: active ? "#2563eb" : "#374151", fontSize: 12, fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" });
-const fixedSubmitBarStyle: React.CSSProperties = { position: "fixed", left: "50%", bottom: 14, transform: "translateX(-50%)", width: "calc(100% - 24px)", maxWidth: 980, background: "rgba(255,255,255,0.96)", border: "1px solid #d1d5db", borderRadius: 16, padding: 10, boxShadow: "0 12px 32px rgba(0,0,0,0.18)", zIndex: 8000 };
-const reviewOverlayStyle: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(17,24,39,0.48)", display: "flex", alignItems: "center", justifyContent: "center", padding: 14, zIndex: 9000 };
-const reviewModalStyle: React.CSSProperties = { width: "100%", maxWidth: 760, maxHeight: "90vh", background: "#ffffff", borderRadius: 18, border: "1px solid #e5e7eb", padding: 16, boxShadow: "0 24px 60px rgba(0,0,0,0.28)", overflow: "hidden", display: "flex", flexDirection: "column" };
-const reviewListStyle: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 8, overflowY: "auto", paddingRight: 4 };
-const stickyCatalogToolsStyle: React.CSSProperties = {
-  position: "sticky",
-  top: 0,
-  zIndex: 50,
-  background: "rgba(255,255,255,0.97)",
-  padding: "8px 0 10px",
-  marginBottom: 12,
-  borderBottom: "1px solid #eef2f7",
-};
-
-const cartSummaryTextStyle: React.CSSProperties = {
-  textAlign: "center",
-  fontSize: 13,
-  fontWeight: 900,
-  color: "#111827",
-  marginBottom: 8,
-};
-
-const reviewQtyControlStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "34px 58px 34px auto",
-  gap: 6,
-  alignItems: "center",
-};
-
-const reviewQtyButtonStyle: React.CSSProperties = {
-  width: 34,
-  height: 34,
-  borderRadius: 10,
-  border: "1px solid #d1d5db",
-  background: "#ffffff",
-  fontSize: 18,
-  fontWeight: 900,
-  cursor: "pointer",
-};
-
-const reviewQtyInputStyle: React.CSSProperties = {
-  width: 58,
-  height: 34,
-  borderRadius: 10,
-  border: "1px solid #d1d5db",
-  textAlign: "center",
-  fontSize: 14,
-  fontWeight: 900,
-  outline: "none",
-};
-
-const reviewRemoveButtonStyle: React.CSSProperties = {
-  height: 34,
-  borderRadius: 10,
-  border: "1px solid #fecaca",
-  background: "#fef2f2",
-  color: "#dc2626",
-  fontSize: 12,
-  fontWeight: 900,
-  cursor: "pointer",
-  padding: "0 9px",
-};
-
-const reviewItemStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, border: "1px solid #e5e7eb", borderRadius: 12, background: "#f9fafb", padding: 10, flexWrap: "wrap" };

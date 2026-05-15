@@ -8,9 +8,12 @@
     "start": "next start",
     "lint": "eslint",
     "seed:nongshim-promo": "node scripts/seed-nongshim-promotions.mjs",
-    "assign-categories": "npx tsx scripts/assign-catalog-categories.ts"
+    "assign-categories": "npx tsx scripts/assign-catalog-categories.ts",
+    "catalog:export": "node scripts/build-catalog-from-xlsx.js",
+    "catalog:rebuild": "node scripts/build-catalog-from-xlsx.js && npx tsx scripts/assign-catalog-categories.ts"
   },
   "dependencies": {
+    "@tanstack/react-virtual": "^3.13.12",
     "@upstash/redis": "^1.37.0",
     "@vercel/blob": "^2.3.3",
     "next": "16.2.3",

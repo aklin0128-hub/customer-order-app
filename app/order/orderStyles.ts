@@ -1,0 +1,472 @@
+import type { CSSProperties } from "react";
+
+export const mainStyle: CSSProperties = {
+  minHeight: "100vh",
+  background: "#f8fafc",
+  padding: "14px 10px 120px",
+  fontFamily:
+    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+  overflow: "visible",
+};
+export const containerStyle: CSSProperties = {
+  width: "100%",
+  maxWidth: 980,
+  margin: "0 auto",
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+  overflow: "visible",
+};
+export const cardStyle: CSSProperties = {
+  background: "#ffffff",
+  borderRadius: 14,
+  padding: 14,
+  border: "1px solid #e5e7eb",
+  boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+  overflow: "visible",
+};
+export const sectionTitleStyle: CSSProperties = { fontSize: 17, fontWeight: 800, color: "#111827" };
+export const sectionToggleStyle: CSSProperties = {
+  width: "100%",
+  border: "none",
+  background: "transparent",
+  padding: 0,
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  cursor: "pointer",
+};
+export const toggleTextStyle: CSSProperties = { fontSize: 13, fontWeight: 800, color: "#2563eb" };
+export const smallButtonStyle: CSSProperties = {
+  border: "1px solid #d1d5db",
+  background: "#ffffff",
+  borderRadius: 10,
+  padding: "7px 10px",
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: "pointer",
+};
+export const dangerSmallButtonStyle: CSSProperties = {
+  border: "1px solid #fecaca",
+  background: "#ffffff",
+  color: "#dc2626",
+  borderRadius: 10,
+  padding: "7px 9px",
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: "pointer",
+  flexShrink: 0,
+};
+export const langButtonStyle = (active: boolean): CSSProperties => ({
+  border: active ? "1px solid #2563eb" : "1px solid #d1d5db",
+  background: active ? "#eff6ff" : "#ffffff",
+  color: active ? "#2563eb" : "#374151",
+  borderRadius: 999,
+  padding: "6px 10px",
+  fontSize: 12,
+  fontWeight: 800,
+  cursor: "pointer",
+});
+export const modeTabsStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 };
+export const modeButtonStyle = (active: boolean): CSSProperties => ({
+  padding: "10px 6px",
+  borderRadius: 12,
+  border: active ? "1px solid #2563eb" : "1px solid #d1d5db",
+  background: active ? "#eff6ff" : "#ffffff",
+  color: active ? "#1d4ed8" : "#374151",
+  fontSize: 12,
+  fontWeight: 900,
+  cursor: "pointer",
+  lineHeight: 1.25,
+});
+export const promoModeButtonStyle = (active: boolean): CSSProperties => ({
+  ...modeButtonStyle(active),
+  border: active ? "1px solid #ea580c" : "1px solid #fdba74",
+  background: active ? "#fff7ed" : "#fffbeb",
+  color: active ? "#c2410c" : "#9a3412",
+});
+export const qtyButtonStyle: CSSProperties = {
+  padding: "6px 0",
+  borderRadius: 10,
+  border: "1px solid #d1d5db",
+  background: "#f9fafb",
+  fontWeight: 700,
+  fontSize: 13,
+  cursor: "pointer",
+};
+export const primarySmallButtonStyle: CSSProperties = {
+  width: "35%",
+  minWidth: 110,
+  maxWidth: 150,
+  padding: "8px 0",
+  borderRadius: 10,
+  border: "none",
+  background: "#2563eb",
+  color: "#ffffff",
+  fontSize: 14,
+  fontWeight: 800,
+  cursor: "pointer",
+};
+export const secondaryButtonStyle: CSSProperties = {
+  width: "100%",
+  padding: "11px 16px",
+  borderRadius: 12,
+  border: "1px solid #d1d5db",
+  background: "#ffffff",
+  color: "#111827",
+  fontSize: 14,
+  fontWeight: 800,
+  cursor: "pointer",
+};
+export const dangerButtonStyle: CSSProperties = {
+  width: "100%",
+  padding: "11px 16px",
+  borderRadius: 12,
+  border: "1px solid #fecaca",
+  background: "#fef2f2",
+  color: "#b91c1c",
+  fontSize: 14,
+  fontWeight: 800,
+  cursor: "pointer",
+};
+export const submitButtonStyle: CSSProperties = {
+  width: "100%",
+  padding: "13px 16px",
+  borderRadius: 12,
+  border: "none",
+  color: "#ffffff",
+  fontSize: 15,
+  fontWeight: 800,
+  cursor: "pointer",
+};
+export const emptyStyle: CSSProperties = {
+  padding: "14px 12px",
+  borderRadius: 12,
+  background: "#f9fafb",
+  color: "#6b7280",
+  fontSize: 14,
+  textAlign: "center",
+};
+export const cartItemStyle: CSSProperties = {
+  border: "1px solid #e5e7eb",
+  borderRadius: 12,
+  padding: 10,
+  background: "#f9fafb",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 10,
+  overflow: "visible",
+};
+export const cartQtyInputStyle: CSSProperties = {
+  width: 92,
+  padding: "6px 8px",
+  borderRadius: 8,
+  border: "1px solid #d1d5db",
+  fontSize: 13,
+  fontWeight: 700,
+  background: "#ffffff",
+  outline: "none",
+};
+export const productSmallButtonStyle: CSSProperties = {
+  width: "100%",
+  border: "1px solid #e5e7eb",
+  background: "#ffffff",
+  borderRadius: 12,
+  padding: 10,
+  textAlign: "left",
+  cursor: "pointer",
+  display: "flex",
+  gap: 10,
+  alignItems: "center",
+  overflow: "visible",
+  position: "relative",
+};
+export const wideInputStyle: CSSProperties = {
+  width: "100%",
+  padding: "11px 12px",
+  borderRadius: 12,
+  border: "1px solid #d1d5db",
+  fontSize: 14,
+  boxSizing: "border-box",
+  outline: "none",
+  background: "#ffffff",
+};
+export const promoGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+  gap: 12,
+};
+export const catalogCardStyle: CSSProperties = {
+  borderRadius: 16,
+  padding: 10,
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+  overflow: "visible",
+  position: "relative",
+  minWidth: 0,
+  boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+};
+export const catalogNameStyle: CSSProperties = {
+  fontSize: 11,
+  color: "#4b5563",
+  lineHeight: 1.35,
+  maxHeight: 40,
+  overflow: "hidden",
+};
+export const promoTagStyle: CSSProperties = {
+  alignSelf: "flex-start",
+  padding: "3px 8px",
+  borderRadius: 999,
+  fontSize: 10,
+  fontWeight: 900,
+  background: "#ffedd5",
+  color: "#c2410c",
+  border: "1px solid #fdba74",
+};
+export const promoPriceStyle: CSSProperties = {
+  fontSize: 13,
+  fontWeight: 900,
+  color: "#b45309",
+};
+export const promoDetailsStyle: CSSProperties = {
+  fontSize: 10,
+  color: "#6b7280",
+  lineHeight: 1.35,
+};
+export const inCartTagStyle: CSSProperties = {
+  fontSize: 11,
+  color: "#059669",
+  fontWeight: 900,
+};
+export const catalogStepperStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "36px 1fr 36px",
+  gap: 6,
+  alignItems: "center",
+  marginTop: "auto",
+};
+export const catalogStepBtnStyle: CSSProperties = {
+  width: 36,
+  height: 36,
+  borderRadius: 10,
+  border: "1px solid #d1d5db",
+  background: "#f9fafb",
+  fontSize: 20,
+  fontWeight: 900,
+  cursor: "pointer",
+  lineHeight: 1,
+};
+export const catalogStepInputStyle: CSSProperties = {
+  width: "100%",
+  height: 36,
+  borderRadius: 10,
+  border: "1px solid #d1d5db",
+  textAlign: "center",
+  fontSize: 15,
+  fontWeight: 900,
+  outline: "none",
+  boxSizing: "border-box",
+};
+export const stepperStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "30px 1fr 30px",
+  gap: 5,
+  alignItems: "center",
+};
+export const stepButtonStyle: CSSProperties = {
+  width: 30,
+  height: 32,
+  borderRadius: 10,
+  border: "1px solid #d1d5db",
+  background: "#f9fafb",
+  fontSize: 18,
+  fontWeight: 900,
+  cursor: "pointer",
+  lineHeight: 1,
+};
+export const stepInputStyle: CSSProperties = {
+  width: "100%",
+  height: 32,
+  borderRadius: 10,
+  border: "1px solid #d1d5db",
+  textAlign: "center",
+  fontSize: 14,
+  fontWeight: 900,
+  outline: "none",
+  boxSizing: "border-box",
+};
+export const limitedBadgeStyle: CSSProperties = {
+  padding: "2px 7px",
+  borderRadius: 999,
+  fontSize: 10,
+  fontWeight: 800,
+  background: "#fff7ed",
+  color: "#c2410c",
+  border: "1px solid #fed7aa",
+};
+export const filterBlockStyle: CSSProperties = { marginBottom: 10 };
+export const filterLabelStyle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 900,
+  color: "#6b7280",
+  marginBottom: 6,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
+};
+export const categoryBarStyle: CSSProperties = {
+  display: "flex",
+  gap: 8,
+  overflowX: "auto",
+  paddingBottom: 4,
+  WebkitOverflowScrolling: "touch",
+  flexWrap: "wrap",
+  alignItems: "center",
+};
+export const categoryButtonStyle = (active: boolean): CSSProperties => ({
+  padding: "8px 12px",
+  borderRadius: 999,
+  border: active ? "1px solid #2563eb" : "1px solid #d1d5db",
+  background: active ? "#eff6ff" : "#ffffff",
+  color: active ? "#2563eb" : "#374151",
+  fontSize: 12,
+  fontWeight: 900,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+});
+
+export const brandSelectStyle: CSSProperties = {
+  padding: "8px 10px",
+  borderRadius: 999,
+  border: "1px solid #d1d5db",
+  background: "#ffffff",
+  color: "#374151",
+  fontSize: 12,
+  fontWeight: 800,
+  cursor: "pointer",
+  maxWidth: 200,
+  minWidth: 120,
+};
+export const fixedSubmitBarStyle: CSSProperties = {
+  position: "fixed",
+  left: "50%",
+  bottom: 14,
+  transform: "translateX(-50%)",
+  width: "calc(100% - 24px)",
+  maxWidth: 980,
+  background: "rgba(255,255,255,0.96)",
+  border: "1px solid #d1d5db",
+  borderRadius: 16,
+  padding: 10,
+  boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
+  zIndex: 8000,
+};
+export const reviewOverlayStyle: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(17,24,39,0.48)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 14,
+  zIndex: 9000,
+};
+export const reviewModalStyle: CSSProperties = {
+  width: "100%",
+  maxWidth: 760,
+  maxHeight: "90vh",
+  background: "#ffffff",
+  borderRadius: 18,
+  border: "1px solid #e5e7eb",
+  padding: 16,
+  boxShadow: "0 24px 60px rgba(0,0,0,0.28)",
+  overflow: "hidden",
+  display: "flex",
+  flexDirection: "column",
+};
+export const reviewListStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+  overflowY: "auto",
+  paddingRight: 4,
+};
+export const stickyCatalogToolsStyle: CSSProperties = {
+  position: "sticky",
+  top: 0,
+  zIndex: 50,
+  background: "rgba(255,255,255,0.97)",
+  padding: "8px 0 10px",
+  marginBottom: 12,
+  borderBottom: "1px solid #eef2f7",
+};
+
+export const cartSummaryTextStyle: CSSProperties = {
+  textAlign: "center",
+  fontSize: 13,
+  fontWeight: 900,
+  color: "#111827",
+  marginBottom: 8,
+};
+
+export const reviewQtyControlStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "34px 58px 34px auto",
+  gap: 6,
+  alignItems: "center",
+};
+
+export const reviewQtyButtonStyle: CSSProperties = {
+  width: 34,
+  height: 34,
+  borderRadius: 10,
+  border: "1px solid #d1d5db",
+  background: "#ffffff",
+  fontSize: 18,
+  fontWeight: 900,
+  cursor: "pointer",
+};
+
+export const reviewQtyInputStyle: CSSProperties = {
+  width: 58,
+  height: 34,
+  borderRadius: 10,
+  border: "1px solid #d1d5db",
+  textAlign: "center",
+  fontSize: 14,
+  fontWeight: 900,
+  outline: "none",
+};
+
+export const reviewRemoveButtonStyle: CSSProperties = {
+  height: 34,
+  borderRadius: 10,
+  border: "1px solid #fecaca",
+  background: "#fef2f2",
+  color: "#dc2626",
+  fontSize: 12,
+  fontWeight: 900,
+  cursor: "pointer",
+  padding: "0 9px",
+};
+
+export const reviewItemStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 10,
+  border: "1px solid #e5e7eb",
+  borderRadius: 12,
+  background: "#f9fafb",
+  padding: 10,
+  flexWrap: "wrap",
+};
+
+/** Scroll area for virtualized catalog grid */
+export const catalogVirtualScrollStyle: CSSProperties = {
+  height: "min(70vh, 900px)",
+  overflow: "auto",
+  marginTop: 4,
+  WebkitOverflowScrolling: "touch",
+};

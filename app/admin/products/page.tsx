@@ -389,6 +389,9 @@ export default function AdminProductsPage() {
                     </option>
                   ))}
                 </select>
+                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>
+                  Saved in Redis overrides the spreadsheet category for this SKU on the customer order page.
+                </div>
               </div>
               <div>
                 <label style={labelStyle}>Size</label>
