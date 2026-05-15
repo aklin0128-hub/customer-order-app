@@ -147,14 +147,25 @@ export const emptyStyle: CSSProperties = {
   fontSize: 14,
   textAlign: "center",
 };
+export const cartListScrollStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+  maxHeight: "min(48vh, 400px)",
+  overflowY: "auto",
+  WebkitOverflowScrolling: "touch",
+  marginTop: 10,
+  paddingRight: 4,
+};
 export const cartItemStyle: CSSProperties = {
   border: "1px solid #e5e7eb",
   borderRadius: 12,
   padding: 10,
   background: "#f9fafb",
   display: "flex",
+  flexWrap: "wrap",
   justifyContent: "space-between",
-  alignItems: "center",
+  alignItems: "flex-start",
   gap: 10,
   overflow: "visible",
 };
@@ -375,7 +386,7 @@ export const reviewOverlayStyle: CSSProperties = {
 export const reviewModalStyle: CSSProperties = {
   width: "100%",
   maxWidth: 760,
-  maxHeight: "90vh",
+  maxHeight: "min(90vh, 900px)",
   background: "#ffffff",
   borderRadius: 18,
   border: "1px solid #e5e7eb",
@@ -384,6 +395,15 @@ export const reviewModalStyle: CSSProperties = {
   overflow: "hidden",
   display: "flex",
   flexDirection: "column",
+  boxSizing: "border-box",
+};
+export const reviewModalHeaderStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: 12,
+  marginBottom: 10,
+  flexShrink: 0,
 };
 export const reviewListStyle: CSSProperties = {
   display: "flex",
@@ -391,6 +411,17 @@ export const reviewListStyle: CSSProperties = {
   gap: 8,
   overflowY: "auto",
   paddingRight: 4,
+  flex: 1,
+  minHeight: 0,
+};
+export const reviewModalFooterStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: 10,
+  marginTop: 12,
+  paddingTop: 12,
+  borderTop: "1px solid #eef2f7",
+  flexShrink: 0,
 };
 export const stickyCatalogToolsStyle: CSSProperties = {
   position: "sticky",
@@ -410,11 +441,20 @@ export const cartSummaryTextStyle: CSSProperties = {
   marginBottom: 8,
 };
 
+/** Shared qty strip (− · input · + · …) for cart + review modal */
 export const reviewQtyControlStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "34px 58px 34px auto",
+  gridTemplateColumns: "34px minmax(48px, 1fr) 34px auto",
   gap: 6,
   alignItems: "center",
+  minWidth: 0,
+};
+export const compactQtyStripWrapStyle: CSSProperties = {
+  flex: "1 1 min(290px, 100%)",
+  display: "flex",
+  justifyContent: "flex-end",
+  alignItems: "center",
+  minWidth: 0,
 };
 
 export const reviewQtyButtonStyle: CSSProperties = {
@@ -429,7 +469,8 @@ export const reviewQtyButtonStyle: CSSProperties = {
 };
 
 export const reviewQtyInputStyle: CSSProperties = {
-  width: 58,
+  width: "100%",
+  minWidth: 48,
   height: 34,
   borderRadius: 10,
   border: "1px solid #d1d5db",
@@ -437,6 +478,7 @@ export const reviewQtyInputStyle: CSSProperties = {
   fontSize: 14,
   fontWeight: 900,
   outline: "none",
+  boxSizing: "border-box",
 };
 
 export const reviewRemoveButtonStyle: CSSProperties = {
@@ -454,13 +496,30 @@ export const reviewRemoveButtonStyle: CSSProperties = {
 export const reviewItemStyle: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
-  alignItems: "center",
+  alignItems: "flex-start",
   gap: 10,
   border: "1px solid #e5e7eb",
   borderRadius: 12,
   background: "#f9fafb",
   padding: 10,
   flexWrap: "wrap",
+};
+export const cartQtyStripWrapStyle: CSSProperties = {
+  flex: "1 1 100%",
+  display: "flex",
+  justifyContent: "flex-end",
+  alignItems: "center",
+};
+
+/** Read-only submitted order lines (avoid flex:1 bleed in short modals) */
+export const submittedOrderListStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+  overflowY: "auto",
+  paddingRight: 4,
+  marginTop: 12,
+  maxHeight: "min(42vh, 340px)",
 };
 
 /** Scroll area for virtualized catalog grid */

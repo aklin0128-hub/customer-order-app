@@ -8,7 +8,10 @@ import { CATEGORY_OPTIONS, inferCategory } from "@/lib/inferCategory";
 
 import { CatalogVirtualGrid } from "./components/CatalogVirtualGrid";
 import { CatalogQtyCard } from "./components/CatalogQtyCard";
+import { OrderCartSection } from "./components/OrderCartSection";
 import { OrderInput } from "./components/OrderInput";
+import { OrderReviewModal } from "./components/OrderReviewModal";
+import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
 import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog } from "./catalogState";
 import {
@@ -24,14 +27,11 @@ import { copy } from "./orderCopy";
 import {
   brandSelectStyle,
   cardStyle,
-  cartItemStyle,
-  cartQtyInputStyle,
   cartSummaryTextStyle,
   categoryBarStyle,
   categoryButtonStyle,
   containerStyle,
   dangerButtonStyle,
-  dangerSmallButtonStyle,
   emptyStyle,
   filterBlockStyle,
   filterLabelStyle,
@@ -46,14 +46,6 @@ import {
   promoGridStyle,
   promoModeButtonStyle,
   qtyButtonStyle,
-  reviewItemStyle,
-  reviewListStyle,
-  reviewModalStyle,
-  reviewOverlayStyle,
-  reviewQtyButtonStyle,
-  reviewQtyControlStyle,
-  reviewQtyInputStyle,
-  reviewRemoveButtonStyle,
   secondaryButtonStyle,
   sectionTitleStyle,
   sectionToggleStyle,
@@ -66,6 +58,13 @@ import {
   wideInputStyle,
 } from "./orderStyles";
 import type { CartItem, CatalogItem, Lang, OrderHistoryItem, OrderMode, PromotionItem } from "./types";
+
+const ORDER_LANG_LABELS: Record<Lang, string> = {
+  en: "EN",
+  zh: "中文",
+  ko: "한국어",
+  vi: "Tiếng Việt",
+};
 
 const quickQtyButtons = ["1", "2", "3", "4", "5", "10", "15", "20"];
 
@@ -145,7 +144,7 @@ export default function OrderPage() {
 
   useEffect(() => {
     const saved = localStorage.getItem("lang") as Lang | null;
-    if (saved === "en" || saved === "zh" || saved === "ko") setLang(saved);
+    if (saved === "en" || saved === "zh" || saved === "ko" || saved === "vi") setLang(saved);
 
     const savedMode = localStorage.getItem("order_mode") as OrderMode | null;
     if (savedMode === "search" || savedMode === "catalog" || savedMode === "promotion") setMode(savedMode);
@@ -380,6 +379,13 @@ export default function OrderPage() {
     if (delta > 0 && promoRemaining !== null && next > promoRemaining) {
       alert(t.promoLimitAlert.replace("{sku}", cleanSku).replace("{qty}", String(promoRemaining)));
       next = promoRemaining;
+    }
+
+    const catalogItem = getCatalogItemBySku(cleanSku);
+    const limitedQty = Number(String(catalogItem?.limitedQty || "").replace(/[^0-9]/g, ""));
+    if (delta > 0 && limitedQty > 0 && next > limitedQty) {
+      alert(`${cleanSku} limited qty is ${limitedQty}.`);
+      next = limitedQty;
     }
 
     setQtyForSku(cleanSku, next ? String(next) : "");
@@ -726,9 +732,9 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
       <div style={containerStyle}>
         <section style={cardStyle}>
           <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 12 }}>
-            {(["en", "zh", "ko"] as Lang[]).map((item) => (
+            {(["en", "zh", "ko", "vi"] as Lang[]).map((item) => (
               <button key={item} type="button" onClick={() => changeLang(item)} style={langButtonStyle(lang === item)}>
-                {item === "en" ? "EN" : item === "zh" ? "中文" : "한국어"}
+                {ORDER_LANG_LABELS[item]}
               </button>
             ))}
           </div>
@@ -1044,51 +1050,17 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
             ) : null}
           </section>
         )}
-        <section style={cardStyle}>
-          <button type="button" onClick={() => setShowCart((prev) => !prev)} style={sectionToggleStyle}>
-            <div style={sectionTitleStyle}>{t.orderCart} ({cartItemCount}) · {totalCases} {t.cases}</div>
-            <div style={toggleTextStyle}>{showCart ? t.hideCart : t.showCart}</div>
-          </button>
-
-          {showCart ? (
-            catalogItemsForSubmit.length === 0 ? (
-              <div style={emptyStyle}>{t.noItems}</div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
-                {catalogItemsForSubmit.map((item) => {
-                  const catalogItem = getCatalogItemBySku(item.sku);
-                  return (
-                    <div key={item.sku} style={cartItemStyle}>
-                      <div style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0, flex: 1 }}>
-                        <ProductImage sku={item.sku} alt={item.sku} size={48} imageUrl={catalogItem?.imageUrl} />
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontSize: 15, fontWeight: 800, color: "#111827" }}>{item.sku}</div>
-                          {catalogItem ? (
-                            <div style={{ fontSize: 12, color: "#4b5563", marginTop: 2, lineHeight: 1.35 }}>
-                              {catalogItem.brand ? `${catalogItem.brand} | ` : ""}{catalogItem.name || ""}
-                            </div>
-                          ) : null}
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
-                            <span style={{ fontSize: 12, fontWeight: 800, color: "#4b5563" }}>{t.qty}:</span>
-                            <input
-                              value={item.qty}
-                              onChange={(e) => setQtyForSku(item.sku, e.target.value)}
-                              style={cartQtyInputStyle}
-                              inputMode="numeric"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      <button type="button" onClick={() => removeSkuFromOrder(item.sku)} style={dangerSmallButtonStyle}>
-                        {t.remove}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )
-          ) : null}
-        </section>
+        <OrderCartSection
+          lang={lang}
+          items={catalogItemsForSubmit}
+          expanded={showCart}
+          onToggleExpanded={() => setShowCart((prev) => !prev)}
+          lineCount={cartItemCount}
+          totalCases={totalCases}
+          onAdjustQty={adjustQtyForSku}
+          onQtyInput={updateCatalogQty}
+          onRemove={removeSkuFromOrder}
+        />
 
         <section style={cardStyle}>
           <div style={{ display: "grid", gap: 8 }}>
@@ -1117,84 +1089,27 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
           </div>
         </div>
 
-        {showReview ? (
-          <div style={reviewOverlayStyle}>
-            <div style={reviewModalStyle}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                <div>
-                  <div style={{ fontSize: 18, fontWeight: 900, color: "#111827" }}>{t.reviewOrder}</div>
-                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>{accountNo} | {storeName} | {getCurrentSubmitItems().length} {t.items}</div>
-                </div>
-                <button type="button" onClick={() => setShowReview(false)} style={dangerSmallButtonStyle}>{t.close}</button>
-              </div>
+        <OrderReviewModal
+          open={showReview}
+          onClose={() => setShowReview(false)}
+          lang={lang}
+          items={catalogItemsForSubmit}
+          accountNo={accountNo}
+          storeName={storeName}
+          submitting={submitting}
+          onAdjustQty={adjustQtyForSku}
+          onQtyInput={updateCatalogQty}
+          onRemove={removeSkuFromOrder}
+          onSubmit={submitOrder}
+        />
 
-              <div style={reviewListStyle}>
-                {getCurrentSubmitItems().map((item, index) => {
-                  const catalogItem = getCatalogItemBySku(item.sku);
-                  return (
-                    <div key={`${item.sku}-${index}`} style={reviewItemStyle}>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center", minWidth: 0, flex: 1 }}>
-                        <ProductImage sku={item.sku} alt={item.sku} size={42} imageUrl={catalogItem?.imageUrl} />
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 14, fontWeight: 900, color: "#111827" }}>{item.sku}</div>
-                          <div style={{ fontSize: 12, color: "#4b5563", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 420 }}>
-                            {catalogItem?.brand ? `${catalogItem.brand} | ` : ""}{catalogItem?.name || "-"}
-                          </div>
-                          <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
-                            {catalogItem?.palletSize ? `Pallet: ${catalogItem.palletSize}` : ""}{catalogItem?.limitedQty ? `  Limited: ${catalogItem.limitedQty}` : ""}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div style={reviewQtyControlStyle}>
-                        <button type="button" onClick={() => adjustQtyForSku(item.sku, -1)} style={reviewQtyButtonStyle}>−</button>
-                        <input value={item.qty} onChange={(e) => setQtyForSku(item.sku, e.target.value)} inputMode="numeric" style={reviewQtyInputStyle} />
-                        <button type="button" onClick={() => adjustQtyForSku(item.sku, 1)} style={reviewQtyButtonStyle}>+</button>
-                        <button type="button" onClick={() => removeSkuFromOrder(item.sku)} style={reviewRemoveButtonStyle}>{t.remove}</button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}>
-                <button type="button" onClick={() => setShowReview(false)} style={secondaryButtonStyle}>{t.back}</button>
-                <button type="button" onClick={submitOrder} disabled={submitting} style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}>
-                  {submitting ? t.submitting : t.confirmSubmit}
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {lastSubmittedRef ? (
-          <div style={reviewOverlayStyle}>
-            <div style={reviewModalStyle}>
-              <div style={{ fontSize: 22, fontWeight: 900, color: "#16a34a", textAlign: "center" }}>{t.orderSubmitted}</div>
-              <div style={{ fontSize: 14, color: "#374151", textAlign: "center", marginTop: 6 }}>{t.ref}: {lastSubmittedRef}</div>
-              <div style={{ fontSize: 13, color: "#6b7280", textAlign: "center", marginTop: 4 }}>{lastSubmittedItems.length} {t.items}</div>
-
-              <div style={{ ...reviewListStyle, marginTop: 12 }}>
-                {lastSubmittedItems.map((item, index) => {
-                  const catalogItem = getCatalogItemBySku(item.sku);
-                  return (
-                    <div key={`${item.sku}-${index}`} style={reviewItemStyle}>
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 900 }}>{item.sku}</div>
-                        <div style={{ fontSize: 12, color: "#6b7280" }}>{catalogItem?.brand ? `${catalogItem.brand} | ` : ""}{catalogItem?.name || "-"}</div>
-                      </div>
-                      <div style={{ fontSize: 15, fontWeight: 900, color: "#16a34a" }}>Qty: {item.qty}</div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <button type="button" onClick={() => setLastSubmittedRef("")} style={{ ...submitButtonStyle, background: "#2563eb", marginTop: 12 }}>
-                {t.done}
-              </button>
-            </div>
-          </div>
-        ) : null}
+        <OrderSubmittedModal
+          open={Boolean(lastSubmittedRef)}
+          onDone={() => setLastSubmittedRef("")}
+          lang={lang}
+          orderRef={lastSubmittedRef}
+          items={lastSubmittedItems}
+        />
 
         {orderHistory.length > 0 ? (
           <section style={cardStyle}>

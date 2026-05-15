@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
+import { prependOrderHistory } from "@/lib/orderHistory";
 import { incrementPromotionSold } from "@/lib/promotions";
-import { redis } from "@/lib/redis";
+import { mergeRecentItems } from "@/lib/recentItems";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -21,46 +22,6 @@ function buildCsv(items: any[]) {
   }
 
   return rows.map((row) => row.map(csvEscape).join(",")).join("\n");
-}
-
-async function saveOrderHistory(order: any) {
-  const accountNo = String(order.accountNo || "").trim().toUpperCase();
-  if (!accountNo) return;
-
-  const current = (await redis.get<any[]>(`orderHistory:${accountNo}`)) || [];
-  const next = [order, ...current].slice(0, 20);
-
-  await redis.set(`orderHistory:${accountNo}`, next);
-}
-
-async function saveRecentItems(accountNo: string, items: any[]) {
-  const key = `recentItems:${accountNo}`;
-  const current = (await redis.get<any[]>(key)) || [];
-  const map = new Map<string, any>();
-
-  for (const item of current) {
-    const sku = String(item?.sku || "").trim().toUpperCase();
-    if (sku) map.set(sku, item);
-  }
-
-  for (const item of items) {
-    const sku = String(item?.sku || "").trim().toUpperCase();
-    if (!sku) continue;
-
-    map.set(sku, {
-      sku,
-      qty: String(item?.qty || "1").trim(),
-      lastOrderedAt: new Date().toISOString(),
-    });
-  }
-
-  const next = Array.from(map.values())
-    .sort((a, b) =>
-      String(b.lastOrderedAt || "").localeCompare(String(a.lastOrderedAt || ""))
-    )
-    .slice(0, 30);
-
-  await redis.set(key, next);
 }
 
 export async function POST(req: Request) {
@@ -145,8 +106,8 @@ export async function POST(req: Request) {
       ],
     });
 
-    await saveOrderHistory(order);
-    await saveRecentItems(accountNo, cleanedItems);
+    await prependOrderHistory(order);
+    await mergeRecentItems(accountNo, cleanedItems);
     await incrementPromotionSold(cleanedItems);
 
     return NextResponse.json({

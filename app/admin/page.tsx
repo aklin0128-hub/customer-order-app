@@ -27,6 +27,12 @@ const QUICK_LINKS = [
     emoji: "🏷️",
   },
   {
+    title: "Invoices",
+    description: "Upload customer invoices (PDF or image). Lines are parsed into SKUs and quantities; optionally feed recent items & order history.",
+    href: "/admin/invoices",
+    emoji: "📄",
+  },
+  {
     title: "Orders",
     description: "Browse recent submitted orders and download CSV files.",
     href: "/admin/orders",

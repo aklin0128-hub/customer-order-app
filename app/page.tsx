@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-type Lang = "en" | "zh" | "ko";
+type Lang = "en" | "zh" | "ko" | "vi";
 
 const copy = {
   en: {
@@ -22,7 +22,7 @@ const copy = {
     hidePassword: "Hide",
     welcomeBack: "Welcome back",
     lastAccountHint: "Last signed-in account loaded.",
-    footer: "Online order portal · Draft auto-save · EN / 中文 / 한국어",
+    footer: "Online order portal · Draft auto-save · EN / 中文 / 한국어 / Tiếng Việt",
     featSearch: "Quick search",
     featCatalog: "Full catalog",
     featPromo: "Promotions",
@@ -72,12 +72,35 @@ const copy = {
     featPromo: "프로모션",
     featDraft: "임시 저장",
   },
+  vi: {
+    title: "Đặt hàng khách",
+    subtitle: "Đăng nhập để xem sản phẩm, khuyến mãi và gửi đơn.",
+    accountNumber: "Mã khách",
+    password: "Mật khẩu",
+    accountPlaceholder: "ví dụ FL111",
+    passwordPlaceholder: "Nhập mật khẩu",
+    signIn: "Đăng nhập",
+    signingIn: "Đang đăng nhập…",
+    invalid: "Sai mã khách hoặc mật khẩu.",
+    emptyAccount: "Vui lòng nhập mã khách.",
+    emptyPassword: "Vui lòng nhập mật khẩu.",
+    showPassword: "Hiện",
+    hidePassword: "Ẩn",
+    welcomeBack: "Chào mừng trở lại",
+    lastAccountHint: "Đã điền mã khách lần đăng nhập trước.",
+    footer: "Cổng đặt hàng trực tuyến · Tự lưu nháp · Đa ngôn ngữ",
+    featSearch: "Tìm nhanh",
+    featCatalog: "Danh mục đầy đủ",
+    featPromo: "Khuyến mãi",
+    featDraft: "Lưu nháp",
+  },
 };
 
 const langLabels: Record<Lang, string> = {
   en: "EN",
   zh: "中文",
   ko: "한국어",
+  vi: "Tiếng Việt",
 };
 
 export default function LoginPage() {
@@ -101,7 +124,7 @@ export default function LoginPage() {
     setCheckingSession(false);
 
     const savedLang = localStorage.getItem("lang") as Lang | null;
-    if (savedLang === "en" || savedLang === "zh" || savedLang === "ko") {
+    if (savedLang === "en" || savedLang === "zh" || savedLang === "ko" || savedLang === "vi") {
       setLang(savedLang);
     }
 
@@ -201,7 +224,7 @@ export default function LoginPage() {
             <span style={brandTextStyle}>Order Portal</span>
           </div>
           <div style={langRowStyle} role="group" aria-label="Language">
-            {(["en", "zh", "ko"] as Lang[]).map((item) => (
+            {(["en", "zh", "ko", "vi"] as Lang[]).map((item) => (
               <button
                 key={item}
                 type="button"

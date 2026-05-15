@@ -1,4 +1,4 @@
-export type Lang = "en" | "zh" | "ko";
+export type Lang = "en" | "zh" | "ko" | "vi";
 export type OrderMode = "search" | "catalog" | "promotion";
 
 export type CatalogItem = {
