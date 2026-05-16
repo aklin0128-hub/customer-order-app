@@ -198,7 +198,7 @@ export const wideInputStyle: CSSProperties = {
   padding: "11px 12px",
   borderRadius: 12,
   border: "1px solid #d1d5db",
-  fontSize: 14,
+  fontSize: 16,
   boxSizing: "border-box",
   outline: "none",
   background: "#ffffff",

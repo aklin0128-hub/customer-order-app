@@ -41,6 +41,7 @@ const statusOptions = [
   "NORMAL_NBR",
   "NORMAL_NOBR",
   "TBD",
+  "NEW",
   "LIMITED",
   "SEASONAL",
   "DISCONTINUED",
@@ -48,6 +49,7 @@ const statusOptions = [
 ];
 
 const categoryOptions = ["", ...CATEGORY_OPTIONS.filter((c) => c !== "ALL")];
+const AUTO_SAVE_DELAY_MS = 0;
 
 function productImageSrc(sku: string, imageUrl?: string) {
   if (imageUrl) return imageUrl;
@@ -58,7 +60,7 @@ function productImageSrc(sku: string, imageUrl?: string) {
 function isNewProduct(p?: Product | null) {
   if (typeof p?.isNew === "boolean") return p.isNew;
 
-  const text = [p?.name, p?.size, p?.status]
+  const text = [p?.name, p?.size]
     .filter(Boolean)
     .join(" ")
     .toUpperCase()
@@ -90,6 +92,7 @@ export default function AdminProductsPage() {
 
   const [busy, setBusy] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingStatusXlsx, setUploadingStatusXlsx] = useState(false);
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
   const [formDirty, setFormDirty] = useState(false);
@@ -103,7 +106,7 @@ export default function AdminProductsPage() {
 
   const markDirty = () => {
     setFormDirty(true);
-    setAutoSaveStatus("Unsaved changes");
+    setAutoSaveStatus("Saving...");
   };
 
   const updateText = (setter: (value: string) => void, value: string) => {
@@ -228,7 +231,7 @@ export default function AdminProductsPage() {
       return false;
     }
 
-    if (auto) setAutoSaveStatus("Auto-saving...");
+    if (auto) setAutoSaveStatus("Saving...");
     else setBusy(true);
     try {
       const res = await fetch("/api/admin/products", {
@@ -267,7 +270,7 @@ export default function AdminProductsPage() {
       if (!auto) notify(`Saved ${finalSku}`);
       return true;
     } catch (err: any) {
-      if (auto) setAutoSaveStatus(`Auto-save failed: ${err?.message || "Failed to save product."}`);
+      if (auto) setAutoSaveStatus(`Save failed: ${err?.message || "Failed to save product."}`);
       else notify(err?.message || "Failed to save product.", "error");
       return false;
     } finally {
@@ -284,7 +287,7 @@ export default function AdminProductsPage() {
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
       void saveProduct({ auto: true });
-    }, 900);
+    }, AUTO_SAVE_DELAY_MS);
 
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
@@ -318,6 +321,33 @@ export default function AdminProductsPage() {
       notify(err?.message || "Failed to upload image.", "error");
     } finally {
       setUploadingImage(false);
+    }
+  };
+
+  const uploadStatusXlsx = async (file: File | null) => {
+    if (!file) return;
+
+    setUploadingStatusXlsx(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/admin/upload-status-xlsx", {
+        method: "POST",
+        headers: adminHeaders(),
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to upload status XLSX.");
+
+      notify(
+        `Status upload complete: ${data.updatedCount || 0} updated, ${data.unknownCount || 0} unknown, ${data.skippedCount || 0} skipped.`
+      );
+      await loadProducts();
+    } catch (err: any) {
+      notify(err?.message || "Failed to upload status XLSX.", "error");
+    } finally {
+      setUploadingStatusXlsx(false);
     }
   };
 
@@ -359,6 +389,23 @@ export default function AdminProductsPage() {
           { label: "New items", value: products.filter((p) => isNewProduct(p)).length },
         ]}
       />
+
+      <Panel title="Upload today_update.xlsx status update">
+        <div style={{ display: "grid", gap: 8 }}>
+          <input
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            onChange={(e) => uploadStatusXlsx(e.target.files?.[0] || null)}
+            style={inputStyle}
+            disabled={uploadingStatusXlsx}
+          />
+          <p style={{ margin: 0, fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>
+            Reads <strong>PID/SKU</strong> and <strong>Status</strong> from the Export sheet (or first sheet) and updates existing SKUs only.
+            Status <strong>NEW</strong> is just a product status; it does not add the SKU to customer “New items”.
+          </p>
+          {uploadingStatusXlsx ? <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: "#2563eb" }}>Uploading and updating status...</p> : null}
+        </div>
+      </Panel>
 
       <div style={splitLayout} className="admin-split">
         <Panel title={`SKU list (${filteredProducts.length}${search ? "" : ", search for more"})`}>

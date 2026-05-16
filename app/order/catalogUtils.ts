@@ -50,6 +50,7 @@ export function isNormalItem(item?: CatalogItem | null) {
     s === "NORMAL_NOBR" ||
     s === "NORMAL_NBR" ||
     s === "TBD" ||
+    s === "NEW" ||
     s === "LIMITED"
   );
 }
@@ -60,7 +61,6 @@ export function isNewItem(item?: CatalogItem | null) {
   const text = [
     item?.name,
     item?.size,
-    item?.status,
     (item as CatalogItem & { name_k?: string })?.name_k,
   ]
     .filter(Boolean)
