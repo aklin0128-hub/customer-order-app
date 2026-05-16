@@ -952,9 +952,9 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
             </div>
           </section>
         ) : mode === "promotion" ? (
-          <section style={{ ...cardStyle, border: "1px solid #fed7aa", background: "linear-gradient(180deg, #fffbeb 0%, #ffffff 40%)" }}>
+          <section style={{ ...cardStyle, border: "1px solid #5eead4", background: "linear-gradient(180deg, #f0fdfa 0%, #ffffff 40%)" }}>
             <div style={sectionTitleStyle}>{t.promotionMode}</div>
-            <p style={{ fontSize: 13, color: "#9a3412", margin: "4px 0 14px", lineHeight: 1.45 }}>{t.promotionHint}</p>
+            <p style={{ fontSize: 13, color: "#115e59", margin: "4px 0 14px", lineHeight: 1.45 }}>{t.promotionHint}</p>
 
             {promotionItems.length === 0 ? (
               <div style={emptyStyle}>{t.noPromotions}</div>

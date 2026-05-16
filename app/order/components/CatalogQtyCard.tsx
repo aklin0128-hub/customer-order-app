@@ -49,8 +49,8 @@ export function CatalogQtyCard({
     <div
       style={{
         ...catalogCardStyle,
-        background: hasQty ? "#ecfdf5" : highlight ? "#fffbeb" : "#ffffff",
-        border: hasQty ? "2px solid #86efac" : highlight ? "2px solid #fdba74" : "1px solid #e5e7eb",
+        background: hasQty ? "#ecfdf5" : highlight ? "#f0fdfa" : "#ffffff",
+        border: hasQty ? "2px solid #86efac" : highlight ? "2px solid #5eead4" : "1px solid #e5e7eb",
       }}
     >
       {showAdminEdit ? (

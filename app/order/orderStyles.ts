@@ -81,9 +81,9 @@ export const modeButtonStyle = (active: boolean): CSSProperties => ({
 });
 export const promoModeButtonStyle = (active: boolean): CSSProperties => ({
   ...modeButtonStyle(active),
-  border: active ? "1px solid #ea580c" : "1px solid #fdba74",
-  background: active ? "#fff7ed" : "#fffbeb",
-  color: active ? "#c2410c" : "#9a3412",
+  border: active ? "1px solid #0f766e" : "1px solid #5eead4",
+  background: active ? "#ccfbf1" : "#f0fdfa",
+  color: active ? "#0f766e" : "#115e59",
 });
 export const qtyButtonStyle: CSSProperties = {
   padding: "6px 0",
@@ -232,14 +232,14 @@ export const promoTagStyle: CSSProperties = {
   borderRadius: 999,
   fontSize: 10,
   fontWeight: 900,
-  background: "#ffedd5",
-  color: "#c2410c",
-  border: "1px solid #fdba74",
+  background: "#ccfbf1",
+  color: "#0f766e",
+  border: "1px solid #5eead4",
 };
 export const promoPriceStyle: CSSProperties = {
   fontSize: 13,
   fontWeight: 900,
-  color: "#b45309",
+  color: "#0f766e",
 };
 export const promoDetailsStyle: CSSProperties = {
   fontSize: 10,
