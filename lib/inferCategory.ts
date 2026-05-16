@@ -1,18 +1,23 @@
 export const CATEGORY_OPTIONS = [
   "ALL",
   "RICE",
+  "NOODLE",
+  "FROZEN",
+  "SEAFOOD",
+  "ICE CREAM",
   "SAUCE",
   "SEASONING",
-  "NOODLES",
-  "PROCESSED",
-  "FROZEN",
   "REFRIGERATED",
+  "PRODUCE",
   "SNACK",
+  "DRINK",
+  "DRY GOODS",
   "NON-FOOD",
+  "OTHER",
 ] as const;
 
 export type ProductCategory = (typeof CATEGORY_OPTIONS)[number] extends infer T
-  ? T extends "ALL"
+  ? T extends "ALL" | "OTHER"
     ? never
     : T
   : never;
@@ -29,14 +34,14 @@ export type CategoryItem = {
 const SKU_PREFIX_CATEGORY: Record<string, ProductCategory> = {
   "00": "RICE",
   "01": "RICE",
-  "02": "PROCESSED",
+  "02": "DRY GOODS",
   "03": "SAUCE",
   "04": "SAUCE",
   "05": "SEASONING",
-  "06": "PROCESSED",
-  "08": "NOODLES",
+  "06": "DRY GOODS",
+  "08": "NOODLE",
   "09": "SNACK",
-  "10": "PROCESSED",
+  "10": "DRINK",
   "13": "NON-FOOD",
   "19": "REFRIGERATED",
   "20": "FROZEN",
@@ -49,7 +54,7 @@ const SKU_PREFIX_CATEGORY: Record<string, ProductCategory> = {
   "56": "FROZEN",
   "80": "REFRIGERATED",
   "81": "REFRIGERATED",
-  "95": "PROCESSED",
+  "95": "DRY GOODS",
 };
 
 const NOODLE_BRANDS = [
@@ -80,6 +85,17 @@ function skuPrefix(sku: string) {
 
 function matchAny(text: string, words: string[]) {
   return words.some((w) => text.includes(w));
+}
+
+function normalizeLegacyCategory(category: string): ProductCategory | "OTHER" | null {
+  const explicit = category.trim().toUpperCase();
+  if (!explicit || explicit === "ALL") return null;
+  if (explicit === "NOODLES") return "NOODLE";
+  if (explicit === "PROCESSED") return "DRY GOODS";
+  if (CATEGORY_OPTIONS.includes(explicit as (typeof CATEGORY_OPTIONS)[number])) {
+    return explicit as ProductCategory | "OTHER";
+  }
+  return null;
 }
 
 function inferFromKeywords(text: string, sku: string): ProductCategory | null {
@@ -148,14 +164,14 @@ function inferFromKeywords(text: string, sku: string): ProductCategory | null {
       "MANDU WRAPPER",
     ])
   ) {
-    return "NOODLES";
+    return "NOODLE";
   }
 
   if (
     matchAny(text, ["RICE FLOUR", "MOCHIKO", "RICE PAPER", "RICE STICK", "RICE WINE"]) ||
     (text.includes("FLOUR") && !text.includes("RICE"))
   ) {
-    return "PROCESSED";
+    return "DRY GOODS";
   }
 
   if (
@@ -196,7 +212,7 @@ function inferFromKeywords(text: string, sku: string): ProductCategory | null {
     ]) &&
     !matchAny(text, ["SOY SAUCE", "SOYBEAN PASTE", "SOYBEAN OIL", "FERMENTED SOYBEAN", "EDAMAME"])
   ) {
-    return "PROCESSED";
+    return "DRY GOODS";
   }
 
   if (
@@ -285,6 +301,22 @@ function inferFromKeywords(text: string, sku: string): ProductCategory | null {
 
   if (
     matchAny(text, [
+      "ICE CREAM",
+      "ICECREAM",
+      "MOCHI ICE",
+      "POPSICLE",
+      "ICE BAR",
+      "MELONA",
+      "SAMANCO",
+      "BINGSU",
+      "SHAVED ICE",
+    ])
+  ) {
+    return "ICE CREAM";
+  }
+
+  if (
+    matchAny(text, [
       "CHIP",
       "CHIPS",
       "SNACK",
@@ -301,12 +333,35 @@ function inferFromKeywords(text: string, sku: string): ProductCategory | null {
       "PEANUT",
       "ALMOND SNACK",
       "YAN YAN",
-      "POPSICLE",
-      "ICE CREAM",
-      "MOCHI ICE",
     ])
   ) {
     return "SNACK";
+  }
+
+  if (
+    matchAny(text, [
+      "SEAFOOD",
+      "SQUID",
+      "SHRIMP",
+      "FISH CAKE",
+      "EMPA",
+      "SURIMI",
+      "OCTOPUS",
+      "TUNA",
+      "SALMON",
+      "MACKEREL",
+      "CRAB",
+      "CLAM",
+      "MUSSEL",
+      "EEL",
+      "YELLOW CROAKER",
+      "POLLOCK",
+      "COD",
+      "CUTTLEFISH",
+    ]) &&
+    !matchAny(text, ["FISH SAUCE", "OYSTER SAUCE"])
+  ) {
+    return "SEAFOOD";
   }
 
   if (
@@ -320,18 +375,6 @@ function inferFromKeywords(text: string, sku: string): ProductCategory | null {
       "BEAN CURD",
       "EDAMAME",
       "FROZEN",
-      "ICE CREAM",
-      "POPSICLE",
-      "SEAFOOD",
-      "SQUID",
-      "SHRIMP",
-      "FISH CAKE",
-      "EMPA",
-      "SURIMI",
-      "OCTOPUS",
-      "TUNA",
-      "SALMON",
-      "MACKEREL",
       "BUN",
       "SIOPAO",
       "PANCAKE",
@@ -364,7 +407,30 @@ function inferFromKeywords(text: string, sku: string): ProductCategory | null {
     ]) &&
   matchAny(text, ["FRESH", "NAPA", "BANCHAN", "REF", "USA", "CANADA", "LB", "BULK"])
   ) {
+    if (matchAny(text, ["NAPA", "PERILLA", "SPROUT", "YAM", "POTATO", "ONION", "GARLIC", "GINGER", "CABBAGE", "LETTUCE", "CILANTRO", "SCALLION"])) {
+      return "PRODUCE";
+    }
     return "REFRIGERATED";
+  }
+
+  if (
+    matchAny(text, [
+      "TEA",
+      "COFFEE",
+      "JUICE",
+      "DRINK",
+      "BEVERAGE",
+      "WATER",
+      "SODA",
+      "MILK",
+      "BARLEY TEA",
+      "CORN TEA",
+      "POCARI",
+      "MAXIM",
+      "INSTANT COFFEE",
+    ])
+  ) {
+    return "DRINK";
   }
 
   if (
@@ -380,22 +446,8 @@ function inferFromKeywords(text: string, sku: string): ProductCategory | null {
       "LUNCHEON",
       "SPAM",
       "SAUSAGE",
-      "FISH CAKE",
       "BREAD CRUMB",
       "PANKO",
-      "TEA",
-      "COFFEE",
-      "JUICE",
-      "DRINK",
-      "BEVERAGE",
-      "WATER",
-      "SODA",
-      "MILK",
-      "BARLEY TEA",
-      "CORN TEA",
-      "POCARI",
-      "MAXIM",
-      "INSTANT COFFEE",
       "EGG",
       "LAVER",
       "NORI",
@@ -406,7 +458,7 @@ function inferFromKeywords(text: string, sku: string): ProductCategory | null {
       "POWDER MIX",
     ])
   ) {
-    return "PROCESSED";
+    return "DRY GOODS";
   }
 
   return null;
@@ -416,15 +468,20 @@ function inferFromStorage(storage: string, text: string): ProductCategory | null
   const s = storage.trim().toLowerCase();
 
   if (s === "frz" || s === "frozen") {
-    if (matchAny(text, ["ICE CREAM", "POPSICLE", "SNACK", "CHIP", "CRACKER"])) return "SNACK";
+    if (matchAny(text, ["ICE CREAM", "POPSICLE", "MOCHI ICE", "MELONA", "SAMANCO"])) return "ICE CREAM";
+    if (matchAny(text, ["SEAFOOD", "SQUID", "SHRIMP", "FISH CAKE", "SURIMI", "OCTOPUS", "TUNA", "SALMON", "MACKEREL", "CRAB", "CLAM", "EEL"])) return "SEAFOOD";
+    if (matchAny(text, ["SNACK", "CHIP", "CRACKER"])) return "SNACK";
     return "FROZEN";
   }
 
   if (s === "ref" || s === "refrigerated") {
     if (matchAny(text, ["NOODLE", "MISO", "SAUCE", "POWDER", "PEPPER"])) {
-      if (matchAny(text, ["NOODLE"])) return "NOODLES";
+      if (matchAny(text, ["NOODLE"])) return "NOODLE";
       if (matchAny(text, ["MISO", "SAUCE"])) return "SAUCE";
       if (matchAny(text, ["POWDER", "PEPPER"])) return "SEASONING";
+    }
+    if (matchAny(text, ["NAPA", "PERILLA", "SPROUT", "YAM", "POTATO", "ONION", "GARLIC", "GINGER", "CABBAGE", "LETTUCE", "CILANTRO", "SCALLION"])) {
+      return "PRODUCE";
     }
     return "REFRIGERATED";
   }
@@ -438,8 +495,8 @@ function inferFromSkuPrefix(prefix: string, text: string): ProductCategory | nul
 
   if (prefix === "07") {
     if (matchAny(text, ["SOUP BASE", "DASHI", "BROTH", "SEASONING"])) return "SEASONING";
-    if (matchAny(text, ["SQUID", "FISH", "SEAFOOD", "OCTOPUS"])) return "FROZEN";
-    return "PROCESSED";
+    if (matchAny(text, ["SQUID", "FISH", "SEAFOOD", "OCTOPUS"])) return "SEAFOOD";
+    return "DRY GOODS";
   }
 
   if (prefix === "04") {
@@ -448,24 +505,24 @@ function inferFromSkuPrefix(prefix: string, text: string): ProductCategory | nul
   }
 
   if (prefix === "02") {
-    if (text.includes("RICE")) return "PROCESSED";
-    return "PROCESSED";
+    if (text.includes("RICE")) return "DRY GOODS";
+    return "DRY GOODS";
   }
 
   if (prefix === "10") {
-    if (matchAny(text, ["TEA", "COFFEE", "JUICE", "DRINK", "WATER", "MILK", "POCARI"])) return "PROCESSED";
-    return "PROCESSED";
+    if (matchAny(text, ["TEA", "COFFEE", "JUICE", "DRINK", "WATER", "MILK", "POCARI"])) return "DRINK";
+    return "DRY GOODS";
   }
 
   if (prefix === "AM") {
     if (matchAny(text, ["SAUCE", "PASTE", "CHILI"])) return "SAUCE";
-    if (matchAny(text, ["NOODLE"])) return "NOODLES";
-    return "PROCESSED";
+    if (matchAny(text, ["NOODLE"])) return "NOODLE";
+    return "DRY GOODS";
   }
 
   if (prefix === "08" || NOODLE_BRANDS.some((b) => text.includes(b))) {
     if (matchAny(text, ["NOODLE", "RAMEN", "UDON", "SOBA", "NAENGMYEON", "CHAPAGETTI", "CUP", "BOWL"])) {
-      return "NOODLES";
+      return "NOODLE";
     }
   }
 
@@ -481,15 +538,20 @@ function inferFromSkuPrefix(prefix: string, text: string): ProductCategory | nul
  * Batch JSON defaults: run `npm run assign-categories` after re-exporting the catalog spreadsheet.
  */
 export function inferCategory(item: CategoryItem): ProductCategory | "OTHER" {
-  const explicit = String(item.category || "").trim().toUpperCase();
-  if (explicit && explicit !== "OTHER" && explicit !== "ALL") {
-    return explicit as ProductCategory;
-  }
-
   const sku = String(item.sku || "").trim().toUpperCase();
   const text = normalizeText(item);
   const storage = String(item.storage_type || "").trim();
   const prefix = skuPrefix(sku);
+  const explicit = normalizeLegacyCategory(String(item.category || ""));
+
+  // Keep precise Admin overrides, but allow legacy/generic categories in the spreadsheet
+  // to be refined into SEAFOOD, ICE CREAM, PRODUCE, DRINK, etc.
+  if (
+    explicit &&
+    !["FROZEN", "REFRIGERATED", "SNACK", "DRY GOODS", "OTHER"].includes(explicit)
+  ) {
+    return explicit;
+  }
 
   const fromKeywords = inferFromKeywords(text, sku);
   if (fromKeywords) return fromKeywords;
@@ -500,7 +562,9 @@ export function inferCategory(item: CategoryItem): ProductCategory | "OTHER" {
   const fromPrefix = inferFromSkuPrefix(prefix, text);
   if (fromPrefix) return fromPrefix;
 
-  if (storage.toLowerCase() === "dry") return "PROCESSED";
+  if (explicit) return explicit;
+
+  if (storage.toLowerCase() === "dry") return "DRY GOODS";
 
   return "OTHER";
 }

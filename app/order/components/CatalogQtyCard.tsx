@@ -26,6 +26,8 @@ export function CatalogQtyCard({
   onUpdateQty,
   highlight,
   disabled,
+  showAdminEdit,
+  editLabel = "Edit",
 }: {
   item: CatalogItem;
   qty: string;
@@ -38,6 +40,8 @@ export function CatalogQtyCard({
   onUpdateQty: (sku: string, value: string) => void;
   highlight?: boolean;
   disabled?: boolean;
+  showAdminEdit?: boolean;
+  editLabel?: string;
 }) {
   const hasQty = Number(qty) > 0;
 
@@ -49,6 +53,28 @@ export function CatalogQtyCard({
         border: hasQty ? "2px solid #86efac" : highlight ? "2px solid #fdba74" : "1px solid #e5e7eb",
       }}
     >
+      {showAdminEdit ? (
+        <a
+          href={`/admin/products?sku=${encodeURIComponent(item.sku)}`}
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            zIndex: 3,
+            border: "1px solid #bfdbfe",
+            borderRadius: 999,
+            background: "#eff6ff",
+            color: "#2563eb",
+            padding: "3px 8px",
+            fontSize: 10,
+            fontWeight: 900,
+            textDecoration: "none",
+          }}
+        >
+          {editLabel}
+        </a>
+      ) : null}
+
       {promoNote || highlight ? (
         <div style={promoTagStyle}>{promoNote || promoBadgeLabel}</div>
       ) : null}

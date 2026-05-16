@@ -332,7 +332,7 @@ export const categoryBarStyle: CSSProperties = {
   overflowX: "auto",
   paddingBottom: 4,
   WebkitOverflowScrolling: "touch",
-  flexWrap: "wrap",
+  flexWrap: "nowrap",
   alignItems: "center",
 };
 export const categoryButtonStyle = (active: boolean): CSSProperties => ({
@@ -371,6 +371,7 @@ export const brandSelectStyle: CSSProperties = {
   cursor: "pointer",
   maxWidth: 200,
   minWidth: 120,
+  flexShrink: 0,
 };
 export const fixedSubmitBarStyle: CSSProperties = {
   position: "fixed",
@@ -441,9 +442,16 @@ export const stickyCatalogToolsStyle: CSSProperties = {
   top: 0,
   zIndex: 50,
   background: "rgba(255,255,255,0.97)",
-  padding: "8px 0 10px",
-  marginBottom: 12,
+  padding: "6px 0 8px",
+  marginBottom: 8,
   borderBottom: "1px solid #eef2f7",
+};
+
+export const compactCatalogToolsRowStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) auto",
+  gap: 8,
+  alignItems: "center",
 };
 
 export const cartSummaryTextStyle: CSSProperties = {

@@ -31,6 +31,7 @@ import {
   cartSummaryTextStyle,
   categoryBarStyle,
   categoryButtonStyle,
+  compactCatalogToolsRowStyle,
   containerStyle,
   dangerButtonStyle,
   emptyStyle,
@@ -107,14 +108,18 @@ export default function OrderPage() {
   const [showCart, setShowCart] = useState(true);
   const [catalogShowSelectedOnly, setCatalogShowSelectedOnly] = useState(false);
   const [catalogShowNewOnly, setCatalogShowNewOnly] = useState(false);
+  const [catalogFiltersOpen, setCatalogFiltersOpen] = useState(false);
   const [recentItems, setRecentItems] = useState<CartItem[]>([]);
   const [orderHistory, setOrderHistory] = useState<OrderHistoryItem[]>([]);
   const [catalogVersion, setCatalogVersion] = useState(0);
   const [promotionItems, setPromotionItems] = useState<PromotionItem[]>([]);
+  const [showAdminEditLinks, setShowAdminEditLinks] = useState(false);
 
   const t = copy[lang];
 
   useEffect(() => {
+    setShowAdminEditLinks(Boolean(sessionStorage.getItem("admin_password")));
+
     const loadCatalog = async () => {
       try {
         const res = await fetch("/api/catalog", { cache: "no-store" });
@@ -300,6 +305,15 @@ export default function OrderPage() {
     () => orderableBaseItems.filter((item) => isNewItem(item)).length,
     [orderableBaseItems]
   );
+
+  const activeCatalogFilterCount = useMemo(() => {
+    let count = 0;
+    if (categoryFilter !== "ALL") count += 1;
+    if (brandFilter !== "ALL") count += 1;
+    if (catalogShowNewOnly) count += 1;
+    if (catalogShowSelectedOnly) count += 1;
+    return count;
+  }, [brandFilter, catalogShowNewOnly, catalogShowSelectedOnly, categoryFilter]);
 
   const orderableCatalogItems = useMemo(() => {
     const q = catalogSearch.trim().toUpperCase();
@@ -854,12 +868,34 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                     <div
                       key={item.sku}
                       style={{
+                        position: "relative",
                         border: isActive ? "2px solid #2563eb" : "1px solid #e5e7eb",
                         background: inCart ? "#ecfdf5" : isActive ? "#eff6ff" : "#ffffff",
                         borderRadius: 12,
                         padding: 10,
                       }}
                     >
+                      {showAdminEditLinks ? (
+                        <a
+                          href={`/admin/products?sku=${encodeURIComponent(item.sku)}`}
+                          style={{
+                            position: "absolute",
+                            top: 8,
+                            right: 8,
+                            zIndex: 2,
+                            border: "1px solid #bfdbfe",
+                            borderRadius: 999,
+                            background: "#eff6ff",
+                            color: "#2563eb",
+                            padding: "3px 8px",
+                            fontSize: 10,
+                            fontWeight: 900,
+                            textDecoration: "none",
+                          }}
+                        >
+                          {t.editProduct}
+                        </a>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => { setSelectedItem(item); setSkuInput(item.sku); }}
@@ -944,6 +980,8 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                       promoDetails={promoDetailsLabel}
                       inCartLabel={t.inCart}
                       promoBadgeLabel={t.promoBadge}
+                      editLabel={t.editProduct}
+                      showAdminEdit={showAdminEditLinks}
                       highlight
                       disabled={soldOut}
                       onAdjust={adjustCatalogQty}
@@ -983,72 +1021,86 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
             </div>
 
             <div style={stickyCatalogToolsStyle}>
-              <div style={filterBlockStyle}>
-                <div style={filterLabelStyle}>{t.category}</div>
-                <div style={categoryBarStyle}>
-                  {categoryOptions.map((cat) => (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setCategoryFilter(cat)}
-                      style={categoryButtonStyle(categoryFilter === cat)}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
+              <div style={compactCatalogToolsRowStyle}>
+                <input
+                  value={catalogSearch}
+                  onChange={(e) => setCatalogSearch(e.target.value)}
+                  placeholder={t.catalogSearch}
+                  style={{ ...wideInputStyle, marginBottom: 0 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setCatalogFiltersOpen((prev) => !prev)}
+                  style={categoryButtonStyle(catalogFiltersOpen || activeCatalogFilterCount > 0)}
+                >
+                  {catalogFiltersOpen ? t.hideFilters : t.showFilters}
+                  {activeCatalogFilterCount > 0 ? ` (${activeCatalogFilterCount})` : ""}
+                </button>
               </div>
 
-              {(brandSplit.topBrands.length > 0 || brandSplit.moreBrands.length > 0) ? (
-                <div style={filterBlockStyle}>
-                  <div style={filterLabelStyle}>{t.brand}</div>
-                  <div style={categoryBarStyle}>
-                    <button
-                      type="button"
-                      onClick={() => setBrandFilter("ALL")}
-                      style={categoryButtonStyle(brandFilter === "ALL")}
-                    >
-                      {t.allBrands}
-                    </button>
-                    {brandSplit.topBrands.map((brand) => (
-                      <button
-                        key={brand}
-                        type="button"
-                        onClick={() => setBrandFilter(brand)}
-                        style={categoryButtonStyle(brandFilter === brand)}
-                      >
-                        {formatBrandLabel(brand)}
-                      </button>
-                    ))}
-                    {brandSplit.moreBrands.length > 0 ? (
-                      <select
-                        aria-label={t.moreBrandsPick}
-                        value={
-                          brandFilter !== "ALL" && brandSplit.moreBrands.includes(brandFilter)
-                            ? brandFilter
-                            : ""
-                        }
-                        onChange={(e) => setBrandFilter(e.target.value ? e.target.value : "ALL")}
-                        style={brandSelectStyle}
-                      >
-                        <option value="">{t.moreBrandsPick}</option>
-                        {brandSplit.moreBrands.map((brand) => (
-                          <option key={brand} value={brand}>
-                            {formatBrandLabel(brand)}
-                          </option>
-                        ))}
-                      </select>
-                    ) : null}
+              {catalogFiltersOpen ? (
+                <div style={{ marginTop: 8 }}>
+                  <div style={filterBlockStyle}>
+                    <div style={filterLabelStyle}>{t.category}</div>
+                    <div style={categoryBarStyle}>
+                      {categoryOptions.map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setCategoryFilter(cat)}
+                          style={categoryButtonStyle(categoryFilter === cat)}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
                   </div>
+
+                  {(brandSplit.topBrands.length > 0 || brandSplit.moreBrands.length > 0) ? (
+                    <div style={filterBlockStyle}>
+                      <div style={filterLabelStyle}>{t.brand}</div>
+                      <div style={categoryBarStyle}>
+                        <button
+                          type="button"
+                          onClick={() => setBrandFilter("ALL")}
+                          style={categoryButtonStyle(brandFilter === "ALL")}
+                        >
+                          {t.allBrands}
+                        </button>
+                        {brandSplit.topBrands.slice(0, 8).map((brand) => (
+                          <button
+                            key={brand}
+                            type="button"
+                            onClick={() => setBrandFilter(brand)}
+                            style={categoryButtonStyle(brandFilter === brand)}
+                          >
+                            {formatBrandLabel(brand)}
+                          </button>
+                        ))}
+                        {brandSplit.moreBrands.length > 0 ? (
+                          <select
+                            aria-label={t.moreBrandsPick}
+                            value={
+                              brandFilter !== "ALL" && brandSplit.moreBrands.includes(brandFilter)
+                                ? brandFilter
+                                : ""
+                            }
+                            onChange={(e) => setBrandFilter(e.target.value ? e.target.value : "ALL")}
+                            style={brandSelectStyle}
+                          >
+                            <option value="">{t.moreBrandsPick}</option>
+                            {brandSplit.moreBrands.map((brand) => (
+                              <option key={brand} value={brand}>
+                                {formatBrandLabel(brand)}
+                              </option>
+                            ))}
+                          </select>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
-
-              <input
-                value={catalogSearch}
-                onChange={(e) => setCatalogSearch(e.target.value)}
-                placeholder={t.catalogSearch}
-                style={{ ...wideInputStyle, marginBottom: 0 }}
-              />
             </div>
 
             <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 10px" }}>
@@ -1060,6 +1112,8 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
               catalogQtyMap={catalogQtyMap}
               inCartLabel={t.inCart}
               promoBadgeLabel={t.promoBadge}
+              editLabel={t.editProduct}
+              showAdminEdit={showAdminEditLinks}
               onAdjust={adjustCatalogQty}
               onUpdateQty={updateCatalogQty}
             />

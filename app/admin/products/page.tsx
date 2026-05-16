@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AdminLogin } from "../_components/AdminLogin";
 import { AdminShell } from "../_components/AdminShell";
 import { formGrid, inputStyle, labelStyle, splitForm, splitLayout, splitList } from "../_components/admin-styles";
@@ -73,6 +73,7 @@ export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [listFilter, setListFilter] = useState<ProductFilter>("all");
+  const [initialSkuFromQuery, setInitialSkuFromQuery] = useState("");
 
   const [sku, setSku] = useState("");
   const [name, setName] = useState("");
@@ -91,10 +92,23 @@ export default function AdminProductsPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
+  const [formDirty, setFormDirty] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState("");
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const notify = (text: string, tone: "success" | "error" = "success") => {
     setMsg(text);
     setMsgTone(tone);
+  };
+
+  const markDirty = () => {
+    setFormDirty(true);
+    setAutoSaveStatus("Unsaved changes");
+  };
+
+  const updateText = (setter: (value: string) => void, value: string) => {
+    setter(value);
+    markDirty();
   };
 
   const loadProducts = async () => {
@@ -118,6 +132,15 @@ export default function AdminProductsPage() {
     if (authed) loadProducts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
+
+  useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get("sku");
+    if (fromUrl) {
+      const clean = fromUrl.trim().toUpperCase();
+      setInitialSkuFromQuery(clean);
+      setSearch(clean);
+    }
+  }, []);
 
   const filteredProducts = useMemo(() => {
     const q = search.trim().toUpperCase();
@@ -161,8 +184,19 @@ export default function AdminProductsPage() {
     setPalletSize(p.palletSize || "");
     setImageUrl(p.imageUrl || "");
     setIsNew(isNewProduct(p));
+    setFormDirty(false);
+    setAutoSaveStatus("");
     notify(`Editing ${p.sku}`);
   };
+
+  useEffect(() => {
+    if (!initialSkuFromQuery || products.length === 0) return;
+    const match = products.find((p) => p.sku?.toUpperCase() === initialSkuFromQuery);
+    if (!match) return;
+    selectProduct(match);
+    setInitialSkuFromQuery("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSkuFromQuery, products]);
 
   const clearForm = () => {
     setSku("");
@@ -177,15 +211,25 @@ export default function AdminProductsPage() {
     setPalletSize("");
     setImageUrl("");
     setIsNew(false);
+    setFormDirty(false);
+    setAutoSaveStatus("");
     setMsg("");
   };
 
-  const saveProduct = async () => {
+  const saveProduct = async (options: { auto?: boolean } = {}) => {
+    const auto = Boolean(options.auto);
     const finalSku = sku.trim().toUpperCase();
-    if (!finalSku) return notify("Please enter SKU.", "error");
-    if (!name.trim()) return notify("Please enter item name.", "error");
+    if (!finalSku) {
+      if (!auto) notify("Please enter SKU.", "error");
+      return false;
+    }
+    if (!name.trim()) {
+      if (!auto) notify("Please enter item name.", "error");
+      return false;
+    }
 
-    setBusy(true);
+    if (auto) setAutoSaveStatus("Auto-saving...");
+    else setBusy(true);
     try {
       const res = await fetch("/api/admin/products", {
         method: "POST",
@@ -207,14 +251,46 @@ export default function AdminProductsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to save product.");
-      notify(`Saved ${finalSku}`);
-      await loadProducts();
+
+      if (data.product?.sku) {
+        setProducts((prev) => {
+          const next = [...prev];
+          const idx = next.findIndex((p) => p.sku?.toUpperCase() === data.product.sku.toUpperCase());
+          if (idx >= 0) next[idx] = { ...next[idx], ...data.product };
+          else next.unshift(data.product);
+          return next;
+        });
+      }
+
+      setFormDirty(false);
+      setAutoSaveStatus(auto ? `Saved ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "");
+      if (!auto) notify(`Saved ${finalSku}`);
+      return true;
     } catch (err: any) {
-      notify(err?.message || "Failed to save product.", "error");
+      if (auto) setAutoSaveStatus(`Auto-save failed: ${err?.message || "Failed to save product."}`);
+      else notify(err?.message || "Failed to save product.", "error");
+      return false;
     } finally {
-      setBusy(false);
+      if (!auto) setBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (!authed || !formDirty) return;
+
+    const finalSku = sku.trim().toUpperCase();
+    if (!finalSku || !name.trim()) return;
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      void saveProduct({ auto: true });
+    }, 900);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed, formDirty, sku, name, brand, status, category, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew]);
 
   const uploadProductImage = async (file: File | null) => {
     const finalSku = sku.trim().toUpperCase();
@@ -235,6 +311,7 @@ export default function AdminProductsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to upload image.");
       setImageUrl(data.imageUrl || "");
+      markDirty();
       notify(`Image uploaded for ${finalSku}`);
       await loadProducts();
     } catch (err: any) {
@@ -359,6 +436,19 @@ export default function AdminProductsPage() {
 
         <div style={splitForm}>
           <Panel title={sku ? `Edit ${sku}` : "SKU details"}>
+            {autoSaveStatus ? (
+              <div
+                style={{
+                  marginBottom: 10,
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: autoSaveStatus.includes("failed") ? "#b91c1c" : formDirty ? "#b45309" : "#059669",
+                }}
+              >
+                {autoSaveStatus}
+              </div>
+            ) : null}
+
             {previewSrc ? (
               <img
                 src={previewSrc}
@@ -380,22 +470,22 @@ export default function AdminProductsPage() {
                 <label style={labelStyle}>SKU</label>
                 <input
                   value={sku}
-                  onChange={(e) => setSku(e.target.value.toUpperCase())}
+                  onChange={(e) => updateText(setSku, e.target.value.toUpperCase())}
                   placeholder="00003D"
                   style={inputStyle}
                 />
               </div>
               <div>
                 <label style={labelStyle}>Brand</label>
-                <input value={brand} onChange={(e) => setBrand(e.target.value)} style={inputStyle} />
+                <input value={brand} onChange={(e) => updateText(setBrand, e.target.value)} style={inputStyle} />
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
                 <label style={labelStyle}>Item name</label>
-                <input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
+                <input value={name} onChange={(e) => updateText(setName, e.target.value)} style={inputStyle} />
               </div>
               <div>
                 <label style={labelStyle}>Status</label>
-                <select value={status} onChange={(e) => setStatus(e.target.value)} style={inputStyle}>
+                <select value={status} onChange={(e) => updateText(setStatus, e.target.value)} style={inputStyle}>
                   {statusOptions.map((s) => (
                     <option key={s} value={s}>
                       {s}
@@ -405,7 +495,7 @@ export default function AdminProductsPage() {
               </div>
               <div>
                 <label style={labelStyle}>Category</label>
-                <select value={category} onChange={(e) => setCategory(e.target.value)} style={inputStyle}>
+                <select value={category} onChange={(e) => updateText(setCategory, e.target.value)} style={inputStyle}>
                   {categoryOptions.map((c) => (
                     <option key={c || "AUTO"} value={c}>
                       {c || "AUTO (from catalog)"}
@@ -432,32 +522,32 @@ export default function AdminProductsPage() {
                   cursor: "pointer",
                 }}
               >
-                <input type="checkbox" checked={isNew} onChange={(e) => setIsNew(e.target.checked)} />
+                <input type="checkbox" checked={isNew} onChange={(e) => { setIsNew(e.target.checked); markDirty(); }} />
                 Show this SKU in customer “New items”
               </label>
               <div>
                 <label style={labelStyle}>Size</label>
-                <input value={size} onChange={(e) => setSize(e.target.value)} style={inputStyle} />
+                <input value={size} onChange={(e) => updateText(setSize, e.target.value)} style={inputStyle} />
               </div>
               <div>
                 <label style={labelStyle}>Limited qty</label>
-                <input value={limitedQty} onChange={(e) => setLimitedQty(e.target.value)} style={inputStyle} placeholder="e.g. 10" />
+                <input value={limitedQty} onChange={(e) => updateText(setLimitedQty, e.target.value)} style={inputStyle} placeholder="e.g. 10" />
               </div>
               <div>
                 <label style={labelStyle}>Pallet size</label>
-                <input value={palletSize} onChange={(e) => setPalletSize(e.target.value)} style={inputStyle} placeholder="e.g. 56" />
+                <input value={palletSize} onChange={(e) => updateText(setPalletSize, e.target.value)} style={inputStyle} placeholder="e.g. 56" />
               </div>
               <div>
                 <label style={labelStyle}>Barcode</label>
-                <input value={barcode} onChange={(e) => setBarcode(e.target.value)} style={inputStyle} />
+                <input value={barcode} onChange={(e) => updateText(setBarcode, e.target.value)} style={inputStyle} />
               </div>
               <div>
                 <label style={labelStyle}>UPC</label>
-                <input value={upc} onChange={(e) => setUpc(e.target.value)} style={inputStyle} />
+                <input value={upc} onChange={(e) => updateText(setUpc, e.target.value)} style={inputStyle} />
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
                 <label style={labelStyle}>Image URL</label>
-                <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} style={inputStyle} placeholder="Filled after upload" />
+                <input value={imageUrl} onChange={(e) => updateText(setImageUrl, e.target.value)} style={inputStyle} placeholder="Filled after upload" />
               </div>
               <div style={{ gridColumn: "1 / -1" }}>
                 <label style={labelStyle}>Upload photo</label>
@@ -475,8 +565,8 @@ export default function AdminProductsPage() {
             </div>
 
             <BtnRow>
-              <BtnPrimary onClick={saveProduct} disabled={busy}>
-                {busy ? "Saving..." : "Save SKU"}
+              <BtnPrimary onClick={() => void saveProduct()} disabled={busy || !formDirty}>
+                {busy ? "Saving..." : formDirty ? "Save now" : "Saved automatically"}
               </BtnPrimary>
               <BtnSecondary onClick={clearForm}>Clear</BtnSecondary>
               <BtnSecondary onClick={loadProducts} disabled={busy}>

@@ -17,6 +17,8 @@ export function CatalogVirtualGrid({
   catalogQtyMap,
   inCartLabel,
   promoBadgeLabel,
+  editLabel,
+  showAdminEdit,
   onAdjust,
   onUpdateQty,
 }: {
@@ -24,6 +26,8 @@ export function CatalogVirtualGrid({
   catalogQtyMap: Record<string, string>;
   inCartLabel: string;
   promoBadgeLabel: string;
+  editLabel?: string;
+  showAdminEdit?: boolean;
   onAdjust: (sku: string, delta: number) => void;
   onUpdateQty: (sku: string, value: string) => void;
 }) {
@@ -88,6 +92,8 @@ export function CatalogVirtualGrid({
                     qty={qty}
                     inCartLabel={inCartLabel}
                     promoBadgeLabel={promoBadgeLabel}
+                    editLabel={editLabel}
+                    showAdminEdit={showAdminEdit}
                     onAdjust={onAdjust}
                     onUpdateQty={onUpdateQty}
                   />
