@@ -131,18 +131,25 @@ export async function savePromotionRecords(records: PromotionRecord[]) {
   await redis.set(PROMOTIONS_KEY, records);
 }
 
-async function buildCatalogMap() {
+async function buildCatalogMap(skus?: string[]) {
   const map = new Map<string, PromotionProduct>();
+  const wantedSkus = skus?.length
+    ? new Set(skus.map((sku) => String(sku || "").trim().toUpperCase()).filter(Boolean))
+    : null;
 
   for (const item of catalogData as PromotionProduct[]) {
     if (!item.sku) continue;
     const sku = String(item.sku).toUpperCase();
+    if (wantedSkus && !wantedSkus.has(sku)) continue;
     map.set(sku, { ...item, sku });
   }
 
-  const keys = await redis.keys("product:*");
-  for (const key of keys) {
-    const item = await redis.get<PromotionProduct>(key);
+  const keys = wantedSkus
+    ? Array.from(wantedSkus).map((sku) => `product:${sku}`)
+    : await redis.keys("product:*");
+  const redisItems = await Promise.all(keys.map((key) => redis.get<PromotionProduct>(key)));
+
+  for (const item of redisItems) {
     if (!item?.sku) continue;
     const sku = String(item.sku).toUpperCase();
     map.set(sku, { ...(map.get(sku) || {}), ...item, sku });
@@ -169,11 +176,12 @@ function recordToProduct(record: PromotionRecord, product: PromotionProduct): Pr
 
 export async function getPromotionProducts(options?: {
   activeOnly?: boolean;
+  records?: PromotionRecord[];
 }): Promise<PromotionProduct[]> {
-  const records = await getPromotionRecords();
+  const records = options?.records || await getPromotionRecords();
   if (records.length === 0) return [];
 
-  const map = await buildCatalogMap();
+  const map = await buildCatalogMap(records.map((record) => record.sku));
   const products: PromotionProduct[] = [];
 
   for (const record of records) {

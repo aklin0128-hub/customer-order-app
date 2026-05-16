@@ -114,6 +114,7 @@ export default function OrderPage() {
   const [orderHistory, setOrderHistory] = useState<OrderHistoryItem[]>([]);
   const [catalogVersion, setCatalogVersion] = useState(0);
   const [promotionItems, setPromotionItems] = useState<PromotionItem[]>([]);
+  const [promotionsLoading, setPromotionsLoading] = useState(false);
   const [showAdminEditLinks, setShowAdminEditLinks] = useState(false);
 
   const t = copy[lang];
@@ -138,6 +139,7 @@ export default function OrderPage() {
     if (!ready) return;
 
     const loadPromotions = async () => {
+      setPromotionsLoading(true);
       try {
         const res = await fetch("/api/promotions", { cache: "no-store" });
         const data = await res.json();
@@ -146,11 +148,14 @@ export default function OrderPage() {
             data.products.filter((item: PromotionItem) => isNormalItem(item))
           );
         }
-      } catch {}
+      } catch {
+      } finally {
+        setPromotionsLoading(false);
+      }
     };
 
     loadPromotions();
-  }, [ready, catalogVersion]);
+  }, [ready]);
 
   useEffect(() => {
     const saved = localStorage.getItem("lang") as Lang | null;
@@ -1003,7 +1008,9 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
             <div style={sectionTitleStyle}>{t.promotionMode}</div>
             <p style={{ fontSize: 13, color: "#115e59", margin: "4px 0 14px", lineHeight: 1.45 }}>{t.promotionHint}</p>
 
-            {promotionItems.length === 0 ? (
+            {promotionsLoading ? (
+              <div style={{ ...emptyStyle, border: "1px solid #5eead4", background: "#f0fdfa", color: "#0f766e" }}>{t.loadingPromotions}</div>
+            ) : promotionItems.length === 0 ? (
               <div style={emptyStyle}>{t.noPromotions}</div>
             ) : (
               <div style={promoGridStyle}>

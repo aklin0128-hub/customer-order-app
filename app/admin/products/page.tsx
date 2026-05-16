@@ -102,6 +102,7 @@ export default function AdminProductsPage() {
   const [isNew, setIsNew] = useState(false);
 
   const [busy, setBusy] = useState(false);
+  const [productsLoaded, setProductsLoaded] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingStatusXlsx, setUploadingStatusXlsx] = useState(false);
   const [statusUploadResult, setStatusUploadResult] = useState<StatusUploadResult | null>(null);
@@ -140,6 +141,7 @@ export default function AdminProductsPage() {
       notify(err?.message || "Failed to load products.", "error");
     } finally {
       setBusy(false);
+      setProductsLoaded(true);
     }
   };
 
@@ -409,6 +411,12 @@ export default function AdminProductsPage() {
           { label: "New items", value: products.filter((p) => isNewProduct(p)).length },
         ]}
       />
+
+      {!productsLoaded && busy ? (
+        <Panel title="Loading products">
+          <p style={{ margin: 0, fontSize: 13, color: "#2563eb", fontWeight: 800 }}>Loading product list...</p>
+        </Panel>
+      ) : null}
 
       <Panel title="Upload today_update.xlsx status update">
         <div style={{ display: "grid", gap: 8 }}>

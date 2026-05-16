@@ -73,6 +73,7 @@ export default function AdminPromotionsPage() {
   const [products, setProducts] = useState<PromotionProduct[]>([]);
   const [form, setForm] = useState(emptyForm());
   const [busy, setBusy] = useState(false);
+  const [promotionsLoaded, setPromotionsLoaded] = useState(false);
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
 
@@ -96,6 +97,7 @@ export default function AdminPromotionsPage() {
       notify(err?.message || "Failed to load promotions.", "error");
     } finally {
       setBusy(false);
+      setPromotionsLoaded(true);
     }
   };
 
@@ -206,6 +208,12 @@ export default function AdminPromotionsPage() {
           },
         ]}
       />
+
+      {!promotionsLoaded && busy ? (
+        <Panel title="Loading promotions">
+          <p style={{ margin: 0, fontSize: 13, color: "#0f766e", fontWeight: 800 }}>Loading promotion list...</p>
+        </Panel>
+      ) : null}
 
       <Panel title="Add / update promotion">
         <div style={formGrid}>
@@ -371,7 +379,7 @@ export default function AdminPromotionsPage() {
               </div>
             );
           })}
-          {promotions.length === 0 ? (
+          {promotionsLoaded && promotions.length === 0 ? (
             <EmptyState title="No promotions yet" detail="Add SKUs to feature them on the customer order page." />
           ) : null}
         </div>

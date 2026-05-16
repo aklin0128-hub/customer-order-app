@@ -23,7 +23,7 @@ export async function GET(req: Request) {
 
   try {
     const promotions = await getPromotionRecords();
-    const products = await getPromotionProducts();
+    const products = await getPromotionProducts({ records: promotions });
 
     const enriched = promotions.map((record) => ({
       ...record,
