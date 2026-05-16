@@ -108,6 +108,7 @@ export default function OrderPage() {
   const [showCart, setShowCart] = useState(true);
   const [catalogShowSelectedOnly, setCatalogShowSelectedOnly] = useState(false);
   const [catalogShowNewOnly, setCatalogShowNewOnly] = useState(false);
+  const [catalogShowRecommendedOnly, setCatalogShowRecommendedOnly] = useState(false);
   const [catalogFiltersOpen, setCatalogFiltersOpen] = useState(false);
   const [recentItems, setRecentItems] = useState<CartItem[]>([]);
   const [orderHistory, setOrderHistory] = useState<OrderHistoryItem[]>([]);
@@ -306,14 +307,38 @@ export default function OrderPage() {
     [orderableBaseItems]
   );
 
+  const recommendedSkuSet = useMemo(() => {
+    const skuSet = new Set<string>();
+
+    for (const item of recentItems) {
+      const sku = item.sku?.toUpperCase();
+      if (sku) skuSet.add(sku);
+    }
+
+    for (const order of orderHistory) {
+      for (const item of order.items || []) {
+        const sku = item.sku?.toUpperCase();
+        if (sku) skuSet.add(sku);
+      }
+    }
+
+    return skuSet;
+  }, [orderHistory, recentItems]);
+
+  const recommendedItemCount = useMemo(
+    () => orderableBaseItems.filter((item) => recommendedSkuSet.has(item.sku?.toUpperCase() || "")).length,
+    [orderableBaseItems, recommendedSkuSet]
+  );
+
   const activeCatalogFilterCount = useMemo(() => {
     let count = 0;
     if (categoryFilter !== "ALL") count += 1;
     if (brandFilter !== "ALL") count += 1;
     if (catalogShowNewOnly) count += 1;
+    if (catalogShowRecommendedOnly) count += 1;
     if (catalogShowSelectedOnly) count += 1;
     return count;
-  }, [brandFilter, catalogShowNewOnly, catalogShowSelectedOnly, categoryFilter]);
+  }, [brandFilter, catalogShowNewOnly, catalogShowRecommendedOnly, catalogShowSelectedOnly, categoryFilter]);
 
   const orderableCatalogItems = useMemo(() => {
     const q = catalogSearch.trim().toUpperCase();
@@ -327,6 +352,7 @@ export default function OrderPage() {
         if (categoryFilter !== "ALL" && inferCategory(item) !== categoryFilter) return false;
         if (brandFilter !== "ALL" && !brandMatchesFilter(item.brand, brandFilter)) return false;
         if (catalogShowNewOnly && !isNewItem(item)) return false;
+        if (catalogShowRecommendedOnly && !recommendedSkuSet.has(item.sku?.toUpperCase() || "")) return false;
         return true;
       })
       .filter((item) => {
@@ -340,7 +366,7 @@ export default function OrderPage() {
         );
       })
       .sort((a, b) => (a.sku || "").localeCompare(b.sku || ""));
-  }, [catalogSearch, categoryFilter, brandFilter, catalogQtyMap, orderableBaseItems, catalogShowSelectedOnly, catalogShowNewOnly]);
+  }, [catalogSearch, categoryFilter, brandFilter, catalogQtyMap, orderableBaseItems, catalogShowSelectedOnly, catalogShowNewOnly, catalogShowRecommendedOnly, recommendedSkuSet]);
 
   useEffect(() => {
     if (brandFilter !== "ALL" && !isKnownBrandFilter(brandSplit, brandFilter)) {
@@ -393,6 +419,27 @@ export default function OrderPage() {
     }
     return promo.remainingQty;
   };
+
+  const orderReviewWarnings = useMemo(() => {
+    const warnings: string[] = [];
+
+    for (const item of catalogItemsForSubmit) {
+      const cleanSku = item.sku.toUpperCase();
+      const qty = Number(item.qty || 0);
+      const catalogItem = getCatalogItemBySku(cleanSku);
+      const status = String(catalogItem?.status || "").trim().toUpperCase();
+      const limitedQty = Number(String(catalogItem?.limitedQty || "").replace(/[^0-9]/g, ""));
+      const promoRemaining = getPromoRemainingForSku(cleanSku);
+
+      if (qty >= 100) warnings.push(t.highQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(qty)));
+      if (catalogItem && !isNormalItem(catalogItem)) warnings.push(t.statusWarning.replace("{sku}", cleanSku).replace("{status}", status || "-"));
+      if (limitedQty > 0 && qty > limitedQty) warnings.push(t.limitedQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(limitedQty)));
+      if (promoRemaining !== null && qty > promoRemaining) warnings.push(t.promoQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(promoRemaining)));
+    }
+
+    return warnings;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogItemsForSubmit, promotionItems, t]);
 
   const adjustQtyForSku = (sku: string, delta: number) => {
     const cleanSku = sku.trim().toUpperCase();
@@ -970,14 +1017,20 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                   const promoDetailsLabel = soldOut
                     ? t.promoSoldOut
                     : formatPromoDetails(item, t);
+                  const promoRemainingLabel = soldOut
+                    ? t.promoSoldOut
+                    : item.remainingQty !== null && item.remainingQty !== undefined
+                      ? `${t.promoRemaining}: ${item.remainingQty}`
+                      : undefined;
                   return (
                     <CatalogQtyCard
                       key={item.sku}
                       item={item}
                       qty={qty}
-                      promoNote={item.promoNote}
+                      promoNote={soldOut ? t.promoSoldOut : item.promoNote}
                       promoPrice={promoPriceLabel}
                       promoDetails={promoDetailsLabel}
+                      promoRemaining={promoRemainingLabel}
                       inCartLabel={t.inCart}
                       promoBadgeLabel={t.promoBadge}
                       editLabel={t.editProduct}
@@ -1002,6 +1055,13 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  onClick={() => setCatalogShowRecommendedOnly((prev) => !prev)}
+                  style={categoryButtonStyle(catalogShowRecommendedOnly)}
+                >
+                  {t.recommended} ({recommendedItemCount})
+                </button>
                 <button
                   type="button"
                   onClick={() => setCatalogShowNewOnly((prev) => !prev)}
@@ -1167,6 +1227,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
           onClose={() => setShowReview(false)}
           lang={lang}
           items={catalogItemsForSubmit}
+          warnings={orderReviewWarnings}
           accountNo={accountNo}
           storeName={storeName}
           submitting={submitting}

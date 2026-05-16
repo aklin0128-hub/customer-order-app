@@ -34,7 +34,18 @@ type Product = {
   source?: string;
 };
 
-type ProductFilter = "all" | "redis" | "customized" | "new";
+type StatusUploadResult = {
+  sheetName?: string;
+  totalRows?: number;
+  updatedCount?: number;
+  unknownCount?: number;
+  skippedCount?: number;
+  updatedPreview?: { sku: string; status: string }[];
+  unknownPreview?: string[];
+  skippedPreview?: string[];
+};
+
+type ProductFilter = "all" | "redis" | "customized" | "new" | "statusNew" | "discontinued" | "noImage";
 
 const statusOptions = [
   "NORMAL",
@@ -93,6 +104,7 @@ export default function AdminProductsPage() {
   const [busy, setBusy] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingStatusXlsx, setUploadingStatusXlsx] = useState(false);
+  const [statusUploadResult, setStatusUploadResult] = useState<StatusUploadResult | null>(null);
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
   const [formDirty, setFormDirty] = useState(false);
@@ -156,6 +168,12 @@ export default function AdminProductsPage() {
       list = list.filter((p) => p.source === "Redis" || p.category || p.imageUrl || p.limitedQty || p.palletSize || typeof p.isNew === "boolean");
     } else if (listFilter === "new") {
       list = list.filter((p) => isNewProduct(p));
+    } else if (listFilter === "statusNew") {
+      list = list.filter((p) => String(p.status || "").trim().toUpperCase() === "NEW");
+    } else if (listFilter === "discontinued") {
+      list = list.filter((p) => String(p.status || "").trim().toUpperCase() === "DISCONTINUED");
+    } else if (listFilter === "noImage") {
+      list = list.filter((p) => !p.imageUrl);
     }
 
     if (!q) return list.slice(0, 120);
@@ -328,6 +346,7 @@ export default function AdminProductsPage() {
     if (!file) return;
 
     setUploadingStatusXlsx(true);
+    setStatusUploadResult(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -340,6 +359,7 @@ export default function AdminProductsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to upload status XLSX.");
 
+      setStatusUploadResult(data);
       notify(
         `Status upload complete: ${data.updatedCount || 0} updated, ${data.unknownCount || 0} unknown, ${data.skippedCount || 0} skipped.`
       );
@@ -404,6 +424,31 @@ export default function AdminProductsPage() {
             Status <strong>NEW</strong> is just a product status; it does not add the SKU to customer “New items”.
           </p>
           {uploadingStatusXlsx ? <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: "#2563eb" }}>Uploading and updating status...</p> : null}
+          {statusUploadResult ? (
+            <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 10, background: "#f9fafb", fontSize: 12, color: "#374151", lineHeight: 1.5 }}>
+              <div style={{ fontWeight: 900, color: "#111827" }}>
+                Sheet {statusUploadResult.sheetName || "-"}: {statusUploadResult.updatedCount || 0} updated / {statusUploadResult.totalRows || 0} rows
+              </div>
+              {statusUploadResult.updatedPreview?.length ? (
+                <div style={{ marginTop: 6 }}>
+                  <strong>Updated:</strong> {statusUploadResult.updatedPreview.map((item) => `${item.sku} → ${item.status}`).join(", ")}
+                  {(statusUploadResult.updatedCount || 0) > statusUploadResult.updatedPreview.length ? " ..." : ""}
+                </div>
+              ) : null}
+              {statusUploadResult.unknownPreview?.length ? (
+                <div style={{ marginTop: 6, color: "#b45309" }}>
+                  <strong>Unknown SKU:</strong> {statusUploadResult.unknownPreview.join(", ")}
+                  {(statusUploadResult.unknownCount || 0) > statusUploadResult.unknownPreview.length ? " ..." : ""}
+                </div>
+              ) : null}
+              {statusUploadResult.skippedPreview?.length ? (
+                <div style={{ marginTop: 6, color: "#6b7280" }}>
+                  <strong>Skipped rows:</strong> {statusUploadResult.skippedPreview.join(", ")}
+                  {(statusUploadResult.skippedCount || 0) > statusUploadResult.skippedPreview.length ? " ..." : ""}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </Panel>
 
@@ -421,6 +466,9 @@ export default function AdminProductsPage() {
             options={[
               { id: "all", label: "Browse" },
               { id: "new", label: "New items" },
+              { id: "statusNew", label: "Status NEW" },
+              { id: "discontinued", label: "Discontinued" },
+              { id: "noImage", label: "No uploaded image" },
               { id: "redis", label: "Redis only" },
               { id: "customized", label: "Customized" },
             ]}

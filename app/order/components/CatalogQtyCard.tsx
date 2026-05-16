@@ -20,6 +20,7 @@ export function CatalogQtyCard({
   promoNote,
   promoPrice,
   promoDetails,
+  promoRemaining,
   inCartLabel,
   promoBadgeLabel,
   onAdjust,
@@ -34,6 +35,7 @@ export function CatalogQtyCard({
   promoNote?: string;
   promoPrice?: string;
   promoDetails?: string;
+  promoRemaining?: string;
   inCartLabel: string;
   promoBadgeLabel: string;
   onAdjust: (sku: string, delta: number) => void;
@@ -49,8 +51,9 @@ export function CatalogQtyCard({
     <div
       style={{
         ...catalogCardStyle,
-        background: hasQty ? "#ecfdf5" : highlight ? "#f0fdfa" : "#ffffff",
-        border: hasQty ? "2px solid #86efac" : highlight ? "2px solid #5eead4" : "1px solid #e5e7eb",
+        background: disabled ? "#f3f4f6" : hasQty ? "#ecfdf5" : highlight ? "#f0fdfa" : "#ffffff",
+        border: disabled ? "2px solid #d1d5db" : hasQty ? "2px solid #86efac" : highlight ? "2px solid #5eead4" : "1px solid #e5e7eb",
+        opacity: disabled ? 0.68 : 1,
       }}
     >
       {showAdminEdit ? (
@@ -75,12 +78,19 @@ export function CatalogQtyCard({
         </a>
       ) : null}
 
-      {promoNote || highlight ? (
-        <div style={promoTagStyle}>{promoNote || promoBadgeLabel}</div>
+      {promoNote || highlight || promoRemaining ? (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+          {promoNote || highlight ? <div style={promoTagStyle}>{promoNote || promoBadgeLabel}</div> : null}
+          {promoRemaining ? (
+            <div style={{ ...promoTagStyle, background: disabled ? "#e5e7eb" : "#ffffff", color: disabled ? "#6b7280" : "#0f766e" }}>
+              {promoRemaining}
+            </div>
+          ) : null}
+        </div>
       ) : null}
 
       <div style={{ textAlign: "center", paddingTop: promoNote || highlight ? 4 : 0 }}>
-        <ProductImage sku={item.sku} alt={item.name || item.sku} size={84} imageUrl={item.imageUrl} />
+        <ProductImage sku={item.sku} alt={item.name || item.sku} size={76} imageUrl={item.imageUrl} />
       </div>
 
       <div style={{ fontSize: 12, fontWeight: 900, color: "#111827", lineHeight: 1.2 }}>{item.sku}</div>

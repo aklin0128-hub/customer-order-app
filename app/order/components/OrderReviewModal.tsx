@@ -28,6 +28,7 @@ export function OrderReviewModal({
   onClose,
   lang,
   items,
+  warnings = [],
   accountNo,
   storeName,
   submitting,
@@ -40,6 +41,7 @@ export function OrderReviewModal({
   onClose: () => void;
   lang: Lang;
   items: CartItem[];
+  warnings?: string[];
   accountNo: string;
   storeName: string;
   submitting: boolean;
@@ -104,6 +106,16 @@ export function OrderReviewModal({
             {t.close}
           </button>
         </header>
+
+        {warnings.length > 0 ? (
+          <div style={{ border: "1px solid #fde68a", background: "#fffbeb", color: "#92400e", borderRadius: 12, padding: 10, fontSize: 12, lineHeight: 1.45, marginBottom: 10 }}>
+            <div style={{ fontWeight: 900, marginBottom: 4 }}>{t.reviewWarnings}</div>
+            {warnings.slice(0, 6).map((warning) => (
+              <div key={warning}>• {warning}</div>
+            ))}
+            {warnings.length > 6 ? <div>• ...</div> : null}
+          </div>
+        ) : null}
 
         <div style={reviewListStyle}>
           {items.map((item, index) => {

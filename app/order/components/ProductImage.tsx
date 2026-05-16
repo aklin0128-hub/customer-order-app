@@ -146,6 +146,10 @@ export function ProductImage({
         <img
           src={src}
           alt={alt}
+          width={size}
+          height={size}
+          loading="lazy"
+          decoding="async"
           style={{
             width: size,
             height: size,
