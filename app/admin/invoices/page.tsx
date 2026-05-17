@@ -40,6 +40,9 @@ type BatchUploadResult = {
   error?: string;
 };
 
+type InvoiceSortField = "uploadedAt" | "account" | "invoiceDate" | "invoiceNo";
+type SortDir = "asc" | "desc";
+
 const labelStyle = { display: "block" as const, fontSize: 12, fontWeight: 700, marginBottom: 6, color: "#374151" };
 
 function invoiceFileHref(row: Pick<ImportRecord, "id" | "blobUrl" | "blobPathname">) {
@@ -58,6 +61,8 @@ export default function AdminInvoicesPage() {
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
   const [imports, setImports] = useState<ImportRecord[]>([]);
+  const [sortField, setSortField] = useState<InvoiceSortField>("uploadedAt");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const [files, setFiles] = useState<File[]>([]);
   const [accountNo, setAccountNo] = useState("");
@@ -194,6 +199,20 @@ export default function AdminInvoicesPage() {
   };
 
   const selectedImports = imports.filter((row) => selectedImportIds.includes(row.id));
+  const sortedImports = [...imports].sort((a, b) => {
+    const av =
+      sortField === "account" ? a.accountNo || "" :
+      sortField === "invoiceDate" ? a.invoiceDate || "" :
+      sortField === "invoiceNo" ? a.invoiceNo || "" :
+      a.uploadedAt || "";
+    const bv =
+      sortField === "account" ? b.accountNo || "" :
+      sortField === "invoiceDate" ? b.invoiceDate || "" :
+      sortField === "invoiceNo" ? b.invoiceNo || "" :
+      b.uploadedAt || "";
+    const result = String(av).localeCompare(String(bv), undefined, { numeric: true });
+    return sortDir === "asc" ? result : -result;
+  });
   const allVisibleSelected = imports.length > 0 && selectedImportIds.length === imports.length;
 
   const toggleImportSelection = (id: string) => {
@@ -404,9 +423,31 @@ export default function AdminInvoicesPage() {
         <h2 style={panelTitle}>Recent imports (Redis, last {imports.length})</h2>
         {imports.length > 0 ? (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+            <select value={sortField} onChange={(e) => setSortField(e.target.value as InvoiceSortField)} style={{ ...inputStyle, width: "auto", minWidth: 170 }}>
+              <option value="uploadedAt">Sort by upload date</option>
+              <option value="account">Sort by account #</option>
+              <option value="invoiceDate">Sort by invoice date</option>
+              <option value="invoiceNo">Sort by invoice no</option>
+            </select>
             <button
               type="button"
-              onClick={() => setSelectedImportIds(allVisibleSelected ? [] : imports.map((row) => row.id))}
+              onClick={() => setSortDir((prev) => prev === "asc" ? "desc" : "asc")}
+              disabled={busy}
+              style={{
+                border: "1px solid #d1d5db",
+                background: "#fff",
+                borderRadius: 10,
+                padding: "7px 10px",
+                fontSize: 12,
+                fontWeight: 900,
+                cursor: busy ? "not-allowed" : "pointer",
+              }}
+            >
+              {sortDir === "asc" ? "Asc ↑" : "Desc ↓"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedImportIds(allVisibleSelected ? [] : sortedImports.map((row) => row.id))}
               disabled={busy}
               style={{
                 border: "1px solid #d1d5db",
@@ -463,7 +504,7 @@ export default function AdminInvoicesPage() {
           {imports.length === 0 ? (
             <p style={{ color: "#6b7280", fontSize: 14 }}>No imports yet.</p>
           ) : (
-            imports.map((row) => (
+            sortedImports.map((row) => (
               <div key={row.id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fafafa" }}>
                 <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                   <input

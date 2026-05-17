@@ -26,12 +26,17 @@ type OrderRecord = {
   createdAt?: string;
 };
 
+type OrderSortField = "date" | "account" | "ref";
+type SortDir = "asc" | "desc";
+
 export default function AdminOrdersPage() {
   const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
   const [passwordInput, setPasswordInput] = useState("");
 
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [search, setSearch] = useState("");
+  const [sortField, setSortField] = useState<OrderSortField>("date");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [selectedOrderKeys, setSelectedOrderKeys] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -65,15 +70,21 @@ export default function AdminOrdersPage() {
 
   const filteredOrders = useMemo(() => {
     const q = search.trim().toUpperCase();
-    if (!q) return orders;
-    return orders.filter((o) => {
+    const list = !q ? orders : orders.filter((o) => {
       return (
         o.accountNo?.toUpperCase().includes(q) ||
         o.storeName?.toUpperCase().includes(q) ||
         o.orderRef?.toUpperCase().includes(q)
       );
     });
-  }, [orders, search]);
+
+    return [...list].sort((a, b) => {
+      const av = sortField === "account" ? a.accountNo || "" : sortField === "ref" ? a.orderRef || "" : a.createdAt || "";
+      const bv = sortField === "account" ? b.accountNo || "" : sortField === "ref" ? b.orderRef || "" : b.createdAt || "";
+      const result = String(av).localeCompare(String(bv), undefined, { numeric: true });
+      return sortDir === "asc" ? result : -result;
+    });
+  }, [orders, search, sortDir, sortField]);
 
   const todayCount = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -193,6 +204,28 @@ export default function AdminOrdersPage() {
           placeholder="Search account, store name, or order ref..."
           style={{ ...inputStyle, marginBottom: 10 }}
         />
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+          <select value={sortField} onChange={(e) => setSortField(e.target.value as OrderSortField)} style={{ ...inputStyle, width: "auto", minWidth: 160 }}>
+            <option value="date">Sort by order date</option>
+            <option value="account">Sort by account #</option>
+            <option value="ref">Sort by order ref</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => setSortDir((prev) => prev === "asc" ? "desc" : "asc")}
+            style={{
+              border: "1px solid #d1d5db",
+              background: "#fff",
+              borderRadius: 10,
+              padding: "9px 12px",
+              fontSize: 12,
+              fontWeight: 900,
+              cursor: "pointer",
+            }}
+          >
+            {sortDir === "asc" ? "Asc ↑" : "Desc ↓"}
+          </button>
+        </div>
 
         <Toast message={msg} tone={msgTone} />
 
