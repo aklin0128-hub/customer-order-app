@@ -21,9 +21,9 @@ export async function GET() {
     }
 
     const keys = await redis.keys("product:*");
+    const redisProducts = await Promise.all(keys.map((key) => redis.get<any>(key)));
 
-    for (const key of keys) {
-      const item = await redis.get<any>(key);
+    for (const item of redisProducts) {
       if (!item?.sku) continue;
 
       const sku = String(item.sku).toUpperCase();
