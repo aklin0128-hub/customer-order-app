@@ -64,3 +64,54 @@ export async function GET(req: Request) {
     );
   }
 }
+
+export async function DELETE(req: Request) {
+  if (!checkAdmin(req)) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+    const targets = Array.isArray(body?.orders) ? body.orders : [];
+
+    if (targets.length === 0) {
+      return NextResponse.json({ error: "No orders selected." }, { status: 400 });
+    }
+
+    let deletedCount = 0;
+    const byAccount = new Map<string, { orderRef: string; createdAt: string }[]>();
+
+    for (const target of targets) {
+      const accountNo = String(target?.accountNo || "").trim().toUpperCase();
+      const orderRef = String(target?.orderRef || "").trim();
+      const createdAt = String(target?.createdAt || "").trim();
+      if (!accountNo || !orderRef || !createdAt) continue;
+
+      const list = byAccount.get(accountNo) || [];
+      list.push({ orderRef, createdAt });
+      byAccount.set(accountNo, list);
+    }
+
+    for (const [accountNo, accountTargets] of byAccount.entries()) {
+      const key = `orderHistory:${accountNo}`;
+      const current = (await redis.get<OrderRecord[]>(key)) || [];
+      const next = current.filter((order) => {
+        const match = accountTargets.some((target) =>
+          String(order.orderRef || "").trim() === target.orderRef &&
+          String(order.createdAt || "").trim() === target.createdAt
+        );
+        if (match) deletedCount += 1;
+        return !match;
+      });
+
+      await redis.set(key, next);
+    }
+
+    return NextResponse.json({ success: true, deletedCount });
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error?.message || "Failed to delete orders." },
+      { status: 500 }
+    );
+  }
+}

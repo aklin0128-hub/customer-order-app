@@ -33,6 +33,7 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [search, setSearch] = useState("");
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [selectedOrderKeys, setSelectedOrderKeys] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
@@ -48,6 +49,7 @@ export default function AdminOrdersPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to load orders.");
       setOrders(Array.isArray(data.orders) ? data.orders : []);
+      setSelectedOrderKeys([]);
     } catch (err: any) {
       setMsg(err?.message || "Failed to load orders.");
       setMsgTone("error");
@@ -80,6 +82,71 @@ export default function AdminOrdersPage() {
 
   const orderKey = (o: OrderRecord, index: number) =>
     `${o.accountNo}-${o.orderRef || ""}-${o.createdAt || ""}-${index}`;
+
+  const stableOrderKey = (o: OrderRecord) =>
+    `${o.accountNo || ""}|${o.orderRef || ""}|${o.createdAt || ""}`;
+
+  const selectedOrders = filteredOrders.filter((order) =>
+    selectedOrderKeys.includes(stableOrderKey(order))
+  );
+
+  const allVisibleSelected =
+    filteredOrders.length > 0 &&
+    filteredOrders.every((order) => selectedOrderKeys.includes(stableOrderKey(order)));
+
+  const toggleOrderSelection = (order: OrderRecord) => {
+    const key = stableOrderKey(order);
+    setSelectedOrderKeys((prev) =>
+      prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]
+    );
+  };
+
+  const bulkDownloadOrders = () => {
+    selectedOrders.forEach((order, index) => {
+      setTimeout(() => {
+        downloadOrderCsv({
+          accountNo: order.accountNo,
+          orderRef: order.orderRef,
+          items: order.items,
+        });
+      }, index * 200);
+    });
+  };
+
+  const deleteOrders = async (targets: OrderRecord[], options: { skipConfirm?: boolean } = {}) => {
+    if (targets.length === 0) return;
+    if (!options.skipConfirm && !confirm(`Delete ${targets.length} selected order(s)? This cannot be undone.`)) return;
+
+    setBusy(true);
+    setMsg("");
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "DELETE",
+        headers: adminHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          orders: targets.map((order) => ({
+            accountNo: order.accountNo,
+            orderRef: order.orderRef,
+            createdAt: order.createdAt,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to delete orders.");
+
+      const deletedKeys = new Set(targets.map(stableOrderKey));
+      setOrders((prev) => prev.filter((order) => !deletedKeys.has(stableOrderKey(order))));
+      setSelectedOrderKeys((prev) => prev.filter((key) => !deletedKeys.has(key)));
+      setExpandedKey(null);
+      setMsg(`Deleted ${data.deletedCount || 0} order(s).`);
+      setMsgTone("success");
+    } catch (err: any) {
+      setMsg(err?.message || "Failed to delete orders.");
+      setMsgTone("error");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (!ready) return null;
 
@@ -140,11 +207,66 @@ export default function AdminOrdersPage() {
           />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 2 }}>
+              <button
+                type="button"
+                onClick={() =>
+                  setSelectedOrderKeys(allVisibleSelected ? [] : filteredOrders.map(stableOrderKey))
+                }
+                disabled={busy}
+                style={{
+                  border: "1px solid #d1d5db",
+                  background: "#fff",
+                  borderRadius: 10,
+                  padding: "7px 10px",
+                  fontSize: 12,
+                  fontWeight: 900,
+                  cursor: busy ? "not-allowed" : "pointer",
+                }}
+              >
+                {allVisibleSelected ? "Clear selection" : "Select all shown"}
+              </button>
+              <button
+                type="button"
+                onClick={bulkDownloadOrders}
+                disabled={busy || selectedOrders.length === 0}
+                style={{
+                  border: "1px solid #bfdbfe",
+                  background: "#eff6ff",
+                  color: "#1d4ed8",
+                  borderRadius: 10,
+                  padding: "7px 10px",
+                  fontSize: 12,
+                  fontWeight: 900,
+                  cursor: busy || selectedOrders.length === 0 ? "not-allowed" : "pointer",
+                }}
+              >
+                Download selected ({selectedOrders.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => void deleteOrders(selectedOrders)}
+                disabled={busy || selectedOrders.length === 0}
+                style={{
+                  border: "1px solid #fecaca",
+                  background: "#fef2f2",
+                  color: "#b91c1c",
+                  borderRadius: 10,
+                  padding: "7px 10px",
+                  fontSize: 12,
+                  fontWeight: 900,
+                  cursor: busy || selectedOrders.length === 0 ? "not-allowed" : "pointer",
+                }}
+              >
+                Delete selected ({selectedOrders.length})
+              </button>
+            </div>
             {filteredOrders.map((order, index) => {
               const key = orderKey(order, index);
               const expanded = expandedKey === key;
               const itemCount = order.items?.length || 0;
               const caseTotal = (order.items || []).reduce((sum, i) => sum + (Number(i.qty) || 0), 0);
+              const selected = selectedOrderKeys.includes(stableOrderKey(order));
 
               return (
                 <article
@@ -156,20 +278,36 @@ export default function AdminOrdersPage() {
                     overflow: "hidden",
                   }}
                 >
-                  <button
-                    type="button"
-                    onClick={() => setExpandedKey(expanded ? null : key)}
+                  <div
                     style={{
                       width: "100%",
-                      border: "none",
                       background: expanded ? "#eff6ff" : "#fff",
                       padding: "14px 16px",
-                      textAlign: "left",
-                      cursor: "pointer",
+                      boxSizing: "border-box",
                     }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                      <div>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleOrderSelection(order)}
+                        disabled={busy}
+                        style={{ marginTop: 3 }}
+                        aria-label={`Select order ${order.orderRef || key}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setExpandedKey(expanded ? null : key)}
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          border: "none",
+                          background: "transparent",
+                          padding: 0,
+                          textAlign: "left",
+                          cursor: "pointer",
+                        }}
+                      >
                         <div style={{ fontSize: 15, fontWeight: 900, color: "#111827" }}>
                           {order.accountNo} · {order.storeName || "—"}
                         </div>
@@ -179,12 +317,56 @@ export default function AdminOrdersPage() {
                         <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
                           {formatDate(order.createdAt)}
                         </div>
-                      </div>
-                      <span style={{ fontSize: 12, fontWeight: 800, color: "#2563eb" }}>
-                        {expanded ? "Hide" : "View"}
-                      </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          downloadOrderCsv({
+                            accountNo: order.accountNo,
+                            orderRef: order.orderRef,
+                            items: order.items,
+                          })
+                        }
+                        title="Download order CSV"
+                        aria-label={`Download order ${order.orderRef || key}`}
+                        style={{
+                          border: "1px solid #bfdbfe",
+                          background: "#eff6ff",
+                          color: "#1d4ed8",
+                          borderRadius: 10,
+                          width: 34,
+                          height: 34,
+                          fontSize: 16,
+                          fontWeight: 900,
+                          cursor: "pointer",
+                          flexShrink: 0,
+                        }}
+                      >
+                        ↓
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void deleteOrders([order])}
+                        disabled={busy}
+                        title="Delete order"
+                        aria-label={`Delete order ${order.orderRef || key}`}
+                        style={{
+                          border: "1px solid #fecaca",
+                          background: "#fef2f2",
+                          color: "#b91c1c",
+                          borderRadius: 10,
+                          width: 34,
+                          height: 34,
+                          fontSize: 16,
+                          fontWeight: 900,
+                          cursor: busy ? "not-allowed" : "pointer",
+                          flexShrink: 0,
+                        }}
+                      >
+                        🗑
+                      </button>
                     </div>
-                  </button>
+                  </div>
 
                   {expanded ? (
                     <div style={{ padding: "0 16px 16px", borderTop: "1px solid #e5e7eb" }}>
@@ -221,20 +403,6 @@ export default function AdminOrdersPage() {
                             ))}
                           </tbody>
                         </table>
-                      </div>
-
-                      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-                        <BtnSecondary
-                          onClick={() =>
-                            downloadOrderCsv({
-                              accountNo: order.accountNo,
-                              orderRef: order.orderRef,
-                              items: order.items,
-                            })
-                          }
-                        >
-                          Download CSV
-                        </BtnSecondary>
                       </div>
                     </div>
                   ) : null}

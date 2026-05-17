@@ -9,6 +9,7 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const id = String(searchParams.get("id") || "").trim();
+    const download = searchParams.get("download") === "1";
     if (!id) return NextResponse.json({ error: "Not found." }, { status: 404 });
 
     const imports = (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
@@ -28,6 +29,11 @@ export async function GET(req: Request) {
     headers.set("Content-Type", result.blob.contentType || record.mimeType || "application/octet-stream");
     headers.set("Cache-Control", "private, max-age=60");
     headers.set("ETag", result.blob.etag);
+    if (download) {
+      const ext = String(record.mimeType || "").includes("pdf") ? "pdf" : "bin";
+      const filename = `${record.accountNo || "invoice"}-${record.invoiceNo || record.id}.${ext}`.replace(/[^\w.-]+/g, "_");
+      headers.set("Content-Disposition", `attachment; filename="${filename}"`);
+    }
 
     return new Response(result.stream, { status: 200, headers });
   } catch (error: any) {

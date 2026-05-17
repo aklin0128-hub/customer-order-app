@@ -46,6 +46,10 @@ function invoiceFileHref(row: Pick<ImportRecord, "id" | "blobUrl" | "blobPathnam
   return row.blobPathname ? `/api/admin/invoice-file?id=${encodeURIComponent(row.id)}` : row.blobUrl;
 }
 
+function invoiceDownloadHref(row: Pick<ImportRecord, "id" | "blobUrl" | "blobPathname">) {
+  return row.blobPathname ? `/api/admin/invoice-file?id=${encodeURIComponent(row.id)}&download=1` : row.blobUrl;
+}
+
 export default function AdminInvoicesPage() {
   const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
   const [passwordInput, setPasswordInput] = useState("");
@@ -63,6 +67,7 @@ export default function AdminInvoicesPage() {
   const [unknownSkus, setUnknownSkus] = useState<string[]>([]);
   const [parsedChars, setParsedChars] = useState(0);
   const [batchResults, setBatchResults] = useState<BatchUploadResult[]>([]);
+  const [selectedImportIds, setSelectedImportIds] = useState<string[]>([]);
 
   const loadImports = async () => {
     try {
@@ -73,6 +78,7 @@ export default function AdminInvoicesPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to load imports.");
       setImports(Array.isArray(data.imports) ? data.imports : []);
+      setSelectedImportIds((prev) => prev.filter((id) => Array.isArray(data.imports) && data.imports.some((row: ImportRecord) => row.id === id)));
     } catch (err: any) {
       setMsg(err?.message || "Failed to load invoice history.");
       setMsgTone("error");
@@ -159,8 +165,8 @@ export default function AdminInvoicesPage() {
     }
   };
 
-  const deleteImport = async (row: ImportRecord) => {
-    if (!confirm(`Delete invoice import ${row.invoiceNo || row.id}? This removes the saved import and invoice file, but does not undo customer history/recent items.`)) return;
+  const deleteImport = async (row: ImportRecord, options: { skipConfirm?: boolean } = {}) => {
+    if (!options.skipConfirm && !confirm(`Delete invoice import ${row.invoiceNo || row.id}? This removes the saved import and invoice file, but does not undo customer history/recent items.`)) return false;
 
     setBusy(true);
     setMsg("");
@@ -173,15 +179,59 @@ export default function AdminInvoicesPage() {
       if (!res.ok) throw new Error(data?.error || "Failed to delete invoice import.");
 
       setImports((prev) => prev.filter((item) => item.id !== row.id));
+      setSelectedImportIds((prev) => prev.filter((id) => id !== row.id));
       if (lastRecord?.id === row.id) setLastRecord(null);
       setMsg(data?.warning ? `Deleted import, but file delete warning: ${data.warning}` : "Invoice import deleted.");
       setMsgTone(data?.warning ? "error" : "success");
+      return true;
     } catch (err: any) {
       setMsg(err?.message || "Failed to delete invoice import.");
       setMsgTone("error");
+      return false;
     } finally {
       setBusy(false);
     }
+  };
+
+  const selectedImports = imports.filter((row) => selectedImportIds.includes(row.id));
+  const allVisibleSelected = imports.length > 0 && selectedImportIds.length === imports.length;
+
+  const toggleImportSelection = (id: string) => {
+    setSelectedImportIds((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]);
+  };
+
+  const bulkDeleteImports = async () => {
+    if (selectedImports.length === 0) return;
+    if (!confirm(`Delete ${selectedImports.length} selected invoice imports? This removes saved imports and invoice files, but does not undo customer history/recent items.`)) return;
+
+    setBusy(true);
+    let successCount = 0;
+    try {
+      for (const row of selectedImports) {
+        const ok = await deleteImport(row, { skipConfirm: true });
+        if (ok) successCount += 1;
+      }
+      setMsg(`Deleted ${successCount}/${selectedImports.length} selected invoice imports.`);
+      setMsgTone(successCount === selectedImports.length ? "success" : "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const bulkDownloadImports = () => {
+    if (selectedImports.length === 0) return;
+
+    selectedImports.forEach((row, index) => {
+      setTimeout(() => {
+        const link = document.createElement("a");
+        link.href = invoiceDownloadHref(row);
+        link.download = "";
+        link.target = "_blank";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }, index * 250);
+    });
   };
 
   if (!ready) return null;
@@ -352,39 +402,135 @@ export default function AdminInvoicesPage() {
 
       <section style={panel}>
         <h2 style={panelTitle}>Recent imports (Redis, last {imports.length})</h2>
+        {imports.length > 0 ? (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+            <button
+              type="button"
+              onClick={() => setSelectedImportIds(allVisibleSelected ? [] : imports.map((row) => row.id))}
+              disabled={busy}
+              style={{
+                border: "1px solid #d1d5db",
+                background: "#fff",
+                borderRadius: 10,
+                padding: "7px 10px",
+                fontSize: 12,
+                fontWeight: 900,
+                cursor: busy ? "not-allowed" : "pointer",
+              }}
+            >
+              {allVisibleSelected ? "Clear selection" : "Select all"}
+            </button>
+            <button
+              type="button"
+              onClick={bulkDownloadImports}
+              disabled={busy || selectedImports.length === 0}
+              style={{
+                border: "1px solid #bfdbfe",
+                background: "#eff6ff",
+                color: "#1d4ed8",
+                borderRadius: 10,
+                padding: "7px 10px",
+                fontSize: 12,
+                fontWeight: 900,
+                cursor: busy || selectedImports.length === 0 ? "not-allowed" : "pointer",
+              }}
+            >
+              Download selected ({selectedImports.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => void bulkDeleteImports()}
+              disabled={busy || selectedImports.length === 0}
+              style={{
+                border: "1px solid #fecaca",
+                background: "#fef2f2",
+                color: "#b91c1c",
+                borderRadius: 10,
+                padding: "7px 10px",
+                fontSize: 12,
+                fontWeight: 900,
+                cursor: busy || selectedImports.length === 0 ? "not-allowed" : "pointer",
+              }}
+            >
+              Delete selected ({selectedImports.length})
+            </button>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              Deleting imports does not undo customer recent/history.
+            </span>
+          </div>
+        ) : null}
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
           {imports.length === 0 ? (
             <p style={{ color: "#6b7280", fontSize: 14 }}>No imports yet.</p>
           ) : (
             imports.map((row) => (
               <div key={row.id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fafafa" }}>
-                <div style={{ fontWeight: 900, fontSize: 14 }}>
-                  {row.invoiceNo || "—"} · {row.accountNo || "no acct"} · {row.lineCount} lines
-                </div>
-                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
-                  {new Date(row.uploadedAt).toLocaleString()} · {row.extractMethod} ·{" "}
-                  <a href={invoiceFileHref(row)} target="_blank" rel="noreferrer">
-                    file
+                <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedImportIds.includes(row.id)}
+                    onChange={() => toggleImportSelection(row.id)}
+                    disabled={busy}
+                    style={{ marginTop: 2 }}
+                    aria-label={`Select invoice ${row.invoiceNo || row.id}`}
+                  />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontWeight: 900, fontSize: 14 }}>
+                      {row.invoiceNo || "—"} · {row.accountNo || "no acct"} · {row.lineCount} lines
+                    </div>
+                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                      {new Date(row.uploadedAt).toLocaleString()} · {row.extractMethod}
+                    </div>
+                  </div>
+                  <a
+                    href={invoiceDownloadHref(row)}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Download invoice"
+                    aria-label={`Download invoice ${row.invoiceNo || row.id}`}
+                    style={{
+                      border: "1px solid #bfdbfe",
+                      background: "#eff6ff",
+                      color: "#1d4ed8",
+                      borderRadius: 10,
+                      width: 34,
+                      height: 34,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 16,
+                      fontWeight: 900,
+                      textDecoration: "none",
+                      flexShrink: 0,
+                    }}
+                  >
+                    ↓
                   </a>
+                  <button
+                    type="button"
+                    onClick={() => void deleteImport(row)}
+                    disabled={busy}
+                    title="Delete invoice"
+                    aria-label={`Delete invoice ${row.invoiceNo || row.id}`}
+                    style={{
+                      border: "1px solid #fecaca",
+                      background: "#fef2f2",
+                      color: "#b91c1c",
+                      borderRadius: 10,
+                      width: 34,
+                      height: 34,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 16,
+                      fontWeight: 900,
+                      flexShrink: 0,
+                      cursor: busy ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    🗑
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void deleteImport(row)}
-                  disabled={busy}
-                  style={{
-                    marginTop: 8,
-                    border: "1px solid #fecaca",
-                    background: "#fef2f2",
-                    color: "#b91c1c",
-                    borderRadius: 10,
-                    padding: "7px 10px",
-                    fontSize: 12,
-                    fontWeight: 900,
-                    cursor: busy ? "not-allowed" : "pointer",
-                  }}
-                >
-                  Delete import
-                </button>
               </div>
             ))
           )}

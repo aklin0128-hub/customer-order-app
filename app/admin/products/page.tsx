@@ -418,46 +418,50 @@ export default function AdminProductsPage() {
         </Panel>
       ) : null}
 
-      <Panel title="Upload today_update.xlsx status update">
-        <div style={{ display: "grid", gap: 8 }}>
-          <input
-            type="file"
-            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            onChange={(e) => uploadStatusXlsx(e.target.files?.[0] || null)}
-            style={inputStyle}
-            disabled={uploadingStatusXlsx}
-          />
-          <p style={{ margin: 0, fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>
-            Reads <strong>PID/SKU</strong> and <strong>Status</strong> from the Export sheet (or first sheet) and updates existing SKUs only.
-            Status <strong>NEW</strong> is just a product status; it does not add the SKU to customer “New items”.
-          </p>
-          {uploadingStatusXlsx ? <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: "#2563eb" }}>Uploading and updating status...</p> : null}
-          {statusUploadResult ? (
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 10, background: "#f9fafb", fontSize: 12, color: "#374151", lineHeight: 1.5 }}>
-              <div style={{ fontWeight: 900, color: "#111827" }}>
-                Sheet {statusUploadResult.sheetName || "-"}: {statusUploadResult.updatedCount || 0} updated / {statusUploadResult.totalRows || 0} rows
+      <Panel title="Bulk tools">
+        <details>
+          <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 900, color: "#2563eb" }}>
+            Upload today_update.xlsx status update
+          </summary>
+          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+            <input
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              onChange={(e) => uploadStatusXlsx(e.target.files?.[0] || null)}
+              style={inputStyle}
+              disabled={uploadingStatusXlsx}
+            />
+            <p style={{ margin: 0, fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>
+              Reads <strong>PID/SKU</strong> and <strong>Status</strong>. Status <strong>NEW</strong> is not customer “New items”.
+            </p>
+            {uploadingStatusXlsx ? <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: "#2563eb" }}>Uploading and updating status...</p> : null}
+            {statusUploadResult ? (
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 10, background: "#f9fafb", fontSize: 12, color: "#374151", lineHeight: 1.5 }}>
+                <div style={{ fontWeight: 900, color: "#111827" }}>
+                  Sheet {statusUploadResult.sheetName || "-"}: {statusUploadResult.updatedCount || 0} updated / {statusUploadResult.totalRows || 0} rows
+                </div>
+                {statusUploadResult.updatedPreview?.length ? (
+                  <div style={{ marginTop: 6 }}>
+                    <strong>Updated:</strong> {statusUploadResult.updatedPreview.map((item) => `${item.sku} → ${item.status}`).join(", ")}
+                    {(statusUploadResult.updatedCount || 0) > statusUploadResult.updatedPreview.length ? " ..." : ""}
+                  </div>
+                ) : null}
+                {statusUploadResult.unknownPreview?.length ? (
+                  <div style={{ marginTop: 6, color: "#b45309" }}>
+                    <strong>Unknown SKU:</strong> {statusUploadResult.unknownPreview.join(", ")}
+                    {(statusUploadResult.unknownCount || 0) > statusUploadResult.unknownPreview.length ? " ..." : ""}
+                  </div>
+                ) : null}
+                {statusUploadResult.skippedPreview?.length ? (
+                  <div style={{ marginTop: 6, color: "#6b7280" }}>
+                    <strong>Skipped rows:</strong> {statusUploadResult.skippedPreview.join(", ")}
+                    {(statusUploadResult.skippedCount || 0) > statusUploadResult.skippedPreview.length ? " ..." : ""}
+                  </div>
+                ) : null}
               </div>
-              {statusUploadResult.updatedPreview?.length ? (
-                <div style={{ marginTop: 6 }}>
-                  <strong>Updated:</strong> {statusUploadResult.updatedPreview.map((item) => `${item.sku} → ${item.status}`).join(", ")}
-                  {(statusUploadResult.updatedCount || 0) > statusUploadResult.updatedPreview.length ? " ..." : ""}
-                </div>
-              ) : null}
-              {statusUploadResult.unknownPreview?.length ? (
-                <div style={{ marginTop: 6, color: "#b45309" }}>
-                  <strong>Unknown SKU:</strong> {statusUploadResult.unknownPreview.join(", ")}
-                  {(statusUploadResult.unknownCount || 0) > statusUploadResult.unknownPreview.length ? " ..." : ""}
-                </div>
-              ) : null}
-              {statusUploadResult.skippedPreview?.length ? (
-                <div style={{ marginTop: 6, color: "#6b7280" }}>
-                  <strong>Skipped rows:</strong> {statusUploadResult.skippedPreview.join(", ")}
-                  {(statusUploadResult.skippedCount || 0) > statusUploadResult.skippedPreview.length ? " ..." : ""}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
+            ) : null}
+          </div>
+        </details>
       </Panel>
 
       <div style={splitLayout} className="admin-split">
@@ -493,33 +497,35 @@ export default function AdminProductsPage() {
                 selected={sku.toUpperCase() === p.sku?.toUpperCase()}
                 onClick={() => selectProduct(p)}
               >
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   {productImageSrc(p.sku, p.imageUrl) ? (
                     <img
                       src={productImageSrc(p.sku, p.imageUrl)}
                       alt=""
-                      style={{ width: 44, height: 44, objectFit: "contain", borderRadius: 8, border: "1px solid #e5e7eb" }}
+                      loading="lazy"
+                      style={{ width: 34, height: 34, objectFit: "contain", borderRadius: 8, border: "1px solid #e5e7eb", flexShrink: 0 }}
                     />
                   ) : (
                     <div
                       style={{
-                        width: 44,
-                        height: 44,
+                        width: 34,
+                        height: 34,
                         borderRadius: 8,
                         background: "#f3f4f6",
-                        fontSize: 9,
+                        fontSize: 8,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         color: "#9ca3af",
+                        flexShrink: 0,
                       }}
                     >
-                      No img
+                      IMG
                     </div>
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <strong>{p.sku}</strong>
-                    <div style={{ fontSize: 12, color: "#374151" }}>{p.name || "—"}</div>
+                    <strong style={{ fontSize: 13 }}>{p.sku}</strong>
+                    <div title={p.name || ""} style={{ fontSize: 12, color: "#374151", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name || "—"}</div>
                     <div style={{ fontSize: 11, color: "#9ca3af" }}>
                       {p.brand || "—"} · {p.source || "Catalog"}
                     </div>
