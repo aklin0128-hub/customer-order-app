@@ -32,6 +32,14 @@ type ImportRecord = {
   appliedToHistory: boolean;
 };
 
+type BatchUploadResult = {
+  fileName: string;
+  record?: ImportRecord;
+  unknownSkus: string[];
+  parsedChars: number;
+  error?: string;
+};
+
 const labelStyle = { display: "block" as const, fontSize: 12, fontWeight: 700, marginBottom: 6, color: "#374151" };
 
 function invoiceFileHref(row: Pick<ImportRecord, "id" | "blobUrl" | "blobPathname">) {
@@ -47,13 +55,14 @@ export default function AdminInvoicesPage() {
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
   const [imports, setImports] = useState<ImportRecord[]>([]);
 
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [accountNo, setAccountNo] = useState("");
   const [storeName, setStoreName] = useState("");
   const [applyHistory, setApplyHistory] = useState(true);
   const [lastRecord, setLastRecord] = useState<ImportRecord | null>(null);
   const [unknownSkus, setUnknownSkus] = useState<string[]>([]);
   const [parsedChars, setParsedChars] = useState(0);
+  const [batchResults, setBatchResults] = useState<BatchUploadResult[]>([]);
 
   const loadImports = async () => {
     try {
@@ -76,8 +85,8 @@ export default function AdminInvoicesPage() {
   }, [authed]);
 
   const upload = async () => {
-    if (!file) {
-      setMsg("Choose a PDF or image file.");
+    if (files.length === 0) {
+      setMsg("Choose one or more PDF/image invoice files.");
       setMsgTone("error");
       return;
     }
@@ -86,30 +95,62 @@ export default function AdminInvoicesPage() {
     setMsg("");
     setLastRecord(null);
     setUnknownSkus([]);
+    setParsedChars(0);
+    setBatchResults([]);
 
     try {
-      const fd = new FormData();
-      fd.set("file", file);
-      if (accountNo.trim()) fd.set("accountNo", accountNo.trim());
-      if (storeName.trim()) fd.set("storeName", storeName.trim());
-      fd.set("applyHistory", applyHistory ? "true" : "false");
+      const results: BatchUploadResult[] = [];
 
-      const res = await fetch("/api/admin/upload-invoice", {
-        method: "POST",
-        headers: adminHeaders(),
-        body: fd,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Upload failed.");
+      for (const selectedFile of files) {
+        setMsg(`Processing ${results.length + 1}/${files.length}: ${selectedFile.name}`);
+        setMsgTone("success");
 
-      const rec = data.record as ImportRecord;
-      setLastRecord(rec);
-      setUnknownSkus(Array.isArray(data.unknownSkus) ? data.unknownSkus : []);
-      setParsedChars(Number(data.parsedTextChars || 0));
-      setMsg("Invoice parsed. Review lines and warnings below.");
-      setMsgTone("success");
+        try {
+          const fd = new FormData();
+          fd.set("file", selectedFile);
+          if (accountNo.trim()) fd.set("accountNo", accountNo.trim());
+          if (storeName.trim()) fd.set("storeName", storeName.trim());
+          fd.set("applyHistory", applyHistory ? "true" : "false");
+
+          const res = await fetch("/api/admin/upload-invoice", {
+            method: "POST",
+            headers: adminHeaders(),
+            body: fd,
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data?.error || "Upload failed.");
+
+          const rec = data.record as ImportRecord;
+          const result: BatchUploadResult = {
+            fileName: selectedFile.name,
+            record: rec,
+            unknownSkus: Array.isArray(data.unknownSkus) ? data.unknownSkus : [],
+            parsedChars: Number(data.parsedTextChars || 0),
+          };
+          results.push(result);
+          setBatchResults([...results]);
+          setLastRecord(rec);
+          setUnknownSkus(result.unknownSkus);
+          setParsedChars(result.parsedChars);
+        } catch (err: any) {
+          results.push({
+            fileName: selectedFile.name,
+            unknownSkus: [],
+            parsedChars: 0,
+            error: err?.message || "Upload failed.",
+          });
+          setBatchResults([...results]);
+        }
+      }
+
+      const successCount = results.filter((r) => r.record).length;
+      const failedCount = results.length - successCount;
+      const combinedUnknown = Array.from(new Set(results.flatMap((r) => r.unknownSkus)));
+      setUnknownSkus(combinedUnknown);
+      setMsg(`Invoice upload complete: ${successCount} succeeded, ${failedCount} failed.`);
+      setMsgTone(failedCount ? "error" : "success");
       await loadImports();
-      setFile(null);
+      setFiles([]);
     } catch (err: any) {
       setMsg(err?.message || "Upload failed.");
       setMsgTone("error");
@@ -147,8 +188,19 @@ export default function AdminInvoicesPage() {
         <h2 style={panelTitle}>Upload</h2>
         <div style={{ display: "grid", gap: 12, marginTop: 8, maxWidth: 520 }}>
           <div>
-            <label style={labelStyle}>Invoice file (PDF, PNG, JPEG)</label>
-            <input type="file" accept=".pdf,application/pdf,image/png,image/jpeg,image/webp" onChange={(e) => setFile(e.target.files?.[0] ?? null)} style={inputStyle} />
+            <label style={labelStyle}>Invoice files (PDF, PNG, JPEG)</label>
+            <input
+              type="file"
+              multiple
+              accept=".pdf,application/pdf,image/png,image/jpeg,image/webp"
+              onChange={(e) => setFiles(Array.from(e.target.files || []))}
+              style={inputStyle}
+            />
+            {files.length > 0 ? (
+              <div style={{ marginTop: 8, fontSize: 12, color: "#6b7280", lineHeight: 1.45 }}>
+                Selected {files.length}: {files.map((selectedFile) => selectedFile.name).join(", ")}
+              </div>
+            ) : null}
           </div>
           <div>
             <label style={labelStyle}>Manual account # (optional, overrides OCR)</label>
@@ -180,14 +232,45 @@ export default function AdminInvoicesPage() {
               cursor: busy ? "not-allowed" : "pointer",
             }}
           >
-            {busy ? "Processing…" : "Upload & parse"}
+            {busy ? "Processing…" : files.length > 1 ? `Upload & parse ${files.length} files` : "Upload & parse"}
           </button>
         </div>
       </section>
 
+      {batchResults.length > 0 ? (
+        <section style={{ ...panel, marginBottom: 16 }}>
+          <h2 style={panelTitle}>Batch results</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+            {batchResults.map((result) => (
+              <div
+                key={result.fileName}
+                style={{
+                  border: result.error ? "1px solid #fecaca" : "1px solid #bbf7d0",
+                  background: result.error ? "#fef2f2" : "#f0fdf4",
+                  borderRadius: 12,
+                  padding: 10,
+                  fontSize: 13,
+                  color: result.error ? "#991b1b" : "#166534",
+                }}
+              >
+                <div style={{ fontWeight: 900 }}>{result.fileName}</div>
+                {result.error ? (
+                  <div style={{ marginTop: 4 }}>{result.error}</div>
+                ) : result.record ? (
+                  <div style={{ marginTop: 4 }}>
+                    {result.record.accountNo || "no acct"} · {result.record.invoiceNo || "no invoice #"} · {result.record.lineCount} lines · {result.parsedChars} chars
+                    {result.unknownSkus.length ? ` · Unknown: ${result.unknownSkus.join(", ")}` : ""}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {lastRecord ? (
         <section style={{ ...panel, marginBottom: 16 }}>
-          <h2 style={panelTitle}>Last result</h2>
+          <h2 style={panelTitle}>Last successful result</h2>
           <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 10 }}>
             Account: <strong>{lastRecord.accountNo || "(none)"}</strong> · Invoice:{" "}
             <strong>{lastRecord.invoiceNo || "(none)"}</strong> · Method:{" "}
