@@ -57,6 +57,12 @@ function invoiceHref(importId: string) {
   return `/api/admin/invoice-file?id=${encodeURIComponent(importId)}`;
 }
 
+function changeFromPrevious(history: PriceHistoryPoint[], index: number) {
+  const previous = history[index + 1];
+  if (!previous) return null;
+  return ((history[index].price - previous.price) / previous.price) * 100;
+}
+
 export default function AdminPriceHistoryPage() {
   const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
   const [passwordInput, setPasswordInput] = useState("");
@@ -146,7 +152,7 @@ export default function AdminPriceHistoryPage() {
 
       {data?.accountRows.length ? (
         <section style={panel}>
-          <h2 style={panelTitle}>Unit Price History</h2>
+          <h2 style={panelTitle}>Latest Price Summary</h2>
           <div style={{ overflowX: "auto", marginTop: 10 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
@@ -179,12 +185,39 @@ export default function AdminPriceHistoryPage() {
                       {expanded ? (
                         <tr>
                           <td colSpan={7} style={{ padding: 8, background: "#f9fafb" }}>
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                              {row.history.map((point) => (
-                                <span key={`${point.importId}-${point.price}-${point.qty}`} style={{ border: "1px solid #e5e7eb", borderRadius: 999, padding: "4px 8px", background: "#fff" }}>
-                                  {point.invoiceDate}: {money(point.price)} x {point.qty}
-                                </span>
-                              ))}
+                            <div style={{ fontWeight: 900, marginBottom: 8 }}>All invoice unit prices</div>
+                            <div style={{ overflowX: "auto" }}>
+                              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, background: "#fff" }}>
+                                <thead>
+                                  <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
+                                    <th style={{ padding: 8 }}>Date</th>
+                                    <th style={{ padding: 8 }}>Unit price</th>
+                                    <th style={{ padding: 8 }}>Qty</th>
+                                    <th style={{ padding: 8 }}>Change vs previous</th>
+                                    <th style={{ padding: 8 }}>Invoice</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {row.history.map((point, historyIndex) => {
+                                    const change = changeFromPrevious(row.history, historyIndex);
+                                    return (
+                                      <tr key={`${point.importId}-${point.price}-${point.qty}-${point.invoiceDate}`} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                                        <td style={{ padding: 8 }}>{point.invoiceDate || "-"}</td>
+                                        <td style={{ padding: 8, fontWeight: 900 }}>{money(point.price)}</td>
+                                        <td style={{ padding: 8 }}>{point.qty}</td>
+                                        <td style={{ padding: 8 }}>
+                                          <span style={{ ...pctStyle(change), borderRadius: 999, padding: "3px 8px", fontWeight: 900 }}>
+                                            {historyIndex === row.history.length - 1 ? "First" : pct(change)}
+                                          </span>
+                                        </td>
+                                        <td style={{ padding: 8 }}>
+                                          {point.importId ? <a href={invoiceHref(point.importId)} target="_blank" rel="noreferrer">open</a> : "-"}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
                             </div>
                           </td>
                         </tr>

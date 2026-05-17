@@ -294,7 +294,7 @@ export async function GET(req: Request) {
           previousDate: previous?.invoiceDate || "",
           invoiceNo: latest?.invoiceNo || "",
           importId: latest?.importId || "",
-          history: sorted.slice(0, 12),
+          history: sorted,
         };
       })
       .sort((a, b) => {

@@ -29,6 +29,8 @@ export function OrderReviewModal({
   lang,
   items,
   warnings = [],
+  promoReminder,
+  newItemsReminder,
   accountNo,
   storeName,
   submitting,
@@ -42,6 +44,14 @@ export function OrderReviewModal({
   lang: Lang;
   items: CartItem[];
   warnings?: string[];
+  promoReminder?: {
+    count: number;
+    onView: () => void;
+  } | null;
+  newItemsReminder?: {
+    count: number;
+    onView: () => void;
+  } | null;
   accountNo: string;
   storeName: string;
   submitting: boolean;
@@ -114,6 +124,56 @@ export function OrderReviewModal({
               <div key={warning}>• {warning}</div>
             ))}
             {warnings.length > 6 ? <div>• ...</div> : null}
+          </div>
+        ) : null}
+
+        {promoReminder ? (
+          <div style={{ border: "1px solid #5eead4", background: "#f0fdfa", color: "#115e59", borderRadius: 12, padding: 10, fontSize: 12, lineHeight: 1.45, marginBottom: 10 }}>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>
+              {t.promoReviewReminder.replace("{count}", String(promoReminder.count))}
+            </div>
+            <button
+              type="button"
+              onClick={promoReminder.onView}
+              disabled={submitting}
+              style={{
+                border: "1px solid #0f766e",
+                background: "#ccfbf1",
+                color: "#0f766e",
+                borderRadius: 999,
+                padding: "7px 12px",
+                fontSize: 12,
+                fontWeight: 900,
+                cursor: submitting ? "not-allowed" : "pointer",
+              }}
+            >
+              {t.viewPromotions}
+            </button>
+          </div>
+        ) : null}
+
+        {newItemsReminder ? (
+          <div style={{ border: "1px solid #fdba74", background: "#fff7ed", color: "#9a3412", borderRadius: 12, padding: 10, fontSize: 12, lineHeight: 1.45, marginBottom: 10 }}>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>
+              {t.newItemsReviewReminder.replace("{count}", String(newItemsReminder.count))}
+            </div>
+            <button
+              type="button"
+              onClick={newItemsReminder.onView}
+              disabled={submitting}
+              style={{
+                border: "1px solid #ea580c",
+                background: "#ffedd5",
+                color: "#c2410c",
+                borderRadius: 999,
+                padding: "7px 12px",
+                fontSize: 12,
+                fontWeight: 900,
+                cursor: submitting ? "not-allowed" : "pointer",
+              }}
+            >
+              {t.viewNewItems}
+            </button>
           </div>
         ) : null}
 

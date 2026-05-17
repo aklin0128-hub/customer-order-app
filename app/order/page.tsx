@@ -446,6 +446,20 @@ export default function OrderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogItemsForSubmit, promotionItems, t]);
 
+  const showPromotionReviewReminder = useMemo(() => {
+    if (promotionItems.length === 0 || catalogItemsForSubmit.length === 0) return false;
+    const promoSkus = new Set(promotionItems.map((item) => item.sku?.toUpperCase()).filter(Boolean));
+    return catalogItemsForSubmit.every((item) => !promoSkus.has(item.sku.toUpperCase()));
+  }, [catalogItemsForSubmit, promotionItems]);
+
+  const showNewItemsReviewReminder = useMemo(() => {
+    if (newItemCount === 0 || catalogItemsForSubmit.length === 0) return false;
+    return catalogItemsForSubmit.every((item) => {
+      const catalogItem = getCatalogItemBySku(item.sku);
+      return !isNewItem(catalogItem);
+    });
+  }, [catalogItemsForSubmit, newItemCount]);
+
   const adjustQtyForSku = (sku: string, delta: number) => {
     const cleanSku = sku.trim().toUpperCase();
     const current = Number(catalogQtyMap[cleanSku] || 0);
@@ -1235,6 +1249,31 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
           lang={lang}
           items={catalogItemsForSubmit}
           warnings={orderReviewWarnings}
+          promoReminder={
+            showPromotionReviewReminder
+              ? {
+                  count: promotionItems.length,
+                  onView: () => {
+                    setShowReview(false);
+                    changeMode("promotion");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  },
+                }
+              : null
+          }
+          newItemsReminder={
+            showNewItemsReviewReminder
+              ? {
+                  count: newItemCount,
+                  onView: () => {
+                    setShowReview(false);
+                    setCatalogShowNewOnly(true);
+                    changeMode("catalog");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  },
+                }
+              : null
+          }
           accountNo={accountNo}
           storeName={storeName}
           submitting={submitting}
