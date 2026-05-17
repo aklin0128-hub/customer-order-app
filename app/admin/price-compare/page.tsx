@@ -271,7 +271,7 @@ export default function AdminPriceComparePage() {
           <div style={{ fontSize: 14, color: "#374151", marginBottom: 10 }}>
             <strong>{data.skuProduct.sku}</strong>
             {data.skuProduct.brand ? ` · ${data.skuProduct.brand}` : ""} · {data.skuProduct.name || "-"} · Status:{" "}
-            <strong>{data.skuProduct.status || "-"}</strong>
+            <strong>{data.skuProduct.status || "Not found in catalog"}</strong>
           </div>
           {data.buyerRows.length ? (
             <div style={{ overflowX: "auto" }}>

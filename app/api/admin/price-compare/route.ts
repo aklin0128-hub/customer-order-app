@@ -34,6 +34,10 @@ function cleanSku(value: unknown) {
   return String(value || "").trim().toUpperCase();
 }
 
+function skuAlias(value: unknown) {
+  return cleanSku(value).replace(/^0+(?=\d)/, "");
+}
+
 function parseDate(value: unknown) {
   const text = String(value || "").trim();
   if (!text) return null;
@@ -70,12 +74,20 @@ function priceForLine(line: InvoiceImportRecord["lines"][number]) {
 
 async function getProductMap(skus: string[]) {
   const wanted = new Set(skus.map(cleanSku).filter(Boolean));
+  const wantedAliases = new Set(Array.from(wanted).map(skuAlias).filter(Boolean));
   const map = new Map<string, Product>();
 
   for (const item of catalogData as Product[]) {
     const sku = cleanSku(item.sku);
-    if (!sku || !wanted.has(sku)) continue;
-    map.set(sku, { ...item, sku });
+    const alias = skuAlias(sku);
+    if (!sku || (!wanted.has(sku) && !wantedAliases.has(alias))) continue;
+
+    const product = { ...item, sku };
+    map.set(sku, product);
+    map.set(alias, product);
+    for (const wantedSku of wanted) {
+      if (skuAlias(wantedSku) === alias) map.set(wantedSku, product);
+    }
   }
 
   const redisItems = await Promise.all(
@@ -85,7 +97,10 @@ async function getProductMap(skus: string[]) {
   for (const item of redisItems) {
     const sku = cleanSku(item?.sku);
     if (!sku) continue;
-    map.set(sku, { ...(map.get(sku) || { sku }), ...item, sku });
+    const alias = skuAlias(sku);
+    const product = { ...(map.get(sku) || map.get(alias) || { sku }), ...item, sku };
+    map.set(sku, product);
+    map.set(alias, product);
   }
 
   return map;
@@ -144,7 +159,9 @@ export async function GET(req: Request) {
       }
     }
 
-    const productMap = await getProductMap(Array.from(new Set(points.map((p) => p.sku))));
+    const productMap = await getProductMap(
+      Array.from(new Set([...points.map((p) => p.sku), skuQuery].filter(Boolean)))
+    );
 
     const accountRows = Array.from(
       points.reduce((map, point) => {
