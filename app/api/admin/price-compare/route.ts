@@ -303,6 +303,20 @@ export async function GET(req: Request) {
         return bc - ac || a.sku.localeCompare(b.sku);
       });
 
+    const latestUnitPriceByAccount = new Map<string, { price: number; date: string }>();
+    for (const point of buyerImportPoints) {
+      if (point.price === null) continue;
+      const existing = latestUnitPriceByAccount.get(point.accountNo);
+      const existingDate = parseDate(existing?.date)?.getTime() || 0;
+      const pointDate = parseDate(point.invoiceDate)?.getTime() || 0;
+      if (!existing || pointDate >= existingDate) {
+        latestUnitPriceByAccount.set(point.accountNo, {
+          price: point.price,
+          date: point.invoiceDate,
+        });
+      }
+    }
+
     const buyerSourcePoints = mode === "buyers"
       ? orderPurchasePoints.length > 0 ? orderPurchasePoints : buyerImportPoints
       : [];
@@ -330,7 +344,12 @@ export async function GET(req: Request) {
         return map;
       }, new Map<string, { accountNo: string; totalQty: number; invoiceCount: number; latestPrice: number | null; latestDate: string }>())
         .values()
-    ).sort((a, b) => b.totalQty - a.totalQty);
+    ).map((row) => {
+      const latestUnit = latestUnitPriceByAccount.get(row.accountNo);
+      return latestUnit
+        ? { ...row, latestPrice: latestUnit.price, latestDate: latestUnit.date || row.latestDate }
+        : row;
+    }).sort((a, b) => b.totalQty - a.totalQty);
 
     const skuProduct = skuQuery ? productMap.get(skuQuery) : null;
 

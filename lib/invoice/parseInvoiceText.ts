@@ -127,7 +127,10 @@ export function parseInvoiceText(raw: string): ParsedInvoice {
 
   let supplierOrderNo = text.match(/order\s*no\.?\s*[#:\s]*\s*([A-Z]{2,3}-\d{5,})/i)?.[1] ?? null;
 
-  const invoiceDate = text.match(/invoice\s*date\s*[#:\s]*\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i)?.[1] ?? null;
+  const invoiceDate =
+    text.match(/invoice\s*date\s*[#:\s]*\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i)?.[1] ??
+    text.match(/invoice\s*date\s*\n\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i)?.[1] ??
+    null;
 
   const merged = new Map<string, ParsedInvoiceLine>();
 
