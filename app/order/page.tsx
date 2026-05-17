@@ -1078,14 +1078,20 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                 <button
                   type="button"
-                  onClick={() => setCatalogShowRecommendedOnly((prev) => !prev)}
+                  onClick={() => {
+                    setCatalogShowRecommendedOnly((prev) => !prev);
+                    setCatalogShowNewOnly(false);
+                  }}
                   style={categoryButtonStyle(catalogShowRecommendedOnly)}
                 >
                   {t.recommended} ({recommendedItemCount})
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCatalogShowNewOnly((prev) => !prev)}
+                  onClick={() => {
+                    setCatalogShowNewOnly((prev) => !prev);
+                    setCatalogShowRecommendedOnly(false);
+                  }}
                   style={newItemsButtonStyle(catalogShowNewOnly)}
                 >
                   {t.newItems} ({newItemCount})
