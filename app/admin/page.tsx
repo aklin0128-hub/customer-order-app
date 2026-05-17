@@ -33,10 +33,16 @@ const QUICK_LINKS = [
     emoji: "📄",
   },
   {
-    title: "Price Compare",
-    description: "Compare uploaded invoice prices by account and see which accounts buy each SKU the most.",
-    href: "/admin/price-compare",
+    title: "Price History",
+    description: "Check one account's historical invoice unit price for a SKU.",
+    href: "/admin/price-history",
     emoji: "📈",
+  },
+  {
+    title: "SKU Buyers",
+    description: "See which accounts bought a SKU the most over a selected period.",
+    href: "/admin/sku-buyers",
+    emoji: "🏆",
   },
   {
     title: "Orders",

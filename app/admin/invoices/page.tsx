@@ -159,6 +159,31 @@ export default function AdminInvoicesPage() {
     }
   };
 
+  const deleteImport = async (row: ImportRecord) => {
+    if (!confirm(`Delete invoice import ${row.invoiceNo || row.id}? This removes the saved import and invoice file, but does not undo customer history/recent items.`)) return;
+
+    setBusy(true);
+    setMsg("");
+    try {
+      const res = await fetch(`/api/admin/invoice-imports?id=${encodeURIComponent(row.id)}`, {
+        method: "DELETE",
+        headers: adminHeaders(),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to delete invoice import.");
+
+      setImports((prev) => prev.filter((item) => item.id !== row.id));
+      if (lastRecord?.id === row.id) setLastRecord(null);
+      setMsg(data?.warning ? `Deleted import, but file delete warning: ${data.warning}` : "Invoice import deleted.");
+      setMsgTone(data?.warning ? "error" : "success");
+    } catch (err: any) {
+      setMsg(err?.message || "Failed to delete invoice import.");
+      setMsgTone("error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (!ready) return null;
 
   if (!authed) {
@@ -342,6 +367,24 @@ export default function AdminInvoicesPage() {
                     file
                   </a>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => void deleteImport(row)}
+                  disabled={busy}
+                  style={{
+                    marginTop: 8,
+                    border: "1px solid #fecaca",
+                    background: "#fef2f2",
+                    color: "#b91c1c",
+                    borderRadius: 10,
+                    padding: "7px 10px",
+                    fontSize: 12,
+                    fontWeight: 900,
+                    cursor: busy ? "not-allowed" : "pointer",
+                  }}
+                >
+                  Delete import
+                </button>
               </div>
             ))
           )}

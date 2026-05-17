@@ -22,10 +22,62 @@ function money(s: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+function tryParseNoBrandInvoiceRow(line: string): ParsedInvoiceLine | null {
+  const normalized = line.trim().replace(/\s+/g, " ");
+  const rx = /^(\d{4,7}[A-Z0-9]{0,3})\s+\S+\s+.+?\s+(\d{1,5})\s+(?:Case|CS|CA|EA|Each|BX|Box|PK|Pack|BG|Bag)\s+\S+\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*$/i;
+  const match = normalized.match(rx);
+  if (!match) return null;
+
+  const sku = match[1].toUpperCase();
+  const qty = Math.max(1, parseInt(match[2], 10) || 0);
+  const unitPrice = money(match[3]);
+  const lineTotal = money(match[5]);
+  if (!sku || !qty) return null;
+
+  return { sku, qty, unitPrice, lineTotal, rawLine: line };
+}
+
+function parseFlexibleNoRow(line: string): ParsedInvoiceLine | null {
+  const normalized = line.trim().replace(/\s+/g, " ");
+  const moneyMatches = Array.from(normalized.matchAll(/\$?(\d[\d,]*\.\d{2})/g));
+  if (moneyMatches.length === 0) return null;
+
+  const skuMatch = normalized.match(
+    /(?:^|\s)(?:NO\.?\s*)?(\d{4,7}[A-Z0-9]{0,3})(?=\s)/i
+  );
+  if (!skuMatch?.[1] || skuMatch.index === undefined) return null;
+
+  const sku = skuMatch[1].toUpperCase();
+  const skuEnd = skuMatch.index + skuMatch[0].length;
+  const firstMoneyIndex = moneyMatches[0].index ?? normalized.length;
+  const middle = normalized.slice(skuEnd, firstMoneyIndex);
+
+  const qtyUnitMatches = Array.from(
+    middle.matchAll(/\b(\d{1,5})\s*(?:Case|CS|CA|EA|Each|BX|Box|PK|Pack|BG|Bag)\b/gi)
+  );
+  const qtyText = qtyUnitMatches.at(-1)?.[1] ?? Array.from(middle.matchAll(/\b(\d{1,5})\b/g)).at(-1)?.[1];
+  const qty = Math.max(1, parseInt(qtyText || "", 10) || 0);
+  if (!sku || !qty) return null;
+
+  const prices = moneyMatches
+    .map((match) => money(match[1]))
+    .filter((value): value is number => typeof value === "number");
+  if (prices.length === 0) return null;
+
+  const unitPrice =
+    prices.length >= 3 ? prices[prices.length - 3] : prices.length >= 2 ? prices[prices.length - 2] : prices[0];
+  const lineTotal = prices.at(-1);
+
+  return { sku, qty, unitPrice, lineTotal, rawLine: line };
+}
+
 /**
  * RHEEBROS-style row: SKU … (description) … Qty Case Type Unit Each Total
  */
 function tryParseTableRow(line: string): ParsedInvoiceLine | null {
+  const noBrandRow = tryParseNoBrandInvoiceRow(line);
+  if (noBrandRow) return noBrandRow;
+
   const typeWord = "(?:Dry|Frozen|Chilled|REF|COOL|WET)";
   const rxLoose = new RegExp(
     `^(\\d{4,7}[A-Z0-9]{0,3})\\s+.+\\s+(\\d+)\\s+Case\\s+${typeWord}\\s+([\\d,]+\\.\\d{2})\\s+([\\d,]+\\.\\d{2})\\s+([\\d,]+\\.\\d{2})\\s*$`,
@@ -39,7 +91,7 @@ function tryParseTableRow(line: string): ParsedInvoiceLine | null {
       "i"
     );
     m = line.trim().match(rxAnyType);
-    if (!m) return null;
+    if (!m) return parseFlexibleNoRow(line);
     const sku = m[1].toUpperCase();
     const qty = Math.max(1, parseInt(m[2], 10) || 0);
     const unitPrice = money(m[4]);
