@@ -86,6 +86,10 @@ export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [listFilter, setListFilter] = useState<ProductFilter>("all");
+  const [selectedProductSkus, setSelectedProductSkus] = useState<string[]>([]);
+  const [bulkStatus, setBulkStatus] = useState("");
+  const [bulkCategory, setBulkCategory] = useState("");
+  const [bulkNewFlag, setBulkNewFlag] = useState<"keep" | "yes" | "no">("keep");
   const [initialSkuFromQuery, setInitialSkuFromQuery] = useState("");
 
   const [sku, setSku] = useState("");
@@ -210,6 +214,66 @@ export default function AdminProductsPage() {
     setFormDirty(false);
     setAutoSaveStatus("");
     notify(`Editing ${p.sku}`);
+  };
+
+  const selectedProducts = products.filter((p) =>
+    selectedProductSkus.includes(p.sku?.toUpperCase())
+  );
+  const allFilteredSelected =
+    filteredProducts.length > 0 &&
+    filteredProducts.every((p) => selectedProductSkus.includes(p.sku?.toUpperCase()));
+
+  const toggleProductSelection = (targetSku: string) => {
+    const clean = targetSku.toUpperCase();
+    setSelectedProductSkus((prev) =>
+      prev.includes(clean) ? prev.filter((item) => item !== clean) : [...prev, clean]
+    );
+  };
+
+  const applyBulkProductUpdate = async () => {
+    if (selectedProducts.length === 0) return notify("Select SKUs first.", "error");
+    if (!bulkStatus && !bulkCategory && bulkNewFlag === "keep") {
+      return notify("Choose a bulk change first.", "error");
+    }
+    if (!confirm(`Apply bulk update to ${selectedProducts.length} SKU(s)?`)) return;
+
+    setBusy(true);
+    try {
+      let updated = 0;
+
+      for (const product of selectedProducts) {
+        const nextProduct = {
+          ...product,
+          status: bulkStatus || product.status || "NORMAL",
+          category: bulkCategory || product.category || "",
+          isNew: bulkNewFlag === "keep" ? Boolean(product.isNew) : bulkNewFlag === "yes",
+        };
+
+        const res = await fetch("/api/admin/products", {
+          method: "POST",
+          headers: adminHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify(nextProduct),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || `Failed to save ${product.sku}.`);
+
+        if (data.product?.sku) {
+          updated += 1;
+          setProducts((prev) => prev.map((item) =>
+            item.sku?.toUpperCase() === data.product.sku.toUpperCase()
+              ? { ...item, ...data.product }
+              : item
+          ));
+        }
+      }
+
+      setSelectedProductSkus([]);
+      notify(`Bulk updated ${updated} SKU(s).`);
+    } catch (err: any) {
+      notify(err?.message || "Bulk update failed.", "error");
+    } finally {
+      setBusy(false);
+    }
   };
 
   useEffect(() => {
@@ -490,13 +554,59 @@ export default function AdminProductsPage() {
               Tip: search by SKU to find items quickly. Showing first 120 without a search.
             </p>
           ) : null}
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 10, background: "#f9fafb", marginBottom: 10, display: "grid", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <button
+                type="button"
+                onClick={() => setSelectedProductSkus(allFilteredSelected ? [] : filteredProducts.map((p) => p.sku.toUpperCase()))}
+                disabled={busy}
+                style={{ border: "1px solid #d1d5db", background: "#fff", borderRadius: 10, padding: "7px 10px", fontSize: 12, fontWeight: 900, cursor: busy ? "not-allowed" : "pointer" }}
+              >
+                {allFilteredSelected ? "Clear selection" : "Select shown"}
+              </button>
+              <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 800 }}>
+                {selectedProducts.length} selected
+              </span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
+              <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} style={inputStyle}>
+                <option value="">Keep status</option>
+                {statusOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <select value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} style={inputStyle}>
+                <option value="">Keep category</option>
+                {categoryOptions.filter(Boolean).map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select value={bulkNewFlag} onChange={(e) => setBulkNewFlag(e.target.value as "keep" | "yes" | "no")} style={inputStyle}>
+                <option value="keep">Keep New flag</option>
+                <option value="yes">Set New items: Yes</option>
+                <option value="no">Set New items: No</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => void applyBulkProductUpdate()}
+                disabled={busy || selectedProducts.length === 0}
+                style={{ border: "none", background: busy || selectedProducts.length === 0 ? "#93c5fd" : "#2563eb", color: "#fff", borderRadius: 10, padding: "9px 12px", fontSize: 12, fontWeight: 900, cursor: busy || selectedProducts.length === 0 ? "not-allowed" : "pointer" }}
+              >
+                Apply bulk
+              </button>
+            </div>
+          </div>
           <div style={splitList}>
             {filteredProducts.map((p) => (
-              <ListItemButton
-                key={p.sku}
-                selected={sku.toUpperCase() === p.sku?.toUpperCase()}
-                onClick={() => selectProduct(p)}
-              >
+              <div key={p.sku} style={{ position: "relative" }}>
+                <input
+                  type="checkbox"
+                  checked={selectedProductSkus.includes(p.sku?.toUpperCase())}
+                  onChange={() => toggleProductSelection(p.sku)}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ position: "absolute", top: 10, left: 10, zIndex: 2 }}
+                  aria-label={`Select ${p.sku}`}
+                />
+                <ListItemButton
+                  selected={sku.toUpperCase() === p.sku?.toUpperCase()}
+                  onClick={() => selectProduct(p)}
+                >
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   {productImageSrc(p.sku, p.imageUrl) ? (
                     <img
@@ -523,7 +633,7 @@ export default function AdminProductsPage() {
                       IMG
                     </div>
                   )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ flex: 1, minWidth: 0, paddingLeft: 18 }}>
                     <strong style={{ fontSize: 13 }}>{p.sku}</strong>
                     <div title={p.name || ""} style={{ fontSize: 12, color: "#374151", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name || "—"}</div>
                     <div style={{ fontSize: 11, color: "#9ca3af" }}>
@@ -535,7 +645,8 @@ export default function AdminProductsPage() {
                     <StatusBadge status={p.status} />
                   </div>
                 </div>
-              </ListItemButton>
+                </ListItemButton>
+              </div>
             ))}
             {filteredProducts.length === 0 ? (
               <EmptyState title="No SKUs found" detail="Try another search term or filter." />
