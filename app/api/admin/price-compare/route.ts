@@ -22,7 +22,6 @@ type PricePoint = {
   uploadedAt: string;
   qty: number;
   price: number;
-  lineTotal?: number;
   importId: string;
 };
 
@@ -78,13 +77,6 @@ function displayDate(invoiceDate: string | null, uploadedAt: string) {
 
 function priceForLine(line: InvoiceImportRecord["lines"][number]) {
   if (typeof line.unitPrice === "number" && Number.isFinite(line.unitPrice)) return line.unitPrice;
-  if (
-    typeof line.lineTotal === "number" &&
-    Number.isFinite(line.lineTotal) &&
-    Number(line.qty) > 0
-  ) {
-    return line.lineTotal / Number(line.qty);
-  }
   return null;
 }
 
@@ -134,6 +126,7 @@ export async function GET(req: Request) {
 
   try {
     const url = new URL(req.url);
+    const mode = String(url.searchParams.get("mode") || "price").trim();
     const accountNo = String(url.searchParams.get("accountNo") || "").trim().toUpperCase();
     const skuQuery = cleanSku(url.searchParams.get("sku"));
     const days = Number(url.searchParams.get("days") || 0);
@@ -169,7 +162,6 @@ export async function GET(req: Request) {
           uploadedAt: record.uploadedAt,
           qty: Number(line.qty) || 0,
           price,
-          lineTotal: line.lineTotal,
           importId: record.id,
         };
 
@@ -179,7 +171,7 @@ export async function GET(req: Request) {
     }
 
     const buyerImportPoints: PurchasePoint[] = [];
-    if (skuQuery) {
+    if (skuQuery && mode === "buyers") {
       for (const record of imports) {
         const acct = String(record.accountNo || "").trim().toUpperCase();
         if (!acct) continue;
@@ -198,7 +190,6 @@ export async function GET(req: Request) {
             uploadedAt: record.uploadedAt,
             qty: Number(line.qty) || 0,
             price,
-            lineTotal: line.lineTotal,
             importId: record.id,
           });
         }
@@ -206,7 +197,7 @@ export async function GET(req: Request) {
     }
 
     const orderPurchasePoints: PurchasePoint[] = [];
-    if (skuQuery) {
+    if (skuQuery && mode === "buyers") {
       const historyKeys = await redis.keys("orderHistory:*");
       const histories = await Promise.all(
         historyKeys.map(async (key) => ({
@@ -312,20 +303,20 @@ export async function GET(req: Request) {
         return bc - ac || a.sku.localeCompare(b.sku);
       });
 
-    const buyerSourcePoints = orderPurchasePoints.length > 0 ? orderPurchasePoints : buyerImportPoints;
+    const buyerSourcePoints = mode === "buyers"
+      ? orderPurchasePoints.length > 0 ? orderPurchasePoints : buyerImportPoints
+      : [];
     const buyerRows = Array.from(
       buyerSourcePoints.reduce((map, point) => {
         if (!skuQuery) return map;
         const existing = map.get(point.accountNo) || {
           accountNo: point.accountNo,
           totalQty: 0,
-          totalSpend: 0,
           invoiceCount: 0,
           latestPrice: point.price,
           latestDate: point.invoiceDate,
         };
         existing.totalQty += point.qty;
-        existing.totalSpend += point.lineTotal ?? (point.price !== null ? point.price * point.qty : 0);
         existing.invoiceCount += 1;
 
         const existingDate = parseDate(existing.latestDate)?.getTime() || 0;
@@ -337,15 +328,15 @@ export async function GET(req: Request) {
 
         map.set(point.accountNo, existing);
         return map;
-      }, new Map<string, { accountNo: string; totalQty: number; totalSpend: number; invoiceCount: number; latestPrice: number | null; latestDate: string }>())
+      }, new Map<string, { accountNo: string; totalQty: number; invoiceCount: number; latestPrice: number | null; latestDate: string }>())
         .values()
-    ).sort((a, b) => b.totalQty - a.totalQty || b.totalSpend - a.totalSpend);
+    ).sort((a, b) => b.totalQty - a.totalQty);
 
     const skuProduct = skuQuery ? productMap.get(skuQuery) : null;
 
     return NextResponse.json({
       success: true,
-      filters: { accountNo, sku: skuQuery, days: days || null },
+      filters: { mode, accountNo, sku: skuQuery, days: days || null },
       accountRows,
       buyerRows,
       skuProduct: skuProduct ? { ...skuProduct, sku: skuQuery } : skuQuery ? { sku: skuQuery } : null,
