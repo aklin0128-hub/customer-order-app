@@ -26,6 +26,10 @@ type PricePoint = {
   importId: string;
 };
 
+type PurchasePoint = Omit<PricePoint, "price"> & {
+  price: number | null;
+};
+
 function checkAdmin(req: Request) {
   return (req.headers.get("x-admin-password") || "") === ADMIN_PASSWORD;
 }
@@ -128,6 +132,8 @@ export async function GET(req: Request) {
 
     const imports = (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
     const points: PricePoint[] = [];
+    const purchasePoints: PurchasePoint[] = [];
+    const skuQueryAlias = skuAlias(skuQuery);
 
     for (const record of imports) {
       const acct = String(record.accountNo || "").trim().toUpperCase();
@@ -140,12 +146,10 @@ export async function GET(req: Request) {
       for (const line of record.lines || []) {
         const sku = cleanSku(line.sku);
         if (!sku) continue;
-        if (skuQuery && sku !== skuQuery) continue;
+        if (skuQuery && sku !== skuQuery && skuAlias(sku) !== skuQueryAlias) continue;
 
         const price = priceForLine(line);
-        if (price === null) continue;
-
-        points.push({
+        const purchasePoint: PurchasePoint = {
           accountNo: acct,
           sku,
           invoiceNo: record.invoiceNo,
@@ -155,12 +159,15 @@ export async function GET(req: Request) {
           price,
           lineTotal: line.lineTotal,
           importId: record.id,
-        });
+        };
+
+        purchasePoints.push(purchasePoint);
+        if (price !== null) points.push({ ...purchasePoint, price });
       }
     }
 
     const productMap = await getProductMap(
-      Array.from(new Set([...points.map((p) => p.sku), skuQuery].filter(Boolean)))
+      Array.from(new Set([...purchasePoints.map((p) => p.sku), skuQuery].filter(Boolean)))
     );
 
     const accountRows = Array.from(
@@ -203,7 +210,7 @@ export async function GET(req: Request) {
       });
 
     const buyerRows = Array.from(
-      points.reduce((map, point) => {
+      purchasePoints.reduce((map, point) => {
         if (!skuQuery) return map;
         const existing = map.get(point.accountNo) || {
           accountNo: point.accountNo,
@@ -214,7 +221,7 @@ export async function GET(req: Request) {
           latestDate: point.invoiceDate,
         };
         existing.totalQty += point.qty;
-        existing.totalSpend += point.lineTotal ?? point.price * point.qty;
+        existing.totalSpend += point.lineTotal ?? (point.price !== null ? point.price * point.qty : 0);
         existing.invoiceCount += 1;
 
         const existingDate = parseDate(existing.latestDate)?.getTime() || 0;
@@ -226,7 +233,7 @@ export async function GET(req: Request) {
 
         map.set(point.accountNo, existing);
         return map;
-      }, new Map<string, { accountNo: string; totalQty: number; totalSpend: number; invoiceCount: number; latestPrice: number; latestDate: string }>())
+      }, new Map<string, { accountNo: string; totalQty: number; totalSpend: number; invoiceCount: number; latestPrice: number | null; latestDate: string }>())
         .values()
     ).sort((a, b) => b.totalQty - a.totalQty || b.totalSpend - a.totalSpend);
 
@@ -238,7 +245,8 @@ export async function GET(req: Request) {
       accountRows,
       buyerRows,
       skuProduct: skuProduct ? { ...skuProduct, sku: skuQuery } : skuQuery ? { sku: skuQuery } : null,
-      pointCount: points.length,
+      pointCount: purchasePoints.length,
+      pricedPointCount: points.length,
       importCount: imports.length,
     });
   } catch (error: any) {

@@ -38,7 +38,7 @@ type BuyerRow = {
   totalQty: number;
   totalSpend: number;
   invoiceCount: number;
-  latestPrice: number;
+  latestPrice: number | null;
   latestDate: string;
 };
 
@@ -188,7 +188,7 @@ export default function AdminPriceComparePage() {
         </div>
         {data ? (
           <p style={{ margin: "10px 0 0", color: "#6b7280", fontSize: 13 }}>
-            Found {data.pointCount} priced invoice lines from {data.importCount} saved imports.
+            Found {data.pointCount} matching invoice lines from {data.importCount} saved imports.
           </p>
         ) : null}
       </section>
