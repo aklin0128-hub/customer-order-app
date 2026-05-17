@@ -1,0 +1,233 @@
+import { NextResponse } from "next/server";
+import catalogData from "@/data/catalog_sku_master_extracted.json";
+import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
+import { redis } from "@/lib/redis";
+
+export const dynamic = "force-dynamic";
+
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "536678";
+
+type Product = {
+  sku: string;
+  name?: string;
+  brand?: string;
+  status?: string;
+};
+
+type PricePoint = {
+  accountNo: string;
+  sku: string;
+  invoiceNo: string | null;
+  invoiceDate: string;
+  uploadedAt: string;
+  qty: number;
+  price: number;
+  lineTotal?: number;
+  importId: string;
+};
+
+function checkAdmin(req: Request) {
+  return (req.headers.get("x-admin-password") || "") === ADMIN_PASSWORD;
+}
+
+function cleanSku(value: unknown) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function parseDate(value: unknown) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+
+  const us = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (us) {
+    const y = Number(us[3].length === 2 ? `20${us[3]}` : us[3]);
+    const m = Number(us[1]) - 1;
+    const d = Number(us[2]);
+    const date = new Date(Date.UTC(y, m, d, 12));
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function displayDate(invoiceDate: string | null, uploadedAt: string) {
+  const date = parseDate(invoiceDate) || parseDate(uploadedAt);
+  return date ? date.toISOString().slice(0, 10) : "";
+}
+
+function priceForLine(line: InvoiceImportRecord["lines"][number]) {
+  if (typeof line.unitPrice === "number" && Number.isFinite(line.unitPrice)) return line.unitPrice;
+  if (
+    typeof line.lineTotal === "number" &&
+    Number.isFinite(line.lineTotal) &&
+    Number(line.qty) > 0
+  ) {
+    return line.lineTotal / Number(line.qty);
+  }
+  return null;
+}
+
+async function getProductMap(skus: string[]) {
+  const wanted = new Set(skus.map(cleanSku).filter(Boolean));
+  const map = new Map<string, Product>();
+
+  for (const item of catalogData as Product[]) {
+    const sku = cleanSku(item.sku);
+    if (!sku || !wanted.has(sku)) continue;
+    map.set(sku, { ...item, sku });
+  }
+
+  const redisItems = await Promise.all(
+    Array.from(wanted).map((sku) => redis.get<Product>(`product:${sku}`))
+  );
+
+  for (const item of redisItems) {
+    const sku = cleanSku(item?.sku);
+    if (!sku) continue;
+    map.set(sku, { ...(map.get(sku) || { sku }), ...item, sku });
+  }
+
+  return map;
+}
+
+function pctChange(latest?: number, previous?: number) {
+  if (latest === undefined || previous === undefined || previous === 0) return null;
+  return ((latest - previous) / previous) * 100;
+}
+
+export async function GET(req: Request) {
+  if (!checkAdmin(req)) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  try {
+    const url = new URL(req.url);
+    const accountNo = String(url.searchParams.get("accountNo") || "").trim().toUpperCase();
+    const skuQuery = cleanSku(url.searchParams.get("sku"));
+    const days = Number(url.searchParams.get("days") || 0);
+    const since =
+      Number.isFinite(days) && days > 0
+        ? new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+        : null;
+
+    const imports = (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
+    const points: PricePoint[] = [];
+
+    for (const record of imports) {
+      const acct = String(record.accountNo || "").trim().toUpperCase();
+      if (!acct) continue;
+      if (accountNo && acct !== accountNo) continue;
+
+      const effectiveDate = parseDate(record.invoiceDate) || parseDate(record.uploadedAt);
+      if (since && effectiveDate && effectiveDate < since) continue;
+
+      for (const line of record.lines || []) {
+        const sku = cleanSku(line.sku);
+        if (!sku) continue;
+        if (skuQuery && sku !== skuQuery) continue;
+
+        const price = priceForLine(line);
+        if (price === null) continue;
+
+        points.push({
+          accountNo: acct,
+          sku,
+          invoiceNo: record.invoiceNo,
+          invoiceDate: displayDate(record.invoiceDate, record.uploadedAt),
+          uploadedAt: record.uploadedAt,
+          qty: Number(line.qty) || 0,
+          price,
+          lineTotal: line.lineTotal,
+          importId: record.id,
+        });
+      }
+    }
+
+    const productMap = await getProductMap(Array.from(new Set(points.map((p) => p.sku))));
+
+    const accountRows = Array.from(
+      points.reduce((map, point) => {
+        if (!accountNo) return map;
+        const list = map.get(point.sku) || [];
+        list.push(point);
+        map.set(point.sku, list);
+        return map;
+      }, new Map<string, PricePoint[]>())
+    )
+      .map(([sku, list]) => {
+        const sorted = list.sort((a, b) =>
+          (parseDate(b.invoiceDate)?.getTime() || 0) - (parseDate(a.invoiceDate)?.getTime() || 0) ||
+          (parseDate(b.uploadedAt)?.getTime() || 0) - (parseDate(a.uploadedAt)?.getTime() || 0)
+        );
+        const latest = sorted[0];
+        const previous = sorted[1];
+        const product = productMap.get(sku);
+
+        return {
+          sku,
+          name: product?.name || "",
+          brand: product?.brand || "",
+          status: product?.status || "",
+          latestPrice: latest?.price ?? null,
+          previousPrice: previous?.price ?? null,
+          changePct: pctChange(latest?.price, previous?.price),
+          latestDate: latest?.invoiceDate || "",
+          previousDate: previous?.invoiceDate || "",
+          invoiceNo: latest?.invoiceNo || "",
+          importId: latest?.importId || "",
+          history: sorted.slice(0, 12),
+        };
+      })
+      .sort((a, b) => {
+        const ac = Math.abs(a.changePct ?? -1);
+        const bc = Math.abs(b.changePct ?? -1);
+        return bc - ac || a.sku.localeCompare(b.sku);
+      });
+
+    const buyerRows = Array.from(
+      points.reduce((map, point) => {
+        if (!skuQuery) return map;
+        const existing = map.get(point.accountNo) || {
+          accountNo: point.accountNo,
+          totalQty: 0,
+          totalSpend: 0,
+          invoiceCount: 0,
+          latestPrice: point.price,
+          latestDate: point.invoiceDate,
+        };
+        existing.totalQty += point.qty;
+        existing.totalSpend += point.lineTotal ?? point.price * point.qty;
+        existing.invoiceCount += 1;
+
+        const existingDate = parseDate(existing.latestDate)?.getTime() || 0;
+        const pointDate = parseDate(point.invoiceDate)?.getTime() || 0;
+        if (pointDate >= existingDate) {
+          existing.latestPrice = point.price;
+          existing.latestDate = point.invoiceDate;
+        }
+
+        map.set(point.accountNo, existing);
+        return map;
+      }, new Map<string, { accountNo: string; totalQty: number; totalSpend: number; invoiceCount: number; latestPrice: number; latestDate: string }>())
+        .values()
+    ).sort((a, b) => b.totalQty - a.totalQty || b.totalSpend - a.totalSpend);
+
+    const skuProduct = skuQuery ? productMap.get(skuQuery) : null;
+
+    return NextResponse.json({
+      success: true,
+      filters: { accountNo, sku: skuQuery, days: days || null },
+      accountRows,
+      buyerRows,
+      skuProduct: skuProduct ? { ...skuProduct, sku: skuQuery } : skuQuery ? { sku: skuQuery } : null,
+      pointCount: points.length,
+      importCount: imports.length,
+    });
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error?.message || "Failed to load price comparison." },
+      { status: 500 }
+    );
+  }
+}

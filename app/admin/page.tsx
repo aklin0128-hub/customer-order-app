@@ -33,6 +33,12 @@ const QUICK_LINKS = [
     emoji: "📄",
   },
   {
+    title: "Price Compare",
+    description: "Compare uploaded invoice prices by account and see which accounts buy each SKU the most.",
+    href: "/admin/price-compare",
+    emoji: "📈",
+  },
+  {
     title: "Orders",
     description: "Browse recent submitted orders and download CSV files.",
     href: "/admin/orders",

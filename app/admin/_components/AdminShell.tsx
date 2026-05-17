@@ -22,7 +22,7 @@ import {
   topBar,
 } from "./admin-styles";
 
-export type AdminNav = "home" | "customers" | "products" | "promotions" | "orders" | "invoices";
+export type AdminNav = "home" | "customers" | "products" | "promotions" | "orders" | "invoices" | "priceCompare";
 
 const NAV: { id: AdminNav; label: string; href: string; hint: string }[] = [
   { id: "home", label: "Dashboard", href: "/admin", hint: "Overview" },
@@ -31,6 +31,7 @@ const NAV: { id: AdminNav; label: string; href: string; hint: string }[] = [
   { id: "promotions", label: "Promotions", href: "/admin/promotions", hint: "Featured sales" },
   { id: "orders", label: "Orders", href: "/admin/orders", hint: "Order history" },
   { id: "invoices", label: "Invoices", href: "/admin/invoices", hint: "PDF / scan import" },
+  { id: "priceCompare", label: "Price Compare", href: "/admin/price-compare", hint: "Invoice price trends" },
 ];
 
 export function AdminShell({
