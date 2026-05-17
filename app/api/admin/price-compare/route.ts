@@ -30,6 +30,18 @@ type PurchasePoint = Omit<PricePoint, "price"> & {
   price: number | null;
 };
 
+type OrderHistoryEntry = {
+  accountNo?: string;
+  createdAt?: string;
+  items?: { sku?: string; qty?: string | number }[];
+};
+
+type RecentEntry = {
+  sku?: string;
+  qty?: string | number;
+  lastOrderedAt?: string;
+};
+
 function checkAdmin(req: Request) {
   return (req.headers.get("x-admin-password") || "") === ADMIN_PASSWORD;
 }
@@ -166,8 +178,99 @@ export async function GET(req: Request) {
       }
     }
 
+    const buyerImportPoints: PurchasePoint[] = [];
+    if (skuQuery) {
+      for (const record of imports) {
+        const acct = String(record.accountNo || "").trim().toUpperCase();
+        if (!acct) continue;
+
+        for (const line of record.lines || []) {
+          const sku = cleanSku(line.sku);
+          if (!sku) continue;
+          if (sku !== skuQuery && skuAlias(sku) !== skuQueryAlias) continue;
+
+          const price = priceForLine(line);
+          buyerImportPoints.push({
+            accountNo: acct,
+            sku,
+            invoiceNo: record.invoiceNo,
+            invoiceDate: displayDate(record.invoiceDate, record.uploadedAt),
+            uploadedAt: record.uploadedAt,
+            qty: Number(line.qty) || 0,
+            price,
+            lineTotal: line.lineTotal,
+            importId: record.id,
+          });
+        }
+      }
+    }
+
+    const orderPurchasePoints: PurchasePoint[] = [];
+    if (skuQuery) {
+      const historyKeys = await redis.keys("orderHistory:*");
+      const histories = await Promise.all(
+        historyKeys.map(async (key) => ({
+          accountNo: key.replace(/^orderHistory:/, "").toUpperCase(),
+          entries: (await redis.get<OrderHistoryEntry[]>(key)) || [],
+        }))
+      );
+
+      for (const { accountNo: keyAccountNo, entries } of histories) {
+        for (const entry of entries) {
+          const entryAccountNo = String(entry.accountNo || keyAccountNo).trim().toUpperCase();
+          if (!entryAccountNo) continue;
+
+          for (const item of entry.items || []) {
+            const itemSku = cleanSku(item.sku);
+            if (!itemSku) continue;
+            if (itemSku !== skuQuery && skuAlias(itemSku) !== skuQueryAlias) continue;
+
+            orderPurchasePoints.push({
+              accountNo: entryAccountNo,
+              sku: itemSku,
+              invoiceNo: null,
+              invoiceDate: displayDate(null, entry.createdAt || ""),
+              uploadedAt: entry.createdAt || "",
+              qty: Number(String(item.qty || "").replace(/[^0-9]/g, "")) || 0,
+              price: null,
+              importId: "",
+            });
+          }
+        }
+      }
+
+      if (orderPurchasePoints.length === 0) {
+        const recentKeys = await redis.keys("recentItems:*");
+        const recentLists = await Promise.all(
+          recentKeys.map(async (key) => ({
+            accountNo: key.replace(/^recentItems:/, "").toUpperCase(),
+            entries: (await redis.get<RecentEntry[]>(key)) || [],
+          }))
+        );
+
+        for (const { accountNo: recentAccountNo, entries } of recentLists) {
+          for (const entry of entries) {
+            const itemSku = cleanSku(entry.sku);
+            if (!itemSku) continue;
+            if (itemSku !== skuQuery && skuAlias(itemSku) !== skuQueryAlias) continue;
+
+            orderPurchasePoints.push({
+              accountNo: recentAccountNo,
+              sku: itemSku,
+              invoiceNo: null,
+              invoiceDate: displayDate(null, entry.lastOrderedAt || ""),
+              uploadedAt: entry.lastOrderedAt || "",
+              qty: Number(String(entry.qty || "").replace(/[^0-9]/g, "")) || 0,
+              price: null,
+              importId: "",
+            });
+          }
+        }
+      }
+    }
+
     const productMap = await getProductMap(
-      Array.from(new Set([...purchasePoints.map((p) => p.sku), skuQuery].filter(Boolean)))
+      Array.from(new Set([...purchasePoints.map((p) => p.sku), ...buyerImportPoints.map((p) => p.sku), ...orderPurchasePoints.map((p) => p.sku), skuQuery].filter(Boolean)))
     );
 
     const accountRows = Array.from(
@@ -209,8 +312,9 @@ export async function GET(req: Request) {
         return bc - ac || a.sku.localeCompare(b.sku);
       });
 
+    const buyerSourcePoints = orderPurchasePoints.length > 0 ? orderPurchasePoints : buyerImportPoints;
     const buyerRows = Array.from(
-      purchasePoints.reduce((map, point) => {
+      buyerSourcePoints.reduce((map, point) => {
         if (!skuQuery) return map;
         const existing = map.get(point.accountNo) || {
           accountNo: point.accountNo,
