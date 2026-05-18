@@ -251,7 +251,7 @@ export default function OrderPage() {
         await fetch("/api/save-draft", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ accountNo, phone: phone.trim(), note: note.trim(), cart, catalogQtyMap }),
+          body: JSON.stringify({ accountNo, storeName, phone: phone.trim(), note: note.trim(), cart, catalogQtyMap }),
         });
       } catch {}
     }, 700);

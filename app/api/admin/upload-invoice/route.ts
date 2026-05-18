@@ -21,7 +21,6 @@ export const maxDuration = 120;
 export const dynamic = "force-dynamic";
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "536678";
-const IMPORT_MAX = 80;
 
 function checkAdmin(req: Request) {
   return (req.headers.get("x-admin-password") || "") === ADMIN_PASSWORD;
@@ -145,7 +144,7 @@ export async function POST(req: Request) {
 
     const list =
       (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
-    const nextList = [record, ...list].slice(0, IMPORT_MAX);
+    const nextList = [record, ...list];
     await redis.set(IMPORT_LIST_KEY, nextList);
 
     return NextResponse.json({

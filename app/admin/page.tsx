@@ -27,6 +27,12 @@ const QUICK_LINKS = [
     emoji: "🏷️",
   },
   {
+    title: "Active Carts",
+    description: "See which customer accounts currently have unsent items saved in their cart.",
+    href: "/admin/active-carts",
+    emoji: "🛒",
+  },
+  {
     title: "Invoices",
     description: "Upload customer invoices (PDF or image). Lines are parsed into SKUs and quantities; optionally feed recent items & order history.",
     href: "/admin/invoices",

@@ -12,9 +12,11 @@ export async function POST(req: Request) {
 
     const draft = {
       accountNo,
+      storeName: body?.storeName || "",
       phone: body?.phone || "",
       note: body?.note || "",
       cart: Array.isArray(body?.cart) ? body.cart : [],
+      catalogQtyMap: body?.catalogQtyMap && typeof body.catalogQtyMap === "object" ? body.catalogQtyMap : {},
       updatedAt: new Date().toISOString(),
     };
 
