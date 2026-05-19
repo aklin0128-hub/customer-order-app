@@ -14,6 +14,7 @@ export type PromoCopyStrings = {
   promoRemaining: string;
   promoBuyXGetY: string;
   promoBuyXGetYPackHint: string;
+  promoVolumeTiers: string;
   promoPrice: string;
   promoTierQtyWarning: string;
   casesAbbr: string;
@@ -40,6 +41,47 @@ export function formatPromoBuyXGetY(item: Pick<PromotionItem, "buyQty" | "getQty
   const free = item.getQtyFree;
   if (!buy || !free || buy <= 0 || free <= 0) return "";
   return t.promoBuyXGetY.replace("{buy}", String(buy)).replace("{free}", String(free));
+}
+
+export function formatPromoVolumeTiersLine(
+  item: Pick<PromotionItem, "priceTiers">,
+  casesAbbr: string
+) {
+  if (!item.priceTiers?.length) return "";
+  return formatPromoTierPricesLine(item.priceTiers, casesAbbr);
+}
+
+export type PromotionDealHighlight = {
+  headline?: string;
+  detail?: string;
+  simplePrice?: string;
+};
+
+/** BOGO and volume tiers use the amber deal highlight; simple price uses promo price line. */
+export function getPromotionDealHighlight(
+  item: Pick<PromotionItem, "buyQty" | "getQtyFree" | "priceTiers" | "promoPrice">,
+  t: PromoCopyStrings
+): PromotionDealHighlight {
+  const bogo = formatPromoBuyXGetY(item, t);
+  if (bogo) return { headline: bogo };
+
+  const tierLine = formatPromoVolumeTiersLine(item, t.casesAbbr);
+  if (tierLine) {
+    return { headline: t.promoVolumeTiers, detail: tierLine };
+  }
+
+  const simple = String(item.promoPrice || "").trim();
+  if (!simple) return {};
+
+  const display = simple.startsWith("$") ? simple : formatMoneyPrice(simple);
+  return { simplePrice: `${t.promoPrice}: ${display}` };
+}
+
+export function formatPromotionDealReviewLabel(highlight: PromotionDealHighlight) {
+  if (highlight.headline && highlight.detail) {
+    return `${highlight.headline}\n${highlight.detail}`;
+  }
+  return highlight.headline || highlight.detail || "";
 }
 
 export function formatPromotionPriceLabel(

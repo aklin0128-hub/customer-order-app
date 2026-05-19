@@ -23,6 +23,7 @@ export function CatalogQtyCard({
   promoPrice,
   promoDetails,
   promoDealLabel,
+  promoDealDetail,
   promoRemaining,
   policyNote,
   inCartLabel,
@@ -40,6 +41,7 @@ export function CatalogQtyCard({
   promoPrice?: string;
   promoDetails?: string;
   promoDealLabel?: string;
+  promoDealDetail?: string;
   promoRemaining?: string;
   policyNote?: string;
   inCartLabel: string;
@@ -103,7 +105,14 @@ export function CatalogQtyCard({
       <div style={{ fontSize: 11, fontWeight: 800, color: "#374151" }}>{item.brand || "-"}</div>
       <div style={catalogNameStyle}>{item.name || "-"}</div>
       {item.size ? <div style={{ fontSize: 10, color: "#6b7280" }}>{item.size}</div> : null}
-      {promoDealLabel ? <div style={promoDealStyle}>{promoDealLabel}</div> : null}
+      {promoDealLabel ? (
+        <div style={promoDealStyle}>
+          <div>{promoDealLabel}</div>
+          {promoDealDetail ? (
+            <div style={{ fontSize: 11, fontWeight: 800, marginTop: 4, lineHeight: 1.35 }}>{promoDealDetail}</div>
+          ) : null}
+        </div>
+      ) : null}
       {promoPrice ? <div style={promoPriceStyle}>{promoPrice}</div> : null}
       {promoDetails ? <div style={promoDetailsStyle}>{promoDetails}</div> : null}
       {policyNote ? <div style={clearancePolicyStyle}>{policyNote}</div> : null}

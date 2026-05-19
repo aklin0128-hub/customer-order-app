@@ -18,6 +18,7 @@ import {
   reviewQtyInputStyle,
   reviewRemoveButtonStyle,
   clearancePolicyStyle,
+  promoDealStyle,
   secondaryButtonStyle,
   submitButtonStyle,
 } from "../orderStyles";
@@ -233,7 +234,9 @@ export function OrderReviewModal({
                       </div>
                     ) : null}
                     {promoDeal ? (
-                      <div style={{ fontSize: 11, fontWeight: 900, color: "#b45309", marginTop: 6 }}>{promoDeal}</div>
+                      <div style={{ ...promoDealStyle, marginTop: 6, textAlign: "left", whiteSpace: "pre-line" }}>
+                        {promoDeal}
+                      </div>
                     ) : null}
                     {isClearance ? (
                       <div style={{ ...clearancePolicyStyle, marginTop: 6 }}>{t.clearanceNoReturn}</div>

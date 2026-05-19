@@ -1,6 +1,6 @@
 import type { UpsellLine } from "./components/SalesUpsellPanel";
 import { formatClearancePriceLabel } from "./components/SalesUpsellPanel";
-import { formatPromoBuyXGetY, formatPromotionPriceLabel } from "./catalogUtils";
+import { getPromotionDealHighlight } from "./catalogUtils";
 import { copy } from "./orderCopy";
 import type { ClearanceItem, Lang, PromotionItem } from "./types";
 
@@ -18,16 +18,16 @@ export function buildWeeklyUpsellLines(
       return true;
     })
     .map((item) => {
-      const deal = formatPromoBuyXGetY(item, copy[lang]);
-      const price = formatPromotionPriceLabel(item, copy[lang]);
-      const priceLabel = [deal, price].filter(Boolean).join(" · ") || undefined;
+      const highlight = getPromotionDealHighlight(item, copy[lang]);
       return {
       sku: item.sku!.toUpperCase(),
       name: item.name,
       brand: item.brand,
       imageUrl: item.imageUrl,
-      priceLabel,
-      badge: deal || t.promoBadge,
+      priceLabel: highlight.simplePrice,
+      dealHeadline: highlight.headline,
+      dealDetail: highlight.detail,
+      badge: highlight.headline || t.promoBadge,
       remainingLabel:
         item.remainingQty !== null && item.remainingQty !== undefined
           ? `${t.promoRemaining}: ${item.remainingQty}`

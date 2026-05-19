@@ -1,7 +1,6 @@
 export const copy = {
   en: {
     title: "Store Ordering",
-    pageSubtitle: "Weekly ad picks first — built for supermarket restock and add-on sales.",
     weeklyPicksHero: "This week's ad specials for your store. Tap + to add cases to your cart.",
     addAllWeeklyPicksOneCase: "Add 1 case of each pick",
     addAllClearanceOneCase: "Add 1 case of each clearance item",
@@ -32,6 +31,7 @@ export const copy = {
     promoSoldOut: "Sold out",
     promoDateRange: "Valid",
     promoBuyXGetY: "Buy {buy} Get {free} FREE",
+    promoVolumeTiers: "VOLUME CASE PRICING",
     promoBuyXGetYPackHint: "Deal = {pack} cases per set (buy + free)",
     promoBogoQtyWarning: "{sku}: Buy {buy} Get {free} free — qty {qty} is not a full set of {pack} cases.",
     promoTierQtyWarning: "{sku}: Qty {qty} is below the lowest volume tier ({min} {cs}).",
@@ -139,7 +139,6 @@ export const copy = {
   },
   zh: {
     title: "门店订货",
-    pageSubtitle: "超市订货：先看本周海报主推，再补常订与全品。",
     weeklyPicksHero: "本周海报/促销商品，点 + 按箱加入购物车。",
     addAllWeeklyPicksOneCase: "各加 1 箱（全部主推）",
     addAllClearanceOneCase: "各加 1 箱（全部临期）",
@@ -170,6 +169,7 @@ export const copy = {
     promoSoldOut: "已售罄",
     promoDateRange: "有效期",
     promoBuyXGetY: "买 {buy} 送 {free}",
+    promoVolumeTiers: "量价优惠",
     promoBuyXGetYPackHint: "每组 {pack} 箱（买 + 送）",
     promoBogoQtyWarning: "{sku}：买 {buy} 送 {free} — 当前 {qty} 箱不是完整的 {pack} 箱一组。",
     promoTierQtyWarning: "{sku}：当前 {qty} 箱未达到最低档量价（{min}{cs} 起）。",
@@ -277,7 +277,6 @@ export const copy = {
   },
   ko: {
     title: "매장 주문",
-    pageSubtitle: "슈퍼마켓 주문 — 이번 주 추천부터, 상비 보충까지.",
     weeklyPicksHero: "이번 주 전단 추천 상품입니다. + 로 박스 수량을 담으세요.",
     addAllWeeklyPicksOneCase: "추천 전체 각 1박스 추가",
     addAllClearanceOneCase: "임박 전체 각 1박스 추가",
@@ -308,6 +307,7 @@ export const copy = {
     promoSoldOut: "품절",
     promoDateRange: "유효기간",
     promoBuyXGetY: "Buy {buy} Get {free} FREE",
+    promoVolumeTiers: "수량별 단가",
     promoBuyXGetYPackHint: "1세트 = {pack}박스 (구매+무료)",
     promoBogoQtyWarning: "{sku}: Buy {buy} Get {free} — 수량이 {pack}박스 세트가 아닙니다.",
     promoTierQtyWarning: "{sku}: 수량 {qty} — 최저 구간({min}{cs}) 미달입니다.",
@@ -415,7 +415,6 @@ export const copy = {
   },
   vi: {
     title: "Đặt hàng cửa hàng",
-    pageSubtitle: "Đặt hàng siêu thị — ưu đãi tuần trước, bổ hàng thường đặt sau.",
     weeklyPicksHero: "Hàng nổi bật tuần này — bấm + để thêm thùng vào giỏ.",
     addAllWeeklyPicksOneCase: "Thêm 1 thùng mỗi mặt hàng nổi bật",
     addAllClearanceOneCase: "Thêm 1 thùng mỗi mặt hàng thanh lý",
@@ -446,6 +445,7 @@ export const copy = {
     promoSoldOut: "Hết hàng",
     promoDateRange: "Hiệu lực",
     promoBuyXGetY: "Mua {buy} tặng {free}",
+    promoVolumeTiers: "GIÁ THEO SỐ LƯỢNG",
     promoBuyXGetYPackHint: "Mỗi bộ = {pack} thùng (mua + tặng)",
     promoBogoQtyWarning: "{sku}: Mua {buy} tặng {free} — số lượng chưa đủ bộ {pack} thùng.",
     promoTierQtyWarning: "{sku}: SL {qty} chưa đạt bậc thấp nhất ({min} {cs}).",

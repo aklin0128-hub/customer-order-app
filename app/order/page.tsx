@@ -24,8 +24,9 @@ import {
   formatPromoBuyXGetY,
   formatPromoBuyXGetYPackHint,
   formatPromoDetails,
-  formatPromotionPriceLabel,
+  formatPromotionDealReviewLabel,
   formatPromoTierQtyWarning,
+  getPromotionDealHighlight,
   generateOrderRef,
   getCatalogItemBySku,
   getDisplayStatus,
@@ -530,7 +531,8 @@ export default function OrderPage() {
     for (const item of promotionItems) {
       const sku = item.sku?.toUpperCase();
       if (!sku) continue;
-      const label = formatPromoBuyXGetY(item, t);
+      const highlight = getPromotionDealHighlight(item, t);
+      const label = formatPromotionDealReviewLabel(highlight);
       if (label) map[sku] = label;
     }
     return map;
@@ -977,8 +979,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <div>
               <div style={{ fontSize: 21, fontWeight: 800, color: "#111827", lineHeight: 1.15 }}>{t.title}</div>
-              <div style={{ marginTop: 4, fontSize: 12, color: "#6b7280", lineHeight: 1.4 }}>{t.pageSubtitle}</div>
-              <div style={{ marginTop: 2, fontSize: 12, color: "#9ca3af" }}>{accountNo} | {storeName}</div>
+              <div style={{ marginTop: 4, fontSize: 12, color: "#9ca3af" }}>{accountNo} | {storeName}</div>
             </div>
             <button type="button" onClick={logout} style={smallButtonStyle}>{t.logout}</button>
           </div>
@@ -1206,10 +1207,10 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                   const sku = item.sku?.toUpperCase() || "";
                   const qty = catalogQtyMap[sku] || "";
                   const soldOut = item.remainingQty === 0;
-                  const promoPriceLabel = soldOut
-                    ? undefined
-                    : formatPromotionPriceLabel(item, t);
-                  const promoDealLabel = soldOut ? undefined : formatPromoBuyXGetY(item, t);
+                  const dealHighlight = soldOut ? {} : getPromotionDealHighlight(item, t);
+                  const promoDealLabel = dealHighlight.headline;
+                  const promoDealDetail = dealHighlight.detail;
+                  const promoPriceLabel = dealHighlight.simplePrice;
                   const promoDetailsLabel = soldOut
                     ? t.promoSoldOut
                     : [formatPromoBuyXGetYPackHint(item, t), formatPromoDetails(item, t)].filter(Boolean).join(" · ");
@@ -1225,6 +1226,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                       qty={qty}
                       promoNote={soldOut ? t.promoSoldOut : item.promoNote}
                       promoDealLabel={promoDealLabel}
+                      promoDealDetail={promoDealDetail}
                       promoPrice={promoPriceLabel}
                       promoDetails={promoDetailsLabel}
                       promoRemaining={promoRemainingLabel}

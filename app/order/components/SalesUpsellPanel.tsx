@@ -2,7 +2,7 @@
 
 import { formatClearancePriceDisplay } from "@/lib/clearanceFormat";
 import { copy } from "../orderCopy";
-import { promoTagStyle } from "../orderStyles";
+import { promoDealStyle, promoTagStyle } from "../orderStyles";
 import type { Lang } from "../types";
 import { ProductImage } from "./ProductImage";
 
@@ -12,6 +12,8 @@ export type UpsellLine = {
   brand?: string;
   imageUrl?: string;
   priceLabel?: string;
+  dealHeadline?: string;
+  dealDetail?: string;
   badge?: string;
   remainingLabel?: string;
 };
@@ -89,6 +91,14 @@ export function SalesUpsellPanel({
                 {line.brand ? `${line.brand} · ` : ""}
                 {line.name || "—"}
               </div>
+              {line.dealHeadline ? (
+                <div style={{ ...promoDealStyle, marginTop: 6, textAlign: "left" }}>
+                  <div>{line.dealHeadline}</div>
+                  {line.dealDetail ? (
+                    <div style={{ fontSize: 11, fontWeight: 800, marginTop: 4, lineHeight: 1.35 }}>{line.dealDetail}</div>
+                  ) : null}
+                </div>
+              ) : null}
               {line.priceLabel ? (
                 <div style={{ fontSize: 11, fontWeight: 800, color: "#0f766e", marginTop: 4 }}>{line.priceLabel}</div>
               ) : null}
