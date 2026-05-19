@@ -1,16 +1,13 @@
 import { redis } from "@/lib/redis";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
+import { formatClearancePriceDisplay } from "@/lib/clearanceFormat";
+
+export { formatClearancePriceDisplay } from "@/lib/clearanceFormat";
 
 export const CLEARANCE_KEY = "clearance:list";
 
 /** Appended to order email/CSV lines for active clearance items (e.g. 00003D - 5 - NH_ITEMS). */
 export const CLEARANCE_ORDER_EMAIL_TAG = "NH_ITEMS";
-
-export function formatClearancePriceDisplay(price: string) {
-  const trimmed = String(price || "").trim();
-  if (!trimmed) return "";
-  return trimmed.startsWith("$") ? trimmed : `$${trimmed}`;
-}
 
 export type ClearanceStatus = "active" | "scheduled" | "expired" | "sold_out";
 

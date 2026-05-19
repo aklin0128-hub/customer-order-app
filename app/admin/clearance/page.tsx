@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatClearancePriceDisplay } from "@/lib/clearance";
+import type { CSSProperties } from "react";
+import { formatClearancePriceDisplay } from "@/lib/clearanceFormat";
 import { AdminLogin } from "../_components/AdminLogin";
 import { AdminShell } from "../_components/AdminShell";
 import { formGrid, inputStyle, labelStyle, splitList } from "../_components/admin-styles";
@@ -38,7 +39,7 @@ type ClearanceProduct = {
   brand?: string;
 };
 
-const statusStyle: Record<ClearanceStatus, React.CSSProperties> = {
+const statusStyle: Record<ClearanceStatus, CSSProperties> = {
   active: { background: "#fff7ed", color: "#c2410c", border: "1px solid #fdba74" },
   scheduled: { background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" },
   expired: { background: "#f3f4f6", color: "#4b5563", border: "1px solid #d1d5db" },
