@@ -57,6 +57,12 @@ const QUICK_LINKS = [
     emoji: "🏆",
   },
   {
+    title: "Top SKUs",
+    description: "Rank best-selling SKUs across all accounts from invoices and orders.",
+    href: "/admin/top-skus",
+    emoji: "📊",
+  },
+  {
     title: "Orders",
     description: "Browse recent submitted orders and download CSV files.",
     href: "/admin/orders",

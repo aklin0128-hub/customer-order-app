@@ -201,7 +201,7 @@ export async function getTopSkus(options?: {
       totalQty: row.invoiceQty + row.orderQty,
     }))
     .filter((row) => row.totalQty > 0)
-    .sort((a, b) => b.totalQty - a.totalQty || b.accountCount - a.accountCount || a.sku.localeCompare(b.sku));
+    .sort((a, b) => b.totalQty - a.totalQty || b.accounts.size - a.accounts.size || a.sku.localeCompare(b.sku));
 
   const topSlice = sorted.slice(0, limit);
   const productMap = await buildProductMap(topSlice.map((row) => row.sku));
