@@ -23,6 +23,7 @@ import {
 } from "../orderStyles";
 import type { CartItem, Lang } from "../types";
 import { ProductImage } from "./ProductImage";
+import { SalesUpsellPanel, type UpsellLine } from "./SalesUpsellPanel";
 
 export function OrderReviewModal({
   open,
@@ -30,9 +31,13 @@ export function OrderReviewModal({
   lang,
   items,
   warnings = [],
-  promoReminder,
-  clearanceReminder,
+  weeklyUpsellLines,
+  clearanceUpsellLines,
+  onAddUpsellCase,
+  onAddAllWeeklyUpsell,
+  onAddAllClearanceUpsell,
   clearanceSkus,
+  promoDealBySku,
   newItemsReminder,
   accountNo,
   storeName,
@@ -47,15 +52,13 @@ export function OrderReviewModal({
   lang: Lang;
   items: CartItem[];
   warnings?: string[];
-  promoReminder?: {
-    count: number;
-    onView: () => void;
-  } | null;
-  clearanceReminder?: {
-    count: number;
-    onView: () => void;
-  } | null;
+  weeklyUpsellLines?: UpsellLine[];
+  clearanceUpsellLines?: UpsellLine[];
+  onAddUpsellCase: (sku: string) => void;
+  onAddAllWeeklyUpsell: () => void;
+  onAddAllClearanceUpsell: () => void;
   clearanceSkus?: Set<string>;
+  promoDealBySku?: Record<string, string>;
   newItemsReminder?: {
     count: number;
     onView: () => void;
@@ -145,57 +148,29 @@ export function OrderReviewModal({
           </div>
         ) : null}
 
-        {promoReminder ? (
-          <div style={{ border: "1px solid #5eead4", background: "#f0fdfa", color: "#115e59", borderRadius: 12, padding: 10, fontSize: 12, lineHeight: 1.45, marginBottom: 10 }}>
-            <div style={{ fontWeight: 900, marginBottom: 6 }}>
-              {t.promoReviewReminder.replace("{count}", String(promoReminder.count))}
-            </div>
-            <button
-              type="button"
-              onClick={promoReminder.onView}
-              disabled={submitting}
-              style={{
-                border: "1px solid #0f766e",
-                background: "#ccfbf1",
-                color: "#0f766e",
-                borderRadius: 999,
-                padding: "7px 12px",
-                fontSize: 12,
-                fontWeight: 900,
-                cursor: submitting ? "not-allowed" : "pointer",
-              }}
-            >
-              {t.viewPromotions}
-            </button>
-          </div>
+                {weeklyUpsellLines && weeklyUpsellLines.length > 0 ? (
+          <SalesUpsellPanel
+            lang={lang}
+            title={t.missingWeeklyPicksTitle}
+            lines={weeklyUpsellLines}
+            disabled={submitting}
+            onAddOne={onAddUpsellCase}
+            onAddAll={onAddAllWeeklyUpsell}
+          />
         ) : null}
 
-        {clearanceReminder ? (
-          <div style={{ border: "1px solid #fdba74", background: "#fff7ed", color: "#9a3412", borderRadius: 12, padding: 10, fontSize: 12, lineHeight: 1.45, marginBottom: 10 }}>
-            <div style={{ fontWeight: 900, marginBottom: 6 }}>
-              {t.clearanceReviewReminder.replace("{count}", String(clearanceReminder.count))}
-            </div>
-            <button
-              type="button"
-              onClick={clearanceReminder.onView}
-              disabled={submitting}
-              style={{
-                border: "1px solid #ea580c",
-                background: "#ffedd5",
-                color: "#c2410c",
-                borderRadius: 999,
-                padding: "7px 12px",
-                fontSize: 12,
-                fontWeight: 900,
-                cursor: submitting ? "not-allowed" : "pointer",
-              }}
-            >
-              {t.viewClearance}
-            </button>
-          </div>
+        {clearanceUpsellLines && clearanceUpsellLines.length > 0 ? (
+          <SalesUpsellPanel
+            lang={lang}
+            title={t.missingClearancePicksTitle}
+            lines={clearanceUpsellLines}
+            disabled={submitting}
+            onAddOne={onAddUpsellCase}
+            onAddAll={onAddAllClearanceUpsell}
+          />
         ) : null}
 
-        {newItemsReminder ? (
+{newItemsReminder ? (
           <div style={{ border: "1px solid #fdba74", background: "#fff7ed", color: "#9a3412", borderRadius: 12, padding: 10, fontSize: 12, lineHeight: 1.45, marginBottom: 10 }}>
             <div style={{ fontWeight: 900, marginBottom: 6 }}>
               {t.newItemsReviewReminder.replace("{count}", String(newItemsReminder.count))}
@@ -223,7 +198,9 @@ export function OrderReviewModal({
         <div style={reviewListStyle}>
           {items.map((item, index) => {
             const catalogItem = getCatalogItemBySku(item.sku);
-            const isClearance = clearanceSkus?.has(item.sku.toUpperCase()) ?? false;
+            const cleanSku = item.sku.toUpperCase();
+            const isClearance = clearanceSkus?.has(cleanSku) ?? false;
+            const promoDeal = promoDealBySku?.[cleanSku];
             const hasMetaLine = !!(catalogItem?.limitedQty || catalogItem?.palletSize);
 
             return (
@@ -254,6 +231,9 @@ export function OrderReviewModal({
                         {catalogItem?.palletSize && catalogItem?.limitedQty ? " · " : ""}
                         {catalogItem?.limitedQty ? `${t.limited}: ${catalogItem.limitedQty}` : ""}
                       </div>
+                    ) : null}
+                    {promoDeal ? (
+                      <div style={{ fontSize: 11, fontWeight: 900, color: "#b45309", marginTop: 6 }}>{promoDeal}</div>
                     ) : null}
                     {isClearance ? (
                       <div style={{ ...clearancePolicyStyle, marginTop: 6 }}>{t.clearanceNoReturn}</div>

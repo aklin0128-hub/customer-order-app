@@ -12,11 +12,17 @@ import { OrderCartSection } from "./components/OrderCartSection";
 import { OrderInput } from "./components/OrderInput";
 import { OrderReviewModal } from "./components/OrderReviewModal";
 import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
+import {
+  buildClearanceUpsellLines,
+  buildWeeklyUpsellLines,
+} from "./salesFlow";
 import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog } from "./catalogState";
 import {
   formatBrandLabel,
   formatClearanceDetails,
+  formatPromoBuyXGetY,
+  formatPromoBuyXGetYPackHint,
   formatPromoDetails,
   generateOrderRef,
   getCatalogItemBySku,
@@ -481,27 +487,78 @@ export default function OrderPage() {
       if (clearanceRemaining !== null && qty > clearanceRemaining) {
         warnings.push(t.clearanceQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(clearanceRemaining)));
       }
+
+      const promo = promotionItems.find((p) => p.sku?.toUpperCase() === cleanSku);
+      if (promo?.buyQty && promo?.getQtyFree && qty > 0) {
+        const pack = promo.buyQty + promo.getQtyFree;
+        if (qty % pack !== 0) {
+          warnings.push(
+            t.promoBogoQtyWarning
+              .replace("{sku}", cleanSku)
+              .replace("{buy}", String(promo.buyQty))
+              .replace("{free}", String(promo.getQtyFree))
+              .replace("{pack}", String(pack))
+              .replace("{qty}", String(qty))
+          );
+        }
+      }
     }
 
     return warnings;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [catalogItemsForSubmit, promotionItems, clearanceItems, t]);
 
-  const showPromotionReviewReminder = useMemo(() => {
-    if (promotionItems.length === 0 || catalogItemsForSubmit.length === 0) return false;
-    const promoSkus = new Set(promotionItems.map((item) => item.sku?.toUpperCase()).filter(Boolean));
-    return catalogItemsForSubmit.every((item) => !promoSkus.has(item.sku.toUpperCase()));
-  }, [catalogItemsForSubmit, promotionItems]);
+  const promoSkuSet = useMemo(
+    () => new Set(promotionItems.map((item) => item.sku?.toUpperCase()).filter(Boolean) as Iterable<string>),
+    [promotionItems]
+  );
 
   const clearanceSkuSet = useMemo(
     () => new Set(clearanceItems.map((item) => item.sku?.toUpperCase()).filter(Boolean)),
     [clearanceItems]
   );
 
-  const showClearanceReviewReminder = useMemo(() => {
-    if (clearanceItems.length === 0 || catalogItemsForSubmit.length === 0) return false;
-    return catalogItemsForSubmit.every((item) => !clearanceSkuSet.has(item.sku.toUpperCase()));
-  }, [catalogItemsForSubmit, clearanceItems.length, clearanceSkuSet]);
+  const promoDealBySku = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const item of promotionItems) {
+      const sku = item.sku?.toUpperCase();
+      if (!sku) continue;
+      const label = formatPromoBuyXGetY(item, t);
+      if (label) map[sku] = label;
+    }
+    return map;
+  }, [promotionItems, t]);
+
+  const cartSkuSet = useMemo(
+    () => new Set(catalogItemsForSubmit.map((item) => item.sku.toUpperCase())),
+    [catalogItemsForSubmit]
+  );
+
+  const weeklyUpsellLines = useMemo(
+    () => buildWeeklyUpsellLines(lang, promotionItems, cartSkuSet, t),
+    [lang, promotionItems, cartSkuSet, t]
+  );
+
+  const clearanceUpsellLines = useMemo(
+    () => buildClearanceUpsellLines(lang, clearanceItems, cartSkuSet, t),
+    [lang, clearanceItems, cartSkuSet, t]
+  );
+
+  const weeklyInCartCount = useMemo(
+    () => catalogItemsForSubmit.filter((item) => promoSkuSet.has(item.sku.toUpperCase())).length,
+    [catalogItemsForSubmit, promoSkuSet]
+  );
+
+  const clearanceInCartCount = useMemo(
+    () => catalogItemsForSubmit.filter((item) => clearanceSkuSet.has(item.sku.toUpperCase())).length,
+    [catalogItemsForSubmit, clearanceSkuSet]
+  );
+
+  const postSubmitSuggestLines = useMemo(() => {
+    if (!lastSubmittedRef || lastSubmittedItems.length === 0) return [];
+    const submittedSkus = new Set(lastSubmittedItems.map((item) => item.sku.toUpperCase()));
+    return buildWeeklyUpsellLines(lang, promotionItems, submittedSkus, t);
+  }, [lastSubmittedRef, lastSubmittedItems, promotionItems, lang, t]);
 
   const showNewItemsReviewReminder = useMemo(() => {
     if (newItemCount === 0 || catalogItemsForSubmit.length === 0) return false;
@@ -540,6 +597,30 @@ export default function OrderPage() {
 
   const removeSkuFromOrder = (sku: string) => {
     setQtyForSku(sku, "");
+  };
+
+  const addAllWeeklyPicksOneCase = () => {
+    for (const item of promotionItems) {
+      if (item.remainingQty === 0) continue;
+      const sku = item.sku?.toUpperCase();
+      if (sku) adjustQtyForSku(sku, 1);
+    }
+  };
+
+  const addAllClearanceOneCase = () => {
+    for (const item of clearanceItems) {
+      if (item.remainingQty === 0) continue;
+      const sku = item.sku?.toUpperCase();
+      if (sku) adjustQtyForSku(sku, 1);
+    }
+  };
+
+  const addAllMissingWeeklyUpsell = () => {
+    for (const line of weeklyUpsellLines) adjustQtyForSku(line.sku, 1);
+  };
+
+  const addAllMissingClearanceUpsell = () => {
+    for (const line of clearanceUpsellLines) adjustQtyForSku(line.sku, 1);
   };
 
   useEffect(() => {
@@ -1086,7 +1167,27 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
         ) : mode === "promotion" ? (
           <section style={{ ...cardStyle, border: "1px solid #5eead4", background: "linear-gradient(180deg, #f0fdfa 0%, #ffffff 40%)" }}>
             <div style={sectionTitleStyle}>{t.promotionMode}</div>
-            <p style={{ fontSize: 13, color: "#115e59", margin: "4px 0 14px", lineHeight: 1.45 }}>{t.promotionHint}</p>
+            <p style={{ fontSize: 13, color: "#115e59", margin: "4px 0 10px", lineHeight: 1.45 }}>{t.weeklyPicksHero}</p>
+            {promotionItems.length > 0 ? (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+                <button
+                  type="button"
+                  onClick={addAllWeeklyPicksOneCase}
+                  style={{
+                    border: "1px solid #0f766e",
+                    background: "#0f766e",
+                    color: "#fff",
+                    borderRadius: 999,
+                    padding: "8px 14px",
+                    fontSize: 12,
+                    fontWeight: 900,
+                    cursor: "pointer",
+                  }}
+                >
+                  {t.addAllWeeklyPicksOneCase}
+                </button>
+              </div>
+            ) : null}
 
             {promotionsLoading ? (
               <div style={{ ...emptyStyle, border: "1px solid #5eead4", background: "#f0fdfa", color: "#0f766e" }}>{t.loadingPromotions}</div>
@@ -1101,9 +1202,10 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                   const promoPriceLabel = item.promoPrice
                     ? `${t.promoPrice}: ${item.promoPrice}`
                     : undefined;
+                  const promoDealLabel = soldOut ? undefined : formatPromoBuyXGetY(item, t);
                   const promoDetailsLabel = soldOut
                     ? t.promoSoldOut
-                    : formatPromoDetails(item, t);
+                    : [formatPromoBuyXGetYPackHint(item, t), formatPromoDetails(item, t)].filter(Boolean).join(" · ");
                   const promoRemainingLabel = soldOut
                     ? t.promoSoldOut
                     : item.remainingQty !== null && item.remainingQty !== undefined
@@ -1115,6 +1217,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                       item={item}
                       qty={qty}
                       promoNote={soldOut ? t.promoSoldOut : item.promoNote}
+                      promoDealLabel={promoDealLabel}
                       promoPrice={promoPriceLabel}
                       promoDetails={promoDetailsLabel}
                       promoRemaining={promoRemainingLabel}
@@ -1135,7 +1238,27 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
         ) : mode === "clearance" ? (
           <section style={{ ...cardStyle, border: "1px solid #fdba74", background: "linear-gradient(180deg, #fff7ed 0%, #ffffff 40%)" }}>
             <div style={sectionTitleStyle}>{t.clearanceMode}</div>
-            <p style={{ fontSize: 13, color: "#9a3412", margin: "4px 0 14px", lineHeight: 1.45 }}>{t.clearanceHint}</p>
+            <p style={{ fontSize: 13, color: "#9a3412", margin: "4px 0 10px", lineHeight: 1.45 }}>{t.clearanceHint}</p>
+            {clearanceItems.length > 0 ? (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+                <button
+                  type="button"
+                  onClick={addAllClearanceOneCase}
+                  style={{
+                    border: "1px solid #ea580c",
+                    background: "#ea580c",
+                    color: "#fff",
+                    borderRadius: 999,
+                    padding: "8px 14px",
+                    fontSize: 12,
+                    fontWeight: 900,
+                    cursor: "pointer",
+                  }}
+                >
+                  {t.addAllClearanceOneCase}
+                </button>
+              </div>
+            ) : null}
             {clearanceLoading ? (
               <div style={{ ...emptyStyle, border: "1px solid #fdba74", background: "#fff7ed", color: "#c2410c" }}>{t.loadingClearance}</div>
             ) : clearanceItems.length === 0 ? (
@@ -1295,6 +1418,11 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
               catalogQtyMap={catalogQtyMap}
               inCartLabel={t.inCart}
               promoBadgeLabel={t.promoBadge}
+              weeklyPickSkus={promoSkuSet}
+              clearancePickSkus={clearanceSkuSet}
+              newItemChecker={isNewItem}
+              clearanceBadgeLabel={t.clearanceBadge}
+              newBadgeLabel={t.newItems}
               editLabel={t.editProduct}
               showAdminEdit={showAdminEditLinks}
               onAdjust={adjustCatalogQty}
@@ -1334,7 +1462,14 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
 
         <div style={fixedSubmitBarStyle}>
           <div style={cartSummaryTextStyle}>
-            {t.cartSummary}: {cartItemCount} {t.lines} / {totalCases} {t.cases}
+            <div>{t.cartSummary}: {cartItemCount} {t.lines} / {totalCases} {t.cases}</div>
+            {weeklyInCartCount > 0 || clearanceInCartCount > 0 ? (
+              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2, fontWeight: 700 }}>
+                {t.cartSalesSummary
+                  .replace("{weekly}", String(weeklyInCartCount))
+                  .replace("{clearance}", String(clearanceInCartCount))}
+              </div>
+            ) : null}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "0.9fr 1.1fr", gap: 8 }}>
             <button type="button" onClick={openReview} disabled={submitting} style={secondaryButtonStyle}>
@@ -1352,31 +1487,13 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
           lang={lang}
           items={catalogItemsForSubmit}
           warnings={orderReviewWarnings}
-          promoReminder={
-            showPromotionReviewReminder
-              ? {
-                  count: promotionItems.length,
-                  onView: () => {
-                    setShowReview(false);
-                    changeMode("promotion");
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  },
-                }
-              : null
-          }
-          clearanceReminder={
-            showClearanceReviewReminder
-              ? {
-                  count: clearanceItems.length,
-                  onView: () => {
-                    setShowReview(false);
-                    changeMode("clearance");
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  },
-                }
-              : null
-          }
+          weeklyUpsellLines={weeklyUpsellLines}
+          clearanceUpsellLines={clearanceUpsellLines}
+          onAddUpsellCase={(sku) => adjustQtyForSku(sku, 1)}
+          onAddAllWeeklyUpsell={addAllMissingWeeklyUpsell}
+          onAddAllClearanceUpsell={addAllMissingClearanceUpsell}
           clearanceSkus={clearanceSkuSet}
+          promoDealBySku={promoDealBySku}
           newItemsReminder={
             showNewItemsReviewReminder
               ? {
@@ -1401,10 +1518,20 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
 
         <OrderSubmittedModal
           open={Boolean(lastSubmittedRef)}
-          onDone={() => setLastSubmittedRef("")}
+          onDone={() => {
+            setLastSubmittedRef("");
+            setLastSubmittedItems([]);
+          }}
           lang={lang}
           orderRef={lastSubmittedRef}
           items={lastSubmittedItems}
+          suggestLines={postSubmitSuggestLines}
+          onBrowseWeeklyPicks={() => {
+            setLastSubmittedRef("");
+            setLastSubmittedItems([]);
+            changeMode("promotion");
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
         />
 
         {orderHistory.length > 0 ? (

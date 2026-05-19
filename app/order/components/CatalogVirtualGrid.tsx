@@ -17,6 +17,11 @@ export function CatalogVirtualGrid({
   catalogQtyMap,
   inCartLabel,
   promoBadgeLabel,
+  weeklyPickSkus,
+  clearancePickSkus,
+  newItemChecker,
+  clearanceBadgeLabel,
+  newBadgeLabel,
   editLabel,
   showAdminEdit,
   onAdjust,
@@ -26,6 +31,11 @@ export function CatalogVirtualGrid({
   catalogQtyMap: Record<string, string>;
   inCartLabel: string;
   promoBadgeLabel: string;
+  weeklyPickSkus?: Set<string>;
+  clearancePickSkus?: Set<string>;
+  newItemChecker?: (item: CatalogItem) => boolean;
+  clearanceBadgeLabel?: string;
+  newBadgeLabel?: string;
   editLabel?: string;
   showAdminEdit?: boolean;
   onAdjust: (sku: string, delta: number) => void;
@@ -87,13 +97,25 @@ export function CatalogVirtualGrid({
               {rowItems.map((item) => {
                 const sku = item.sku?.toUpperCase() || "";
                 const qty = catalogQtyMap[sku] || "";
+                const isWeekly = weeklyPickSkus?.has(sku);
+                const isClearance = clearancePickSkus?.has(sku);
+                const isNew = newItemChecker?.(item);
+                const promoNote = isWeekly
+                  ? promoBadgeLabel
+                  : isClearance
+                    ? clearanceBadgeLabel || promoBadgeLabel
+                    : isNew
+                      ? newBadgeLabel
+                      : undefined;
                 return (
                   <CatalogQtyCard
                     key={item.sku}
                     item={item}
                     qty={qty}
+                    promoNote={promoNote}
                     inCartLabel={inCartLabel}
                     promoBadgeLabel={promoBadgeLabel}
+                    highlight={Boolean(isWeekly || isClearance)}
                     editLabel={editLabel}
                     showAdminEdit={showAdminEdit}
                     onAdjust={onAdjust}

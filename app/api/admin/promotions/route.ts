@@ -57,6 +57,8 @@ export async function POST(req: Request) {
       endDate: body?.endDate,
       promoQty: body?.promoQty,
       promoPrice: body?.promoPrice,
+      buyQty: body?.buyQty,
+      getQtyFree: body?.getQtyFree,
     });
 
     if ("error" in validated && validated.error) {
@@ -69,6 +71,8 @@ export async function POST(req: Request) {
     const endDate = validated.record!.endDate;
     const promoQty = validated.record!.promoQty;
     const promoPrice = validated.record!.promoPrice;
+    const buyQty = validated.record!.buyQty;
+    const getQtyFree = validated.record!.getQtyFree;
 
     const current = await getPromotionRecords();
     const existing = current.find((p) => p.sku === sku);
@@ -82,6 +86,8 @@ export async function POST(req: Request) {
       endDate,
       promoQty,
       promoPrice,
+      buyQty,
+      getQtyFree,
       soldQty: resetSoldQty ? 0 : existing?.soldQty || 0,
       updatedAt: new Date().toISOString(),
     };

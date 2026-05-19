@@ -252,6 +252,17 @@ export const promoPriceStyle: CSSProperties = {
   fontWeight: 900,
   color: "#0f766e",
 };
+export const promoDealStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 900,
+  color: "#b45309",
+  background: "#fffbeb",
+  border: "1px solid #fcd34d",
+  borderRadius: 8,
+  padding: "5px 8px",
+  lineHeight: 1.3,
+  textAlign: "center",
+};
 export const promoDetailsStyle: CSSProperties = {
   fontSize: 10,
   color: "#6b7280",

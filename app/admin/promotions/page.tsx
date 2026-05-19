@@ -26,6 +26,8 @@ type PromotionRecord = {
   promoQty?: number;
   soldQty?: number;
   promoPrice?: string;
+  buyQty?: number;
+  getQtyFree?: number;
   promoStatus?: PromotionStatus;
   updatedAt?: string;
 };
@@ -61,6 +63,8 @@ function emptyForm() {
     endDate: "",
     promoQty: "",
     promoPrice: "",
+    buyQty: "",
+    getQtyFree: "",
     resetSoldQty: false,
   };
 }
@@ -114,6 +118,8 @@ export default function AdminPromotionsPage() {
       endDate: record.endDate || "",
       promoQty: record.promoQty ? String(record.promoQty) : "",
       promoPrice: record.promoPrice || "",
+      buyQty: record.buyQty ? String(record.buyQty) : "",
+      getQtyFree: record.getQtyFree ? String(record.getQtyFree) : "",
       resetSoldQty: false,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -135,6 +141,8 @@ export default function AdminPromotionsPage() {
           endDate: form.endDate || undefined,
           promoQty: form.promoQty || undefined,
           promoPrice: form.promoPrice || undefined,
+          buyQty: form.buyQty || undefined,
+          getQtyFree: form.getQtyFree || undefined,
           resetSoldQty: form.resetSoldQty,
         }),
       });
@@ -272,6 +280,28 @@ export default function AdminPromotionsPage() {
               style={inputStyle}
             />
           </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label style={labelStyle}>Buy X Get Y free (optional)</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <input
+                value={form.buyQty}
+                onChange={(e) => setForm((f) => ({ ...f, buyQty: e.target.value.replace(/[^0-9]/g, "") }))}
+                placeholder="Buy qty (e.g. 2)"
+                inputMode="numeric"
+                style={inputStyle}
+              />
+              <input
+                value={form.getQtyFree}
+                onChange={(e) => setForm((f) => ({ ...f, getQtyFree: e.target.value.replace(/[^0-9]/g, "") }))}
+                placeholder="Free qty (e.g. 1)"
+                inputMode="numeric"
+                style={inputStyle}
+              />
+            </div>
+            <p style={{ margin: "6px 0 0", fontSize: 11, color: "#6b7280", lineHeight: 1.4 }}>
+              Example: Buy 2 Get 1 free — customer adds 3 cases to cart, pays for 2. Set both fields or leave empty.
+            </p>
+          </div>
         </div>
 
         <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
@@ -361,6 +391,11 @@ export default function AdminPromotionsPage() {
                       </div>
                     )}
                     {p.promoPrice ? <div>Price: {p.promoPrice}</div> : null}
+                    {p.buyQty && p.getQtyFree ? (
+                      <div style={{ fontWeight: 800, color: "#b45309" }}>
+                        Buy {p.buyQty} Get {p.getQtyFree} free
+                      </div>
+                    ) : null}
                     {p.promoQty ? (
                       <div>
                         Sold: {p.soldQty || 0} / {p.promoQty}

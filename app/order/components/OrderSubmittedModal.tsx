@@ -10,8 +10,12 @@ import {
   reviewOverlayStyle,
   submitButtonStyle,
   submittedOrderListStyle,
+  secondaryButtonStyle,
+  promoTagStyle,
 } from "../orderStyles";
 import type { CartItem, Lang } from "../types";
+import { ProductImage } from "./ProductImage";
+import type { UpsellLine } from "./SalesUpsellPanel";
 
 export function OrderSubmittedModal({
   open,
@@ -19,12 +23,16 @@ export function OrderSubmittedModal({
   lang,
   orderRef,
   items,
+  suggestLines = [],
+  onBrowseWeeklyPicks,
 }: {
   open: boolean;
   onDone: () => void;
   lang: Lang;
   orderRef: string;
   items: CartItem[];
+  suggestLines?: UpsellLine[];
+  onBrowseWeeklyPicks?: () => void;
 }) {
   const t = copy[lang];
 
@@ -58,7 +66,7 @@ export function OrderSubmittedModal({
       role="presentation"
     >
       <div
-        style={{ ...reviewModalStyle, maxHeight: "min(88vh, 640px)" }}
+        style={{ ...reviewModalStyle, maxHeight: "min(88vh, 680px)" }}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-labelledby="order-submitted-heading"
@@ -95,6 +103,57 @@ export function OrderSubmittedModal({
             );
           })}
         </div>
+
+        {suggestLines.length > 0 ? (
+          <div
+            style={{
+              marginTop: 12,
+              border: "1px solid #5eead4",
+              background: "#f0fdfa",
+              borderRadius: 12,
+              padding: 12,
+              flexShrink: 0,
+            }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 900, color: "#115e59" }}>{t.postSubmitSuggestTitle}</div>
+            <div style={{ fontSize: 12, color: "#0f766e", marginTop: 4, lineHeight: 1.45 }}>{t.postSubmitSuggestHint}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+              {suggestLines.map((line) => (
+                <div
+                  key={line.sku}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: 8,
+                    borderRadius: 10,
+                    background: "#fff",
+                    border: "1px solid #99f6e4",
+                  }}
+                >
+                  <ProductImage sku={line.sku} alt={line.sku} size={40} imageUrl={line.imageUrl} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 900 }}>{line.sku}</div>
+                    <div style={{ fontSize: 11, color: "#4b5563" }}>{line.name || "—"}</div>
+                    {line.priceLabel ? (
+                      <div style={{ fontSize: 11, fontWeight: 800, color: "#0f766e", marginTop: 2 }}>{line.priceLabel}</div>
+                    ) : null}
+                  </div>
+                  {line.badge ? <span style={{ ...promoTagStyle, fontSize: 9 }}>{line.badge}</span> : null}
+                </div>
+              ))}
+            </div>
+            {onBrowseWeeklyPicks ? (
+              <button
+                type="button"
+                onClick={onBrowseWeeklyPicks}
+                style={{ ...secondaryButtonStyle, width: "100%", marginTop: 10, borderColor: "#0f766e", color: "#0f766e" }}
+              >
+                {t.browseMoreWeeklyPicks}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         <button type="button" onClick={onDone} style={{ ...submitButtonStyle, background: "#2563eb", marginTop: 12, flexShrink: 0 }}>
           {t.done}

@@ -24,6 +24,8 @@ export type PromotionItem = CatalogItem & {
   remainingQty?: number | null;
   startDate?: string;
   endDate?: string;
+  buyQty?: number;
+  getQtyFree?: number;
 };
 
 export type ClearanceItem = CatalogItem & {

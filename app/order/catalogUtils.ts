@@ -9,6 +9,8 @@ export type PromoCopyStrings = {
   promoDateRange: string;
   promoQtyLimit: string;
   promoRemaining: string;
+  promoBuyXGetY: string;
+  promoBuyXGetYPackHint: string;
 };
 
 export type ClearanceCopyStrings = {
@@ -25,6 +27,21 @@ export function formatBrandLabel(brand: string) {
     .split(/\s+/)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+export function formatPromoBuyXGetY(item: Pick<PromotionItem, "buyQty" | "getQtyFree">, t: Pick<PromoCopyStrings, "promoBuyXGetY">) {
+  const buy = item.buyQty;
+  const free = item.getQtyFree;
+  if (!buy || !free || buy <= 0 || free <= 0) return "";
+  return t.promoBuyXGetY.replace("{buy}", String(buy)).replace("{free}", String(free));
+}
+
+export function formatPromoBuyXGetYPackHint(item: Pick<PromotionItem, "buyQty" | "getQtyFree">, t: Pick<PromoCopyStrings, "promoBuyXGetYPackHint">) {
+  const buy = item.buyQty;
+  const free = item.getQtyFree;
+  if (!buy || !free || buy <= 0 || free <= 0) return "";
+  const pack = buy + free;
+  return t.promoBuyXGetYPackHint.replace("{pack}", String(pack));
 }
 
 export function formatPromoDetails(item: PromotionItem, t: PromoCopyStrings) {

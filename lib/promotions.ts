@@ -13,6 +13,10 @@ export type PromotionRecord = {
   promoQty?: number;
   soldQty?: number;
   promoPrice?: string;
+  /** Buy this many cases to qualify (e.g. 2 in Buy 2 Get 1 free). */
+  buyQty?: number;
+  /** Free cases when buyQty is met (e.g. 1 in Buy 2 Get 1 free). */
+  getQtyFree?: number;
   updatedAt?: string;
 };
 
@@ -34,6 +38,8 @@ export type PromotionProduct = {
   startDate?: string;
   endDate?: string;
   promoStatus?: PromotionStatus;
+  buyQty?: number;
+  getQtyFree?: number;
 };
 
 function parseDateOnly(value?: string) {
@@ -72,6 +78,8 @@ export function normalizePromotionRecord(entry: unknown): PromotionRecord | null
   const promoQty = parsePositiveInt(raw.promoQty);
   const soldQty = parsePositiveInt(raw.soldQty) ?? 0;
   const promoPrice = String(raw.promoPrice || "").trim() || undefined;
+  const buyQty = parsePositiveInt(raw.buyQty);
+  const getQtyFree = parsePositiveInt(raw.getQtyFree);
 
   return {
     sku,
@@ -81,8 +89,14 @@ export function normalizePromotionRecord(entry: unknown): PromotionRecord | null
     promoQty,
     soldQty,
     promoPrice,
+    buyQty,
+    getQtyFree,
     updatedAt: String(raw.updatedAt || "").trim() || undefined,
   };
+}
+
+export function hasBuyXGetYDeal(record: Pick<PromotionRecord, "buyQty" | "getQtyFree">) {
+  return Boolean(record.buyQty && record.getQtyFree && record.buyQty > 0 && record.getQtyFree > 0);
 }
 
 export function getPromotionRemainingQty(record: PromotionRecord): number | null {
@@ -170,6 +184,8 @@ function recordToProduct(record: PromotionRecord, product: PromotionProduct): Pr
     remainingQty,
     startDate: record.startDate,
     endDate: record.endDate,
+    buyQty: record.buyQty,
+    getQtyFree: record.getQtyFree,
     promoStatus: getPromotionStatus(record),
   };
 }
@@ -236,6 +252,8 @@ export function validatePromotionInput(input: {
   endDate?: string;
   promoQty?: unknown;
   promoPrice?: string;
+  buyQty?: unknown;
+  getQtyFree?: unknown;
 }) {
   const sku = String(input.sku || "")
     .trim()
@@ -259,6 +277,14 @@ export function validatePromotionInput(input: {
 
   const promoQty = parsePositiveInt(input.promoQty);
   const promoPrice = String(input.promoPrice || "").trim();
+  const buyQty = parsePositiveInt(input.buyQty);
+  const getQtyFree = parsePositiveInt(input.getQtyFree);
+
+  const hasBuy = buyQty !== undefined;
+  const hasFree = getQtyFree !== undefined;
+  if (hasBuy !== hasFree) {
+    return { error: "Buy X Get Y free requires both buy qty and free qty, or leave both empty." };
+  }
 
   return {
     record: {
@@ -268,6 +294,8 @@ export function validatePromotionInput(input: {
       endDate: endDate || undefined,
       promoQty,
       promoPrice: promoPrice || undefined,
+      buyQty,
+      getQtyFree,
     } as Partial<PromotionRecord>,
   };
 }
