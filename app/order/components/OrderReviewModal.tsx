@@ -17,6 +17,7 @@ import {
   reviewQtyControlStyle,
   reviewQtyInputStyle,
   reviewRemoveButtonStyle,
+  clearancePolicyStyle,
   secondaryButtonStyle,
   submitButtonStyle,
 } from "../orderStyles";
@@ -31,6 +32,7 @@ export function OrderReviewModal({
   warnings = [],
   promoReminder,
   clearanceReminder,
+  clearanceSkus,
   newItemsReminder,
   accountNo,
   storeName,
@@ -53,6 +55,7 @@ export function OrderReviewModal({
     count: number;
     onView: () => void;
   } | null;
+  clearanceSkus?: Set<string>;
   newItemsReminder?: {
     count: number;
     onView: () => void;
@@ -88,6 +91,10 @@ export function OrderReviewModal({
 
   if (!open) return null;
 
+  const hasClearanceInOrder = clearanceSkus
+    ? items.some((item) => clearanceSkus.has(item.sku.toUpperCase()))
+    : false;
+
   return (
     <div
       style={reviewOverlayStyle}
@@ -121,6 +128,12 @@ export function OrderReviewModal({
             {t.close}
           </button>
         </header>
+
+        {hasClearanceInOrder ? (
+          <div style={{ border: "1px solid #fdba74", background: "#fff7ed", color: "#9a3412", borderRadius: 12, padding: 10, fontSize: 12, lineHeight: 1.45, marginBottom: 10, fontWeight: 800 }}>
+            {t.clearancePolicyReviewNote}
+          </div>
+        ) : null}
 
         {warnings.length > 0 ? (
           <div style={{ border: "1px solid #fde68a", background: "#fffbeb", color: "#92400e", borderRadius: 12, padding: 10, fontSize: 12, lineHeight: 1.45, marginBottom: 10 }}>
@@ -210,6 +223,7 @@ export function OrderReviewModal({
         <div style={reviewListStyle}>
           {items.map((item, index) => {
             const catalogItem = getCatalogItemBySku(item.sku);
+            const isClearance = clearanceSkus?.has(item.sku.toUpperCase()) ?? false;
             const hasMetaLine = !!(catalogItem?.limitedQty || catalogItem?.palletSize);
 
             return (
@@ -240,6 +254,9 @@ export function OrderReviewModal({
                         {catalogItem?.palletSize && catalogItem?.limitedQty ? " · " : ""}
                         {catalogItem?.limitedQty ? `${t.limited}: ${catalogItem.limitedQty}` : ""}
                       </div>
+                    ) : null}
+                    {isClearance ? (
+                      <div style={{ ...clearancePolicyStyle, marginTop: 6 }}>{t.clearanceNoReturn}</div>
                     ) : null}
                   </div>
                 </div>

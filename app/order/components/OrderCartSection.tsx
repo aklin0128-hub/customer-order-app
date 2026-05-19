@@ -16,6 +16,7 @@ import {
   reviewQtyInputStyle,
   sectionTitleStyle,
   sectionToggleStyle,
+  clearancePolicyStyle,
   toggleTextStyle,
 } from "../orderStyles";
 import type { CartItem, Lang } from "../types";
@@ -31,9 +32,11 @@ export function OrderCartSection({
   onAdjustQty,
   onQtyInput,
   onRemove,
+  clearanceSkus,
 }: {
   lang: Lang;
   items: CartItem[];
+  clearanceSkus?: Set<string>;
   expanded: boolean;
   onToggleExpanded: () => void;
   lineCount: number;
@@ -87,6 +90,9 @@ export function OrderCartSection({
                         <div style={{ fontSize: 11, fontWeight: 700, color: "#b45309", marginTop: 4 }}>
                           {t.limited}: {catalogItem.limitedQty}
                         </div>
+                      ) : null}
+                      {clearanceSkus?.has(item.sku.toUpperCase()) ? (
+                        <div style={{ ...clearancePolicyStyle, marginTop: 6 }}>{t.clearanceNoReturn}</div>
                       ) : null}
                     </div>
                   </div>

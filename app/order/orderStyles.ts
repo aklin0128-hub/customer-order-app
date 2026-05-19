@@ -257,6 +257,17 @@ export const promoDetailsStyle: CSSProperties = {
   color: "#6b7280",
   lineHeight: 1.35,
 };
+export const clearancePolicyStyle: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 900,
+  color: "#c2410c",
+  background: "#fff7ed",
+  border: "1px solid #fdba74",
+  borderRadius: 8,
+  padding: "4px 8px",
+  lineHeight: 1.35,
+  alignSelf: "flex-start",
+};
 export const inCartTagStyle: CSSProperties = {
   fontSize: 11,
   color: "#059669",

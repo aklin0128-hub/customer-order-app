@@ -8,6 +8,7 @@ import {
   catalogStepInputStyle,
   catalogStepperStyle,
   inCartTagStyle,
+  clearancePolicyStyle,
   promoDetailsStyle,
   promoPriceStyle,
   promoTagStyle,
@@ -21,6 +22,7 @@ export function CatalogQtyCard({
   promoPrice,
   promoDetails,
   promoRemaining,
+  policyNote,
   inCartLabel,
   promoBadgeLabel,
   onAdjust,
@@ -36,6 +38,7 @@ export function CatalogQtyCard({
   promoPrice?: string;
   promoDetails?: string;
   promoRemaining?: string;
+  policyNote?: string;
   inCartLabel: string;
   promoBadgeLabel: string;
   onAdjust: (sku: string, delta: number) => void;
@@ -99,6 +102,7 @@ export function CatalogQtyCard({
       {item.size ? <div style={{ fontSize: 10, color: "#6b7280" }}>{item.size}</div> : null}
       {promoPrice ? <div style={promoPriceStyle}>{promoPrice}</div> : null}
       {promoDetails ? <div style={promoDetailsStyle}>{promoDetails}</div> : null}
+      {policyNote ? <div style={clearancePolicyStyle}>{policyNote}</div> : null}
       {hasQty ? <div style={inCartTagStyle}>{inCartLabel}: {qty}</div> : null}
 
       <div style={catalogStepperStyle}>

@@ -3,6 +3,15 @@ import catalogData from "@/data/catalog_sku_master_extracted.json";
 
 export const CLEARANCE_KEY = "clearance:list";
 
+/** Appended to order email/CSV lines for active clearance items (e.g. 00003D - 5 - NH_ITEMS). */
+export const CLEARANCE_ORDER_EMAIL_TAG = "NH_ITEMS";
+
+export function formatClearancePriceDisplay(price: string) {
+  const trimmed = String(price || "").trim();
+  if (!trimmed) return "";
+  return trimmed.startsWith("$") ? trimmed : `$${trimmed}`;
+}
+
 export type ClearanceStatus = "active" | "scheduled" | "expired" | "sold_out";
 
 export type ClearanceRecord = {
@@ -126,6 +135,17 @@ export function isClearanceVisibleToCustomers(record: ClearanceRecord, now = new
   return getClearanceStatus(record, now) === "active";
 }
 
+export async function getActiveClearanceSkuSet(now = new Date()) {
+  const records = await getClearanceRecords();
+  const skus = new Set<string>();
+  for (const record of records) {
+    if (isClearanceVisibleToCustomers(record, now)) {
+      skus.add(record.sku);
+    }
+  }
+  return skus;
+}
+
 export async function getClearanceRecords(): Promise<ClearanceRecord[]> {
   const raw = await redis.get<unknown[]>(CLEARANCE_KEY);
   if (!Array.isArray(raw)) return [];
@@ -180,7 +200,7 @@ function recordToProduct(record: ClearanceRecord, product: ClearanceProduct): Cl
   return {
     ...product,
     clearanceNote: record.note || "Sell as is",
-    clearancePrice: record.clearancePrice,
+    clearancePrice: formatClearancePriceDisplay(record.clearancePrice),
     expiryDate: record.expiryDate,
     saleEndDate: record.saleEndDate,
     clearanceQty: record.clearanceQty,

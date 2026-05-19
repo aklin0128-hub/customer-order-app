@@ -491,11 +491,15 @@ export default function OrderPage() {
     return catalogItemsForSubmit.every((item) => !promoSkus.has(item.sku.toUpperCase()));
   }, [catalogItemsForSubmit, promotionItems]);
 
+  const clearanceSkuSet = useMemo(
+    () => new Set(clearanceItems.map((item) => item.sku?.toUpperCase()).filter(Boolean)),
+    [clearanceItems]
+  );
+
   const showClearanceReviewReminder = useMemo(() => {
     if (clearanceItems.length === 0 || catalogItemsForSubmit.length === 0) return false;
-    const clearanceSkus = new Set(clearanceItems.map((item) => item.sku?.toUpperCase()).filter(Boolean));
-    return catalogItemsForSubmit.every((item) => !clearanceSkus.has(item.sku.toUpperCase()));
-  }, [catalogItemsForSubmit, clearanceItems]);
+    return catalogItemsForSubmit.every((item) => !clearanceSkuSet.has(item.sku.toUpperCase()));
+  }, [catalogItemsForSubmit, clearanceItems.length, clearanceSkuSet]);
 
   const showNewItemsReviewReminder = useMemo(() => {
     if (newItemCount === 0 || catalogItemsForSubmit.length === 0) return false;
@@ -1146,6 +1150,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                     <CatalogQtyCard key={item.sku} item={item} qty={qty}
                       promoNote={soldOut ? t.clearanceSoldOut : item.clearanceNote || t.clearanceBadge}
                       promoPrice={priceLabel} promoDetails={detailsLabel} promoRemaining={remainingLabel}
+                      policyNote={soldOut ? undefined : t.clearanceNoReturn}
                       inCartLabel={t.inCart} promoBadgeLabel={t.clearanceBadge} editLabel={t.editProduct}
                       showAdminEdit={showAdminEditLinks} highlight disabled={soldOut}
                       onAdjust={adjustCatalogQty} onUpdateQty={updateCatalogQty} />
@@ -1301,6 +1306,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
         <OrderCartSection
           lang={lang}
           items={catalogItemsForSubmit}
+          clearanceSkus={clearanceSkuSet}
           expanded={showCart}
           onToggleExpanded={() => setShowCart((prev) => !prev)}
           lineCount={cartItemCount}
@@ -1367,6 +1373,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                 }
               : null
           }
+          clearanceSkus={clearanceSkuSet}
           newItemsReminder={
             showNewItemsReviewReminder
               ? {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatClearancePriceDisplay } from "@/lib/clearance";
 import { AdminLogin } from "../_components/AdminLogin";
 import { AdminShell } from "../_components/AdminShell";
 import { formGrid, inputStyle, labelStyle, splitList } from "../_components/admin-styles";
@@ -370,7 +371,9 @@ export default function AdminClearancePage() {
                   )}
                   <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6, lineHeight: 1.45 }}>
                     <div>Expires: {p.expiryDate}</div>
-                    {p.clearancePrice ? <div>Price: {p.clearancePrice}</div> : null}
+                    {p.clearancePrice ? (
+                      <div>Price: {formatClearancePriceDisplay(p.clearancePrice)}</div>
+                    ) : null}
                     {(p.startDate || p.saleEndDate) && (
                       <div>
                         Listing: {p.startDate || "—"} → stop {p.saleEndDate || "—"}
