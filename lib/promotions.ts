@@ -1,9 +1,15 @@
 import { redis } from "@/lib/redis";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
-
 export const PROMOTIONS_KEY = "promotions:list";
 
 export type PromotionStatus = "active" | "scheduled" | "expired" | "sold_out";
+
+export type PromoPriceTier = {
+  minQty: number;
+  price: string;
+};
+
+export type PromotionDealType = "none" | "bogo" | "tiered";
 
 export type PromotionRecord = {
   sku: string;
@@ -12,11 +18,14 @@ export type PromotionRecord = {
   endDate?: string;
   promoQty?: number;
   soldQty?: number;
+  /** Single promo price when deal type is none. */
   promoPrice?: string;
   /** Buy this many cases to qualify (e.g. 2 in Buy 2 Get 1 free). */
   buyQty?: number;
   /** Free cases when buyQty is met (e.g. 1 in Buy 2 Get 1 free). */
   getQtyFree?: number;
+  /** Up to 3 min-qty price breaks (mutually exclusive with bogo). */
+  priceTiers?: PromoPriceTier[];
   updatedAt?: string;
 };
 
@@ -40,6 +49,7 @@ export type PromotionProduct = {
   promoStatus?: PromotionStatus;
   buyQty?: number;
   getQtyFree?: number;
+  priceTiers?: PromoPriceTier[];
 };
 
 function parseDateOnly(value?: string) {
@@ -64,6 +74,22 @@ function parsePositiveInt(value: unknown) {
   return Math.floor(num);
 }
 
+function normalizePriceTiers(raw: unknown): PromoPriceTier[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+
+  const tiers: PromoPriceTier[] = [];
+  for (const entry of raw.slice(0, 3)) {
+    if (!entry || typeof entry !== "object") continue;
+    const row = entry as Record<string, unknown>;
+    const minQty = parsePositiveInt(row.minQty);
+    const price = String(row.price || "").trim();
+    if (!minQty || !price) continue;
+    tiers.push({ minQty, price });
+  }
+
+  return tiers.length > 0 ? tiers : undefined;
+}
+
 export function normalizePromotionRecord(entry: unknown): PromotionRecord | null {
   if (!entry || typeof entry !== "object") return null;
 
@@ -80,8 +106,9 @@ export function normalizePromotionRecord(entry: unknown): PromotionRecord | null
   const promoPrice = String(raw.promoPrice || "").trim() || undefined;
   const buyQty = parsePositiveInt(raw.buyQty);
   const getQtyFree = parsePositiveInt(raw.getQtyFree);
+  const priceTiers = normalizePriceTiers(raw.priceTiers);
 
-  return {
+  const record: PromotionRecord = {
     sku,
     note: String(raw.note || "").trim() || undefined,
     startDate,
@@ -91,12 +118,36 @@ export function normalizePromotionRecord(entry: unknown): PromotionRecord | null
     promoPrice,
     buyQty,
     getQtyFree,
+    priceTiers,
     updatedAt: String(raw.updatedAt || "").trim() || undefined,
   };
+
+  return sanitizePromotionDealFields(record);
 }
 
 export function hasBuyXGetYDeal(record: Pick<PromotionRecord, "buyQty" | "getQtyFree">) {
   return Boolean(record.buyQty && record.getQtyFree && record.buyQty > 0 && record.getQtyFree > 0);
+}
+
+export function hasTieredPromoPricing(record: Pick<PromotionRecord, "priceTiers">) {
+  return Boolean(record.priceTiers && record.priceTiers.length > 0);
+}
+
+export function getPromotionDealType(record: PromotionRecord): PromotionDealType {
+  if (hasBuyXGetYDeal(record)) return "bogo";
+  if (hasTieredPromoPricing(record)) return "tiered";
+  return "none";
+}
+
+/** Keep bogo vs tiered mutually exclusive; prefer bogo if both present in bad data. */
+export function sanitizePromotionDealFields(record: PromotionRecord): PromotionRecord {
+  if (hasBuyXGetYDeal(record)) {
+    return { ...record, priceTiers: undefined };
+  }
+  if (hasTieredPromoPricing(record)) {
+    return { ...record, buyQty: undefined, getQtyFree: undefined, promoPrice: undefined };
+  }
+  return { ...record, buyQty: undefined, getQtyFree: undefined, priceTiers: undefined };
 }
 
 export function getPromotionRemainingQty(record: PromotionRecord): number | null {
@@ -174,19 +225,21 @@ async function buildCatalogMap(skus?: string[]) {
 
 function recordToProduct(record: PromotionRecord, product: PromotionProduct): PromotionProduct {
   const remainingQty = getPromotionRemainingQty(record);
+  const clean = sanitizePromotionDealFields(record);
 
   return {
     ...product,
     promoNote: record.note || "",
-    promoPrice: record.promoPrice || "",
-    promoQty: record.promoQty,
-    soldQty: record.soldQty || 0,
+    promoPrice: clean.promoPrice || "",
+    promoQty: clean.promoQty,
+    soldQty: clean.soldQty || 0,
     remainingQty,
-    startDate: record.startDate,
-    endDate: record.endDate,
-    buyQty: record.buyQty,
-    getQtyFree: record.getQtyFree,
-    promoStatus: getPromotionStatus(record),
+    startDate: clean.startDate,
+    endDate: clean.endDate,
+    buyQty: clean.buyQty,
+    getQtyFree: clean.getQtyFree,
+    priceTiers: clean.priceTiers,
+    promoStatus: getPromotionStatus(clean),
   };
 }
 
@@ -254,6 +307,8 @@ export function validatePromotionInput(input: {
   promoPrice?: string;
   buyQty?: unknown;
   getQtyFree?: unknown;
+  priceTiers?: unknown;
+  dealType?: string;
 }) {
   const sku = String(input.sku || "")
     .trim()
@@ -279,6 +334,8 @@ export function validatePromotionInput(input: {
   const promoPrice = String(input.promoPrice || "").trim();
   const buyQty = parsePositiveInt(input.buyQty);
   const getQtyFree = parsePositiveInt(input.getQtyFree);
+  const priceTiers = normalizePriceTiers(input.priceTiers);
+  const dealType = String(input.dealType || "").trim() as PromotionDealType | "";
 
   const hasBuy = buyQty !== undefined;
   const hasFree = getQtyFree !== undefined;
@@ -286,16 +343,43 @@ export function validatePromotionInput(input: {
     return { error: "Buy X Get Y free requires both buy qty and free qty, or leave both empty." };
   }
 
+  const wantsBogo = dealType === "bogo" || (hasBuy && hasFree);
+  const wantsTiered = dealType === "tiered" || Boolean(priceTiers?.length);
+
+  if (wantsBogo && wantsTiered) {
+    return { error: "Choose either Buy X Get Y free or volume pricing tiers — not both." };
+  }
+
+  if (dealType === "bogo" && (!buyQty || !getQtyFree)) {
+    return { error: "Buy X Get Y free requires buy qty and free qty." };
+  }
+
+  if (dealType === "tiered" && !priceTiers?.length) {
+    return { error: "Add at least one volume price tier (min qty + price)." };
+  }
+
+  if (wantsTiered && priceTiers) {
+    const minQtySet = new Set(priceTiers.map((t) => t.minQty));
+    if (minQtySet.size !== priceTiers.length) {
+      return { error: "Each volume tier must have a different minimum case qty." };
+    }
+  }
+
+  const draft: PromotionRecord = sanitizePromotionDealFields({
+    sku,
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
+    promoQty,
+    promoPrice: wantsBogo || wantsTiered ? undefined : promoPrice || undefined,
+    buyQty: wantsBogo ? buyQty : undefined,
+    getQtyFree: wantsBogo ? getQtyFree : undefined,
+    priceTiers: wantsTiered ? priceTiers : undefined,
+  });
+
   return {
     record: {
-      sku,
+      ...draft,
       note: "",
-      startDate: startDate || undefined,
-      endDate: endDate || undefined,
-      promoQty,
-      promoPrice: promoPrice || undefined,
-      buyQty,
-      getQtyFree,
     } as Partial<PromotionRecord>,
   };
 }

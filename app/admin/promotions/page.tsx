@@ -18,6 +18,13 @@ import { useAdminAuth } from "../_components/useAdminAuth";
 
 type PromotionStatus = "active" | "scheduled" | "expired" | "sold_out";
 
+type PromoPriceTier = {
+  minQty: number;
+  price: string;
+};
+
+type DealMode = "none" | "bogo" | "tiered";
+
 type PromotionRecord = {
   sku: string;
   note?: string;
@@ -28,8 +35,14 @@ type PromotionRecord = {
   promoPrice?: string;
   buyQty?: number;
   getQtyFree?: number;
+  priceTiers?: PromoPriceTier[];
   promoStatus?: PromotionStatus;
   updatedAt?: string;
+};
+
+type TierFormRow = {
+  minQty: string;
+  price: string;
 };
 
 type PromotionProduct = {
@@ -55,6 +68,30 @@ const statusLabel: Record<PromotionStatus, string> = {
   sold_out: "Sold out",
 };
 
+function emptyTierRows(): TierFormRow[] {
+  return [
+    { minQty: "", price: "" },
+    { minQty: "", price: "" },
+    { minQty: "", price: "" },
+  ];
+}
+
+function inferDealMode(record: Pick<PromotionRecord, "buyQty" | "getQtyFree" | "priceTiers">): DealMode {
+  if (record.buyQty && record.getQtyFree) return "bogo";
+  if (record.priceTiers?.length) return "tiered";
+  return "none";
+}
+
+function formatTierPricesLine(tiers: PromoPriceTier[]) {
+  return [...tiers]
+    .sort((a, b) => b.minQty - a.minQty)
+    .map((tier) => {
+      const money = tier.price.startsWith("$") ? tier.price : `$${tier.price}`;
+      return `${money}/${tier.minQty}cs`;
+    })
+    .join(" · ");
+}
+
 function emptyForm() {
   return {
     sku: "",
@@ -63,8 +100,10 @@ function emptyForm() {
     endDate: "",
     promoQty: "",
     promoPrice: "",
+    dealMode: "none" as DealMode,
     buyQty: "",
     getQtyFree: "",
+    tiers: emptyTierRows(),
     resetSoldQty: false,
   };
 }
@@ -111,6 +150,15 @@ export default function AdminPromotionsPage() {
   }, [authed]);
 
   const editPromotion = (record: PromotionRecord) => {
+    const tiers = emptyTierRows();
+    (record.priceTiers || []).forEach((tier, index) => {
+      if (index >= 3) return;
+      tiers[index] = {
+        minQty: String(tier.minQty),
+        price: tier.price,
+      };
+    });
+
     setForm({
       sku: record.sku,
       note: record.note || "",
@@ -118,8 +166,10 @@ export default function AdminPromotionsPage() {
       endDate: record.endDate || "",
       promoQty: record.promoQty ? String(record.promoQty) : "",
       promoPrice: record.promoPrice || "",
+      dealMode: inferDealMode(record),
       buyQty: record.buyQty ? String(record.buyQty) : "",
       getQtyFree: record.getQtyFree ? String(record.getQtyFree) : "",
+      tiers,
       resetSoldQty: false,
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -140,9 +190,19 @@ export default function AdminPromotionsPage() {
           startDate: form.startDate || undefined,
           endDate: form.endDate || undefined,
           promoQty: form.promoQty || undefined,
-          promoPrice: form.promoPrice || undefined,
-          buyQty: form.buyQty || undefined,
-          getQtyFree: form.getQtyFree || undefined,
+          dealType: form.dealMode,
+          promoPrice: form.dealMode === "none" ? form.promoPrice || undefined : undefined,
+          buyQty: form.dealMode === "bogo" ? form.buyQty || undefined : undefined,
+          getQtyFree: form.dealMode === "bogo" ? form.getQtyFree || undefined : undefined,
+          priceTiers:
+            form.dealMode === "tiered"
+              ? form.tiers
+                  .map((tier) => ({
+                    minQty: tier.minQty,
+                    price: tier.price.trim(),
+                  }))
+                  .filter((tier) => tier.minQty && tier.price)
+              : undefined,
           resetSoldQty: form.resetSoldQty,
         }),
       });
@@ -271,17 +331,44 @@ export default function AdminPromotionsPage() {
               style={inputStyle}
             />
           </div>
-          <div>
-            <label style={labelStyle}>Promo price (optional)</label>
-            <input
-              value={form.promoPrice}
-              onChange={(e) => setForm((f) => ({ ...f, promoPrice: e.target.value }))}
-              placeholder="$12.99 / 促销价"
-              style={inputStyle}
-            />
-          </div>
           <div style={{ gridColumn: "1 / -1" }}>
-            <label style={labelStyle}>Buy X Get Y free (optional)</label>
+            <label style={labelStyle}>Deal type (pick one)</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 6 }}>
+              {(
+                [
+                  ["none", "Single promo price"],
+                  ["bogo", "Buy X Get Y free"],
+                  ["tiered", "Volume tiers (up to 3)"],
+                ] as const
+              ).map(([mode, label]) => (
+                <label key={mode} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700 }}>
+                  <input
+                    type="radio"
+                    name="dealMode"
+                    checked={form.dealMode === mode}
+                    onChange={() => setForm((f) => ({ ...f, dealMode: mode }))}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {form.dealMode === "none" ? (
+            <div>
+              <label style={labelStyle}>Promo price</label>
+              <input
+                value={form.promoPrice}
+                onChange={(e) => setForm((f) => ({ ...f, promoPrice: e.target.value }))}
+                placeholder="$12.99"
+                style={inputStyle}
+              />
+            </div>
+          ) : null}
+
+          {form.dealMode === "bogo" ? (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={labelStyle}>Buy X Get Y free</label>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <input
                 value={form.buyQty}
@@ -298,10 +385,54 @@ export default function AdminPromotionsPage() {
                 style={inputStyle}
               />
             </div>
-            <p style={{ margin: "6px 0 0", fontSize: 11, color: "#6b7280", lineHeight: 1.4 }}>
-              Example: Buy 2 Get 1 free — customer adds 3 cases to cart, pays for 2. Set both fields or leave empty.
-            </p>
-          </div>
+              <p style={{ margin: "6px 0 0", fontSize: 11, color: "#6b7280", lineHeight: 1.4 }}>
+                Example: Buy 2 Get 1 free — customer adds 3 cases, pays for 2.
+              </p>
+            </div>
+          ) : null}
+
+          {form.dealMode === "tiered" ? (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label style={labelStyle}>Volume price tiers (min cases + price)</label>
+              <div style={{ display: "grid", gap: 8 }}>
+                {form.tiers.map((tier, index) => (
+                  <div
+                    key={index}
+                    style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, alignItems: "center" }}
+                  >
+                    <input
+                      value={tier.minQty}
+                      onChange={(e) =>
+                        setForm((f) => {
+                          const tiers = [...f.tiers];
+                          tiers[index] = { ...tiers[index], minQty: e.target.value.replace(/[^0-9]/g, "") };
+                          return { ...f, tiers };
+                        })
+                      }
+                      placeholder={`Tier ${index + 1} min cs (e.g. 30)`}
+                      inputMode="numeric"
+                      style={inputStyle}
+                    />
+                    <input
+                      value={tier.price}
+                      onChange={(e) =>
+                        setForm((f) => {
+                          const tiers = [...f.tiers];
+                          tiers[index] = { ...tiers[index], price: e.target.value };
+                          return { ...f, tiers };
+                        })
+                      }
+                      placeholder="Price (e.g. 11.00)"
+                      style={inputStyle}
+                    />
+                  </div>
+                ))}
+              </div>
+              <p style={{ margin: "6px 0 0", fontSize: 11, color: "#6b7280", lineHeight: 1.4 }}>
+                Example: $10.00/280cs · $10.50/140cs · $11.00/30cs. Cannot combine with Buy X Get Y.
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
@@ -391,6 +522,11 @@ export default function AdminPromotionsPage() {
                       </div>
                     )}
                     {p.promoPrice ? <div>Price: {p.promoPrice}</div> : null}
+                    {p.priceTiers?.length ? (
+                      <div style={{ fontWeight: 800, color: "#b45309" }}>
+                        Tiers: {formatTierPricesLine(p.priceTiers)}
+                      </div>
+                    ) : null}
                     {p.buyQty && p.getQtyFree ? (
                       <div style={{ fontWeight: 800, color: "#b45309" }}>
                         Buy {p.buyQty} Get {p.getQtyFree} free

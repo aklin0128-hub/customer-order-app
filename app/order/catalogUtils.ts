@@ -1,5 +1,8 @@
 import { catalog } from "./catalogState";
 
+import { formatMoneyPrice, formatPromoTierPricesLine, getApplicablePromoTier } from "@/lib/promoFormat";
+import type { PromoPriceTier } from "@/lib/promotions";
+
 import type { CatalogItem, ClearanceItem, PromotionItem } from "./types";
 
 import type { CSSProperties } from "react";
@@ -11,6 +14,9 @@ export type PromoCopyStrings = {
   promoRemaining: string;
   promoBuyXGetY: string;
   promoBuyXGetYPackHint: string;
+  promoPrice: string;
+  promoTierQtyWarning: string;
+  casesAbbr: string;
 };
 
 export type ClearanceCopyStrings = {
@@ -34,6 +40,37 @@ export function formatPromoBuyXGetY(item: Pick<PromotionItem, "buyQty" | "getQty
   const free = item.getQtyFree;
   if (!buy || !free || buy <= 0 || free <= 0) return "";
   return t.promoBuyXGetY.replace("{buy}", String(buy)).replace("{free}", String(free));
+}
+
+export function formatPromotionPriceLabel(
+  item: Pick<PromotionItem, "promoPrice" | "priceTiers">,
+  t: Pick<PromoCopyStrings, "promoPrice" | "casesAbbr">
+) {
+  if (item.priceTiers?.length) {
+    const line = formatPromoTierPricesLine(item.priceTiers, t.casesAbbr);
+    return line ? `${t.promoPrice}: ${line}` : undefined;
+  }
+  const simple = String(item.promoPrice || "").trim();
+  if (!simple) return undefined;
+  const display = simple.startsWith("$") ? simple : formatMoneyPrice(simple);
+  return `${t.promoPrice}: ${display}`;
+}
+
+export function formatPromoTierQtyWarning(
+  sku: string,
+  qty: number,
+  tiers: PromoPriceTier[],
+  t: Pick<PromoCopyStrings, "promoTierQtyWarning" | "casesAbbr">
+) {
+  if (!tiers.length || qty <= 0) return "";
+  const tier = getApplicablePromoTier(qty, tiers);
+  if (tier) return "";
+  const lowest = [...tiers].sort((a, b) => a.minQty - b.minQty)[0];
+  return t.promoTierQtyWarning
+    .replace("{sku}", sku)
+    .replace("{qty}", String(qty))
+    .replace("{min}", String(lowest.minQty))
+    .replace("{cs}", t.casesAbbr);
 }
 
 export function formatPromoBuyXGetYPackHint(item: Pick<PromotionItem, "buyQty" | "getQtyFree">, t: Pick<PromoCopyStrings, "promoBuyXGetYPackHint">) {

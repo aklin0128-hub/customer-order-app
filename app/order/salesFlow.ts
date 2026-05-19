@@ -1,6 +1,6 @@
 import type { UpsellLine } from "./components/SalesUpsellPanel";
-import { formatClearancePriceLabel, formatPromoPriceLabel } from "./components/SalesUpsellPanel";
-import { formatPromoBuyXGetY } from "./catalogUtils";
+import { formatClearancePriceLabel } from "./components/SalesUpsellPanel";
+import { formatPromoBuyXGetY, formatPromotionPriceLabel } from "./catalogUtils";
 import { copy } from "./orderCopy";
 import type { ClearanceItem, Lang, PromotionItem } from "./types";
 
@@ -19,7 +19,7 @@ export function buildWeeklyUpsellLines(
     })
     .map((item) => {
       const deal = formatPromoBuyXGetY(item, copy[lang]);
-      const price = formatPromoPriceLabel(lang, item.promoPrice);
+      const price = formatPromotionPriceLabel(item, copy[lang]);
       const priceLabel = [deal, price].filter(Boolean).join(" · ") || undefined;
       return {
       sku: item.sku!.toUpperCase(),

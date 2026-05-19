@@ -16,6 +16,11 @@ export type CatalogItem = {
   isNew?: boolean;
 };
 
+export type PromoPriceTier = {
+  minQty: number;
+  price: string;
+};
+
 export type PromotionItem = CatalogItem & {
   promoNote?: string;
   promoPrice?: string;
@@ -26,6 +31,7 @@ export type PromotionItem = CatalogItem & {
   endDate?: string;
   buyQty?: number;
   getQtyFree?: number;
+  priceTiers?: PromoPriceTier[];
 };
 
 export type ClearanceItem = CatalogItem & {

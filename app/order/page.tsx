@@ -24,6 +24,8 @@ import {
   formatPromoBuyXGetY,
   formatPromoBuyXGetYPackHint,
   formatPromoDetails,
+  formatPromotionPriceLabel,
+  formatPromoTierQtyWarning,
   generateOrderRef,
   getCatalogItemBySku,
   getDisplayStatus,
@@ -501,6 +503,11 @@ export default function OrderPage() {
               .replace("{qty}", String(qty))
           );
         }
+      }
+
+      if (promo?.priceTiers?.length && qty > 0) {
+        const tierWarning = formatPromoTierQtyWarning(cleanSku, qty, promo.priceTiers, t);
+        if (tierWarning) warnings.push(tierWarning);
       }
     }
 
@@ -1199,9 +1206,9 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                   const sku = item.sku?.toUpperCase() || "";
                   const qty = catalogQtyMap[sku] || "";
                   const soldOut = item.remainingQty === 0;
-                  const promoPriceLabel = item.promoPrice
-                    ? `${t.promoPrice}: ${item.promoPrice}`
-                    : undefined;
+                  const promoPriceLabel = soldOut
+                    ? undefined
+                    : formatPromotionPriceLabel(item, t);
                   const promoDealLabel = soldOut ? undefined : formatPromoBuyXGetY(item, t);
                   const promoDetailsLabel = soldOut
                     ? t.promoSoldOut
