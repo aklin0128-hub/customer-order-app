@@ -16,6 +16,7 @@ import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog } from "./catalogState";
 import {
   formatBrandLabel,
+  formatClearanceDetails,
   formatPromoDetails,
   generateOrderRef,
   getCatalogItemBySku,
@@ -47,6 +48,7 @@ import {
   primarySmallButtonStyle,
   productSmallButtonStyle,
   promoGridStyle,
+  clearanceModeButtonStyle,
   promoModeButtonStyle,
   qtyButtonStyle,
   secondaryButtonStyle,
@@ -60,7 +62,7 @@ import {
   toggleTextStyle,
   wideInputStyle,
 } from "./orderStyles";
-import type { CartItem, CatalogItem, Lang, OrderHistoryItem, OrderMode, PromotionItem } from "./types";
+import type { CartItem, CatalogItem, ClearanceItem, Lang, OrderHistoryItem, OrderMode, PromotionItem } from "./types";
 
 const ORDER_LANG_LABELS: Record<Lang, string> = {
   en: "EN",
@@ -115,6 +117,8 @@ export default function OrderPage() {
   const [catalogVersion, setCatalogVersion] = useState(0);
   const [promotionItems, setPromotionItems] = useState<PromotionItem[]>([]);
   const [promotionsLoading, setPromotionsLoading] = useState(false);
+  const [clearanceItems, setClearanceItems] = useState<ClearanceItem[]>([]);
+  const [clearanceLoading, setClearanceLoading] = useState(false);
   const [showAdminEditLinks, setShowAdminEditLinks] = useState(false);
 
   const t = copy[lang];
@@ -154,7 +158,24 @@ export default function OrderPage() {
       }
     };
 
+    const loadClearance = async () => {
+      setClearanceLoading(true);
+      try {
+        const res = await fetch("/api/clearance", { cache: "no-store" });
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.products)) {
+          setClearanceItems(
+            data.products.filter((item: ClearanceItem) => isNormalItem(item))
+          );
+        }
+      } catch {
+      } finally {
+        setClearanceLoading(false);
+      }
+    };
+
     loadPromotions();
+    loadClearance();
   }, [ready]);
 
   useEffect(() => {
@@ -162,7 +183,9 @@ export default function OrderPage() {
     if (saved === "en" || saved === "zh" || saved === "ko" || saved === "vi") setLang(saved);
 
     const savedMode = localStorage.getItem("order_mode") as OrderMode | null;
-    if (savedMode === "search" || savedMode === "catalog" || savedMode === "promotion") setMode(savedMode);
+    if (savedMode === "search" || savedMode === "catalog" || savedMode === "promotion" || savedMode === "clearance") {
+      setMode(savedMode);
+    }
   }, []);
 
   const changeLang = (next: Lang) => {
@@ -425,6 +448,18 @@ export default function OrderPage() {
     return promo.remainingQty;
   };
 
+  const getClearanceRemainingForSku = (cleanSku: string) => {
+    const item = clearanceItems.find((p) => p.sku?.toUpperCase() === cleanSku);
+    if (!item) return null;
+    if (item.remainingQty === null || item.remainingQty === undefined) {
+      if (item.clearanceQty && item.clearanceQty > 0) {
+        return Math.max(0, item.clearanceQty - (item.soldQty || 0));
+      }
+      return null;
+    }
+    return item.remainingQty;
+  };
+
   const orderReviewWarnings = useMemo(() => {
     const warnings: string[] = [];
 
@@ -435,22 +470,32 @@ export default function OrderPage() {
       const status = String(catalogItem?.status || "").trim().toUpperCase();
       const limitedQty = Number(String(catalogItem?.limitedQty || "").replace(/[^0-9]/g, ""));
       const promoRemaining = getPromoRemainingForSku(cleanSku);
+      const clearanceRemaining = getClearanceRemainingForSku(cleanSku);
 
       if (qty >= 100) warnings.push(t.highQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(qty)));
       if (catalogItem && !isNormalItem(catalogItem)) warnings.push(t.statusWarning.replace("{sku}", cleanSku).replace("{status}", status || "-"));
       if (limitedQty > 0 && qty > limitedQty) warnings.push(t.limitedQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(limitedQty)));
       if (promoRemaining !== null && qty > promoRemaining) warnings.push(t.promoQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(promoRemaining)));
+      if (clearanceRemaining !== null && qty > clearanceRemaining) {
+        warnings.push(t.clearanceQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(clearanceRemaining)));
+      }
     }
 
     return warnings;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalogItemsForSubmit, promotionItems, t]);
+  }, [catalogItemsForSubmit, promotionItems, clearanceItems, t]);
 
   const showPromotionReviewReminder = useMemo(() => {
     if (promotionItems.length === 0 || catalogItemsForSubmit.length === 0) return false;
     const promoSkus = new Set(promotionItems.map((item) => item.sku?.toUpperCase()).filter(Boolean));
     return catalogItemsForSubmit.every((item) => !promoSkus.has(item.sku.toUpperCase()));
   }, [catalogItemsForSubmit, promotionItems]);
+
+  const showClearanceReviewReminder = useMemo(() => {
+    if (clearanceItems.length === 0 || catalogItemsForSubmit.length === 0) return false;
+    const clearanceSkus = new Set(clearanceItems.map((item) => item.sku?.toUpperCase()).filter(Boolean));
+    return catalogItemsForSubmit.every((item) => !clearanceSkus.has(item.sku.toUpperCase()));
+  }, [catalogItemsForSubmit, clearanceItems]);
 
   const showNewItemsReviewReminder = useMemo(() => {
     if (newItemCount === 0 || catalogItemsForSubmit.length === 0) return false;
@@ -469,6 +514,12 @@ export default function OrderPage() {
     if (delta > 0 && promoRemaining !== null && next > promoRemaining) {
       alert(t.promoLimitAlert.replace("{sku}", cleanSku).replace("{qty}", String(promoRemaining)));
       next = promoRemaining;
+    }
+
+    const clearanceRemaining = getClearanceRemainingForSku(cleanSku);
+    if (delta > 0 && clearanceRemaining !== null && next > clearanceRemaining) {
+      alert(t.clearanceLimitAlert.replace("{sku}", cleanSku).replace("{qty}", String(clearanceRemaining)));
+      next = clearanceRemaining;
     }
 
     const catalogItem = getCatalogItemBySku(cleanSku);
@@ -854,6 +905,14 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
               {t.promotionMode}
               {promotionItems.length > 0 ? ` (${promotionItems.length})` : ""}
             </button>
+            <button
+              type="button"
+              onClick={() => changeMode("clearance")}
+              style={clearanceModeButtonStyle(mode === "clearance")}
+            >
+              {t.clearanceMode}
+              {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
+            </button>
           </div>
         </section>
 
@@ -1066,6 +1125,35 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
               </div>
             )}
           </section>
+        ) : mode === "clearance" ? (
+          <section style={{ ...cardStyle, border: "1px solid #fdba74", background: "linear-gradient(180deg, #fff7ed 0%, #ffffff 40%)" }}>
+            <div style={sectionTitleStyle}>{t.clearanceMode}</div>
+            <p style={{ fontSize: 13, color: "#9a3412", margin: "4px 0 14px", lineHeight: 1.45 }}>{t.clearanceHint}</p>
+            {clearanceLoading ? (
+              <div style={{ ...emptyStyle, border: "1px solid #fdba74", background: "#fff7ed", color: "#c2410c" }}>{t.loadingClearance}</div>
+            ) : clearanceItems.length === 0 ? (
+              <div style={emptyStyle}>{t.noClearance}</div>
+            ) : (
+              <div style={promoGridStyle}>
+                {clearanceItems.map((item) => {
+                  const sku = item.sku?.toUpperCase() || "";
+                  const qty = catalogQtyMap[sku] || "";
+                  const soldOut = item.remainingQty === 0;
+                  const priceLabel = item.clearancePrice ? `${t.clearancePrice}: ${item.clearancePrice}` : undefined;
+                  const detailsLabel = soldOut ? t.clearanceSoldOut : formatClearanceDetails(item, t);
+                  const remainingLabel = soldOut ? t.clearanceSoldOut : item.remainingQty !== null && item.remainingQty !== undefined ? `${t.clearanceRemaining}: ${item.remainingQty}` : undefined;
+                  return (
+                    <CatalogQtyCard key={item.sku} item={item} qty={qty}
+                      promoNote={soldOut ? t.clearanceSoldOut : item.clearanceNote || t.clearanceBadge}
+                      promoPrice={priceLabel} promoDetails={detailsLabel} promoRemaining={remainingLabel}
+                      inCartLabel={t.inCart} promoBadgeLabel={t.clearanceBadge} editLabel={t.editProduct}
+                      showAdminEdit={showAdminEditLinks} highlight disabled={soldOut}
+                      onAdjust={adjustCatalogQty} onUpdateQty={updateCatalogQty} />
+                  );
+                })}
+              </div>
+            )}
+          </section>
         ) : (
           <section style={cardStyle}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
@@ -1262,6 +1350,18 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                   onView: () => {
                     setShowReview(false);
                     changeMode("promotion");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  },
+                }
+              : null
+          }
+          clearanceReminder={
+            showClearanceReviewReminder
+              ? {
+                  count: clearanceItems.length,
+                  onView: () => {
+                    setShowReview(false);
+                    changeMode("clearance");
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   },
                 }

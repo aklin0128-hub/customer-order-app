@@ -30,6 +30,7 @@ export function OrderReviewModal({
   items,
   warnings = [],
   promoReminder,
+  clearanceReminder,
   newItemsReminder,
   accountNo,
   storeName,
@@ -45,6 +46,10 @@ export function OrderReviewModal({
   items: CartItem[];
   warnings?: string[];
   promoReminder?: {
+    count: number;
+    onView: () => void;
+  } | null;
+  clearanceReminder?: {
     count: number;
     onView: () => void;
   } | null;
@@ -148,6 +153,31 @@ export function OrderReviewModal({
               }}
             >
               {t.viewPromotions}
+            </button>
+          </div>
+        ) : null}
+
+        {clearanceReminder ? (
+          <div style={{ border: "1px solid #fdba74", background: "#fff7ed", color: "#9a3412", borderRadius: 12, padding: 10, fontSize: 12, lineHeight: 1.45, marginBottom: 10 }}>
+            <div style={{ fontWeight: 900, marginBottom: 6 }}>
+              {t.clearanceReviewReminder.replace("{count}", String(clearanceReminder.count))}
+            </div>
+            <button
+              type="button"
+              onClick={clearanceReminder.onView}
+              disabled={submitting}
+              style={{
+                border: "1px solid #ea580c",
+                background: "#ffedd5",
+                color: "#c2410c",
+                borderRadius: 999,
+                padding: "7px 12px",
+                fontSize: 12,
+                fontWeight: 900,
+                cursor: submitting ? "not-allowed" : "pointer",
+              }}
+            >
+              {t.viewClearance}
             </button>
           </div>
         ) : null}

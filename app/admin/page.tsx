@@ -27,6 +27,12 @@ const QUICK_LINKS = [
     emoji: "🏷️",
   },
   {
+    title: "Clearance",
+    description: "Near-expiry sell-as-is items with expiry date and clearance price.",
+    href: "/admin/clearance",
+    emoji: "⏳",
+  },
+  {
     title: "Active Carts",
     description: "See which customer accounts currently have unsent items saved in their cart.",
     href: "/admin/active-carts",

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { prependOrderHistory } from "@/lib/orderHistory";
+import { incrementClearanceSold } from "@/lib/clearance";
 import { incrementPromotionSold } from "@/lib/promotions";
 import { mergeRecentItems } from "@/lib/recentItems";
 
@@ -109,6 +110,7 @@ export async function POST(req: Request) {
     await prependOrderHistory(order);
     await mergeRecentItems(accountNo, cleanedItems);
     await incrementPromotionSold(cleanedItems);
+    await incrementClearanceSold(cleanedItems);
 
     return NextResponse.json({
       success: true,

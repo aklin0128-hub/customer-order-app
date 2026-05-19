@@ -1,5 +1,5 @@
 export type Lang = "en" | "zh" | "ko" | "vi";
-export type OrderMode = "search" | "catalog" | "promotion";
+export type OrderMode = "search" | "catalog" | "promotion" | "clearance";
 
 export type CatalogItem = {
   sku: string;
@@ -24,6 +24,18 @@ export type PromotionItem = CatalogItem & {
   remainingQty?: number | null;
   startDate?: string;
   endDate?: string;
+};
+
+export type ClearanceItem = CatalogItem & {
+  clearanceNote?: string;
+  clearancePrice?: string;
+  expiryDate?: string;
+  saleEndDate?: string;
+  clearanceQty?: number;
+  soldQty?: number;
+  remainingQty?: number | null;
+  startDate?: string;
+  daysUntilExpiry?: number | null;
 };
 
 export type CartItem = {

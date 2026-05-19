@@ -1,6 +1,6 @@
 import { catalog } from "./catalogState";
 
-import type { CatalogItem, PromotionItem } from "./types";
+import type { CatalogItem, ClearanceItem, PromotionItem } from "./types";
 
 import type { CSSProperties } from "react";
 
@@ -9,6 +9,13 @@ export type PromoCopyStrings = {
   promoDateRange: string;
   promoQtyLimit: string;
   promoRemaining: string;
+};
+
+export type ClearanceCopyStrings = {
+  clearanceExpiry: string;
+  clearanceQtyLimit: string;
+  clearanceRemaining: string;
+  clearanceDaysLeft: string;
 };
 
 export function formatBrandLabel(brand: string) {
@@ -32,6 +39,31 @@ export function formatPromoDetails(item: PromotionItem, t: PromoCopyStrings) {
       item.remainingQty ?? Math.max(0, item.promoQty - (item.soldQty || 0));
     parts.push(
       `${t.promoQtyLimit}: ${item.soldQty || 0}/${item.promoQty} (${t.promoRemaining} ${left})`
+    );
+  }
+
+  return parts.join(" · ");
+}
+
+export function formatClearanceDetails(item: ClearanceItem, t: ClearanceCopyStrings) {
+  const parts: string[] = [];
+
+  if (item.expiryDate) {
+    const days = item.daysUntilExpiry;
+    const daysText =
+      days === null || days === undefined
+        ? ""
+        : days <= 0
+          ? ""
+          : ` (${t.clearanceDaysLeft.replace("{days}", String(days))})`;
+    parts.push(`${t.clearanceExpiry}: ${item.expiryDate}${daysText}`);
+  }
+
+  if (item.clearanceQty && item.clearanceQty > 0) {
+    const left =
+      item.remainingQty ?? Math.max(0, item.clearanceQty - (item.soldQty || 0));
+    parts.push(
+      `${t.clearanceQtyLimit}: ${item.soldQty || 0}/${item.clearanceQty} (${t.clearanceRemaining} ${left})`
     );
   }
 

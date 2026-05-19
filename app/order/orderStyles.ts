@@ -67,7 +67,11 @@ export const langButtonStyle = (active: boolean): CSSProperties => ({
   fontWeight: 800,
   cursor: "pointer",
 });
-export const modeTabsStyle: CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 };
+export const modeTabsStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gap: 8,
+};
 export const modeButtonStyle = (active: boolean): CSSProperties => ({
   padding: "10px 6px",
   borderRadius: 12,
@@ -84,6 +88,13 @@ export const promoModeButtonStyle = (active: boolean): CSSProperties => ({
   border: active ? "1px solid #0f766e" : "1px solid #5eead4",
   background: active ? "#ccfbf1" : "#f0fdfa",
   color: active ? "#0f766e" : "#115e59",
+});
+export const clearanceModeButtonStyle = (active: boolean): CSSProperties => ({
+  ...modeButtonStyle(active),
+  border: active ? "1px solid #ea580c" : "1px solid #fdba74",
+  background: active ? "#ffedd5" : "#fff7ed",
+  color: active ? "#c2410c" : "#9a3412",
+  fontSize: 11,
 });
 export const qtyButtonStyle: CSSProperties = {
   padding: "6px 0",
