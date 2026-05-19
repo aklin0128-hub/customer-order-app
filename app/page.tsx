@@ -7,8 +7,9 @@ type Lang = "en" | "zh" | "ko" | "vi";
 
 const copy = {
   en: {
-    title: "Customer Order",
-    subtitle: "Sign in to browse products, use promotions, and submit your order.",
+    title: "Store Ordering",
+    subtitle: "Sign in for weekly picks, clearance deals, and easy ordering.",
+    brandName: "Store Portal",
     accountNumber: "Account number",
     password: "Password",
     accountPlaceholder: "e.g. FL111",
@@ -22,15 +23,17 @@ const copy = {
     hidePassword: "Hide",
     welcomeBack: "Welcome back",
     lastAccountHint: "Last signed-in account loaded.",
-    footer: "Online order portal · Draft auto-save · EN / 中文 / 한국어 / Tiếng Việt",
-    featSearch: "Quick search",
-    featCatalog: "Full catalog",
-    featPromo: "Promotions",
+    footer: "Weekly picks · Clearance · Draft auto-save · EN / 中文 / 한국어 / Tiếng Việt",
+    featPromo: "Weekly picks",
+    featClearance: "Clearance",
+    featCatalog: "Shop all",
+    featSearch: "Quick replenish",
     featDraft: "Save draft",
   },
   zh: {
-    title: "客户订单",
-    subtitle: "登录后可浏览商品、查看促销并提交订单。",
+    title: "门店订货",
+    subtitle: "登录查看本周主推、临期特价，轻松下单。",
+    brandName: "门店订货",
     accountNumber: "客户账号",
     password: "密码",
     accountPlaceholder: "例如 FL111",
@@ -44,15 +47,17 @@ const copy = {
     hidePassword: "隐藏",
     welcomeBack: "欢迎回来",
     lastAccountHint: "已填入上次登录的账号。",
-    footer: "在线下单系统 · 自动保存草稿 · 支持多语言",
-    featSearch: "快速搜索",
-    featCatalog: "商品目录",
-    featPromo: "促销推荐",
+    footer: "本周主推 · 临期特价 · 自动保存草稿 · 多语言",
+    featPromo: "本周主推",
+    featClearance: "临期特价",
+    featCatalog: "全品选购",
+    featSearch: "快速补货",
     featDraft: "保存草稿",
   },
   ko: {
-    title: "고객 주문",
-    subtitle: "로그인 후 상품 검색, 프로모션 확인 및 주문 제출이 가능합니다.",
+    title: "매장 주문",
+    subtitle: "로그인 후 이번 주 추천, 임박 특가를 확인하고 주문하세요.",
+    brandName: "매장 주문",
     accountNumber: "거래처 번호",
     password: "비밀번호",
     accountPlaceholder: "예: FL111",
@@ -66,15 +71,17 @@ const copy = {
     hidePassword: "숨기기",
     welcomeBack: "다시 오신 것을 환영합니다",
     lastAccountHint: "마지막 로그인 계정이 입력되었습니다.",
-    footer: "온라인 주문 포털 · 임시 저장 · 다국어 지원",
-    featSearch: "빠른 검색",
-    featCatalog: "전체 카탈로그",
-    featPromo: "프로모션",
+    footer: "이번 주 추천 · 임박 특가 · 임시 저장 · 다국어",
+    featPromo: "이번 주 추천",
+    featClearance: "임박 특가",
+    featCatalog: "전체 상품",
+    featSearch: "빠른 보충",
     featDraft: "임시 저장",
   },
   vi: {
-    title: "Đặt hàng khách",
-    subtitle: "Đăng nhập để xem sản phẩm, khuyến mãi và gửi đơn.",
+    title: "Đặt hàng cửa hàng",
+    subtitle: "Đăng nhập xem nổi bật tuần, hàng thanh lý và đặt hàng dễ dàng.",
+    brandName: "Cổng đặt hàng",
     accountNumber: "Mã khách",
     password: "Mật khẩu",
     accountPlaceholder: "ví dụ FL111",
@@ -88,10 +95,11 @@ const copy = {
     hidePassword: "Ẩn",
     welcomeBack: "Chào mừng trở lại",
     lastAccountHint: "Đã điền mã khách lần đăng nhập trước.",
-    footer: "Cổng đặt hàng trực tuyến · Tự lưu nháp · Đa ngôn ngữ",
-    featSearch: "Tìm nhanh",
-    featCatalog: "Danh mục đầy đủ",
-    featPromo: "Khuyến mãi",
+    footer: "Nổi bật tuần · Thanh lý · Tự lưu nháp · Đa ngôn ngữ",
+    featPromo: "Nổi bật tuần",
+    featClearance: "Thanh lý",
+    featCatalog: "Mua tất cả",
+    featSearch: "Bổ hàng nhanh",
     featDraft: "Lưu nháp",
   },
 };
@@ -221,7 +229,7 @@ export default function LoginPage() {
         <header style={topBarStyle}>
           <div style={brandRowStyle}>
             <div style={logoMarkStyle}>CO</div>
-            <span style={brandTextStyle}>Order Portal</span>
+            <span style={brandTextStyle}>{t.brandName}</span>
           </div>
           <div style={langRowStyle} role="group" aria-label="Language">
             {(["en", "zh", "ko", "vi"] as Lang[]).map((item) => (
@@ -246,9 +254,10 @@ export default function LoginPage() {
 
           <div style={featuresStyle}>
             {[
-              { label: t.featSearch, icon: "⌕" },
-              { label: t.featCatalog, icon: "▦" },
               { label: t.featPromo, icon: "★" },
+              { label: t.featClearance, icon: "⏱" },
+              { label: t.featCatalog, icon: "▦" },
+              { label: t.featSearch, icon: "⌕" },
               { label: t.featDraft, icon: "✓" },
             ].map((f) => (
               <div key={f.label} style={featureChipStyle}>

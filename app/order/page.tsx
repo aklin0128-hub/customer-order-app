@@ -82,7 +82,7 @@ export default function OrderPage() {
   const submitLockRef = useRef(false);
 
   const [lang, setLang] = useState<Lang>("en");
-  const [mode, setMode] = useState<OrderMode>("search");
+  const [mode, setMode] = useState<OrderMode>("promotion");
   const [ready, setReady] = useState(false);
   const [accountNo, setAccountNo] = useState("");
   const [storeName, setStoreName] = useState("");
@@ -183,8 +183,10 @@ export default function OrderPage() {
     if (saved === "en" || saved === "zh" || saved === "ko" || saved === "vi") setLang(saved);
 
     const savedMode = localStorage.getItem("order_mode") as OrderMode | null;
-    if (savedMode === "search" || savedMode === "catalog" || savedMode === "promotion" || savedMode === "clearance") {
+    if (savedMode === "catalog" || savedMode === "promotion" || savedMode === "clearance") {
       setMode(savedMode);
+    } else if (savedMode === "search" || !savedMode) {
+      setMode("promotion");
     }
   }, []);
 
@@ -887,7 +889,8 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <div>
               <div style={{ fontSize: 21, fontWeight: 800, color: "#111827", lineHeight: 1.15 }}>{t.title}</div>
-              <div style={{ marginTop: 4, fontSize: 12, color: "#6b7280" }}>{accountNo} | {storeName}</div>
+              <div style={{ marginTop: 4, fontSize: 12, color: "#6b7280", lineHeight: 1.4 }}>{t.pageSubtitle}</div>
+              <div style={{ marginTop: 2, fontSize: 12, color: "#9ca3af" }}>{accountNo} | {storeName}</div>
             </div>
             <button type="button" onClick={logout} style={smallButtonStyle}>{t.logout}</button>
           </div>
@@ -895,12 +898,6 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
 
         <section style={cardStyle}>
           <div style={modeTabsStyle}>
-            <button type="button" onClick={() => changeMode("search")} style={modeButtonStyle(mode === "search")}>
-              {t.searchMode}
-            </button>
-            <button type="button" onClick={() => changeMode("catalog")} style={modeButtonStyle(mode === "catalog")}>
-              {t.catalogMode}
-            </button>
             <button
               type="button"
               onClick={() => changeMode("promotion")}
@@ -916,6 +913,12 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
             >
               {t.clearanceMode}
               {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
+            </button>
+            <button type="button" onClick={() => changeMode("catalog")} style={modeButtonStyle(mode === "catalog")}>
+              {t.catalogMode}
+            </button>
+            <button type="button" onClick={() => changeMode("search")} style={modeButtonStyle(mode === "search")}>
+              {t.searchMode}
             </button>
           </div>
         </section>
@@ -934,7 +937,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
           ) : null}
         </section>
 
-        {recentItems.length > 0 ? (
+        {(mode === "search" || mode === "catalog") && recentItems.length > 0 ? (
           <section style={cardStyle}>
             <button type="button" onClick={() => setShowRecent((prev) => !prev)} style={sectionToggleStyle}>
               <div style={sectionTitleStyle}>{t.recent}</div>
@@ -964,7 +967,7 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
         {mode === "search" ? (
           <section style={cardStyle}>
             <div style={{ ...sectionTitleStyle, marginBottom: 8 }}>{t.addItems}</div>
-            <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 10px" }}>{t.tapAdd}</p>
+            <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 10px", lineHeight: 1.45 }}>{t.searchModeHint}</p>
 
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 800, color: "#374151", marginBottom: 10 }}>
               <input type="checkbox" checked={showAvailableOnly} onChange={(e) => setShowAvailableOnly(e.target.checked)} />
