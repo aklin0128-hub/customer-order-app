@@ -68,14 +68,14 @@ export const shell: CSSProperties = {
 };
 
 export const sidebar: CSSProperties = {
-  width: 220,
+  width: 236,
   flexShrink: 0,
   background: "#0f172a",
   color: "#e2e8f0",
-  padding: "18px 14px",
+  padding: "16px 12px",
   display: "flex",
   flexDirection: "column",
-  gap: 8,
+  gap: 6,
   position: "sticky",
   top: 0,
   height: "100vh",

@@ -7,13 +7,7 @@ import {
   brandTitle,
   content,
   logo,
-  logoutBtn,
   mainArea,
-  nav,
-  navHint,
-  navLabel,
-  navLink,
-  navLinkActive,
   pageSubtitle,
   pageTitle,
   shell,
@@ -21,22 +15,21 @@ import {
   topActions,
   topBar,
 } from "./admin-styles";
+import { ADMIN_NAV_GROUPS } from "./admin-nav";
 
-export type AdminNav = "home" | "customers" | "products" | "promotions" | "clearance" | "orders" | "invoices" | "priceCompare" | "priceHistory" | "skuBuyers" | "topSkus" | "activeCarts";
-
-const NAV: { id: AdminNav; label: string; href: string; hint: string }[] = [
-  { id: "home", label: "Dashboard", href: "/admin", hint: "Overview" },
-  { id: "customers", label: "Customers", href: "/admin/customers", hint: "Login accounts" },
-  { id: "products", label: "Products", href: "/admin/products", hint: "SKU settings" },
-  { id: "promotions", label: "Promotions", href: "/admin/promotions", hint: "Featured sales" },
-  { id: "clearance", label: "Clearance", href: "/admin/clearance", hint: "Sell as is" },
-  { id: "activeCarts", label: "Active Carts", href: "/admin/active-carts", hint: "Draft carts" },
-  { id: "orders", label: "Orders", href: "/admin/orders", hint: "Order history" },
-  { id: "invoices", label: "Invoices", href: "/admin/invoices", hint: "PDF / scan import" },
-  { id: "priceHistory", label: "Price History", href: "/admin/price-history", hint: "Account item price" },
-  { id: "skuBuyers", label: "SKU Buyers", href: "/admin/sku-buyers", hint: "Top accounts" },
-  { id: "topSkus", label: "Top SKUs", href: "/admin/top-skus", hint: "Best sellers" },
-];
+export type AdminNav =
+  | "home"
+  | "customers"
+  | "products"
+  | "promotions"
+  | "clearance"
+  | "orders"
+  | "invoices"
+  | "priceCompare"
+  | "priceHistory"
+  | "skuBuyers"
+  | "topSkus"
+  | "activeCarts";
 
 export function AdminShell({
   active,
@@ -54,29 +47,44 @@ export function AdminShell({
   actions?: ReactNode;
 }) {
   return (
-    <div style={shell} className="admin-shell">
+    <div className="admin-shell" style={shell}>
       <aside style={sidebar} className="admin-sidebar">
-        <div style={logo}>RB</div>
-        <div style={brandTitle}>Rhee Bros</div>
-        <div style={brandSub}>Admin</div>
+        <div className="admin-sidebar-brand">
+          <div style={logo}>RB</div>
+          <div className="admin-brand-text">
+            <div style={brandTitle}>Rhee Bros</div>
+            <div style={brandSub}>Admin</div>
+          </div>
+        </div>
 
-        <nav style={nav}>
-          {NAV.map((item) => (
-            <Link
-              key={item.id}
-              href={item.href}
-              style={{
-                ...navLink,
-                ...(active === item.id ? navLinkActive : {}),
-              }}
-            >
-              <span style={navLabel}>{item.label}</span>
-              <span style={navHint}>{item.hint}</span>
-            </Link>
+        <div className="admin-nav-scroll">
+          {ADMIN_NAV_GROUPS.map((group) => (
+            <div key={group.title} className="admin-nav-group">
+              <span className="admin-nav-group-label">{group.title}</span>
+              {group.items.map((item) => {
+                const isActive = active === item.id;
+                return (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    className={`admin-nav-link${isActive ? " admin-nav-link--active" : ""}`}
+                    aria-current={isActive ? "page" : undefined}
+                  >
+                    <span className="admin-nav-icon" aria-hidden>
+                      {item.icon}
+                    </span>
+                    <span className="admin-nav-text">
+                      <span className="admin-nav-label">{item.label}</span>
+                      <span className="admin-nav-hint">{item.hint}</span>
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
           ))}
-        </nav>
+        </div>
 
-        <button type="button" onClick={onLogout} style={logoutBtn}>
+        <button type="button" onClick={onLogout} className="admin-logout-btn">
           Sign out
         </button>
       </aside>

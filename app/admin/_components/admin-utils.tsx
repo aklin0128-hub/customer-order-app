@@ -6,11 +6,7 @@ import {
   alertSuccess,
   btnDanger,
   btnPrimary,
-  btnRow,
   btnSecondary,
-  chip,
-  chipActive,
-  chipRow,
   emptyState,
   inputStyle,
   listItem,
@@ -52,17 +48,22 @@ export function FilterChips<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div style={chipRow}>
-      {options.map((opt) => (
-        <button
-          key={opt.id}
-          type="button"
-          onClick={() => onChange(opt.id)}
-          style={{ ...chip, ...(value === opt.id ? chipActive : {}) }}
-        >
-          {opt.label}
-        </button>
-      ))}
+    <div className="admin-chip-bar" role="tablist" aria-label="Filter">
+      {options.map((opt) => {
+        const active = value === opt.id;
+        return (
+          <button
+            key={opt.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(opt.id)}
+            className={`admin-chip${active ? " admin-chip--active" : ""}`}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -103,7 +104,13 @@ export function ListItemButton({
 
 export function BtnPrimary(props: { children: ReactNode; onClick?: () => void; disabled?: boolean }) {
   return (
-    <button type="button" onClick={props.onClick} disabled={props.disabled} style={btnPrimary}>
+    <button
+      type="button"
+      onClick={props.onClick}
+      disabled={props.disabled}
+      className="admin-btn admin-btn--primary"
+      style={btnPrimary}
+    >
       {props.children}
     </button>
   );
@@ -111,7 +118,13 @@ export function BtnPrimary(props: { children: ReactNode; onClick?: () => void; d
 
 export function BtnSecondary(props: { children: ReactNode; onClick?: () => void; disabled?: boolean }) {
   return (
-    <button type="button" onClick={props.onClick} disabled={props.disabled} style={btnSecondary}>
+    <button
+      type="button"
+      onClick={props.onClick}
+      disabled={props.disabled}
+      className="admin-btn admin-btn--secondary"
+      style={btnSecondary}
+    >
       {props.children}
     </button>
   );
@@ -119,14 +132,20 @@ export function BtnSecondary(props: { children: ReactNode; onClick?: () => void;
 
 export function BtnDanger(props: { children: ReactNode; onClick?: () => void; disabled?: boolean }) {
   return (
-    <button type="button" onClick={props.onClick} disabled={props.disabled} style={btnDanger}>
+    <button
+      type="button"
+      onClick={props.onClick}
+      disabled={props.disabled}
+      className="admin-btn admin-btn--danger"
+      style={btnDanger}
+    >
       {props.children}
     </button>
   );
 }
 
 export function BtnRow({ children }: { children: ReactNode }) {
-  return <div style={btnRow}>{children}</div>;
+  return <div className="admin-btn-row">{children}</div>;
 }
 
 export function formatDate(iso?: string) {
