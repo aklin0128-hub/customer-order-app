@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
+import { resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
+import { getCustomerByAccount, normalizeAccountNo } from "@/lib/customers";
 import { loadCustomers } from "@/lib/loadCustomers";
-import { redis } from "@/lib/redis";
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    const accountNo = String(body?.accountNo || "").trim().toUpperCase();
+    const accountNo = normalizeAccountNo(body?.accountNo || "");
     const password = String(body?.password || "").trim();
 
     if (!accountNo || !password) {
@@ -16,16 +17,14 @@ export async function POST(req: Request) {
       );
     }
 
-    const redisCustomer = await redis.get<any>(`customer:${accountNo}`);
+    const customer = await getCustomerByAccount(accountNo);
 
-    if (redisCustomer) {
-      const redisPassword = String(redisCustomer.password || "").trim();
-
-      if (redisCustomer.active === false) {
+    if (customer) {
+      if (!customer.active) {
         return NextResponse.json({ error: "Account inactive." }, { status: 401 });
       }
 
-      if (redisPassword !== password) {
+      if (String(customer.password || "").trim() !== password) {
         return NextResponse.json(
           { error: "Invalid account number or password." },
           { status: 401 }
@@ -36,7 +35,9 @@ export async function POST(req: Request) {
         success: true,
         customer: {
           accountNo,
-          storeName: redisCustomer.storeName || "",
+          storeName: customer.storeName || "",
+          orderEmail: resolveCustomerOrderEmail(customer.email),
+          phone: customer.phone || "",
         },
       });
     }
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
     const csvCustomer = loadCustomers().find(
       (c) =>
         c.active &&
-        c.accountNo.toUpperCase() === accountNo &&
+        normalizeAccountNo(c.accountNo) === accountNo &&
         String(c.password || "").trim() === password
     );
 
@@ -60,6 +61,8 @@ export async function POST(req: Request) {
       customer: {
         accountNo: csvCustomer.accountNo,
         storeName: csvCustomer.storeName,
+        orderEmail: resolveCustomerOrderEmail(),
+        phone: "",
       },
     });
   } catch (error: any) {

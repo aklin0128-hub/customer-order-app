@@ -202,6 +202,7 @@ export default function LoginPage() {
       sessionStorage.setItem("customer_logged_in", "true");
       sessionStorage.setItem("customer_account_no", data.customer.accountNo);
       sessionStorage.setItem("customer_store_name", data.customer.storeName || "");
+      sessionStorage.setItem("customer_order_email", data.customer.orderEmail || "elin@rheebros.com");
 
       localStorage.setItem("last_account_no", data.customer.accountNo);
 

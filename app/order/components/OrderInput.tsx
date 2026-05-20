@@ -7,6 +7,8 @@ export function OrderInput({
   placeholder,
   inputRef,
   onEnter,
+  type = "text",
+  inputMode,
 }: {
   label: string;
   value: string;
@@ -14,6 +16,8 @@ export function OrderInput({
   placeholder: string;
   inputRef?: React.RefObject<HTMLInputElement | null>;
   onEnter?: () => void;
+  type?: string;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
 }) {
   return (
     <div>
@@ -32,6 +36,9 @@ export function OrderInput({
             }
           }}
           placeholder={placeholder}
+          type={type}
+          inputMode={inputMode}
+          autoComplete={type === "email" ? "email" : undefined}
           style={{
             width: "70%",
             minWidth: 220,

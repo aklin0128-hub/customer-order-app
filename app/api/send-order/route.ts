@@ -7,6 +7,12 @@ import {
   incrementClearanceSold,
 } from "@/lib/clearance";
 import { incrementPromotionSold } from "@/lib/promotions";
+import {
+  emailForCustomerStorage,
+  isValidOrderEmail,
+  resolveCustomerOrderEmail,
+} from "@/lib/customerOrderEmail";
+import { upsertCustomerContact } from "@/lib/customers";
 import { mergeRecentItems } from "@/lib/recentItems";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -51,6 +57,7 @@ export async function POST(req: Request) {
     const storeName = String(body?.storeName || "").trim();
     const phone = String(body?.phone || "").trim();
     const note = String(body?.note || "").trim();
+    const orderEmailRaw = String(body?.orderEmail || "").trim();
     const orderRef = String(body?.orderRef || "").trim();
     const items = Array.isArray(body?.items) ? body.items : [];
 
@@ -82,6 +89,11 @@ export async function POST(req: Request) {
       );
     }
 
+    const orderEmail = resolveCustomerOrderEmail(orderEmailRaw);
+    if (!isValidOrderEmail(orderEmail)) {
+      return NextResponse.json({ error: "Invalid order email address." }, { status: 400 });
+    }
+
     const finalOrderRef =
       orderRef ||
       `${accountNo}-${new Date().toISOString().slice(5, 10).replace("-", "")}`;
@@ -100,20 +112,31 @@ export async function POST(req: Request) {
       storeName,
       phone,
       note,
+      orderEmail,
       orderRef: finalOrderRef,
       items: cleanedItems,
       createdAt: new Date().toISOString(),
     };
 
+    try {
+      await upsertCustomerContact(accountNo, {
+        email: emailForCustomerStorage(orderEmail),
+        phone,
+      });
+    } catch {
+      // Order still sends if profile save fails (e.g. missing customer record).
+    }
+
     await resend.emails.send({
       from: process.env.ORDER_FROM_EMAIL || "orders@rhorder.online",
-      to: process.env.ORDER_TO_EMAIL || process.env.ORDER_FROM_EMAIL || "orders@rhorder.online",
+      to: orderEmail,
       subject: `New Order - ${accountNo} - ${storeName} - ${finalOrderRef}`,
       text: [
         `New order received.`,
         ``,
         `Account: ${accountNo}`,
         `Store: ${storeName}`,
+        `Order email: ${orderEmail}`,
         `Phone: ${phone || "-"}`,
         `Note: ${note || "-"}`,
         `Ref: ${finalOrderRef}`,

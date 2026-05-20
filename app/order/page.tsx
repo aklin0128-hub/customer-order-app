@@ -34,6 +34,13 @@ import {
   isNewItem,
   isNormalItem,
 } from "./catalogUtils";
+import { DEFAULT_ORDER_EMAIL, isValidOrderEmail, resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
+import {
+  countDraftItems,
+  mergeOrderDrafts,
+  normalizeOrderDraft,
+  type OrderDraftPayload,
+} from "@/lib/orderDraft";
 import { copy } from "./orderCopy";
 import {
   brandSelectStyle,
@@ -89,6 +96,16 @@ export default function OrderPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const skuInputRef = useRef<HTMLInputElement | null>(null);
   const submitLockRef = useRef(false);
+  const autoLoadedRef = useRef(false);
+  const draftSnapshotRef = useRef({
+    accountNo: "",
+    storeName: "",
+    phone: "",
+    orderEmail: DEFAULT_ORDER_EMAIL,
+    note: "",
+    cart: [] as CartItem[],
+    catalogQtyMap: {} as Record<string, string>,
+  });
 
   const [lang, setLang] = useState<Lang>("en");
   const [mode, setMode] = useState<OrderMode>("promotion");
@@ -96,6 +113,7 @@ export default function OrderPage() {
   const [accountNo, setAccountNo] = useState("");
   const [storeName, setStoreName] = useState("");
   const [phone, setPhone] = useState("");
+  const [orderEmail, setOrderEmail] = useState(DEFAULT_ORDER_EMAIL);
   const [note, setNote] = useState("");
   const [skuInput, setSkuInput] = useState("");
   const [qtyInput, setQtyInput] = useState("");
@@ -211,6 +229,26 @@ export default function OrderPage() {
   };
 
   useEffect(() => {
+    autoLoadedRef.current = autoLoaded;
+  }, [autoLoaded]);
+
+  useEffect(() => {
+    draftSnapshotRef.current = {
+      accountNo,
+      storeName,
+      phone,
+      orderEmail,
+      note,
+      cart,
+      catalogQtyMap,
+    };
+  }, [accountNo, storeName, phone, orderEmail, note, cart, catalogQtyMap]);
+
+  useEffect(() => {
+    setAutoLoaded(false);
+  }, [accountNo]);
+
+  useEffect(() => {
     const loggedIn = sessionStorage.getItem("customer_logged_in");
     const savedAccount = sessionStorage.getItem("customer_account_no");
     const savedStore = sessionStorage.getItem("customer_store_name");
@@ -222,6 +260,8 @@ export default function OrderPage() {
 
     setAccountNo(savedAccount);
     setStoreName(savedStore || "");
+    const savedOrderEmail = sessionStorage.getItem("customer_order_email");
+    setOrderEmail(resolveCustomerOrderEmail(savedOrderEmail || ""));
     setReady(true);
   }, [router]);
 
@@ -242,15 +282,28 @@ export default function OrderPage() {
   useEffect(() => {
     if (!ready || !accountNo || autoLoaded) return;
 
+    const applyDraft = (draft: OrderDraftPayload) => {
+      setPhone(draft.phone || "");
+      if (draft.orderEmail) {
+        setOrderEmail(resolveCustomerOrderEmail(draft.orderEmail));
+      }
+      setNote(draft.note || "");
+      setCart(Array.isArray(draft.cart) ? draft.cart : []);
+      setCatalogQtyMap(
+        draft.catalogQtyMap && typeof draft.catalogQtyMap === "object" ? draft.catalogQtyMap : {}
+      );
+    };
+
     const loadDrafts = async () => {
+      let draftHasEmail = false;
+      let localParsed: OrderDraftPayload | null = null;
+      let cloudParsed: OrderDraftPayload | null = null;
+
       const localDraft = localStorage.getItem(`draft_${accountNo}`);
       if (localDraft) {
         try {
-          const parsed = JSON.parse(localDraft);
-          setPhone(parsed.phone || "");
-          setNote(parsed.note || "");
-          setCart(Array.isArray(parsed.cart) ? parsed.cart : []);
-          setCatalogQtyMap(parsed.catalogQtyMap && typeof parsed.catalogQtyMap === "object" ? parsed.catalogQtyMap : {});
+          localParsed = normalizeOrderDraft(accountNo, JSON.parse(localDraft));
+          if (localParsed.orderEmail) draftHasEmail = true;
         } catch {}
       }
 
@@ -258,13 +311,33 @@ export default function OrderPage() {
         const res = await fetch(`/api/load-draft?accountNo=${encodeURIComponent(accountNo)}`, { method: "GET", cache: "no-store" });
         const data = await res.json();
         if (res.ok && data?.draft) {
-          setPhone(data.draft.phone || "");
-          setNote(data.draft.note || "");
-          setCart(Array.isArray(data.draft.cart) ? data.draft.cart : []);
-          setCatalogQtyMap(data.draft.catalogQtyMap && typeof data.draft.catalogQtyMap === "object" ? data.draft.catalogQtyMap : {});
-          setSubmitMsg(t.loadedDraft);
+          cloudParsed = normalizeOrderDraft(accountNo, data.draft);
+          if (cloudParsed.orderEmail) draftHasEmail = true;
         }
       } catch {}
+
+      const merged = mergeOrderDrafts(localParsed, cloudParsed);
+      if (merged) {
+        applyDraft(merged);
+        if (merged.orderEmail) draftHasEmail = true;
+        localStorage.setItem(`draft_${accountNo}`, JSON.stringify(merged));
+        if (countDraftItems(merged) > 0) {
+          setSubmitMsg(t.loadedDraft);
+        }
+      }
+
+      if (!draftHasEmail) {
+        try {
+          const profileRes = await fetch(
+            `/api/customer-profile?accountNo=${encodeURIComponent(accountNo)}`,
+            { cache: "no-store" }
+          );
+          const profileData = await profileRes.json();
+          if (profileRes.ok && profileData?.orderEmail) {
+            setOrderEmail(resolveCustomerOrderEmail(profileData.orderEmail));
+          }
+        } catch {}
+      }
 
       await loadRecentAndHistory(accountNo);
       setAutoLoaded(true);
@@ -277,7 +350,15 @@ export default function OrderPage() {
   useEffect(() => {
     if (!ready || !accountNo || !autoLoaded) return;
 
-    const draft = { phone, note, cart, catalogQtyMap };
+    const draft = normalizeOrderDraft(accountNo, {
+      storeName,
+      phone,
+      orderEmail,
+      note,
+      cart,
+      catalogQtyMap,
+      updatedAt: new Date().toISOString(),
+    });
     localStorage.setItem(`draft_${accountNo}`, JSON.stringify(draft));
 
     const timer = setTimeout(async () => {
@@ -285,13 +366,62 @@ export default function OrderPage() {
         await fetch("/api/save-draft", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ accountNo, storeName, phone: phone.trim(), note: note.trim(), cart, catalogQtyMap }),
+          body: JSON.stringify(draft),
+        });
+      } catch {}
+
+      try {
+        await fetch("/api/customer-profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            accountNo,
+            email: orderEmail.trim(),
+            phone: phone.trim(),
+          }),
         });
       } catch {}
     }, 700);
 
     return () => clearTimeout(timer);
-  }, [ready, accountNo, phone, note, cart, catalogQtyMap, autoLoaded]);
+  }, [ready, accountNo, storeName, phone, orderEmail, note, cart, catalogQtyMap, autoLoaded]);
+
+  useEffect(() => {
+    if (!ready || !accountNo) return;
+
+    const flushDraft = () => {
+      if (!autoLoadedRef.current) return;
+
+      const snapshot = draftSnapshotRef.current;
+      if (!snapshot.accountNo || countDraftItems(snapshot) === 0) return;
+
+      const payload = normalizeOrderDraft(snapshot.accountNo, {
+        ...snapshot,
+        updatedAt: new Date().toISOString(),
+      });
+
+      localStorage.setItem(`draft_${snapshot.accountNo}`, JSON.stringify(payload));
+
+      if (typeof navigator.sendBeacon === "function") {
+        navigator.sendBeacon(
+          "/api/save-draft",
+          new Blob([JSON.stringify(payload)], { type: "application/json" })
+        );
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") flushDraft();
+    };
+
+    window.addEventListener("pagehide", flushDraft);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pagehide", flushDraft);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [ready, accountNo]);
 
   const normalizedSkuInput = useMemo(() => skuInput.trim().toUpperCase(), [skuInput]);
 
@@ -777,6 +907,23 @@ export default function OrderPage() {
     localStorage.removeItem(`draft_${accountNo}`);
 
     try {
+      await fetch("/api/save-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountNo,
+          storeName,
+          phone: phone.trim(),
+          orderEmail: orderEmail.trim(),
+          note: note.trim(),
+          cart: [],
+          catalogQtyMap: {},
+          allowClear: true,
+        }),
+      });
+    } catch {}
+
+    try {
       await fetch("/api/delete-draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -869,6 +1016,7 @@ export default function OrderPage() {
     sessionStorage.removeItem("customer_logged_in");
     sessionStorage.removeItem("customer_account_no");
     sessionStorage.removeItem("customer_store_name");
+    sessionStorage.removeItem("customer_order_email");
     router.replace("/");
   };
 
@@ -905,6 +1053,13 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
       return;
     }
 
+    const emailToSend = resolveCustomerOrderEmail(orderEmail);
+    if (!isValidOrderEmail(emailToSend)) {
+      alert(t.orderEmailInvalid);
+      setShowCustomerInfo(true);
+      return;
+    }
+
     const ref = generateOrderRef(accountNo);
 
     submitLockRef.current = true;
@@ -915,7 +1070,15 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
       const res = await fetch("/api/send-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accountNo, storeName, phone: phone.trim(), note: note.trim(), orderRef: ref, items }),
+        body: JSON.stringify({
+          accountNo,
+          storeName,
+          phone: phone.trim(),
+          orderEmail: emailToSend,
+          note: note.trim(),
+          orderRef: ref,
+          items,
+        }),
       });
 
       const data = await res.json();
@@ -1020,6 +1183,17 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
 
           {showCustomerInfo ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
+              <OrderInput
+                label={t.orderEmail}
+                value={orderEmail}
+                onChange={setOrderEmail}
+                placeholder={DEFAULT_ORDER_EMAIL}
+                type="email"
+                inputMode="email"
+              />
+              <p style={{ margin: "-4px 0 0", fontSize: 11, color: "#6b7280", lineHeight: 1.4, textAlign: "center" }}>
+                {t.orderEmailHint}
+              </p>
               <OrderInput label={t.phone} value={phone} onChange={setPhone} placeholder="" />
               <OrderInput label={t.note} value={note} onChange={setNote} placeholder="" />
             </div>

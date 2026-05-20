@@ -1,3 +1,4 @@
+import { countDraftItems, normalizeOrderDraft, type OrderDraftPayload } from "@/lib/orderDraft";
 import { NextResponse } from "next/server";
 import { redis } from "@/lib/redis";
 
@@ -10,15 +11,35 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing account number." }, { status: 400 });
     }
 
-    const draft = {
-      accountNo,
-      storeName: body?.storeName || "",
-      phone: body?.phone || "",
-      note: body?.note || "",
-      cart: Array.isArray(body?.cart) ? body.cart : [],
-      catalogQtyMap: body?.catalogQtyMap && typeof body.catalogQtyMap === "object" ? body.catalogQtyMap : {},
+    const allowClear = Boolean(body?.allowClear);
+    const incoming = normalizeOrderDraft(accountNo, {
+      storeName: body?.storeName,
+      phone: body?.phone,
+      note: body?.note,
+      orderEmail: body?.orderEmail,
+      cart: body?.cart,
+      catalogQtyMap: body?.catalogQtyMap,
       updatedAt: new Date().toISOString(),
-    };
+    });
+
+    const existing = await redis.get<OrderDraftPayload>(`draft:${accountNo}`);
+    let draft = incoming;
+
+    if (
+      existing &&
+      !allowClear &&
+      countDraftItems(incoming) === 0 &&
+      countDraftItems(existing) > 0
+    ) {
+      draft = normalizeOrderDraft(accountNo, {
+        ...existing,
+        phone: incoming.phone,
+        note: incoming.note,
+        orderEmail: incoming.orderEmail,
+        storeName: incoming.storeName || existing.storeName,
+        updatedAt: incoming.updatedAt,
+      });
+    }
 
     await redis.set(`draft:${accountNo}`, draft);
 
