@@ -4,6 +4,7 @@ import {
   normalizeAccountNo,
   type CustomerRecord,
 } from "@/lib/customers";
+import { normalizeMarketRegion } from "@/lib/customerRegion";
 import { loadCustomers } from "@/lib/loadCustomers";
 import { redis } from "@/lib/redis";
 
@@ -50,6 +51,18 @@ export async function POST(req: Request) {
     const email = String(body?.email || "").trim();
     const phone = String(body?.phone || "").trim();
     const note = String(body?.note || "").trim();
+    const regionRaw = body?.region;
+    const region =
+      regionRaw === "" || regionRaw === null || regionRaw === undefined
+        ? undefined
+        : normalizeMarketRegion(regionRaw);
+
+    if (regionRaw && !region) {
+      return NextResponse.json(
+        { error: "Invalid region. Choose Miami, Orlando, Melbourne, or Jacksonville." },
+        { status: 400 }
+      );
+    }
 
     if (!accountNo) {
       return NextResponse.json({ error: "Missing account number." }, { status: 400 });
@@ -71,6 +84,7 @@ export async function POST(req: Request) {
       email: email || undefined,
       phone: phone || undefined,
       note: note || undefined,
+      region,
       updatedAt: new Date().toISOString(),
       source: "redis",
     };

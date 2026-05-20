@@ -16,6 +16,7 @@ import {
   StatGrid,
   Toast,
 } from "../_components/admin-utils";
+import { MARKET_REGIONS, marketRegionLabel } from "@/lib/customerRegion";
 import { useAdminAuth } from "../_components/useAdminAuth";
 
 type Customer = {
@@ -26,6 +27,7 @@ type Customer = {
   email?: string;
   phone?: string;
   note?: string;
+  region?: string;
   updatedAt?: string;
   source?: "local" | "redis";
 };
@@ -47,6 +49,7 @@ export default function AdminCustomersPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
+  const [region, setRegion] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   const [busy, setBusy] = useState(false);
@@ -103,6 +106,7 @@ export default function AdminCustomersPage() {
     setEmail(c.email || "");
     setPhone(c.phone || "");
     setNote(c.note || "");
+    setRegion(c.region || "");
     notify(`Editing ${c.accountNo}`);
   };
 
@@ -114,6 +118,7 @@ export default function AdminCustomersPage() {
     setEmail("");
     setPhone("");
     setNote("");
+    setRegion("");
     setMsg("");
   };
 
@@ -136,6 +141,7 @@ export default function AdminCustomersPage() {
           email,
           phone,
           note,
+          region: region || "",
         }),
       });
       const data = await res.json();
@@ -206,6 +212,10 @@ export default function AdminCustomersPage() {
           { label: "From CSV", value: customers.filter((c) => c.source === "local").length },
           { label: "In Redis", value: customers.filter((c) => c.source === "redis").length },
           { label: "Active", value: customers.filter((c) => c.active !== false).length },
+          {
+            label: "With region",
+            value: customers.filter((c) => c.region).length,
+          },
         ]}
       />
 
@@ -237,6 +247,11 @@ export default function AdminCustomersPage() {
                   <div>
                     <strong>{c.accountNo}</strong>
                     <div style={{ fontSize: 13, color: "#374151", marginTop: 2 }}>{c.storeName || "—"}</div>
+                    {c.region ? (
+                      <div style={{ fontSize: 10, fontWeight: 800, color: "#1d4ed8", marginTop: 4 }}>
+                        {marketRegionLabel(c.region)}
+                      </div>
+                    ) : null}
                     {c.phone || c.email ? (
                       <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
                         {[c.phone, c.email].filter(Boolean).join(" · ")}
@@ -307,6 +322,16 @@ export default function AdminCustomersPage() {
                     {showPassword ? "Hide" : "Show"}
                   </BtnSecondary>
                 </div>
+              </Field>
+              <Field label="Market region" hint="For city sales reports">
+                <select value={region} onChange={(e) => setRegion(e.target.value)} style={inputStyle}>
+                  <option value="">— Not set —</option>
+                  {MARKET_REGIONS.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
               </Field>
               <Field label="Status">
                 <select

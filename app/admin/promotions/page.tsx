@@ -418,7 +418,7 @@ export default function AdminPromotionsPage() {
             </FormSection>
 
             <FormSection title="Schedule & limit" hint="Dates and qty cap are optional">
-              <div className="admin-form-grid-2">
+              <div className="admin-form-grid-2" lang="en">
                 <div>
                   <FieldLabel>Start date</FieldLabel>
                   <input
@@ -502,7 +502,7 @@ export default function AdminPromotionsPage() {
               ) : null}
 
               {form.dealMode === "tiered" ? (
-                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div className="admin-tier-list" style={{ marginTop: 10 }}>
                   {form.tiers.map((tier, index) => (
                     <div key={index} className="admin-tier-row">
                       <span className="admin-tier-row-label">{index + 1}</span>

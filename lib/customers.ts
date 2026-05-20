@@ -1,4 +1,5 @@
 import { resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
+import { normalizeMarketRegion, type MarketRegionId } from "@/lib/customerRegion";
 import { loadCustomers } from "@/lib/loadCustomers";
 import { redis } from "@/lib/redis";
 
@@ -10,6 +11,8 @@ export type CustomerRecord = {
   email?: string;
   phone?: string;
   note?: string;
+  /** Miami, Orlando, Melbourne, or Jacksonville — for market reporting. */
+  region?: MarketRegionId;
   updatedAt?: string;
   /** local = from data/customers.csv only; redis = stored or overridden in Redis */
   source: "local" | "redis";
@@ -35,6 +38,7 @@ export async function getCustomerByAccount(accountNo: string): Promise<CustomerR
       email: String(redisCustomer.email || "").trim() || undefined,
       phone: String(redisCustomer.phone || "").trim() || undefined,
       note: String(redisCustomer.note || "").trim() || undefined,
+      region: normalizeMarketRegion(redisCustomer.region),
       updatedAt: String(redisCustomer.updatedAt || "").trim() || undefined,
       source: "redis",
     };
@@ -75,6 +79,7 @@ export async function upsertCustomerContact(
     email: nextEmail,
     phone: nextPhone,
     note: existing.note,
+    region: existing.region,
     updatedAt: new Date().toISOString(),
     source: "redis",
   });
@@ -118,6 +123,7 @@ export async function getAllCustomers(): Promise<CustomerRecord[]> {
       email: String(item.email || "").trim() || undefined,
       phone: String(item.phone || "").trim() || undefined,
       note: String(item.note || "").trim() || undefined,
+      region: normalizeMarketRegion(item.region),
       updatedAt: String(item.updatedAt || "").trim() || undefined,
       source: "redis",
     });

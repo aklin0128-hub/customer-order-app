@@ -27,8 +27,9 @@ export type AdminNav =
   | "invoices"
   | "priceCompare"
   | "priceHistory"
-  | "skuBuyers"
   | "topSkus"
+  | "market"
+  | "insights"
   | "activeCarts";
 
 export function AdminShell({
