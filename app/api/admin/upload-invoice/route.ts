@@ -12,7 +12,10 @@ import {
   type InvoiceLineWithCatalog,
 } from "@/lib/invoice/invoiceImportRecord";
 import { parseInvoiceText } from "@/lib/invoice/parseInvoiceText";
+import { bustAnalyticsCache } from "@/lib/analyticsCache";
+import { findDuplicateInvoiceImport } from "@/lib/invoiceDedup";
 import { prependOrderHistory } from "@/lib/orderHistory";
+import { guessRegionFromText } from "@/lib/regionGuess";
 import { mergeRecentItems } from "@/lib/recentItems";
 import { redis } from "@/lib/redis";
 
@@ -64,6 +67,14 @@ export async function POST(req: Request) {
     const parsed = parseInvoiceText(text);
 
     const accountNo = accountOverride || parsed.accountNo || "";
+
+    const duplicate = accountNo
+      ? await findDuplicateInvoiceImport({
+          accountNo,
+          invoiceNo: parsed.invoiceNo,
+          invoiceDate: parsed.invoiceDate,
+        })
+      : null;
 
     const linesWithFlags: InvoiceLineWithCatalog[] = await Promise.all(
       parsed.lines.map(async (line) => ({
@@ -146,12 +157,19 @@ export async function POST(req: Request) {
       (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
     const nextList = [record, ...list];
     await redis.set(IMPORT_LIST_KEY, nextList);
+    bustAnalyticsCache();
+
+    const suggestedRegion = guessRegionFromText(
+      [storeName, parsed.accountNo, accountNo].filter(Boolean).join(" ")
+    );
 
     return NextResponse.json({
       success: true,
       record,
       parsedTextChars: text.length,
       unknownSkus,
+      duplicateWarning: duplicate,
+      suggestedRegion: suggestedRegion || null,
     });
   } catch (error: any) {
     return NextResponse.json(

@@ -1,5 +1,6 @@
 import { countDraftItems, normalizeOrderDraft, type OrderDraftPayload } from "@/lib/orderDraft";
 import { NextResponse } from "next/server";
+import { indexDraftAccount } from "@/lib/redisIndexes";
 import { redis } from "@/lib/redis";
 
 export async function POST(req: Request) {
@@ -42,6 +43,7 @@ export async function POST(req: Request) {
     }
 
     await redis.set(`draft:${accountNo}`, draft);
+    await indexDraftAccount(accountNo);
 
     return NextResponse.json({
       success: true,

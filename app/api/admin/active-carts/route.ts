@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { listDraftAccounts } from "@/lib/redisIndexes";
 import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
@@ -25,11 +26,11 @@ export async function GET(req: Request) {
   }
 
   try {
-    const keys = await redis.keys("draft:*");
+    const accounts = await listDraftAccounts();
     const drafts = await Promise.all(
-      keys.map(async (key) => ({
-        key,
-        draft: await redis.get<DraftRecord>(key),
+      accounts.map(async (accountNo) => ({
+        key: `draft:${accountNo}`,
+        draft: await redis.get<DraftRecord>(`draft:${accountNo}`),
       }))
     );
 

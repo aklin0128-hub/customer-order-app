@@ -22,6 +22,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     title: "Store",
     items: [
       { id: "customers", label: "Customers", href: "/admin/customers", hint: "Login accounts", icon: "👥" },
+      { id: "account", label: "Account 360", href: "/admin/account", hint: "One-store view", icon: "🔍" },
       { id: "activeCarts", label: "Active Carts", href: "/admin/active-carts", hint: "Draft carts", icon: "🛒" },
       { id: "orders", label: "Orders", href: "/admin/orders", hint: "Order history", icon: "🧾" },
     ],

@@ -363,12 +363,23 @@ export default function OrderPage() {
 
     const timer = setTimeout(async () => {
       try {
-        await fetch("/api/save-draft", {
+        const res = await fetch("/api/save-draft", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(draft),
         });
-      } catch {}
+        if (!res.ok) throw new Error("save failed");
+      } catch {
+        try {
+          await fetch("/api/save-draft", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(draft),
+          });
+        } catch {
+          /* localStorage backup already written above */
+        }
+      }
 
       try {
         await fetch("/api/customer-profile", {
@@ -476,6 +487,31 @@ export default function OrderPage() {
     [orderableBaseItems]
   );
 
+  const [invoiceFrequentSkus, setInvoiceFrequentSkus] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!accountNo) return;
+    const inCart = new Set<string>();
+    for (const [sku, qty] of Object.entries(catalogQtyMap || {})) {
+      if (Number(qty) > 0) inCart.add(sku.toUpperCase());
+    }
+    for (const row of cart || []) {
+      if (Number(row.qty) > 0) inCart.add(String(row.sku || "").toUpperCase());
+    }
+    const cartParam = Array.from(inCart).join(",");
+    void fetch(
+      `/api/recommended-cart-skus?accountNo=${encodeURIComponent(accountNo)}&cart=${encodeURIComponent(cartParam)}`,
+      { cache: "no-store" }
+    )
+      .then((r) => r.json())
+      .then((j) => {
+        if (Array.isArray(j?.rows)) {
+          setInvoiceFrequentSkus(j.rows.map((row: { sku: string }) => String(row.sku).toUpperCase()));
+        }
+      })
+      .catch(() => setInvoiceFrequentSkus([]));
+  }, [accountNo, cart, catalogQtyMap]);
+
   const recommendedSkuSet = useMemo(() => {
     const skuSet = new Set<string>();
 
@@ -491,8 +527,12 @@ export default function OrderPage() {
       }
     }
 
+    for (const sku of invoiceFrequentSkus) {
+      if (sku) skuSet.add(sku);
+    }
+
     return skuSet;
-  }, [orderHistory, recentItems]);
+  }, [orderHistory, recentItems, invoiceFrequentSkus]);
 
   const recommendedItemCount = useMemo(
     () => orderableBaseItems.filter((item) => recommendedSkuSet.has(item.sku?.toUpperCase() || "")).length,
@@ -639,6 +679,19 @@ export default function OrderPage() {
       if (promo?.priceTiers?.length && qty > 0) {
         const tierWarning = formatPromoTierQtyWarning(cleanSku, qty, promo.priceTiers, t);
         if (tierWarning) warnings.push(tierWarning);
+      }
+
+      if (promo?.endDate) {
+        const end = new Date(promo.endDate);
+        const daysLeft = Math.ceil((end.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+        if (daysLeft >= 0 && daysLeft <= 7) {
+          warnings.push(`${cleanSku}: promotion ends in ${daysLeft} day(s).`);
+        }
+      }
+
+      const clearance = clearanceItems.find((c) => c.sku?.toUpperCase() === cleanSku);
+      if (clearance?.daysUntilExpiry != null && clearance.daysUntilExpiry <= 7 && clearance.daysUntilExpiry >= 0) {
+        warnings.push(`${cleanSku}: clearance expires in ${clearance.daysUntilExpiry} day(s).`);
       }
     }
 

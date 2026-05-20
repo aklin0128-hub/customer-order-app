@@ -17,7 +17,9 @@ import {
   StatGrid,
   Toast,
 } from "../_components/admin-utils";
+import { downloadCsv } from "../_components/admin-analytics-ui";
 import { MARKET_REGIONS, marketRegionLabel } from "@/lib/customerRegion";
+import { guessRegionFromText } from "@/lib/regionGuess";
 import { useAdminAuth } from "../_components/useAdminAuth";
 
 type Customer = {
@@ -309,8 +311,26 @@ export default function AdminCustomersPage() {
               <BtnSecondary onClick={() => setSelected(new Set())}>Clear</BtnSecondary>
             </div>
           ) : null}
-          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
             <BtnSecondary onClick={selectAllVisible}>Select visible</BtnSecondary>
+            <BtnSecondary
+              onClick={() =>
+                downloadCsv(
+                  "customers-export.csv",
+                  ["accountNo", "storeName", "region", "email", "phone", "active"],
+                  filteredCustomers.map((c) => [
+                    c.accountNo,
+                    c.storeName,
+                    c.region || "",
+                    c.email || "",
+                    c.phone || "",
+                    c.active ? "yes" : "no",
+                  ])
+                )
+              }
+            >
+              Export visible CSV
+            </BtnSecondary>
           </div>
           <div style={splitList}>
             {filteredCustomers.map((c) => (
@@ -337,7 +357,14 @@ export default function AdminCustomersPage() {
                       <div style={{ fontSize: 10, fontWeight: 800, color: "#1d4ed8", marginTop: 4 }}>
                         {marketRegionLabel(c.region)}
                       </div>
-                    ) : null}
+                    ) : (() => {
+                      const guess = guessRegionFromText(c.storeName || "");
+                      return guess ? (
+                        <div style={{ fontSize: 10, fontWeight: 800, color: "#b45309", marginTop: 4 }}>
+                          Suggest: {marketRegionLabel(guess)}
+                        </div>
+                      ) : null;
+                    })()}
                     {c.phone || c.email ? (
                       <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
                         {[c.phone, c.email].filter(Boolean).join(" · ")}

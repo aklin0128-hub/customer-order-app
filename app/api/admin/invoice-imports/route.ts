@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { del } from "@vercel/blob";
 import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
+import { bustAnalyticsCache } from "@/lib/analyticsCache";
 import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
@@ -60,6 +61,7 @@ export async function DELETE(req: Request) {
       IMPORT_LIST_KEY,
       list.filter((item) => item.id !== id)
     );
+    bustAnalyticsCache();
 
     return NextResponse.json({
       success: true,

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { unindexDraftAccount } from "@/lib/redisIndexes";
 import { redis } from "@/lib/redis";
 
 export async function POST(req: Request) {
@@ -14,6 +15,7 @@ export async function POST(req: Request) {
     }
 
     await redis.del(`draft:${accountNo}`);
+    await unindexDraftAccount(accountNo);
 
     return NextResponse.json({
       success: true,

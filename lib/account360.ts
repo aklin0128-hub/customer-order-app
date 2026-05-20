@@ -1,7 +1,7 @@
 import { collectSaleEvents, buildCatalogMap, loadInvoiceImports } from "@/lib/analyticsCommon";
 import { getCustomerByAccount, normalizeAccountNo } from "@/lib/customers";
 import { marketRegionLabel } from "@/lib/customerRegion";
-import { getCustomerHealth } from "@/lib/customerHealth";
+import { getCustomerHealthRow } from "@/lib/customerHealth";
 import { redis } from "@/lib/redis";
 
 type OrderHistoryEntry = {
@@ -59,8 +59,7 @@ export async function getAccount360(accountNo: string): Promise<Account360Result
   if (!acct) return null;
 
   const customer = await getCustomerByAccount(acct);
-  const healthRows = await getCustomerHealth();
-  const healthRow = healthRows.rows.find((r) => r.accountNo === acct);
+  const healthRow = await getCustomerHealthRow(acct);
 
   const since90 = new Date();
   since90.setUTCDate(since90.getUTCDate() - 90);

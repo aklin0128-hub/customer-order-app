@@ -6,6 +6,7 @@ import {
 } from "@/lib/customers";
 import { normalizeMarketRegion } from "@/lib/customerRegion";
 import { loadCustomers } from "@/lib/loadCustomers";
+import { indexCustomerAccount, unindexCustomerAccount } from "@/lib/redisIndexes";
 import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
@@ -90,6 +91,7 @@ export async function POST(req: Request) {
     };
 
     await redis.set(`customer:${accountNo}`, customer);
+    await indexCustomerAccount(accountNo);
 
     return NextResponse.json({
       success: true,
@@ -120,6 +122,7 @@ export async function DELETE(req: Request) {
 
     if (existingRedis) {
       await redis.del(`customer:${accountNo}`);
+      await unindexCustomerAccount(accountNo);
     } else {
       const local = loadCustomers().find((c) => normalizeAccountNo(c.accountNo) === accountNo);
       if (!local) {
@@ -135,6 +138,7 @@ export async function DELETE(req: Request) {
         updatedAt: new Date().toISOString(),
         source: "redis",
       });
+      await indexCustomerAccount(accountNo);
     }
 
     return NextResponse.json({

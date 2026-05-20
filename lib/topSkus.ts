@@ -171,11 +171,12 @@ export async function getTopSkus(options?: {
     }
   }
 
-  const historyKeys = await redis.keys("orderHistory:*");
+  const { listOrderHistoryAccounts } = await import("@/lib/redisIndexes");
+  const historyAccounts = await listOrderHistoryAccounts();
   const histories = await Promise.all(
-    historyKeys.map(async (key) => ({
-      accountNo: key.replace(/^orderHistory:/, "").toUpperCase(),
-      entries: (await redis.get<OrderHistoryEntry[]>(key)) || [],
+    historyAccounts.map(async (accountNo) => ({
+      accountNo,
+      entries: (await redis.get<OrderHistoryEntry[]>(`orderHistory:${accountNo}`)) || [],
     }))
   );
 

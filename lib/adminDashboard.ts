@@ -11,6 +11,7 @@ import {
   getCartStats,
 } from "@/lib/businessInsights";
 import { parseDate } from "@/lib/analyticsCommon";
+import { listOrderHistoryAccounts } from "@/lib/redisIndexes";
 import { redis } from "@/lib/redis";
 
 export type DashboardAlert = {
@@ -42,41 +43,35 @@ export type AdminDashboardData = {
   restockLeads: Awaited<ReturnType<typeof getRestockLeads>>;
 };
 
-export async function getAdminDashboard(): Promise<AdminDashboardData> {
+export type AdminDashboardKpis = {
+  kpis: AdminDashboardData["kpis"];
+  alerts: DashboardAlert[];
+};
+
+export async function getAdminDashboardKpis(): Promise<AdminDashboardKpis> {
   const [
     health,
     customers,
     invoiceQuality,
     promos,
     clearance,
-    promoEffectiveness,
-    clearanceUrgent,
-    cartFollowUps,
-    restockLeads,
     cartStats,
+    clearanceUrgent,
   ] = await Promise.all([
     getCustomerHealth(),
     getAllCustomers(),
     getInvoiceQualityStats(),
     getPromotionRecords(),
     getClearanceRecords(),
-    getPromoEffectiveness(6),
-    getClearanceUrgency(6),
-    getCartFollowUps(6),
-    getRestockLeads(8),
     getCartStats(),
+    getClearanceUrgency(1),
   ]);
-
-  const storeByAccount = new Map(customers.map((c) => [c.accountNo.toUpperCase(), c.storeName || ""]));
-  for (const lead of restockLeads) {
-    lead.storeName = storeByAccount.get(lead.accountNo) || "";
-  }
 
   const cutoff7 = Date.now() - 7 * 24 * 60 * 60 * 1000;
   let ordersLast7Days = 0;
-  const historyKeys = await redis.keys("orderHistory:*");
-  for (const key of historyKeys) {
-    const entries = (await redis.get<{ createdAt?: string }[]>(key)) || [];
+  const accounts = await listOrderHistoryAccounts();
+  for (const accountNo of accounts) {
+    const entries = (await redis.get<{ createdAt?: string }[]>(`orderHistory:${accountNo}`)) || [];
     for (const entry of entries) {
       const d = parseDate(entry.createdAt);
       if (d && d.getTime() >= cutoff7) ordersLast7Days += 1;
@@ -85,7 +80,6 @@ export async function getAdminDashboard(): Promise<AdminDashboardData> {
 
   const activePromotions = promos.filter((p) => getPromotionStatus(p) === "active").length;
   const activeClearance = clearance.filter((c) => getClearanceStatus(c) === "active").length;
-
   const unassignedRegions = customers.filter((c) => !c.region).length;
 
   const kpis = {
@@ -102,7 +96,6 @@ export async function getAdminDashboard(): Promise<AdminDashboardData> {
   };
 
   const alerts: DashboardAlert[] = [];
-
   if (health.summary.atRisk > 0) {
     alerts.push({
       id: "at_risk",
@@ -149,13 +142,40 @@ export async function getAdminDashboard(): Promise<AdminDashboardData> {
     });
   }
 
+  return { kpis, alerts };
+}
+
+export async function getAdminDashboardSections(): Promise<
+  Omit<AdminDashboardData, "kpis" | "alerts">
+> {
+  const [customers, invoiceQuality, promoEffectiveness, clearanceUrgent, cartFollowUps, restockLeads] =
+    await Promise.all([
+      getAllCustomers(),
+      getInvoiceQualityStats(),
+      getPromoEffectiveness(6),
+      getClearanceUrgency(6),
+      getCartFollowUps(6),
+      getRestockLeads(8),
+    ]);
+
+  const storeByAccount = new Map(customers.map((c) => [c.accountNo.toUpperCase(), c.storeName || ""]));
+  for (const lead of restockLeads) {
+    lead.storeName = storeByAccount.get(lead.accountNo) || "";
+  }
+
   return {
-    kpis,
-    alerts,
     invoiceQuality,
     promoEffectiveness,
     clearanceUrgent,
     cartFollowUps,
     restockLeads,
   };
+}
+
+export async function getAdminDashboard(): Promise<AdminDashboardData> {
+  const [{ kpis, alerts }, sections] = await Promise.all([
+    getAdminDashboardKpis(),
+    getAdminDashboardSections(),
+  ]);
+  return { kpis, alerts, ...sections };
 }

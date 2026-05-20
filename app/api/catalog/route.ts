@@ -35,10 +35,12 @@ export async function GET() {
       });
     }
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       success: true,
       products: Array.from(map.values()),
     });
+    res.headers.set("Cache-Control", "public, s-maxage=120, stale-while-revalidate=600");
+    return res;
   } catch (error: any) {
     return NextResponse.json(
       { error: error?.message || "Failed to load catalog." },

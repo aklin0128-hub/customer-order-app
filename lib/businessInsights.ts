@@ -8,6 +8,7 @@ import {
 } from "@/lib/analyticsCommon";
 import { getClearanceRecords, daysUntilExpiry, getClearanceRemainingQty } from "@/lib/clearance";
 import { getPromotionRecords, getPromotionStatus } from "@/lib/promotions";
+import { listDraftAccounts } from "@/lib/redisIndexes";
 import { redis } from "@/lib/redis";
 
 export type PromoEffectRow = {
@@ -125,13 +126,13 @@ export async function getClearanceUrgency(limit = 8): Promise<ClearanceUrgentRow
 }
 
 export async function getCartStats() {
-  const keys = await redis.keys("draft:*");
+  const accounts = await listDraftAccounts();
   let activeCarts = 0;
   let staleCarts = 0;
   const today = startOfUtcDay(new Date());
 
-  for (const key of keys) {
-    const draft = await redis.get<DraftRecord>(key);
+  for (const accountNo of accounts) {
+    const draft = await redis.get<DraftRecord>(`draft:${accountNo}`);
     if (!draft) continue;
     const hasItems =
       (Array.isArray(draft.cart) && draft.cart.some((i) => Number(i.qty) > 0)) ||
@@ -149,8 +150,8 @@ export async function getCartStats() {
 }
 
 export async function getCartFollowUps(limit = 8): Promise<CartFollowUpRow[]> {
-  const keys = await redis.keys("draft:*");
-  const drafts = await Promise.all(keys.map((key) => redis.get<DraftRecord>(key)));
+  const accounts = await listDraftAccounts();
+  const drafts = await Promise.all(accounts.map((acct) => redis.get<DraftRecord>(`draft:${acct}`)));
   const today = startOfUtcDay(new Date());
 
   const rows: CartFollowUpRow[] = [];

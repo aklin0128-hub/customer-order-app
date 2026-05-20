@@ -7,6 +7,7 @@ import {
   parseDate,
   startOfUtcDay,
 } from "@/lib/analyticsCommon";
+import { cachedAnalytics } from "@/lib/analyticsCache";
 import { getAllCustomers } from "@/lib/customers";
 import { marketRegionLabel } from "@/lib/customerRegion";
 
@@ -26,6 +27,9 @@ export type CustomerHealthRow = {
   yoyRevenueGrowthPct: number | null;
   status: CustomerHealthStatus;
   statusLabel: string;
+  /** Has invoice in last 90 days — false means metrics may be order-only */
+  hasInvoiceData90d: boolean;
+  topSkus90d: { sku: string; qty: number }[];
 };
 
 export type CustomerHealthResult = {
@@ -69,6 +73,17 @@ function classifyHealth(
 }
 
 export async function getCustomerHealth(): Promise<CustomerHealthResult> {
+  return cachedAnalytics("customerHealth", () => computeCustomerHealth());
+}
+
+export async function getCustomerHealthRow(accountNo: string): Promise<CustomerHealthRow | null> {
+  const acct = accountNo.trim().toUpperCase();
+  if (!acct) return null;
+  const { rows } = await getCustomerHealth();
+  return rows.find((r) => r.accountNo === acct) ?? null;
+}
+
+async function computeCustomerHealth(): Promise<CustomerHealthResult> {
   const today = startOfUtcDay(new Date());
   const start90 = addUtcDays(today, -89);
   const end90 = today;
@@ -101,6 +116,8 @@ export async function getCustomerHealth(): Promise<CustomerHealthResult> {
     string,
     { qty90: number; rev90: number; qtyYoy: number; revYoy: number }
   >();
+  const invoiceIn90d = new Set<string>();
+  const skuQty90 = new Map<string, Map<string, number>>();
 
   for (const c of customers) {
     metrics.set(c.accountNo.toUpperCase(), { qty90: 0, rev90: 0, qtyYoy: 0, revYoy: 0 });
@@ -113,6 +130,10 @@ export async function getCustomerHealth(): Promise<CustomerHealthResult> {
     if (t >= start90.getTime() && t <= end90.getTime()) {
       row.qty90 += e.qty;
       row.rev90 += e.revenue;
+      if (e.source === "invoice") invoiceIn90d.add(e.accountNo);
+      const skus = skuQty90.get(e.accountNo) || new Map();
+      skus.set(e.sku, (skus.get(e.sku) || 0) + e.qty);
+      skuQty90.set(e.accountNo, skus);
     }
     if (t >= start90Yoy.getTime() && t <= end90Yoy.getTime()) {
       row.qtyYoy += e.qty;
@@ -134,6 +155,11 @@ export async function getCustomerHealth(): Promise<CustomerHealthResult> {
     const yoyRev = growthPct(m.rev90, m.revYoy);
     const status = classifyHealth(daysSince, m.qty90, m.qtyYoy, yoyQty);
 
+    const topSkus90d = Array.from(skuQty90.get(acct)?.entries() || [])
+      .map(([sku, qty]) => ({ sku, qty }))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5);
+
     rows.push({
       accountNo: acct,
       storeName: meta?.storeName || "",
@@ -148,6 +174,8 @@ export async function getCustomerHealth(): Promise<CustomerHealthResult> {
       yoyRevenueGrowthPct: yoyRev,
       status,
       statusLabel: STATUS_LABELS[status],
+      hasInvoiceData90d: invoiceIn90d.has(acct),
+      topSkus90d,
     });
   }
 

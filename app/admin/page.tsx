@@ -71,22 +71,64 @@ export default function AdminDashboardPage() {
   const [passwordInput, setPasswordInput] = useState("");
   const [data, setData] = useState<DashboardData | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sectionsLoading, setSectionsLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
   const load = useCallback(async () => {
     setBusy(true);
+    setSectionsLoading(true);
     setMsg("");
     try {
-      const res = await fetch("/api/admin/dashboard", { cache: "no-store", headers: adminHeaders() });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || "Failed to load dashboard.");
-      setData(json);
-    } catch (err: any) {
-      setMsg(err?.message || "Failed to load dashboard.");
+      const headers = adminHeaders();
+      const kpisRes = await fetch("/api/admin/dashboard?part=kpis", { cache: "no-store", headers });
+      const kpisJson = await kpisRes.json();
+      if (!kpisRes.ok) throw new Error(kpisJson?.error || "Failed to load dashboard.");
+      setData((prev) => ({
+        ...(prev || ({} as DashboardData)),
+        kpis: kpisJson.kpis,
+        alerts: kpisJson.alerts,
+        invoiceQuality: prev?.invoiceQuality || {
+          totalImports: 0,
+          last30Days: 0,
+          missingAccount: 0,
+          zeroLines: 0,
+          unknownSkuSet: [],
+        },
+        promoEffectiveness: prev?.promoEffectiveness || [],
+        clearanceUrgent: prev?.clearanceUrgent || [],
+        cartFollowUps: prev?.cartFollowUps || [],
+        restockLeads: prev?.restockLeads || [],
+      }));
+      setBusy(false);
+
+      const secRes = await fetch("/api/admin/dashboard?part=sections", { cache: "no-store", headers });
+      const secJson = await secRes.json();
+      if (!secRes.ok) throw new Error(secJson?.error || "Failed to load dashboard sections.");
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              invoiceQuality: secJson.invoiceQuality,
+              promoEffectiveness: secJson.promoEffectiveness,
+              clearanceUrgent: secJson.clearanceUrgent,
+              cartFollowUps: secJson.cartFollowUps,
+              restockLeads: secJson.restockLeads,
+            }
+          : null
+      );
+    } catch (err: unknown) {
+      setMsg(err instanceof Error ? err.message : "Failed to load dashboard.");
     } finally {
       setBusy(false);
+      setSectionsLoading(false);
     }
   }, [adminHeaders]);
+
+  const copyRestockSkus = (accountNo: string, skus: string[]) => {
+    const text = skus.join("\n");
+    void navigator.clipboard?.writeText(text);
+    setMsg(`Copied ${skus.length} SKU(s) for ${accountNo}.`);
+  };
 
   useEffect(() => {
     if (authed) void load();
@@ -261,7 +303,9 @@ export default function AdminDashboardPage() {
               <p style={{ margin: "0 0 8px", fontSize: 12, color: "#6b7280" }}>
                 Bought 2+ times in 180d, not in last 42d (invoice data).
               </p>
-              {data.restockLeads.length ? (
+              {sectionsLoading && !data.restockLeads.length ? (
+                <p style={{ fontSize: 13, color: "#6b7280" }}>Loading leads…</p>
+              ) : data.restockLeads.length ? (
                 <ul style={{ margin: "0 0 10px", paddingLeft: 18, fontSize: 13, lineHeight: 1.55 }}>
                   {data.restockLeads.map((r) => (
                     <li key={`${r.accountNo}-${r.sku}`}>
@@ -271,13 +315,31 @@ export default function AdminDashboardPage() {
                       {" · "}
                       <strong>{r.sku}</strong>
                       {r.productName ? ` ${r.productName}` : ""} — {r.daysSincePurchase}d ago ({r.purchaseCount}{" "}
-                      buys)
+                      buys){" "}
+                      <button
+                        type="button"
+                        onClick={() => copyRestockSkus(r.accountNo, [r.sku])}
+                        style={{
+                          border: "none",
+                          background: "none",
+                          color: "#2563eb",
+                          fontWeight: 800,
+                          cursor: "pointer",
+                          fontSize: 12,
+                          padding: 0,
+                        }}
+                      >
+                        Copy SKU
+                      </button>
                     </li>
                   ))}
                 </ul>
               ) : (
                 <p style={{ fontSize: 13, color: "#6b7280" }}>No leads right now.</p>
               )}
+              <Link href="/admin/promotions">
+                <BtnSecondary>Promo ROI →</BtnSecondary>
+              </Link>
             </section>
           </div>
 

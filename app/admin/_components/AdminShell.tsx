@@ -16,6 +16,7 @@ import {
   topBar,
 } from "./admin-styles";
 import { ADMIN_NAV_GROUPS } from "./admin-nav";
+import { AdminGlobalSearch } from "./AdminGlobalSearch";
 
 export type AdminNav =
   | "home"
@@ -95,7 +96,10 @@ export function AdminShell({
             <h1 style={pageTitle}>{title}</h1>
             {subtitle ? <p style={pageSubtitle}>{subtitle}</p> : null}
           </div>
-          {actions ? <div style={topActions}>{actions}</div> : null}
+          <div style={{ ...topActions, flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+            <AdminGlobalSearch />
+            {actions}
+          </div>
         </header>
 
         <div style={content}>{children}</div>

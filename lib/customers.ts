@@ -1,6 +1,7 @@
 import { resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
 import { normalizeMarketRegion, type MarketRegionId } from "@/lib/customerRegion";
 import { loadCustomers } from "@/lib/loadCustomers";
+import { indexCustomerAccount, listRedisCustomerAccounts } from "@/lib/redisIndexes";
 import { redis } from "@/lib/redis";
 
 export type CustomerRecord = {
@@ -83,6 +84,7 @@ export async function upsertCustomerContact(
     updatedAt: new Date().toISOString(),
     source: "redis",
   });
+  await indexCustomerAccount(acct);
 
   return {
     orderEmail: resolveCustomerOrderEmail(nextEmail),
@@ -107,16 +109,16 @@ export async function getAllCustomers(): Promise<CustomerRecord[]> {
     });
   }
 
-  const keys = await redis.keys("customer:*");
-  for (const key of keys) {
-    const item = await redis.get<Partial<CustomerRecord>>(key);
-    if (!item?.accountNo) continue;
+  const accounts = await listRedisCustomerAccounts();
+  for (const accountNo of accounts) {
+    const item = await redis.get<Partial<CustomerRecord>>(`customer:${accountNo}`);
+    if (!item) continue;
 
-    const accountNo = normalizeAccountNo(item.accountNo);
-    const local = map.get(accountNo);
+    const acctNorm = normalizeAccountNo(item?.accountNo || accountNo);
+    const local = map.get(acctNorm);
 
-    map.set(accountNo, {
-      accountNo,
+    map.set(acctNorm, {
+      accountNo: acctNorm,
       storeName: String(item.storeName || local?.storeName || "").trim(),
       password: String(item.password ?? local?.password ?? "").trim(),
       active: item.active !== false,

@@ -77,6 +77,8 @@ export default function AdminMarketPage() {
   const [onlyWithSales, setOnlyWithSales] = useState(true);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [targets, setTargets] = useState<{ region: string; label: string; qTargetRevenue: number }[]>([]);
+  const [targetsBusy, setTargetsBusy] = useState(false);
   const [data, setData] = useState<MarketData | null>(null);
 
   const load = useCallback(async () => {
@@ -100,6 +102,35 @@ export default function AdminMarketPage() {
   useEffect(() => {
     if (authed) void load();
   }, [authed, load]);
+
+  useEffect(() => {
+    if (!authed) return;
+    void fetch("/api/admin/market-targets", { headers: adminHeaders() })
+      .then((r) => r.json())
+      .then((j) => {
+        if (Array.isArray(j.regions)) setTargets(j.regions);
+      })
+      .catch(() => {});
+  }, [authed, adminHeaders]);
+
+  const saveTargets = async () => {
+    setTargetsBusy(true);
+    try {
+      const res = await fetch("/api/admin/market-targets", {
+        method: "POST",
+        headers: { ...adminHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ regions: targets }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j?.error || "Save failed");
+      setTargets(j.regions || targets);
+      setMsg("Targets saved.");
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setTargetsBusy(false);
+    }
+  };
 
   const filteredAccounts = useMemo(() => {
     if (!data) return [];
@@ -351,6 +382,38 @@ export default function AdminMarketPage() {
         ) : busy ? (
           <section style={panel}>
             <p style={{ margin: 0, fontSize: 13, color: "#2563eb", fontWeight: 800 }}>Loading market data…</p>
+          </section>
+        ) : null}
+
+        {targets.length ? (
+          <section style={panel}>
+            <h2 style={panelTitle}>Quarterly revenue targets (manual)</h2>
+            <div style={{ display: "grid", gap: 8, maxWidth: 420 }}>
+              {targets.map((t, i) => (
+                <label key={t.region} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+                  <span style={{ width: 100, fontWeight: 800 }}>{t.label}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={t.qTargetRevenue || ""}
+                    onChange={(e) => {
+                      const next = [...targets];
+                      next[i] = { ...t, qTargetRevenue: Number(e.target.value) || 0 };
+                      setTargets(next);
+                    }}
+                    style={inputStyle}
+                  />
+                </label>
+              ))}
+            </div>
+            {data ? (
+              <p style={{ fontSize: 12, color: "#6b7280", margin: "10px 0" }}>
+                Current period revenue by region shown above — compare to targets manually.
+              </p>
+            ) : null}
+            <BtnPrimary onClick={() => void saveTargets()} disabled={targetsBusy}>
+              {targetsBusy ? "Saving…" : "Save targets"}
+            </BtnPrimary>
           </section>
         ) : null}
       </div>

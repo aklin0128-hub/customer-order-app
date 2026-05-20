@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAllCustomers, getCustomerByAccount, normalizeAccountNo } from "@/lib/customers";
 import { normalizeMarketRegion } from "@/lib/customerRegion";
+import { indexCustomerAccount } from "@/lib/redisIndexes";
 import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +54,7 @@ export async function POST(req: Request) {
         updatedAt: new Date().toISOString(),
         source: "redis",
       });
+      await indexCustomerAccount(acct);
       updated += 1;
     }
 

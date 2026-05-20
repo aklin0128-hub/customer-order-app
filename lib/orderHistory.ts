@@ -1,3 +1,4 @@
+import { indexOrderHistoryAccount } from "@/lib/redisIndexes";
 import { redis } from "@/lib/redis";
 
 export type OrderHistoryEntry = {
@@ -34,4 +35,5 @@ export async function prependOrderHistory(entry: OrderHistoryEntry) {
   const next = [order, ...current].slice(0, 20);
 
   await redis.set(`orderHistory:${accountNo}`, next);
+  await indexOrderHistoryAccount(accountNo);
 }

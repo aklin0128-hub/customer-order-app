@@ -122,6 +122,12 @@ export default function AdminPromotionsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [busy, setBusy] = useState(false);
   const [promotionsLoaded, setPromotionsLoaded] = useState(false);
+  const [promoStats, setPromoStats] = useState<
+    Record<string, { qtyRecent28: number; qtyPrior28: number; changePct: number | null }>
+  >({});
+  const [promoRoi, setPromoRoi] = useState<
+    { sku: string; brand: string; qtyPromo28: number; qtyBrandPeers28: number; liftVsBrandPct: number | null }[]
+  >([]);
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
 
@@ -177,6 +183,28 @@ export default function AdminPromotionsPage() {
     if (authed) loadPromotions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
+
+  useEffect(() => {
+    if (!authed) return;
+    void (async () => {
+      try {
+        const [effRes, roiRes] = await Promise.all([
+          fetch("/api/admin/promo-effectiveness?limit=50", { headers: adminHeaders() }),
+          fetch("/api/admin/promo-roi", { headers: adminHeaders() }),
+        ]);
+        const eff = await effRes.json();
+        const roi = await roiRes.json();
+        if (effRes.ok && Array.isArray(eff.rows)) {
+          const map: Record<string, { qtyRecent28: number; qtyPrior28: number; changePct: number | null }> = {};
+          for (const row of eff.rows) map[row.sku] = row;
+          setPromoStats(map);
+        }
+        if (roiRes.ok && Array.isArray(roi.rows)) setPromoRoi(roi.rows);
+      } catch {
+        /* optional analytics */
+      }
+    })();
+  }, [authed, adminHeaders]);
 
   const editPromotion = (record: PromotionRecord) => {
     const tiers = emptyTierRows();
@@ -310,6 +338,19 @@ export default function AdminPromotionsPage() {
         </Panel>
       ) : null}
 
+      {promoRoi.length ? (
+        <Panel title="Promo ROI (28d vs same-brand non-promo volume)">
+          <div style={{ fontSize: 13, lineHeight: 1.55 }}>
+            {promoRoi.slice(0, 8).map((r) => (
+              <div key={r.sku} style={{ marginBottom: 6 }}>
+                <strong>{r.sku}</strong> ({r.brand}) — promo {r.qtyPromo28} cs · brand peers {r.qtyBrandPeers28} cs
+                {r.liftVsBrandPct != null ? ` · lift ${r.liftVsBrandPct.toFixed(0)}%` : ""}
+              </div>
+            ))}
+          </div>
+        </Panel>
+      ) : null}
+
       <div style={splitLayout} className="admin-catalog-split admin-split">
         <Panel title={`List (${filteredPromotions.length})`}>
           <input
@@ -374,6 +415,14 @@ export default function AdminPromotionsPage() {
                       ? `Sold ${p.soldQty || 0}/${p.promoQty}${remaining !== null ? ` · left ${remaining}` : ""}`
                       : "No qty cap"}
                   </div>
+                  {promoStats[p.sku] ? (
+                    <div className="admin-sales-list-summary" style={{ fontWeight: 800, color: "#1d4ed8" }}>
+                      28d: {promoStats[p.sku].qtyRecent28} cs (was {promoStats[p.sku].qtyPrior28})
+                      {promoStats[p.sku].changePct != null
+                        ? ` · ${promoStats[p.sku].changePct!.toFixed(0)}%`
+                        : ""}
+                    </div>
+                  ) : null}
                 </SalesListItem>
               );
             })}

@@ -1,5 +1,8 @@
 import catalogData from "@/data/catalog_sku_master_extracted.json";
+import { cleanSku, parseQty } from "@/lib/analyticsPure";
+import { analyticsCacheKey, cachedAnalytics } from "@/lib/analyticsCache";
 import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
+import { listOrderHistoryAccounts } from "@/lib/redisIndexes";
 import { redis } from "@/lib/redis";
 
 export type CatalogProduct = {
@@ -25,14 +28,7 @@ type OrderHistoryEntry = {
   items?: { sku?: string; qty?: string | number }[];
 };
 
-export function cleanSku(value: unknown) {
-  return String(value || "").trim().toUpperCase();
-}
-
-export function parseQty(value: unknown) {
-  const num = Number(String(value ?? "").replace(/[^0-9]/g, ""));
-  return Number.isFinite(num) && num > 0 ? num : 0;
-}
+export { cleanSku, parseQty, growthPct } from "@/lib/analyticsPure";
 
 export function parseDate(value: unknown) {
   const text = String(value || "").trim();
@@ -84,11 +80,6 @@ export function dateInRange(date: Date | null, start: Date | null, end: Date | n
   return true;
 }
 
-export function growthPct(current: number, previous: number): number | null {
-  if (previous === 0) return current > 0 ? null : null;
-  return ((current - previous) / previous) * 100;
-}
-
 export function median(values: number[]) {
   if (!values.length) return null;
   const sorted = [...values].sort((a, b) => a - b);
@@ -97,7 +88,9 @@ export function median(values: number[]) {
 }
 
 export async function loadInvoiceImports() {
-  return (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
+  return cachedAnalytics("invoiceImports", async () => {
+    return (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
+  });
 }
 
 export async function buildCatalogMap(skus?: string[]) {
@@ -131,9 +124,26 @@ export async function collectSaleEvents(options?: {
   until?: Date | null;
   invoicesOnly?: boolean;
 }): Promise<SaleEvent[]> {
-  const events: SaleEvent[] = [];
   const since = options?.since ?? null;
   const until = options?.until ?? null;
+  const invoicesOnly = options?.invoicesOnly ?? false;
+
+  const cacheKey = analyticsCacheKey([
+    "saleEvents",
+    since?.toISOString(),
+    until?.toISOString(),
+    invoicesOnly ? "1" : "0",
+  ]);
+
+  return cachedAnalytics(cacheKey, () => collectSaleEventsUncached(since, until, invoicesOnly));
+}
+
+async function collectSaleEventsUncached(
+  since: Date | null,
+  until: Date | null,
+  invoicesOnly: boolean
+): Promise<SaleEvent[]> {
+  const events: SaleEvent[] = [];
 
   const imports = await loadInvoiceImports();
   for (const record of imports) {
@@ -164,13 +174,13 @@ export async function collectSaleEvents(options?: {
     }
   }
 
-  if (options?.invoicesOnly) return events;
+  if (invoicesOnly) return events;
 
-  const historyKeys = await redis.keys("orderHistory:*");
+  const accounts = await listOrderHistoryAccounts();
   const histories = await Promise.all(
-    historyKeys.map(async (key) => ({
-      accountNo: key.replace(/^orderHistory:/, "").toUpperCase(),
-      entries: (await redis.get<OrderHistoryEntry[]>(key)) || [],
+    accounts.map(async (accountNo) => ({
+      accountNo,
+      entries: (await redis.get<OrderHistoryEntry[]>(`orderHistory:${accountNo}`)) || [],
     }))
   );
 

@@ -40,6 +40,8 @@ type HealthRow = {
   yoyQtyGrowthPct: number | null;
   status: string;
   statusLabel: string;
+  hasInvoiceData90d: boolean;
+  topSkus90d: { sku: string; qty: number }[];
 };
 
 type HealthData = {
@@ -189,7 +191,7 @@ function AdminInsightsPageInner() {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [healthFilter, setHealthFilter] = useState(() => searchParams.get("status") || "all");
   const [healthRegion, setHealthRegion] = useState("all");
-  const [healthSearch, setHealthSearch] = useState("");
+  const [healthSearch, setHealthSearch] = useState(() => searchParams.get("accountNo") || "");
   const [hideInactive, setHideInactive] = useState(true);
   const [busyHealth, setBusyHealth] = useState(false);
   const healthFetched = useRef(false);
@@ -446,6 +448,7 @@ function AdminInsightsPageInner() {
                     <th style={analyticsTh}>90d $</th>
                     <th style={analyticsTh}>YoY</th>
                     <th style={analyticsTh}>Status</th>
+                    <th style={analyticsTh}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -454,6 +457,9 @@ function AdminInsightsPageInner() {
                       <td style={analyticsTd}>
                         <strong>{r.accountNo}</strong>
                         <div style={{ fontSize: 11, color: "#6b7280" }}>{r.storeName || "—"}</div>
+                        {!r.hasInvoiceData90d && r.qty90 > 0 ? (
+                          <div style={{ fontSize: 10, color: "#b45309", fontWeight: 800 }}>Order-only data</div>
+                        ) : null}
                       </td>
                       <td style={analyticsTd}>{r.regionLabel}</td>
                       <td style={analyticsTd}>
@@ -481,6 +487,19 @@ function AdminInsightsPageInner() {
                         >
                           {r.statusLabel}
                         </span>
+                      </td>
+                      <td style={analyticsTd}>
+                        <Link
+                          href={`/admin/account?accountNo=${encodeURIComponent(r.accountNo)}`}
+                          style={{ fontSize: 12, fontWeight: 800 }}
+                        >
+                          360 →
+                        </Link>
+                        {r.status === "at_risk" && r.topSkus90d?.length ? (
+                          <div style={{ fontSize: 10, color: "#6b7280", marginTop: 4 }}>
+                            Top: {r.topSkus90d.map((s) => s.sku).join(", ")}
+                          </div>
+                        ) : null}
                       </td>
                     </tr>
                   ))}

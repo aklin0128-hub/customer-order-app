@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AdminLogin } from "../_components/AdminLogin";
 import { AdminShell } from "../_components/AdminShell";
 import { inputStyle, panel, panelTitle } from "../_components/admin-styles";
+import { downloadCsv } from "../_components/admin-analytics-ui";
 import { BtnSecondary, EmptyState, StatGrid, Toast, downloadOrderCsv, formatDate } from "../_components/admin-utils";
 import { useAdminAuth } from "../_components/useAdminAuth";
 
@@ -84,9 +85,31 @@ export default function AdminActiveCartsPage() {
       subtitle="Follow up on stale carts (3+ days) — call or email the store."
       onLogout={logout}
       actions={
-        <BtnSecondary onClick={loadCarts} disabled={busy}>
-          {busy ? "Loading..." : "Refresh"}
-        </BtnSecondary>
+        <>
+          <BtnSecondary
+            onClick={() => {
+              downloadCsv(
+                "active-carts.csv",
+                ["accountNo", "storeName", "lineCount", "totalCases", "updatedAt", "phone", "note"],
+                filteredCarts.map((c) => [
+                  c.accountNo,
+                  c.storeName || "",
+                  c.lineCount,
+                  c.totalCases,
+                  c.updatedAt || "",
+                  c.phone || "",
+                  c.note || "",
+                ])
+              );
+            }}
+            disabled={!filteredCarts.length}
+          >
+            Export CSV
+          </BtnSecondary>
+          <BtnSecondary onClick={loadCarts} disabled={busy}>
+            {busy ? "Loading..." : "Refresh"}
+          </BtnSecondary>
+        </>
       }
     >
       <StatGrid
