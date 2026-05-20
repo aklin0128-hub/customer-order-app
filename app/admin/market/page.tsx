@@ -49,11 +49,13 @@ type MarketData = {
     storeName: string;
     region: string;
     regionLabel: string;
+    inCustomerList: boolean;
     growth: GrowthMetrics;
   }[];
   summary: {
     assignedAccounts: number;
-    unassignedAccounts: number;
+    customersWithoutRegion: number;
+    unassignedSalesAccounts: number;
     importCount: number;
   };
 };
@@ -243,7 +245,7 @@ export default function AdminMarketPage() {
             <StatGrid
               items={[
                 { label: "With region", value: data.summary.assignedAccounts },
-                { label: "Unassigned", value: data.summary.unassignedAccounts },
+                { label: "Unassigned (sales)", value: data.summary.unassignedSalesAccounts },
                 {
                   label: "Total cases",
                   value: data.regions.reduce((s, r) => s + r.growth.current.qty, 0),
@@ -259,10 +261,23 @@ export default function AdminMarketPage() {
 
             <div style={splitLayout} className="admin-catalog-split admin-split">
               <Panel title="By city">
-                {data.summary.unassignedAccounts > 0 ? (
-                  <p style={{ margin: "0 0 8px", fontSize: 11, color: "#b45309" }}>
-                    {data.summary.unassignedAccounts} account(s) unassigned —{" "}
-                    <Link href="/admin/customers">set region</Link>
+                {data.summary.unassignedSalesAccounts > 0 ? (
+                  <p style={{ margin: "0 0 8px", fontSize: 11, color: "#b45309", lineHeight: 1.45 }}>
+                    <strong>{data.summary.unassignedSalesAccounts}</strong> sales account(s) with no region
+                    {data.summary.customersWithoutRegion > 0 ? (
+                      <>
+                        {" "}
+                        ({data.summary.customersWithoutRegion} in Customers without region)
+                      </>
+                    ) : null}
+                    . Assign in{" "}
+                    <Link href="/admin/customers">Customers</Link>
+                    {data.summary.unassignedSalesAccounts > data.summary.customersWithoutRegion ? (
+                      <>
+                        {" "}
+                        — some accounts only appear on invoices; add them in Customers first, then set region.
+                      </>
+                    ) : null}
                   </p>
                 ) : null}
                 <AnalyticsTableWrap>
@@ -360,6 +375,20 @@ export default function AdminMarketPage() {
                             <strong>{row.accountNo}</strong>
                             <div style={{ fontSize: 11, color: "#6b7280" }}>
                               {row.storeName || "—"} · {row.regionLabel}
+                              {!row.inCustomerList ? (
+                                <span style={{ display: "block", color: "#b45309", fontWeight: 800 }}>
+                                  Not in Customers — add account to assign region
+                                </span>
+                              ) : row.region === "unassigned" ? (
+                                <span style={{ display: "block" }}>
+                                  <Link
+                                    href={`/admin/customers?accountNo=${encodeURIComponent(row.accountNo)}`}
+                                    style={{ fontWeight: 800 }}
+                                  >
+                                    Set region in Customers →
+                                  </Link>
+                                </span>
+                              ) : null}
                             </div>
                           </td>
                           <td style={{ ...analyticsTd, fontWeight: 800 }}>{row.growth.current.qty.toLocaleString()}</td>

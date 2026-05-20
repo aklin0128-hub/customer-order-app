@@ -57,6 +57,7 @@ export default function AdminCustomersPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkRegion, setBulkRegion] = useState("");
   const [regionFilter, setRegionFilter] = useState("all");
+  const [urlAccountHandled, setUrlAccountHandled] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -88,6 +89,30 @@ export default function AdminCustomersPage() {
     if (authed) loadCustomers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
+
+  useEffect(() => {
+    if (urlAccountHandled || !customers.length) return;
+    const acct = new URLSearchParams(window.location.search).get("accountNo")?.trim().toUpperCase();
+    if (!acct) {
+      setUrlAccountHandled(true);
+      return;
+    }
+    const match = customers.find((c) => c.accountNo.toUpperCase() === acct);
+    if (match) {
+      setAccountNo(match.accountNo);
+      setStoreName(match.storeName || "");
+      setPassword(match.password || "");
+      setActive(match.active !== false);
+      setEmail(match.email || "");
+      setPhone(match.phone || "");
+      setNote(match.note || "");
+      setRegion(match.region || "");
+    } else {
+      setAccountNo(acct);
+    }
+    setSearch(acct);
+    setUrlAccountHandled(true);
+  }, [customers, urlAccountHandled]);
 
   const filteredCustomers = useMemo(() => {
     const q = search.trim().toUpperCase();

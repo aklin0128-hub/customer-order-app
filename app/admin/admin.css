@@ -371,9 +371,18 @@
   min-width: 0;
   border: none;
   background: transparent;
+  color: #111827;
   text-align: left;
   padding: 10px 12px;
   cursor: pointer;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.admin-sales-list-item-main strong {
+  color: #111827;
+  font-size: 14px;
+  font-weight: 900;
 }
 
 .admin-sales-list-item--selected .admin-sales-list-item-main {

@@ -47,6 +47,8 @@ export type AccountGrowthRow = {
   storeName: string;
   region: CustomerRegionValue;
   regionLabel: string;
+  /** Account exists in customers.csv or Redis customer record */
+  inCustomerList: boolean;
   growth: GrowthMetrics;
 };
 
@@ -59,7 +61,10 @@ export type MarketAnalyticsResult = {
   summary: {
     totalAccounts: number;
     assignedAccounts: number;
-    unassignedAccounts: number;
+    /** Customers in directory without a region set */
+    customersWithoutRegion: number;
+    /** Sales accounts (invoice/order) showing as unassigned region */
+    unassignedSalesAccounts: number;
     importCount: number;
     linesInRange: number;
   };
@@ -370,14 +375,7 @@ export async function getMarketAnalytics(period: MarketPeriod): Promise<MarketAn
     UNASSIGNED_REGION,
   ];
 
-  const regionAccountSets = new Map<CustomerRegionValue, Set<string>>();
-  for (const id of regionIds) regionAccountSets.set(id, new Set());
-
-  for (const c of customers) {
-    const acct = c.accountNo.toUpperCase();
-    const region = regionByAccount.get(acct) || UNASSIGNED_REGION;
-    regionAccountSets.get(region)?.add(acct);
-  }
+  const customerAccounts = new Set(customers.map((c) => c.accountNo.toUpperCase()));
 
   const regionAgg = new Map<
     CustomerRegionValue,
@@ -401,6 +399,7 @@ export async function getMarketAnalytics(period: MarketPeriod): Promise<MarketAn
       storeName: storeByAccount.get(acct) || "",
       region,
       regionLabel: marketRegionLabel(region),
+      inCustomerList: customerAccounts.has(acct),
       growth,
     });
 
@@ -426,6 +425,12 @@ export async function getMarketAnalytics(period: MarketPeriod): Promise<MarketAn
     if (row.growth.previous.qty > 0) slot.previous += 1;
   }
 
+  const regionAccountSets = new Map<CustomerRegionValue, Set<string>>();
+  for (const id of regionIds) regionAccountSets.set(id, new Set());
+  for (const row of accountRows) {
+    regionAccountSets.get(row.region)?.add(row.accountNo);
+  }
+
   const regions: RegionGrowthRow[] = regionIds.map((region) => {
     const agg = regionAgg.get(region)!;
     const growth = buildGrowth(agg.current, agg.previous);
@@ -448,6 +453,8 @@ export async function getMarketAnalytics(period: MarketPeriod): Promise<MarketAn
   });
 
   const assignedAccounts = customers.filter((c) => c.region).length;
+  const customersWithoutRegion = customers.length - assignedAccounts;
+  const unassignedSalesAccounts = accountRows.filter((r) => r.region === UNASSIGNED_REGION).length;
 
   return {
     period,
@@ -458,7 +465,8 @@ export async function getMarketAnalytics(period: MarketPeriod): Promise<MarketAn
     summary: {
       totalAccounts: customers.length,
       assignedAccounts,
-      unassignedAccounts: customers.length - assignedAccounts,
+      customersWithoutRegion,
+      unassignedSalesAccounts,
       importCount,
       linesInRange,
     },

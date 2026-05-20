@@ -6,6 +6,7 @@ import {
 } from "@/lib/customers";
 import { normalizeMarketRegion } from "@/lib/customerRegion";
 import { loadCustomers } from "@/lib/loadCustomers";
+import { bustAnalyticsCache } from "@/lib/analyticsCache";
 import { indexCustomerAccount, unindexCustomerAccount } from "@/lib/redisIndexes";
 import { redis } from "@/lib/redis";
 
@@ -92,6 +93,7 @@ export async function POST(req: Request) {
 
     await redis.set(`customer:${accountNo}`, customer);
     await indexCustomerAccount(accountNo);
+    bustAnalyticsCache();
 
     return NextResponse.json({
       success: true,

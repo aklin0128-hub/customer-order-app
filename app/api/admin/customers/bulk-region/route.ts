@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAllCustomers, getCustomerByAccount, normalizeAccountNo } from "@/lib/customers";
 import { normalizeMarketRegion } from "@/lib/customerRegion";
+import { bustAnalyticsCache } from "@/lib/analyticsCache";
 import { indexCustomerAccount } from "@/lib/redisIndexes";
 import { redis } from "@/lib/redis";
 
@@ -57,6 +58,8 @@ export async function POST(req: Request) {
       await indexCustomerAccount(acct);
       updated += 1;
     }
+
+    bustAnalyticsCache();
 
     return NextResponse.json({
       success: true,
