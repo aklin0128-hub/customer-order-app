@@ -338,19 +338,6 @@ export default function AdminPromotionsPage() {
         </Panel>
       ) : null}
 
-      {promoRoi.length ? (
-        <Panel title="Promo ROI (28d vs same-brand non-promo volume)">
-          <div style={{ fontSize: 13, lineHeight: 1.55 }}>
-            {promoRoi.slice(0, 8).map((r) => (
-              <div key={r.sku} style={{ marginBottom: 6 }}>
-                <strong>{r.sku}</strong> ({r.brand}) — promo {r.qtyPromo28} cs · brand peers {r.qtyBrandPeers28} cs
-                {r.liftVsBrandPct != null ? ` · lift ${r.liftVsBrandPct.toFixed(0)}%` : ""}
-              </div>
-            ))}
-          </div>
-        </Panel>
-      ) : null}
-
       <div style={splitLayout} className="admin-catalog-split admin-split">
         <Panel title={`List (${filteredPromotions.length})`}>
           <input
@@ -370,7 +357,7 @@ export default function AdminPromotionsPage() {
               { id: "sold_out", label: "Sold out" },
             ]}
           />
-          <div style={splitList}>
+          <div className="admin-split-list">
             {filteredPromotions.map((p) => {
               const product = productMap.get(p.sku.toUpperCase());
               const status = p.promoStatus || "active";
@@ -633,6 +620,19 @@ export default function AdminPromotionsPage() {
           </Panel>
         </div>
       </div>
+
+      {promoRoi.length ? (
+        <Panel title="Promo ROI (28d vs same-brand non-promo volume)">
+          <div style={{ fontSize: 13, lineHeight: 1.55 }}>
+            {promoRoi.slice(0, 8).map((r) => (
+              <div key={r.sku} style={{ marginBottom: 6 }}>
+                <strong>{r.sku}</strong> ({r.brand}) — promo {r.qtyPromo28} cs · brand peers {r.qtyBrandPeers28} cs
+                {r.liftVsBrandPct != null ? ` · lift ${r.liftVsBrandPct.toFixed(0)}%` : ""}
+              </div>
+            ))}
+          </div>
+        </Panel>
+      ) : null}
     </AdminShell>
   );
 }

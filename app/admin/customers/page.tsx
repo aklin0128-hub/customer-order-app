@@ -357,7 +357,7 @@ export default function AdminCustomersPage() {
               Export visible CSV
             </BtnSecondary>
           </div>
-          <div style={splitList}>
+          <div className="admin-split-list">
             {filteredCustomers.map((c) => (
               <ListItemButton
                 key={c.accountNo}

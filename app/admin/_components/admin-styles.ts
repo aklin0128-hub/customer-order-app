@@ -181,7 +181,7 @@ export const content: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 14,
-  maxWidth: 1200,
+  maxWidth: 1400,
   width: "100%",
 };
 
@@ -321,13 +321,8 @@ export const splitLayout: CSSProperties = {
   alignItems: "start",
 };
 
-export const splitList: CSSProperties = {
-  maxHeight: "calc(100vh - 200px)",
-  overflowY: "auto",
-  display: "flex",
-  flexDirection: "column",
-  gap: 6,
-};
+/** Use with className `admin-split-list` — do not add flex on inline style (crushes rows). */
+export const splitList: CSSProperties = {};
 
 export const splitForm: CSSProperties = {
   position: "sticky",

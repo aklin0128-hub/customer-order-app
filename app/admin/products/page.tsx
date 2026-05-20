@@ -592,7 +592,7 @@ export default function AdminProductsPage() {
               </button>
             </div>
           </div>
-          <div style={splitList}>
+          <div className="admin-split-list">
             {filteredProducts.map((p) => (
               <div key={p.sku} style={{ position: "relative" }}>
                 <input

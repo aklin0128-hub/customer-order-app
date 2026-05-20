@@ -274,7 +274,7 @@ export default function AdminClearancePage() {
               { id: "sold_out", label: "Sold out" },
             ]}
           />
-          <div style={splitList}>
+          <div className="admin-split-list">
             {filteredClearances.map((p) => {
               const product = productMap.get(p.sku.toUpperCase());
               const status = p.clearanceStatus || "active";
