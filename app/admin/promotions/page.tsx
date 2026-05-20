@@ -1,15 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import { AdminLogin } from "../_components/AdminLogin";
 import { AdminShell } from "../_components/AdminShell";
-import { formGrid, inputStyle, labelStyle, splitList } from "../_components/admin-styles";
 import {
-  BtnDanger,
+  FieldLabel,
+  FormSection,
+  SalesListItem,
+  SegmentedPicker,
+  SkuPreview,
+  StatusBadge,
+  inputStyle,
+} from "../_components/admin-sales-ui";
+import { formGrid, splitForm, splitLayout, splitList } from "../_components/admin-styles";
+import {
   BtnPrimary,
   BtnRow,
   BtnSecondary,
   EmptyState,
+  FilterChips,
   Panel,
   StatGrid,
   Toast,
@@ -17,12 +27,9 @@ import {
 import { useAdminAuth } from "../_components/useAdminAuth";
 
 type PromotionStatus = "active" | "scheduled" | "expired" | "sold_out";
+type StatusFilter = "all" | PromotionStatus;
 
-type PromoPriceTier = {
-  minQty: number;
-  price: string;
-};
-
+type PromoPriceTier = { minQty: number; price: string };
 type DealMode = "none" | "bogo" | "tiered";
 
 type PromotionRecord = {
@@ -37,24 +44,13 @@ type PromotionRecord = {
   getQtyFree?: number;
   priceTiers?: PromoPriceTier[];
   promoStatus?: PromotionStatus;
-  updatedAt?: string;
 };
 
-type TierFormRow = {
-  minQty: string;
-  price: string;
-};
+type TierFormRow = { minQty: string; price: string };
 
-type PromotionProduct = {
-  sku: string;
-  name?: string;
-  brand?: string;
-  promoNote?: string;
-  promoPrice?: string;
-  remainingQty?: number | null;
-};
+type PromotionProduct = { sku: string; name?: string; brand?: string };
 
-const statusStyle: Record<PromotionStatus, React.CSSProperties> = {
+const statusStyle: Record<PromotionStatus, CSSProperties> = {
   active: { background: "#ecfdf5", color: "#047857", border: "1px solid #a7f3d0" },
   scheduled: { background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" },
   expired: { background: "#f3f4f6", color: "#4b5563", border: "1px solid #d1d5db" },
@@ -92,6 +88,13 @@ function formatTierPricesLine(tiers: PromoPriceTier[]) {
     .join(" · ");
 }
 
+function dealSummary(p: PromotionRecord) {
+  if (p.buyQty && p.getQtyFree) return `Buy ${p.buyQty} Get ${p.getQtyFree} free`;
+  if (p.priceTiers?.length) return formatTierPricesLine(p.priceTiers);
+  if (p.promoPrice) return `Price: ${p.promoPrice}`;
+  return "";
+}
+
 function emptyForm() {
   return {
     sku: "",
@@ -115,6 +118,8 @@ export default function AdminPromotionsPage() {
   const [promotions, setPromotions] = useState<PromotionRecord[]>([]);
   const [products, setProducts] = useState<PromotionProduct[]>([]);
   const [form, setForm] = useState(emptyForm());
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [busy, setBusy] = useState(false);
   const [promotionsLoaded, setPromotionsLoaded] = useState(false);
   const [msg, setMsg] = useState("");
@@ -124,6 +129,30 @@ export default function AdminPromotionsPage() {
     setMsg(text);
     setMsgTone(tone);
   };
+
+  const productMap = useMemo(() => {
+    const map = new Map<string, PromotionProduct>();
+    for (const p of products) map.set(p.sku.toUpperCase(), p);
+    return map;
+  }, [products]);
+
+  const selectedProduct = productMap.get(form.sku.trim().toUpperCase()) ?? null;
+
+  const filteredPromotions = useMemo(() => {
+    const q = search.trim().toUpperCase();
+    return promotions.filter((p) => {
+      const status = p.promoStatus || "active";
+      if (statusFilter !== "all" && status !== statusFilter) return false;
+      if (!q) return true;
+      const product = productMap.get(p.sku.toUpperCase());
+      return (
+        p.sku.toUpperCase().includes(q) ||
+        p.note?.toUpperCase().includes(q) ||
+        product?.name?.toUpperCase().includes(q) ||
+        product?.brand?.toUpperCase().includes(q)
+      );
+    });
+  }, [promotions, search, statusFilter, productMap]);
 
   const loadPromotions = async () => {
     setBusy(true);
@@ -153,12 +182,8 @@ export default function AdminPromotionsPage() {
     const tiers = emptyTierRows();
     (record.priceTiers || []).forEach((tier, index) => {
       if (index >= 3) return;
-      tiers[index] = {
-        minQty: String(tier.minQty),
-        price: tier.price,
-      };
+      tiers[index] = { minQty: String(tier.minQty), price: tier.price };
     });
-
     setForm({
       sku: record.sku,
       note: record.note || "",
@@ -172,7 +197,6 @@ export default function AdminPromotionsPage() {
       tiers,
       resetSoldQty: false,
     });
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const savePromotion = async () => {
@@ -197,10 +221,7 @@ export default function AdminPromotionsPage() {
           priceTiers:
             form.dealMode === "tiered"
               ? form.tiers
-                  .map((tier) => ({
-                    minQty: tier.minQty,
-                    price: tier.price.trim(),
-                  }))
+                  .map((tier) => ({ minQty: tier.minQty, price: tier.price.trim() }))
                   .filter((tier) => tier.minQty && tier.price)
               : undefined,
           resetSoldQty: form.resetSoldQty,
@@ -241,6 +262,7 @@ export default function AdminPromotionsPage() {
   };
 
   const activeCount = promotions.filter((p) => p.promoStatus === "active").length;
+  const editingSku = form.sku.trim().toUpperCase();
 
   if (!ready) return null;
 
@@ -262,8 +284,13 @@ export default function AdminPromotionsPage() {
     <AdminShell
       active="promotions"
       title="Promotions"
-      subtitle="Set date range, promo quantity (sold until gone), and optional price. Customers only see active promos."
+      subtitle="Click a row to edit · form stays on the right. Same deal options as before."
       onLogout={logout}
+      actions={
+        <BtnSecondary onClick={() => setForm(emptyForm())} disabled={busy}>
+          + New promo
+        </BtnSecondary>
+      }
     >
       <StatGrid
         items={[
@@ -272,289 +299,291 @@ export default function AdminPromotionsPage() {
           { label: "Valid SKUs", value: products.length },
           {
             label: "Missing SKU",
-            value: promotions.filter((p) => !products.some((x) => x.sku === p.sku)).length,
+            value: promotions.filter((p) => !productMap.has(p.sku.toUpperCase())).length,
           },
         ]}
       />
 
       {!promotionsLoaded && busy ? (
         <Panel title="Loading promotions">
-          <p style={{ margin: 0, fontSize: 13, color: "#0f766e", fontWeight: 800 }}>Loading promotion list...</p>
+          <p style={{ margin: 0, fontSize: 13, color: "#0f766e", fontWeight: 800 }}>Loading…</p>
         </Panel>
       ) : null}
 
-      <Panel title="Add / update promotion">
-        <div style={formGrid}>
-          <div>
-            <label style={labelStyle}>SKU</label>
-            <input
-              value={form.sku}
-              onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value.toUpperCase() }))}
-              placeholder="00003D"
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Short label (optional)</label>
-            <input
-              value={form.note}
-              onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
-              placeholder="Hot deal / 限时促销"
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Start date (optional)</label>
-            <input
-              type="date"
-              value={form.startDate}
-              onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>End date (optional)</label>
-            <input
-              type="date"
-              value={form.endDate}
-              onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Promo qty (optional)</label>
-            <input
-              value={form.promoQty}
-              onChange={(e) => setForm((f) => ({ ...f, promoQty: e.target.value.replace(/[^0-9]/g, "") }))}
-              placeholder="Leave empty = unlimited"
-              inputMode="numeric"
-              style={inputStyle}
-            />
-          </div>
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label style={labelStyle}>Deal type (pick one)</label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 6 }}>
-              {(
-                [
-                  ["none", "Single promo price"],
-                  ["bogo", "Buy X Get Y free"],
-                  ["tiered", "Volume tiers (up to 3)"],
-                ] as const
-              ).map(([mode, label]) => (
-                <label key={mode} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700 }}>
-                  <input
-                    type="radio"
-                    name="dealMode"
-                    checked={form.dealMode === mode}
-                    onChange={() => setForm((f) => ({ ...f, dealMode: mode }))}
-                  />
-                  {label}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          {form.dealMode === "none" ? (
-            <div>
-              <label style={labelStyle}>Promo price</label>
-              <input
-                value={form.promoPrice}
-                onChange={(e) => setForm((f) => ({ ...f, promoPrice: e.target.value }))}
-                placeholder="$12.99"
-                style={inputStyle}
-              />
-            </div>
-          ) : null}
-
-          {form.dealMode === "bogo" ? (
-            <div style={{ gridColumn: "1 / -1" }}>
-              <label style={labelStyle}>Buy X Get Y free</label>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              <input
-                value={form.buyQty}
-                onChange={(e) => setForm((f) => ({ ...f, buyQty: e.target.value.replace(/[^0-9]/g, "") }))}
-                placeholder="Buy qty (e.g. 2)"
-                inputMode="numeric"
-                style={inputStyle}
-              />
-              <input
-                value={form.getQtyFree}
-                onChange={(e) => setForm((f) => ({ ...f, getQtyFree: e.target.value.replace(/[^0-9]/g, "") }))}
-                placeholder="Free qty (e.g. 1)"
-                inputMode="numeric"
-                style={inputStyle}
-              />
-            </div>
-              <p style={{ margin: "6px 0 0", fontSize: 11, color: "#6b7280", lineHeight: 1.4 }}>
-                Example: Buy 2 Get 1 free — customer adds 3 cases, pays for 2.
-              </p>
-            </div>
-          ) : null}
-
-          {form.dealMode === "tiered" ? (
-            <div style={{ gridColumn: "1 / -1" }}>
-              <label style={labelStyle}>Volume price tiers (min cases + price)</label>
-              <div style={{ display: "grid", gap: 8 }}>
-                {form.tiers.map((tier, index) => (
-                  <div
-                    key={index}
-                    style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, alignItems: "center" }}
-                  >
-                    <input
-                      value={tier.minQty}
-                      onChange={(e) =>
-                        setForm((f) => {
-                          const tiers = [...f.tiers];
-                          tiers[index] = { ...tiers[index], minQty: e.target.value.replace(/[^0-9]/g, "") };
-                          return { ...f, tiers };
-                        })
-                      }
-                      placeholder={`Tier ${index + 1} min cs (e.g. 30)`}
-                      inputMode="numeric"
-                      style={inputStyle}
-                    />
-                    <input
-                      value={tier.price}
-                      onChange={(e) =>
-                        setForm((f) => {
-                          const tiers = [...f.tiers];
-                          tiers[index] = { ...tiers[index], price: e.target.value };
-                          return { ...f, tiers };
-                        })
-                      }
-                      placeholder="Price (e.g. 11.00)"
-                      style={inputStyle}
-                    />
-                  </div>
-                ))}
-              </div>
-              <p style={{ margin: "6px 0 0", fontSize: 11, color: "#6b7280", lineHeight: 1.4 }}>
-                Example: $10.00/280cs · $10.50/140cs · $11.00/30cs. Cannot combine with Buy X Get Y.
-              </p>
-            </div>
-          ) : null}
-        </div>
-
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
+      <div style={splitLayout} className="admin-catalog-split admin-split">
+        <Panel title={`List (${filteredPromotions.length})`}>
           <input
-            type="checkbox"
-            checked={form.resetSoldQty}
-            onChange={(e) => setForm((f) => ({ ...f, resetSoldQty: e.target.checked }))}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search SKU, name, brand, note…"
+            style={{ ...inputStyle, marginBottom: 8 }}
           />
-          Reset sold count to 0 when saving
-        </label>
+          <FilterChips
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[
+              { id: "all", label: "All" },
+              { id: "active", label: "Active" },
+              { id: "scheduled", label: "Scheduled" },
+              { id: "expired", label: "Expired" },
+              { id: "sold_out", label: "Sold out" },
+            ]}
+          />
+          <div style={splitList}>
+            {filteredPromotions.map((p) => {
+              const product = productMap.get(p.sku.toUpperCase());
+              const status = p.promoStatus || "active";
+              const remaining =
+                p.promoQty && p.promoQty > 0 ? Math.max(0, p.promoQty - (p.soldQty || 0)) : null;
+              const deal = dealSummary(p);
 
-        <BtnRow>
-          <BtnPrimary onClick={savePromotion} disabled={busy}>
-            {busy ? "Saving..." : "Save promotion"}
-          </BtnPrimary>
-          <BtnSecondary onClick={() => setForm(emptyForm())} disabled={busy}>
-            Clear form
-          </BtnSecondary>
-          <BtnSecondary onClick={loadPromotions} disabled={busy}>
-            Refresh
-          </BtnSecondary>
-        </BtnRow>
-        <Toast message={msg} tone={msgTone} />
-      </Panel>
-
-      <Panel title={`Promotion list (${promotions.length})`}>
-        <div style={splitList}>
-          {promotions.map((p) => {
-            const product = products.find((x) => x.sku === p.sku);
-            const status = p.promoStatus || "active";
-            const remaining =
-              p.promoQty && p.promoQty > 0
-                ? Math.max(0, p.promoQty - (p.soldQty || 0))
-                : null;
-
-            return (
-              <div
-                key={p.sku}
-                role="button"
-                tabIndex={0}
-                onClick={() => editPromotion(p)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") editPromotion(p);
-                }}
-                style={{
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 12,
-                  padding: 12,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 10,
-                  alignItems: "flex-start",
-                  background: product ? "#fff" : "#fef2f2",
-                  cursor: "pointer",
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
+              return (
+                <SalesListItem
+                  key={p.sku}
+                  selected={editingSku === p.sku.toUpperCase()}
+                  onClick={() => editPromotion(p)}
+                  onRemove={() => removePromotion(p.sku)}
+                  removeDisabled={busy}
+                >
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <strong>{p.sku}</strong>
-                    <span
-                      style={{
-                        ...statusStyle[status],
-                        fontSize: 10,
-                        fontWeight: 900,
-                        padding: "2px 8px",
-                        borderRadius: 999,
-                      }}
-                    >
-                      {statusLabel[status]}
-                    </span>
+                    <strong style={{ fontSize: 14 }}>{p.sku}</strong>
+                    <StatusBadge label={statusLabel[status]} style={statusStyle[status]} />
                   </div>
                   {p.note ? (
-                    <div style={{ fontSize: 12, color: "#c2410c", fontWeight: 800, marginTop: 4 }}>{p.note}</div>
+                    <div style={{ fontSize: 12, color: "#c2410c", fontWeight: 800, marginTop: 2 }}>{p.note}</div>
                   ) : null}
                   {product ? (
-                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                    <div className="admin-sales-list-summary">
                       {product.brand ? `${product.brand} · ` : ""}
                       {product.name || "—"}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 12, color: "#b91c1c", marginTop: 4 }}>SKU not found in catalog</div>
+                    <div className="admin-sales-list-summary" style={{ color: "#b91c1c", fontWeight: 700 }}>
+                      SKU not in catalog
+                    </div>
                   )}
-                  <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6, lineHeight: 1.45 }}>
+                  {deal ? <div className="admin-sales-list-deal">{deal}</div> : null}
+                  <div className="admin-sales-list-summary">
                     {(p.startDate || p.endDate) && (
-                      <div>
-                        Dates: {p.startDate || "—"} → {p.endDate || "—"}
-                      </div>
+                      <span>
+                        {p.startDate || "—"} → {p.endDate || "—"}
+                        {" · "}
+                      </span>
                     )}
-                    {p.promoPrice ? <div>Price: {p.promoPrice}</div> : null}
-                    {p.priceTiers?.length ? (
-                      <div style={{ fontWeight: 800, color: "#b45309" }}>
-                        Tiers: {formatTierPricesLine(p.priceTiers)}
-                      </div>
-                    ) : null}
-                    {p.buyQty && p.getQtyFree ? (
-                      <div style={{ fontWeight: 800, color: "#b45309" }}>
-                        Buy {p.buyQty} Get {p.getQtyFree} free
-                      </div>
-                    ) : null}
-                    {p.promoQty ? (
-                      <div>
-                        Sold: {p.soldQty || 0} / {p.promoQty}
-                        {remaining !== null ? ` · Remaining: ${remaining}` : ""}
-                      </div>
-                    ) : (
-                      <div>No qty cap (date-only or open-ended)</div>
-                    )}
+                    {p.promoQty
+                      ? `Sold ${p.soldQty || 0}/${p.promoQty}${remaining !== null ? ` · left ${remaining}` : ""}`
+                      : "No qty cap"}
+                  </div>
+                </SalesListItem>
+              );
+            })}
+            {promotionsLoaded && filteredPromotions.length === 0 ? (
+              <EmptyState
+                title={promotions.length === 0 ? "No promotions yet" : "No matches"}
+                detail={
+                  promotions.length === 0
+                    ? "Use + New promo or pick a SKU on the right."
+                    : "Try another search or filter."
+                }
+              />
+            ) : null}
+          </div>
+        </Panel>
+
+        <div style={splitForm} className="admin-catalog-form-sticky">
+          <Panel title={editingSku ? `Edit ${editingSku}` : "Add promotion"}>
+            <FormSection title="SKU & label" hint="Required to save">
+              <div style={formGrid}>
+                <div>
+                  <FieldLabel required>SKU</FieldLabel>
+                  <input
+                    value={form.sku}
+                    onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value.toUpperCase() }))}
+                    placeholder="00003D"
+                    style={inputStyle}
+                    autoFocus={!editingSku}
+                  />
+                  <SkuPreview sku={form.sku} product={selectedProduct} />
+                </div>
+                <div>
+                  <FieldLabel>Short label</FieldLabel>
+                  <input
+                    value={form.note}
+                    onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+                    placeholder="Hot deal / 限时促销"
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+            </FormSection>
+
+            <FormSection title="Schedule & limit" hint="Dates and qty cap are optional">
+              <div className="admin-form-grid-2">
+                <div>
+                  <FieldLabel>Start date</FieldLabel>
+                  <input
+                    type="date"
+                    value={form.startDate}
+                    onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <FieldLabel>End date</FieldLabel>
+                  <input
+                    type="date"
+                    value={form.endDate}
+                    onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+              <div style={{ marginTop: 10 }}>
+                <FieldLabel>Promo qty (sold until gone)</FieldLabel>
+                <input
+                  value={form.promoQty}
+                  onChange={(e) => setForm((f) => ({ ...f, promoQty: e.target.value.replace(/[^0-9]/g, "") }))}
+                  placeholder="Empty = unlimited"
+                  inputMode="numeric"
+                  style={inputStyle}
+                />
+              </div>
+            </FormSection>
+
+            <FormSection title="Deal pricing" hint="Pick one — same options as before" tone="accent">
+              <SegmentedPicker
+                value={form.dealMode}
+                onChange={(mode) => setForm((f) => ({ ...f, dealMode: mode }))}
+                ariaLabel="Deal type"
+                options={[
+                  { id: "none", label: "Single price" },
+                  { id: "bogo", label: "Buy X Get Y" },
+                  { id: "tiered", label: "Volume tiers" },
+                ]}
+              />
+
+              {form.dealMode === "none" ? (
+                <div style={{ marginTop: 10 }}>
+                  <FieldLabel>Promo price</FieldLabel>
+                  <input
+                    value={form.promoPrice}
+                    onChange={(e) => setForm((f) => ({ ...f, promoPrice: e.target.value }))}
+                    placeholder="$12.99"
+                    style={inputStyle}
+                  />
+                </div>
+              ) : null}
+
+              {form.dealMode === "bogo" ? (
+                <div className="admin-form-grid-2" style={{ marginTop: 10 }}>
+                  <div>
+                    <FieldLabel>Buy qty</FieldLabel>
+                    <input
+                      value={form.buyQty}
+                      onChange={(e) => setForm((f) => ({ ...f, buyQty: e.target.value.replace(/[^0-9]/g, "") }))}
+                      placeholder="2"
+                      inputMode="numeric"
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <FieldLabel>Free qty</FieldLabel>
+                    <input
+                      value={form.getQtyFree}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, getQtyFree: e.target.value.replace(/[^0-9]/g, "") }))
+                      }
+                      placeholder="1"
+                      inputMode="numeric"
+                      style={inputStyle}
+                    />
                   </div>
                 </div>
-                <span onClick={(e) => e.stopPropagation()}>
-                  <BtnDanger onClick={() => removePromotion(p.sku)} disabled={busy}>
-                    Remove
-                  </BtnDanger>
-                </span>
-              </div>
-            );
-          })}
-          {promotionsLoaded && promotions.length === 0 ? (
-            <EmptyState title="No promotions yet" detail="Add SKUs to feature them on the customer order page." />
-          ) : null}
+              ) : null}
+
+              {form.dealMode === "tiered" ? (
+                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                  {form.tiers.map((tier, index) => (
+                    <div key={index} className="admin-tier-row">
+                      <span className="admin-tier-row-label">{index + 1}</span>
+                      <div>
+                        <FieldLabel>Min cs</FieldLabel>
+                        <input
+                          value={tier.minQty}
+                          onChange={(e) =>
+                            setForm((f) => {
+                              const tiers = [...f.tiers];
+                              tiers[index] = {
+                                ...tiers[index],
+                                minQty: e.target.value.replace(/[^0-9]/g, ""),
+                              };
+                              return { ...f, tiers };
+                            })
+                          }
+                          placeholder={index === 0 ? "280" : index === 1 ? "140" : "30"}
+                          inputMode="numeric"
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <FieldLabel>Price</FieldLabel>
+                        <input
+                          value={tier.price}
+                          onChange={(e) =>
+                            setForm((f) => {
+                              const tiers = [...f.tiers];
+                              tiers[index] = { ...tiers[index], price: e.target.value };
+                              return { ...f, tiers };
+                            })
+                          }
+                          placeholder={index === 0 ? "10.00" : index === 1 ? "10.50" : "11.00"}
+                          style={inputStyle}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <p style={{ margin: 0, fontSize: 11, color: "#6b7280" }}>
+                    e.g. $10.00/280cs · $10.50/140cs · $11.00/30cs
+                  </p>
+                </div>
+              ) : null}
+            </FormSection>
+
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 13,
+                fontWeight: 700,
+                marginBottom: 4,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={form.resetSoldQty}
+                onChange={(e) => setForm((f) => ({ ...f, resetSoldQty: e.target.checked }))}
+              />
+              Reset sold count to 0 when saving
+            </label>
+
+            <div className="admin-form-actions-sticky">
+              <BtnRow>
+                <BtnPrimary onClick={savePromotion} disabled={busy}>
+                  {busy ? "Saving…" : "Save promotion"}
+                </BtnPrimary>
+                <BtnSecondary onClick={() => setForm(emptyForm())} disabled={busy}>
+                  Clear
+                </BtnSecondary>
+                <BtnSecondary onClick={loadPromotions} disabled={busy}>
+                  Refresh
+                </BtnSecondary>
+              </BtnRow>
+              <Toast message={msg} tone={msgTone} />
+            </div>
+          </Panel>
         </div>
-      </Panel>
+      </div>
     </AdminShell>
   );
 }

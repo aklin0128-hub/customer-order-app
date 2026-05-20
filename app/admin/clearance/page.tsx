@@ -1,17 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { formatClearancePriceDisplay } from "@/lib/clearanceFormat";
 import { AdminLogin } from "../_components/AdminLogin";
 import { AdminShell } from "../_components/AdminShell";
-import { formGrid, inputStyle, labelStyle, splitList } from "../_components/admin-styles";
 import {
-  BtnDanger,
+  FieldLabel,
+  FormSection,
+  SalesListItem,
+  SkuPreview,
+  StatusBadge,
+  inputStyle,
+} from "../_components/admin-sales-ui";
+import { formGrid, splitForm, splitLayout, splitList } from "../_components/admin-styles";
+import {
   BtnPrimary,
   BtnRow,
   BtnSecondary,
   EmptyState,
+  FilterChips,
   Panel,
   StatGrid,
   Toast,
@@ -19,6 +27,7 @@ import {
 import { useAdminAuth } from "../_components/useAdminAuth";
 
 type ClearanceStatus = "active" | "scheduled" | "expired" | "sold_out";
+type StatusFilter = "all" | ClearanceStatus;
 
 type ClearanceRecord = {
   sku: string;
@@ -30,14 +39,9 @@ type ClearanceRecord = {
   clearanceQty?: number;
   soldQty?: number;
   clearanceStatus?: ClearanceStatus;
-  updatedAt?: string;
 };
 
-type ClearanceProduct = {
-  sku: string;
-  name?: string;
-  brand?: string;
-};
+type ClearanceProduct = { sku: string; name?: string; brand?: string };
 
 const statusStyle: Record<ClearanceStatus, CSSProperties> = {
   active: { background: "#fff7ed", color: "#c2410c", border: "1px solid #fdba74" },
@@ -73,6 +77,8 @@ export default function AdminClearancePage() {
   const [clearances, setClearances] = useState<ClearanceRecord[]>([]);
   const [products, setProducts] = useState<ClearanceProduct[]>([]);
   const [form, setForm] = useState(emptyForm());
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [msg, setMsg] = useState("");
@@ -82,6 +88,30 @@ export default function AdminClearancePage() {
     setMsg(text);
     setMsgTone(tone);
   };
+
+  const productMap = useMemo(() => {
+    const map = new Map<string, ClearanceProduct>();
+    for (const p of products) map.set(p.sku.toUpperCase(), p);
+    return map;
+  }, [products]);
+
+  const selectedProduct = productMap.get(form.sku.trim().toUpperCase()) ?? null;
+
+  const filteredClearances = useMemo(() => {
+    const q = search.trim().toUpperCase();
+    return clearances.filter((p) => {
+      const status = p.clearanceStatus || "active";
+      if (statusFilter !== "all" && status !== statusFilter) return false;
+      if (!q) return true;
+      const product = productMap.get(p.sku.toUpperCase());
+      return (
+        p.sku.toUpperCase().includes(q) ||
+        p.note?.toUpperCase().includes(q) ||
+        product?.name?.toUpperCase().includes(q) ||
+        product?.brand?.toUpperCase().includes(q)
+      );
+    });
+  }, [clearances, search, statusFilter, productMap]);
 
   const loadClearances = async () => {
     setBusy(true);
@@ -118,7 +148,6 @@ export default function AdminClearancePage() {
       clearanceQty: record.clearanceQty ? String(record.clearanceQty) : "",
       resetSoldQty: false,
     });
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const saveClearance = async () => {
@@ -176,6 +205,7 @@ export default function AdminClearancePage() {
   };
 
   const activeCount = clearances.filter((p) => p.clearanceStatus === "active").length;
+  const editingSku = form.sku.trim().toUpperCase();
 
   if (!ready) return null;
 
@@ -197,8 +227,13 @@ export default function AdminClearancePage() {
     <AdminShell
       active="clearance"
       title="Clearance — Sell as is"
-      subtitle="Product expiry date, clearance price, and optional stock cap. Customers only see active listings."
+      subtitle="Click a row to edit · form on the right. Same fields as before."
       onLogout={logout}
+      actions={
+        <BtnSecondary onClick={() => setForm(emptyForm())} disabled={busy}>
+          + New clearance
+        </BtnSecondary>
+      }
     >
       <StatGrid
         items={[
@@ -207,202 +242,220 @@ export default function AdminClearancePage() {
           { label: "Valid SKUs", value: products.length },
           {
             label: "Missing SKU",
-            value: clearances.filter((p) => !products.some((x) => x.sku === p.sku)).length,
+            value: clearances.filter((p) => !productMap.has(p.sku.toUpperCase())).length,
           },
         ]}
       />
 
       {!loaded && busy ? (
         <Panel title="Loading clearance">
-          <p style={{ margin: 0, fontSize: 13, color: "#c2410c", fontWeight: 800 }}>Loading clearance list...</p>
+          <p style={{ margin: 0, fontSize: 13, color: "#c2410c", fontWeight: 800 }}>Loading…</p>
         </Panel>
       ) : null}
 
-      <Panel title="Add / update clearance item">
-        <p style={{ margin: "0 0 12px", fontSize: 12, color: "#9a3412", lineHeight: 1.45 }}>
-          Product expiry is the date on the package. Listing start / stop selling dates are optional.
-        </p>
-        
-        <div style={formGrid}>
-          <div>
-            <label style={labelStyle}>SKU *</label>
-            <input
-              value={form.sku}
-              onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value.toUpperCase() }))}
-              placeholder="00003D"
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Label / note</label>
-            <input
-              value={form.note}
-              onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
-              placeholder="Sell as is / 临期特价"
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Product expiry date *</label>
-            <input
-              type="date"
-              value={form.expiryDate}
-              onChange={(e) => setForm((f) => ({ ...f, expiryDate: e.target.value }))}
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Clearance price *</label>
-            <input
-              value={form.clearancePrice}
-              onChange={(e) => setForm((f) => ({ ...f, clearancePrice: e.target.value }))}
-              placeholder="$8.99 / case"
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Listing start (optional)</label>
-            <input
-              type="date"
-              value={form.startDate}
-              onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Stop selling after (optional)</label>
-            <input
-              type="date"
-              value={form.saleEndDate}
-              onChange={(e) => setForm((f) => ({ ...f, saleEndDate: e.target.value }))}
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Stock qty (optional)</label>
-            <input
-              value={form.clearanceQty}
-              onChange={(e) => setForm((f) => ({ ...f, clearanceQty: e.target.value.replace(/[^0-9]/g, "") }))}
-              placeholder="Leave empty = unlimited"
-              inputMode="numeric"
-              style={inputStyle}
-            />
-          </div>
-        </div>
-
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
+      <div style={splitLayout} className="admin-catalog-split admin-split">
+        <Panel title={`List (${filteredClearances.length})`}>
           <input
-            type="checkbox"
-            checked={form.resetSoldQty}
-            onChange={(e) => setForm((f) => ({ ...f, resetSoldQty: e.target.checked }))}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search SKU, name, brand…"
+            style={{ ...inputStyle, marginBottom: 8 }}
           />
-          Reset sold count to 0 when saving
-        </label>
+          <FilterChips
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[
+              { id: "all", label: "All" },
+              { id: "active", label: "Active" },
+              { id: "scheduled", label: "Scheduled" },
+              { id: "expired", label: "Expired" },
+              { id: "sold_out", label: "Sold out" },
+            ]}
+          />
+          <div style={splitList}>
+            {filteredClearances.map((p) => {
+              const product = productMap.get(p.sku.toUpperCase());
+              const status = p.clearanceStatus || "active";
+              const remaining =
+                p.clearanceQty && p.clearanceQty > 0
+                  ? Math.max(0, p.clearanceQty - (p.soldQty || 0))
+                  : null;
+              const price = p.clearancePrice ? formatClearancePriceDisplay(p.clearancePrice) : "";
 
-        <BtnRow>
-          <BtnPrimary onClick={saveClearance} disabled={busy}>
-            {busy ? "Saving..." : "Save clearance item"}
-          </BtnPrimary>
-          <BtnSecondary onClick={() => setForm(emptyForm())} disabled={busy}>
-            Clear form
-          </BtnSecondary>
-          <BtnSecondary onClick={loadClearances} disabled={busy}>
-            Refresh
-          </BtnSecondary>
-        </BtnRow>
-        <Toast message={msg} tone={msgTone} />
-      </Panel>
-
-      <Panel title={`Clearance list (${clearances.length})`}>
-        <div style={splitList}>
-          {clearances.map((p) => {
-            const product = products.find((x) => x.sku === p.sku);
-            const status = p.clearanceStatus || "active";
-            const remaining =
-              p.clearanceQty && p.clearanceQty > 0
-                ? Math.max(0, p.clearanceQty - (p.soldQty || 0))
-                : null;
-
-            return (
-              <div
-                key={p.sku}
-                role="button"
-                tabIndex={0}
-                onClick={() => editClearance(p)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") editClearance(p);
-                }}
-                style={{
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 12,
-                  padding: 12,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 10,
-                  alignItems: "flex-start",
-                  background: product ? "#fff" : "#fef2f2",
-                  cursor: "pointer",
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
+              return (
+                <SalesListItem
+                  key={p.sku}
+                  selected={editingSku === p.sku.toUpperCase()}
+                  onClick={() => editClearance(p)}
+                  onRemove={() => removeClearance(p.sku)}
+                  removeDisabled={busy}
+                >
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <strong>{p.sku}</strong>
-                    <span
-                      style={{
-                        ...statusStyle[status],
-                        fontSize: 10,
-                        fontWeight: 900,
-                        padding: "2px 8px",
-                        borderRadius: 999,
-                      }}
-                    >
-                      {statusLabel[status]}
-                    </span>
+                    <strong style={{ fontSize: 14 }}>{p.sku}</strong>
+                    <StatusBadge label={statusLabel[status]} style={statusStyle[status]} />
                   </div>
                   {p.note ? (
-                    <div style={{ fontSize: 12, color: "#c2410c", fontWeight: 800, marginTop: 4 }}>{p.note}</div>
+                    <div style={{ fontSize: 12, color: "#c2410c", fontWeight: 800, marginTop: 2 }}>{p.note}</div>
                   ) : null}
                   {product ? (
-                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                    <div className="admin-sales-list-summary">
                       {product.brand ? `${product.brand} · ` : ""}
                       {product.name || "—"}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 12, color: "#b91c1c", marginTop: 4 }}>SKU not found in catalog</div>
+                    <div className="admin-sales-list-summary" style={{ color: "#b91c1c", fontWeight: 700 }}>
+                      SKU not in catalog
+                    </div>
                   )}
-                  <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6, lineHeight: 1.45 }}>
-                    <div>Expires: {p.expiryDate}</div>
-                    {p.clearancePrice ? (
-                      <div>Price: {formatClearancePriceDisplay(p.clearancePrice)}</div>
-                    ) : null}
+                  {price ? <div className="admin-sales-list-deal">{price}</div> : null}
+                  <div className="admin-sales-list-summary">
+                    Expires {p.expiryDate}
                     {(p.startDate || p.saleEndDate) && (
-                      <div>
-                        Listing: {p.startDate || "—"} → stop {p.saleEndDate || "—"}
-                      </div>
+                      <span>
+                        {" "}
+                        · List {p.startDate || "—"} → {p.saleEndDate || "—"}
+                      </span>
                     )}
-                    {p.clearanceQty ? (
-                      <div>
-                        Sold: {p.soldQty || 0} / {p.clearanceQty}
-                        {remaining !== null ? ` · Remaining: ${remaining}` : ""}
-                      </div>
-                    ) : (
-                      <div>No stock cap</div>
-                    )}
+                    {p.clearanceQty
+                      ? ` · Sold ${p.soldQty || 0}/${p.clearanceQty}${remaining !== null ? ` · left ${remaining}` : ""}`
+                      : " · No stock cap"}
                   </div>
+                </SalesListItem>
+              );
+            })}
+            {loaded && filteredClearances.length === 0 ? (
+              <EmptyState
+                title={clearances.length === 0 ? "No clearance items yet" : "No matches"}
+                detail={
+                  clearances.length === 0
+                    ? "Use + New clearance or enter a SKU on the right."
+                    : "Try another search or filter."
+                }
+              />
+            ) : null}
+          </div>
+        </Panel>
+
+        <div style={splitForm} className="admin-catalog-form-sticky">
+          <Panel title={editingSku ? `Edit ${editingSku}` : "Add clearance item"}>
+            <FormSection title="SKU & label">
+              <div style={formGrid}>
+                <div>
+                  <FieldLabel required>SKU</FieldLabel>
+                  <input
+                    value={form.sku}
+                    onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value.toUpperCase() }))}
+                    placeholder="00003D"
+                    style={inputStyle}
+                    autoFocus={!editingSku}
+                  />
+                  <SkuPreview sku={form.sku} product={selectedProduct} />
                 </div>
-                <span onClick={(e) => e.stopPropagation()}>
-                  <BtnDanger onClick={() => removeClearance(p.sku)} disabled={busy}>
-                    Remove
-                  </BtnDanger>
-                </span>
+                <div>
+                  <FieldLabel>Label / note</FieldLabel>
+                  <input
+                    value={form.note}
+                    onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+                    placeholder="Sell as is / 临期特价"
+                    style={inputStyle}
+                  />
+                </div>
               </div>
-            );
-          })}
-          {loaded && clearances.length === 0 ? (
-            <EmptyState title="No clearance items yet" detail="Add SKUs to show them on the customer Clearance tab." />
-          ) : null}
+            </FormSection>
+
+            <FormSection title="Pricing & expiry" hint="Required" tone="clearance">
+              <div className="admin-form-grid-2">
+                <div>
+                  <FieldLabel required>Product expiry</FieldLabel>
+                  <input
+                    type="date"
+                    value={form.expiryDate}
+                    onChange={(e) => setForm((f) => ({ ...f, expiryDate: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <FieldLabel required>Clearance price</FieldLabel>
+                  <input
+                    value={form.clearancePrice}
+                    onChange={(e) => setForm((f) => ({ ...f, clearancePrice: e.target.value }))}
+                    placeholder="$8.99"
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+            </FormSection>
+
+            <FormSection title="Listing window & stock" hint="Optional">
+              <div className="admin-form-grid-2">
+                <div>
+                  <FieldLabel>Listing start</FieldLabel>
+                  <input
+                    type="date"
+                    value={form.startDate}
+                    onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <FieldLabel>Stop selling after</FieldLabel>
+                  <input
+                    type="date"
+                    value={form.saleEndDate}
+                    onChange={(e) => setForm((f) => ({ ...f, saleEndDate: e.target.value }))}
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+              <div style={{ marginTop: 10 }}>
+                <FieldLabel>Stock qty</FieldLabel>
+                <input
+                  value={form.clearanceQty}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, clearanceQty: e.target.value.replace(/[^0-9]/g, "") }))
+                  }
+                  placeholder="Empty = unlimited"
+                  inputMode="numeric"
+                  style={inputStyle}
+                />
+              </div>
+            </FormSection>
+
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 13,
+                fontWeight: 700,
+                marginBottom: 4,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={form.resetSoldQty}
+                onChange={(e) => setForm((f) => ({ ...f, resetSoldQty: e.target.checked }))}
+              />
+              Reset sold count to 0 when saving
+            </label>
+
+            <div className="admin-form-actions-sticky">
+              <BtnRow>
+                <BtnPrimary onClick={saveClearance} disabled={busy}>
+                  {busy ? "Saving…" : "Save clearance"}
+                </BtnPrimary>
+                <BtnSecondary onClick={() => setForm(emptyForm())} disabled={busy}>
+                  Clear
+                </BtnSecondary>
+                <BtnSecondary onClick={loadClearances} disabled={busy}>
+                  Refresh
+                </BtnSecondary>
+              </BtnRow>
+              <Toast message={msg} tone={msgTone} />
+            </div>
+          </Panel>
         </div>
-      </Panel>
+      </div>
     </AdminShell>
   );
 }
