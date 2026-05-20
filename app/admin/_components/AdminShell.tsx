@@ -25,9 +25,8 @@ export type AdminNav =
   | "clearance"
   | "orders"
   | "invoices"
-  | "priceCompare"
-  | "priceHistory"
   | "topSkus"
+  | "account"
   | "market"
   | "insights"
   | "activeCarts";

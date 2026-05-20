@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AdminLogin } from "../_components/AdminLogin";
 import { AdminShell } from "../_components/AdminShell";
@@ -80,7 +81,7 @@ export default function AdminActiveCartsPage() {
     <AdminShell
       active="activeCarts"
       title="Active Carts"
-      subtitle="See accounts with saved draft carts before they submit."
+      subtitle="Follow up on stale carts (3+ days) — call or email the store."
       onLogout={logout}
       actions={
         <BtnSecondary onClick={loadCarts} disabled={busy}>
@@ -93,6 +94,13 @@ export default function AdminActiveCartsPage() {
           { label: "Active carts", value: filteredCarts.length },
           { label: "Total lines", value: filteredCarts.reduce((sum, cart) => sum + cart.lineCount, 0) },
           { label: "Total cases", value: filteredCarts.reduce((sum, cart) => sum + cart.totalCases, 0) },
+          {
+            label: "Stale (3d+)",
+            value: filteredCarts.filter((c) => {
+              const t = c.updatedAt ? new Date(c.updatedAt).getTime() : 0;
+              return t && Date.now() - t >= 3 * 24 * 60 * 60 * 1000;
+            }).length,
+          },
         ]}
       />
 
@@ -110,10 +118,18 @@ export default function AdminActiveCartsPage() {
           <EmptyState title="No active carts" detail="Customers appear here after draft auto-save has items in cart." />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {filteredCarts.map((cart) => {
+            {filteredCarts
+              .sort((a, b) => String(a.updatedAt || "").localeCompare(String(b.updatedAt || "")))
+              .map((cart) => {
               const expanded = expandedAccount === cart.accountNo;
+              const updatedMs = cart.updatedAt ? new Date(cart.updatedAt).getTime() : 0;
+              const stale = updatedMs > 0 && Date.now() - updatedMs >= 3 * 24 * 60 * 60 * 1000;
               return (
-                <article key={cart.accountNo} style={{ border: "1px solid #e5e7eb", borderRadius: 14, background: "#fff", overflow: "hidden" }}>
+                <article
+                  key={cart.accountNo}
+                  className={stale ? "admin-stale-row" : undefined}
+                  style={{ border: `1px solid ${stale ? "#fde68a" : "#e5e7eb"}`, borderRadius: 14, background: stale ? "#fffbeb" : "#fff", overflow: "hidden" }}
+                >
                   <button
                     type="button"
                     onClick={() => setExpandedAccount(expanded ? "" : cart.accountNo)}
@@ -124,11 +140,21 @@ export default function AdminActiveCartsPage() {
                         <div style={{ fontSize: 15, fontWeight: 900, color: "#111827" }}>
                           {cart.accountNo} · {cart.storeName || "—"}
                         </div>
-                        <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                        <div style={{ fontSize: 12, color: stale ? "#b45309" : "#6b7280", marginTop: 4, fontWeight: stale ? 800 : 400 }}>
                           {cart.lineCount} lines · {cart.totalCases} cases · Updated {formatDate(cart.updatedAt)}
+                          {stale ? " · follow up" : ""}
                         </div>
                       </div>
-                      <span style={{ fontSize: 12, fontWeight: 900, color: "#2563eb" }}>{expanded ? "Hide" : "View"}</span>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                        <Link
+                          href={`/admin/account?accountNo=${encodeURIComponent(cart.accountNo)}`}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ fontSize: 12, fontWeight: 800, color: "#2563eb" }}
+                        >
+                          Account 360 →
+                        </Link>
+                        <span style={{ fontSize: 12, fontWeight: 900, color: "#2563eb" }}>{expanded ? "Hide" : "View"}</span>
+                      </div>
                     </div>
                   </button>
 

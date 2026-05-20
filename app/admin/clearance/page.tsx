@@ -99,18 +99,20 @@ export default function AdminClearancePage() {
 
   const filteredClearances = useMemo(() => {
     const q = search.trim().toUpperCase();
-    return clearances.filter((p) => {
-      const status = p.clearanceStatus || "active";
-      if (statusFilter !== "all" && status !== statusFilter) return false;
-      if (!q) return true;
-      const product = productMap.get(p.sku.toUpperCase());
-      return (
-        p.sku.toUpperCase().includes(q) ||
-        p.note?.toUpperCase().includes(q) ||
-        product?.name?.toUpperCase().includes(q) ||
-        product?.brand?.toUpperCase().includes(q)
-      );
-    });
+    return clearances
+      .filter((p) => {
+        const status = p.clearanceStatus || "active";
+        if (statusFilter !== "all" && status !== statusFilter) return false;
+        if (!q) return true;
+        const product = productMap.get(p.sku.toUpperCase());
+        return (
+          p.sku.toUpperCase().includes(q) ||
+          p.note?.toUpperCase().includes(q) ||
+          product?.name?.toUpperCase().includes(q) ||
+          product?.brand?.toUpperCase().includes(q)
+        );
+      })
+      .sort((a, b) => (a.expiryDate || "9999-99-99").localeCompare(b.expiryDate || "9999-99-99"));
   }, [clearances, search, statusFilter, productMap]);
 
   const loadClearances = async () => {

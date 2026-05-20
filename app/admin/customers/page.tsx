@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AdminLogin } from "../_components/AdminLogin";
 import { AdminShell } from "../_components/AdminShell";
@@ -51,6 +52,9 @@ export default function AdminCustomersPage() {
   const [note, setNote] = useState("");
   const [region, setRegion] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkRegion, setBulkRegion] = useState("");
+  const [regionFilter, setRegionFilter] = useState("all");
 
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -88,6 +92,8 @@ export default function AdminCustomersPage() {
     return customers.filter((c) => {
       if (statusFilter === "active" && c.active === false) return false;
       if (statusFilter === "inactive" && c.active !== false) return false;
+      if (regionFilter === "unassigned" && c.region) return false;
+      if (regionFilter !== "all" && regionFilter !== "unassigned" && c.region !== regionFilter) return false;
       if (!q) return true;
       return (
         c.accountNo?.toUpperCase().includes(q) ||
@@ -96,7 +102,44 @@ export default function AdminCustomersPage() {
         c.phone?.toUpperCase().includes(q)
       );
     });
-  }, [customers, search, statusFilter]);
+  }, [customers, search, statusFilter, regionFilter]);
+
+  const toggleSelect = (acct: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(acct)) next.delete(acct);
+      else next.add(acct);
+      return next;
+    });
+  };
+
+  const selectAllVisible = () => {
+    setSelected(new Set(filteredCustomers.map((c) => c.accountNo.toUpperCase())));
+  };
+
+  const bulkAssignRegion = async () => {
+    if (!selected.size) return notify("Select accounts first.", "error");
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/customers/bulk-region", {
+        method: "POST",
+        headers: adminHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          accountNos: Array.from(selected),
+          region: bulkRegion,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Bulk update failed.");
+      setCustomers(Array.isArray(data.customers) ? data.customers : []);
+      setSelected(new Set());
+      notify(`Updated region for ${data.updated} account(s).`);
+    } catch (err: any) {
+      notify(err?.message || "Bulk update failed.", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const selectCustomer = (c: Customer) => {
     setAccountNo(c.accountNo || "");
@@ -236,6 +279,39 @@ export default function AdminCustomersPage() {
               { id: "inactive", label: "Inactive" },
             ]}
           />
+          <FilterChips
+            value={regionFilter}
+            onChange={setRegionFilter}
+            options={[
+              { id: "all", label: "All regions" },
+              ...MARKET_REGIONS.map((r) => ({ id: r.id, label: r.label })),
+              { id: "unassigned", label: "Unassigned" },
+            ]}
+          />
+          {selected.size > 0 ? (
+            <div className="admin-bulk-bar">
+              <span style={{ fontSize: 12, fontWeight: 800 }}>{selected.size} selected</span>
+              <select
+                value={bulkRegion}
+                onChange={(e) => setBulkRegion(e.target.value)}
+                style={{ ...inputStyle, width: "auto", margin: 0 }}
+              >
+                <option value="">Clear region</option>
+                {MARKET_REGIONS.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+              <BtnPrimary onClick={() => void bulkAssignRegion()} disabled={busy}>
+                Apply region
+              </BtnPrimary>
+              <BtnSecondary onClick={() => setSelected(new Set())}>Clear</BtnSecondary>
+            </div>
+          ) : null}
+          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            <BtnSecondary onClick={selectAllVisible}>Select visible</BtnSecondary>
+          </div>
           <div style={splitList}>
             {filteredCustomers.map((c) => (
               <ListItemButton
@@ -243,6 +319,16 @@ export default function AdminCustomersPage() {
                 selected={accountNo.toUpperCase() === c.accountNo?.toUpperCase()}
                 onClick={() => selectCustomer(c)}
               >
+                <input
+                  type="checkbox"
+                  checked={selected.has(c.accountNo.toUpperCase())}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    toggleSelect(c.accountNo.toUpperCase());
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ marginRight: 8 }}
+                />
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
                   <div>
                     <strong>{c.accountNo}</strong>
@@ -358,6 +444,11 @@ export default function AdminCustomersPage() {
               <BtnPrimary onClick={saveCustomer} disabled={busy}>
                 {busy ? "Saving..." : "Save customer"}
               </BtnPrimary>
+              {accountNo ? (
+                <Link href={`/admin/account?accountNo=${encodeURIComponent(accountNo)}`}>
+                  <BtnSecondary>Account 360</BtnSecondary>
+                </Link>
+              ) : null}
               <BtnSecondary onClick={clearForm}>Clear form</BtnSecondary>
               <BtnSecondary onClick={loadCustomers} disabled={busy}>
                 Refresh

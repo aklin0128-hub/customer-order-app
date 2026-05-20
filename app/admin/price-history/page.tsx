@@ -117,7 +117,7 @@ export default function AdminPriceHistoryPage() {
   }
 
   return (
-    <AdminShell active="priceHistory" title="Price History" subtitle="Check one account's unit price history for one SKU." onLogout={logout}>
+    <AdminShell active="insights" title="Price History" subtitle="Check one account's unit price history for one SKU." onLogout={logout}>
       {msg ? <Toast tone="error" message={msg} /> : null}
 
       <section style={panel}>

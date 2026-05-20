@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { downloadCsv } from "../_components/admin-analytics-ui";
 
 import { AdminLogin } from "../_components/AdminLogin";
 import { AdminShell } from "../_components/AdminShell";
@@ -215,6 +216,23 @@ export default function AdminInvoicesPage() {
   });
   const allVisibleSelected = imports.length > 0 && selectedImportIds.length === imports.length;
 
+  const invoiceQuality = useMemo(() => {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const unknownSkus = new Set<string>();
+    let last30Days = 0;
+    let missingAccount = 0;
+    let zeroLines = 0;
+    for (const record of imports) {
+      if (new Date(record.uploadedAt).getTime() >= cutoff) last30Days += 1;
+      if (!record.accountNo?.trim()) missingAccount += 1;
+      if (!record.lineCount) zeroLines += 1;
+      for (const line of record.lines || []) {
+        if (!line.inCatalog && line.sku) unknownSkus.add(line.sku.toUpperCase());
+      }
+    }
+    return { total: imports.length, last30Days, missingAccount, zeroLines, unknownSkus: Array.from(unknownSkus).sort() };
+  }, [imports]);
+
   const toggleImportSelection = (id: string) => {
     setSelectedImportIds((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]);
   };
@@ -277,6 +295,39 @@ export default function AdminInvoicesPage() {
       onLogout={logout}
     >
       {msg ? <Toast tone={msgTone} message={msg} /> : null}
+
+      <section style={{ ...panel, marginBottom: 16 }}>
+        <h2 style={panelTitle}>Data quality</h2>
+        <p style={{ margin: "0 0 10px", fontSize: 13, color: "#374151", lineHeight: 1.5 }}>
+          {invoiceQuality.total} imports · {invoiceQuality.last30Days} in last 30 days ·{" "}
+          {invoiceQuality.missingAccount} missing account · {invoiceQuality.zeroLines} empty parses ·{" "}
+          {invoiceQuality.unknownSkus.length} unknown SKUs
+        </p>
+        {invoiceQuality.unknownSkus.length > 0 ? (
+          <button
+            type="button"
+            onClick={() =>
+              downloadCsv(
+                "invoice-unknown-skus.csv",
+                ["SKU"],
+                invoiceQuality.unknownSkus.map((s) => [s])
+              )
+            }
+            style={{
+              border: "1px solid #d1d5db",
+              borderRadius: 10,
+              padding: "8px 12px",
+              background: "#fff",
+              fontWeight: 800,
+              fontSize: 12,
+              cursor: "pointer",
+              marginBottom: 8,
+            }}
+          >
+            Export unknown SKU list
+          </button>
+        ) : null}
+      </section>
 
       <section style={{ ...panel, marginBottom: 16 }}>
         <h2 style={panelTitle}>Upload</h2>

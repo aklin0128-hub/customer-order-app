@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useSearchParams } from "next/navigation";
 import { MARKET_REGIONS } from "@/lib/customerRegion";
 import {
   AnalyticsTableWrap,
@@ -178,14 +179,15 @@ function MoverTable({ rows }: { rows: SkuMover[] }) {
   );
 }
 
-export default function AdminInsightsPage() {
+function AdminInsightsPageInner() {
+  const searchParams = useSearchParams();
   const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
   const [passwordInput, setPasswordInput] = useState("");
   const [tab, setTab] = useState<Tab>("health");
   const [msg, setMsg] = useState("");
 
   const [health, setHealth] = useState<HealthData | null>(null);
-  const [healthFilter, setHealthFilter] = useState("all");
+  const [healthFilter, setHealthFilter] = useState(() => searchParams.get("status") || "all");
   const [healthRegion, setHealthRegion] = useState("all");
   const [healthSearch, setHealthSearch] = useState("");
   const [hideInactive, setHideInactive] = useState(true);
@@ -685,5 +687,13 @@ export default function AdminInsightsPage() {
         </>
       ) : null}
     </AdminShell>
+  );
+}
+
+export default function AdminInsightsPage() {
+  return (
+    <Suspense fallback={<p style={{ padding: 16, fontSize: 13, color: "#6b7280" }}>Loading insights…</p>}>
+      <AdminInsightsPageInner />
+    </Suspense>
   );
 }

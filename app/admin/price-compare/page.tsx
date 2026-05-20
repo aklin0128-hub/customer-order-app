@@ -168,7 +168,7 @@ export default function AdminPriceComparePage() {
 
   return (
     <AdminShell
-      active="priceCompare"
+      active="topSkus"
       title="Price Compare"
       subtitle="Two tools: account item price history, and SKU top buyers."
       onLogout={logout}
