@@ -470,6 +470,22 @@ export type GetSkuExpirationOptions = {
   onlyFutureExpiry?: boolean;
 };
 
+/** Earliest expire first; rows without expire date last. */
+export function sortInventoryLotsByExpireDate(lots: InventoryLot[]): InventoryLot[] {
+  return [...lots].sort((a, b) => {
+    const da = a.expireDate || "";
+    const db = b.expireDate || "";
+    if (!da && !db) return 0;
+    if (!da) return 1;
+    if (!db) return -1;
+    if (da !== db) return da.localeCompare(db);
+    const ra = a.receivedDate || "";
+    const rb = b.receivedDate || "";
+    if (ra !== rb) return ra.localeCompare(rb);
+    return (b.onHandQty || 0) - (a.onHandQty || 0);
+  });
+}
+
 function querySkuExpiration(
   sku: string,
   index: Map<string, InventoryLot[]>,
@@ -512,16 +528,18 @@ function querySkuExpiration(
 
   if (lots.length === 0) return empty;
 
+  const sortedLots = sortInventoryLotsByExpireDate(lots);
+
   const expireDates = [
-    ...new Set(lots.map((l) => l.expireDate).filter((d): d is string => Boolean(d))),
+    ...new Set(sortedLots.map((l) => l.expireDate).filter((d): d is string => Boolean(d))),
   ].sort();
 
-  const totalOnHandQty = lots.reduce((sum, l) => sum + (l.onHandQty || 0), 0);
+  const totalOnHandQty = sortedLots.reduce((sum, l) => sum + (l.onHandQty || 0), 0);
 
   return {
     sku: querySku,
     found: true,
-    lots,
+    lots: sortedLots,
     expireDates,
     earliestExpireDate: expireDates[0] || null,
     latestExpireDate: expireDates[expireDates.length - 1] || null,

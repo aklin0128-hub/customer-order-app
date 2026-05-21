@@ -16,7 +16,7 @@ export function countDraftItems(draft: OrderDraftPayload | null | undefined) {
   return Math.max(cartLen, mapCount);
 }
 
-function draftTimestamp(draft: OrderDraftPayload | null | undefined) {
+export function draftTimestamp(draft: OrderDraftPayload | null | undefined) {
   const parsed = Date.parse(String(draft?.updatedAt || ""));
   return Number.isFinite(parsed) ? parsed : 0;
 }
@@ -35,8 +35,12 @@ export function mergeOrderDrafts(
   const localTime = draftTimestamp(local);
   const cloudTime = draftTimestamp(cloud);
 
-  if (localItems === 0 && cloudItems > 0) return { ...cloud };
-  if (cloudItems === 0 && localItems > 0) return { ...local };
+  if (localItems === 0 && cloudItems > 0) {
+    return localTime >= cloudTime ? { ...local } : { ...cloud };
+  }
+  if (cloudItems === 0 && localItems > 0) {
+    return cloudTime >= localTime ? { ...cloud } : { ...local };
+  }
 
   const winner = cloudTime > localTime ? cloud : localTime > cloudTime ? local : cloudItems >= localItems ? cloud : local;
   const loser = winner === cloud ? local : cloud;

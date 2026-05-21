@@ -11,7 +11,9 @@ import {
   normalizeInventorySku,
   parseInventoryCsvText,
   parseInventoryDate,
+  sortInventoryLotsByExpireDate,
   skuLookupKeys,
+  type InventoryLot,
 } from "@/lib/inventoryExpiry";
 import { loadInventoryLotsFromFile } from "@/lib/inventoryExpiry.local";
 import { parseInventoryXlsxBuffer } from "@/lib/inventoryExpiryXlsx";
@@ -40,9 +42,25 @@ test("getSkuExpiration returns lots and sorted expire dates", async () => {
   assert.equal(result.earliestExpireDate, "2028-02-10");
   assert.ok(result.expireDates.includes("2028-02-18"));
   assert.equal(result.lots[0]?.receivedDate, "2026-02-11");
+  assert.equal(result.lots[0]?.expireDate, "2028-02-10");
+  assert.equal(result.lots[1]?.expireDate, "2028-02-18");
 
   await loadInventoryLotsFromFile(filePath);
   assert.equal(normalizeInventorySku(" 000030 "), "000030");
+});
+
+test("sortInventoryLotsByExpireDate orders earliest expire first", () => {
+  const lots: InventoryLot[] = [
+    { sku: "00033D", expireDate: "2028-05-07", onHandQty: 1 },
+    { sku: "00033D", expireDate: "2027-05-11", onHandQty: 2 },
+    { sku: "00033D", expireDate: "2028-03-09", onHandQty: 3 },
+    { sku: "00033D", onHandQty: 4 },
+  ];
+  const sorted = sortInventoryLotsByExpireDate(lots);
+  assert.deepEqual(
+    sorted.map((l) => l.expireDate || ""),
+    ["2027-05-11", "2028-03-09", "2028-05-07", ""]
+  );
 });
 
 test("parseInventoryCsvText rejects missing columns", () => {

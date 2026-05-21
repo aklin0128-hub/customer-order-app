@@ -362,10 +362,14 @@ export default function OrderPage() {
 
     const timer = setTimeout(async () => {
       try {
+        const saveBody = {
+          ...draft,
+          allowClear: countDraftItems(draft) === 0,
+        };
         const res = await fetch("/api/save-draft", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(draft),
+          body: JSON.stringify(saveBody),
         });
         if (!res.ok) throw new Error("save failed");
       } catch {
@@ -373,7 +377,7 @@ export default function OrderPage() {
           await fetch("/api/save-draft", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(draft),
+            body: JSON.stringify({ ...draft, allowClear: countDraftItems(draft) === 0 }),
           });
         } catch {
           /* localStorage backup already written above */
@@ -403,7 +407,7 @@ export default function OrderPage() {
       if (!autoLoadedRef.current) return;
 
       const snapshot = draftSnapshotRef.current;
-      if (!snapshot.accountNo || countDraftItems(snapshot) === 0) return;
+      if (!snapshot.accountNo) return;
 
       const payload = normalizeOrderDraft(snapshot.accountNo, {
         ...snapshot,
@@ -413,10 +417,11 @@ export default function OrderPage() {
       localStorage.setItem(`draft_${snapshot.accountNo}`, JSON.stringify(payload));
 
       if (typeof navigator.sendBeacon === "function") {
-        navigator.sendBeacon(
-          "/api/save-draft",
-          new Blob([JSON.stringify(payload)], { type: "application/json" })
-        );
+        const body = JSON.stringify({
+          ...payload,
+          allowClear: countDraftItems(payload) === 0,
+        });
+        navigator.sendBeacon("/api/save-draft", new Blob([body], { type: "application/json" }));
       }
     };
 
