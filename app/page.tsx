@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { LoginPreviewSection } from "./components/LoginPreviewSection";
+import "./login.css";
+
 type Lang = "en" | "zh" | "ko" | "vi";
 
 const copy = {
@@ -216,30 +219,32 @@ export default function LoginPage() {
 
   if (checkingSession) {
     return (
-      <main style={pageStyle}>
-        <div style={{ ...cardStyle, padding: 32, textAlign: "center", color: "#6b7280", fontSize: 14, fontWeight: 700 }}>
-          …
+      <main className="login-page">
+        <div className="login-card-wrap">
+          <div className="login-card" style={{ padding: 32, textAlign: "center", color: "#6b7280", fontSize: 14, fontWeight: 700 }}>
+            …
+          </div>
         </div>
       </main>
     );
   }
 
   return (
-    <main style={pageStyle}>
-      <div style={shellStyle}>
-        <header style={topBarStyle}>
-          <div style={brandRowStyle}>
-            <div style={logoMarkStyle}>CO</div>
-            <span style={brandTextStyle}>{t.brandName}</span>
+    <main className="login-page">
+      <div className="login-shell">
+        <header className="login-top-bar">
+          <div className="login-brand-row">
+            <div className="login-logo">CO</div>
+            <span className="login-brand-text">{t.brandName}</span>
           </div>
-          <div style={langRowStyle} role="group" aria-label="Language">
+          <div className="login-lang-row" role="group" aria-label="Language">
             {(["en", "zh", "ko", "vi"] as Lang[]).map((item) => (
               <button
                 key={item}
                 type="button"
                 onClick={() => changeLang(item)}
                 aria-pressed={lang === item}
-                style={langBtnStyle(lang === item)}
+                className={`login-lang-btn${lang === item ? " is-active" : ""}`}
               >
                 {langLabels[item]}
               </button>
@@ -247,201 +252,99 @@ export default function LoginPage() {
           </div>
         </header>
 
-        <section style={cardStyle}>
-          <div style={heroStyle}>
-            <h1 style={titleStyle}>{t.title}</h1>
-            <p style={subtitleStyle}>{t.subtitle}</p>
-          </div>
-
-          <div style={featuresStyle}>
-            {[
-              { label: t.featPromo, icon: "★" },
-              { label: t.featClearance, icon: "⏱" },
-              { label: t.featCatalog, icon: "▦" },
-              { label: t.featSearch, icon: "⌕" },
-              { label: t.featDraft, icon: "✓" },
-            ].map((f) => (
-              <div key={f.label} style={featureChipStyle}>
-                <span style={featureIconStyle} aria-hidden>
-                  {f.icon}
-                </span>
-                <span>{f.label}</span>
-              </div>
-            ))}
-          </div>
-
-          {hadSavedAccount && normalizedAccount ? (
-            <div style={welcomeBannerStyle}>
-              <strong>{t.welcomeBack}</strong>
-              <span style={{ opacity: 0.85 }}> · {normalizedAccount}</span>
-              <div style={{ display: "block", fontSize: 11, fontWeight: 600, marginTop: 2, opacity: 0.75 }}>
-                {t.lastAccountHint}
-              </div>
-            </div>
-          ) : null}
-
-          <form
-            style={formStyle}
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleLogin();
-            }}
-          >
-            <div style={fieldStyle}>
-              <label htmlFor="account-no" style={labelStyle}>
-                {t.accountNumber}
-              </label>
-              <input
-                id="account-no"
-                ref={accountRef}
-                value={accountNo}
-                onChange={(e) => {
-                  setAccountNo(e.target.value.toUpperCase());
-                  setError("");
-                }}
-                placeholder={t.accountPlaceholder}
-                autoCapitalize="characters"
-                autoComplete="username"
-                enterKeyHint="next"
-                style={inputStyle(Boolean(error && !normalizedAccount))}
-              />
+        <div className="login-card-wrap">
+          <section className="login-card">
+            <div style={heroStyle}>
+              <h1 style={titleStyle}>{t.title}</h1>
+              <p style={subtitleStyle}>{t.subtitle}</p>
             </div>
 
-            <div style={fieldStyle}>
-              <label htmlFor="password" style={labelStyle}>
-                {t.password}
-              </label>
-              <div style={passwordWrapStyle}>
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setError("");
-                  }}
-                  placeholder={t.passwordPlaceholder}
-                  autoComplete="current-password"
-                  enterKeyHint="go"
-                  style={{ ...inputStyle(Boolean(error && normalizedAccount)), paddingRight: 72 }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  style={togglePasswordStyle}
-                  aria-label={showPassword ? t.hidePassword : t.showPassword}
-                >
-                  {showPassword ? t.hidePassword : t.showPassword}
-                </button>
-              </div>
-            </div>
-
-            {error ? (
-              <div style={errorBoxStyle} role="alert">
-                {error}
+            {hadSavedAccount && normalizedAccount ? (
+              <div style={welcomeBannerStyle}>
+                <strong>{t.welcomeBack}</strong>
+                <span style={{ opacity: 0.85 }}> · {normalizedAccount}</span>
+                <div style={{ display: "block", fontSize: 11, fontWeight: 600, marginTop: 2, opacity: 0.75 }}>
+                  {t.lastAccountHint}
+                </div>
               </div>
             ) : null}
 
-            <button type="submit" disabled={!canSubmit} style={submitBtnStyle(!canSubmit)}>
-              {loading ? t.signingIn : t.signIn}
-            </button>
-          </form>
-        </section>
+            <form
+              style={formStyle}
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleLogin();
+              }}
+            >
+              <div style={fieldStyle}>
+                <label htmlFor="account-no" style={labelStyle}>
+                  {t.accountNumber}
+                </label>
+                <input
+                  id="account-no"
+                  ref={accountRef}
+                  value={accountNo}
+                  onChange={(e) => {
+                    setAccountNo(e.target.value.toUpperCase());
+                    setError("");
+                  }}
+                  placeholder={t.accountPlaceholder}
+                  autoCapitalize="characters"
+                  autoComplete="username"
+                  enterKeyHint="next"
+                  style={inputStyle(Boolean(error && !normalizedAccount))}
+                />
+              </div>
 
-        <p style={footerStyle}>{t.footer}</p>
+              <div style={fieldStyle}>
+                <label htmlFor="password" style={labelStyle}>
+                  {t.password}
+                </label>
+                <div style={passwordWrapStyle}>
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setError("");
+                    }}
+                    placeholder={t.passwordPlaceholder}
+                    autoComplete="current-password"
+                    enterKeyHint="go"
+                    style={{ ...inputStyle(Boolean(error && normalizedAccount)), paddingRight: 72 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    style={togglePasswordStyle}
+                    aria-label={showPassword ? t.hidePassword : t.showPassword}
+                  >
+                    {showPassword ? t.hidePassword : t.showPassword}
+                  </button>
+                </div>
+              </div>
+
+              {error ? (
+                <div style={errorBoxStyle} role="alert">
+                  {error}
+                </div>
+              ) : null}
+
+              <button type="submit" disabled={!canSubmit} style={submitBtnStyle(!canSubmit)}>
+                {loading ? t.signingIn : t.signIn}
+              </button>
+            </form>
+          </section>
+        </div>
+
+        <LoginPreviewSection lang={lang} />
+
+        <p className="login-footer">{t.footer}</p>
       </div>
     </main>
   );
 }
-
-const pageStyle: React.CSSProperties = {
-  minHeight: "100vh",
-  background:
-    "radial-gradient(ellipse 80% 50% at 50% -10%, rgba(37,99,235,0.12), transparent), linear-gradient(180deg, #f8fafc 0%, #eef2ff 48%, #f8fafc 100%)",
-  padding: "max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom))",
-  fontFamily:
-    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  boxSizing: "border-box",
-};
-
-const shellStyle: React.CSSProperties = {
-  width: "100%",
-  maxWidth: 440,
-  display: "flex",
-  flexDirection: "column",
-  gap: 14,
-};
-
-const topBarStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
-  padding: "0 2px",
-};
-
-const brandRowStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 10,
-};
-
-const logoMarkStyle: React.CSSProperties = {
-  width: 40,
-  height: 40,
-  borderRadius: 12,
-  background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
-  color: "#fff",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontWeight: 900,
-  fontSize: 14,
-  boxShadow: "0 6px 16px rgba(37,99,235,0.28)",
-  flexShrink: 0,
-};
-
-const brandTextStyle: React.CSSProperties = {
-  fontSize: 13,
-  fontWeight: 800,
-  color: "#374151",
-  letterSpacing: "-0.01em",
-};
-
-const langRowStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 4,
-  padding: 3,
-  background: "#ffffff",
-  borderRadius: 999,
-  border: "1px solid #e5e7eb",
-  boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-};
-
-function langBtnStyle(active: boolean): React.CSSProperties {
-  return {
-    border: "none",
-    background: active ? "#2563eb" : "transparent",
-    color: active ? "#ffffff" : "#6b7280",
-    borderRadius: 999,
-    padding: "6px 10px",
-    fontSize: 11,
-    fontWeight: 800,
-    cursor: "pointer",
-    transition: "background 0.15s, color 0.15s",
-  };
-}
-
-const cardStyle: React.CSSProperties = {
-  background: "#ffffff",
-  borderRadius: 22,
-  padding: "22px 20px 20px",
-  border: "1px solid #e5e7eb",
-  boxShadow: "0 20px 48px rgba(15,23,42,0.08), 0 4px 12px rgba(37,99,235,0.06)",
-};
 
 const heroStyle: React.CSSProperties = {
   marginBottom: 16,
@@ -461,39 +364,6 @@ const subtitleStyle: React.CSSProperties = {
   fontSize: 14,
   lineHeight: 1.5,
   color: "#6b7280",
-};
-
-const featuresStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: 8,
-  marginBottom: 18,
-};
-
-const featureChipStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  padding: "9px 10px",
-  borderRadius: 12,
-  background: "#f8fafc",
-  border: "1px solid #eef2f7",
-  fontSize: 12,
-  fontWeight: 700,
-  color: "#374151",
-};
-
-const featureIconStyle: React.CSSProperties = {
-  width: 22,
-  height: 22,
-  borderRadius: 8,
-  background: "#eff6ff",
-  color: "#2563eb",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontSize: 12,
-  flexShrink: 0,
 };
 
 const welcomeBannerStyle: React.CSSProperties = {
@@ -589,10 +459,3 @@ function submitBtnStyle(disabled: boolean): React.CSSProperties {
   };
 }
 
-const footerStyle: React.CSSProperties = {
-  textAlign: "center",
-  fontSize: 11,
-  color: "#9ca3af",
-  lineHeight: 1.5,
-  padding: "0 8px",
-};
