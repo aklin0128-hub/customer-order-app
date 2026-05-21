@@ -95,7 +95,7 @@ export default function AdminInventoryPage() {
 
   const upload = async () => {
     if (!file) {
-      notify("Choose a CSV file first.", "error");
+      notify("Choose a CSV or Excel file first.", "error");
       return;
     }
 
@@ -114,7 +114,7 @@ export default function AdminInventoryPage() {
 
       setMeta(data.meta || null);
       setFile(null);
-      notify(data.message || "Inventory CSV uploaded.");
+      notify(data.message || "Inventory file uploaded.");
       await loadMeta();
     } catch (err: unknown) {
       notify(err instanceof Error ? err.message : "Upload failed.", "error");
@@ -166,7 +166,7 @@ export default function AdminInventoryPage() {
     return (
       <AdminLogin
         title="Inventory expiry"
-        subtitle="Upload weekly By Item CSV and look up SKU expiration dates."
+        subtitle="Upload weekly By Item CSV or Excel and look up SKU expiration dates."
         password={passwordInput}
         onPasswordChange={setPasswordInput}
         error={error}
@@ -180,7 +180,7 @@ export default function AdminInventoryPage() {
     <AdminShell
       active="inventory"
       title="Inventory expiry"
-      subtitle="Internal only — upload Friday CSV (By Item). Stores do not see this."
+      subtitle="Internal only — upload Friday By Item CSV or Excel. Stores do not see this."
       onLogout={logout}
     >
       <StatGrid
@@ -193,21 +193,22 @@ export default function AdminInventoryPage() {
       />
 
       <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
-        <Panel title="Upload weekly CSV">
+        <Panel title="Upload weekly file">
           <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 12px", lineHeight: 1.45 }}>
-            Export the <strong>By Item</strong> sheet as CSV. Required columns:{" "}
-            <code>Loc Item</code>, <code>Loc Expire Date</code>. Replaces the previous upload.
+            Upload the <strong>By Item</strong> sheet as <strong>.xlsx</strong> (original Excel) or{" "}
+            <strong>.csv</strong>. Required columns: <code>Loc Item</code>,{" "}
+            <code>Loc Expire Date</code>. Replaces the previous upload.
           </p>
-          <label style={labelStyle}>CSV file</label>
+          <label style={labelStyle}>CSV or Excel file</label>
           <input
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,text/csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
             style={{ ...inputStyle, marginBottom: 12 }}
           />
           <BtnRow>
             <BtnPrimary onClick={upload} disabled={busy || !file}>
-              {busy ? "Uploading…" : "Upload CSV"}
+              {busy ? "Uploading…" : "Upload file"}
             </BtnPrimary>
             <BtnSecondary onClick={() => void loadMeta()} disabled={busy}>
               Refresh

@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  serverExternalPackages: ["pdf-parse", "pdfjs-dist", "tesseract.js"],
+  serverExternalPackages: ["pdf-parse", "pdfjs-dist", "tesseract.js", "xlsx"],
   outputFileTracingIncludes: {
     "/api/admin/upload-invoice": [
       "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",

@@ -6,11 +6,21 @@ import {
   loadInventoryLots,
   parseInventoryCsvText,
 } from "@/lib/inventoryExpiry";
+import { parseInventoryXlsxBuffer } from "@/lib/inventoryExpiryXlsx";
 import {
   getInventoryCsvMeta,
   saveInventoryCsvUpload,
   summarizeInventoryRows,
 } from "@/lib/inventoryExpiryStore";
+
+function isInventorySpreadsheet(name: string) {
+  const lower = name.toLowerCase();
+  return lower.endsWith(".xlsx") || lower.endsWith(".xls");
+}
+
+function isInventoryCsv(name: string) {
+  return name.toLowerCase().endsWith(".csv");
+}
 
 export const dynamic = "force-dynamic";
 
@@ -66,16 +76,27 @@ export async function POST(req: Request) {
     const file = formData.get("file") as File | null;
 
     if (!file?.size) {
-      return NextResponse.json({ error: "Missing CSV file." }, { status: 400 });
+      return NextResponse.json({ error: "Missing file." }, { status: 400 });
     }
 
-    const name = String(file.name || "").toLowerCase();
-    if (!name.endsWith(".csv")) {
-      return NextResponse.json({ error: "Upload a .csv file (By Item export)." }, { status: 400 });
+    const name = String(file.name || "");
+    if (!isInventoryCsv(name) && !isInventorySpreadsheet(name)) {
+      return NextResponse.json(
+        { error: "Upload a .csv or .xlsx file (By Item export)." },
+        { status: 400 }
+      );
     }
 
-    const csvText = await file.text();
-    const rows = parseInventoryCsvText(csvText);
+    let csvText: string;
+    let rows;
+
+    if (isInventorySpreadsheet(name)) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      ({ csvText, rows } = parseInventoryXlsxBuffer(buffer));
+    } else {
+      csvText = await file.text();
+      rows = parseInventoryCsvText(csvText);
+    }
     const summary = summarizeInventoryRows(rows);
 
     const meta = await saveInventoryCsvUpload(csvText, summary, file.name);
@@ -87,7 +108,7 @@ export async function POST(req: Request) {
       message: `Uploaded ${summary.rowCount} lots · ${summary.skuCount} SKUs`,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Failed to upload inventory CSV.";
+    const message = error instanceof Error ? error.message : "Failed to upload inventory file.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
