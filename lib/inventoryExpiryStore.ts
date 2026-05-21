@@ -1,14 +1,28 @@
 import { get, put } from "@vercel/blob";
-import fs from "fs";
 import path from "path";
 
 import type { InventoryLot } from "@/lib/inventoryExpiry";
 import { redis } from "@/lib/redis";
 
-const DEFAULT_CSV_PATH = path.join(process.cwd(), "data/inventory-by-item.csv");
-
 export function getInventoryCsvPath(filePath?: string) {
-  return filePath || process.env.INVENTORY_BY_ITEM_CSV_PATH || DEFAULT_CSV_PATH;
+  if (filePath) return filePath;
+  if (process.env.INVENTORY_BY_ITEM_CSV_PATH) return process.env.INVENTORY_BY_ITEM_CSV_PATH;
+  return path.join(/* turbopackIgnore: true */ process.cwd(), "data", "inventory-by-item.csv");
+}
+
+async function readLocalInventoryCsv(filePath: string) {
+  const fs = await import("node:fs");
+  if (!fs.existsSync(filePath)) return null;
+  return fs.readFileSync(filePath, "utf-8");
+}
+
+async function writeLocalInventoryCsv(filePath: string, csvText: string) {
+  try {
+    const fs = await import("node:fs");
+    fs.writeFileSync(filePath, csvText, "utf-8");
+  } catch {
+    // Local dev mirror only; production uses blob.
+  }
 }
 
 export const INVENTORY_BY_ITEM_META_KEY = "inventory:by-item:meta";
@@ -40,12 +54,7 @@ export async function loadUploadedInventoryCsvText(): Promise<string | null> {
     if (text?.trim()) return text;
   }
 
-  const localPath = getInventoryCsvPath();
-  if (fs.existsSync(localPath)) {
-    return fs.readFileSync(localPath, "utf-8");
-  }
-
-  return null;
+  return readLocalInventoryCsv(getInventoryCsvPath());
 }
 
 export async function saveInventoryCsvUpload(
@@ -73,11 +82,7 @@ export async function saveInventoryCsvUpload(
 
   await redis.set(INVENTORY_BY_ITEM_META_KEY, meta);
 
-  try {
-    fs.writeFileSync(getInventoryCsvPath(), csvText, "utf-8");
-  } catch {
-    // Local dev mirror only; production uses blob.
-  }
+  await writeLocalInventoryCsv(getInventoryCsvPath(), csvText);
 
   return meta;
 }
