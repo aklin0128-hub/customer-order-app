@@ -5,27 +5,12 @@ import {
   getPromotionDealHighlight,
 } from "@/app/order/catalogUtils";
 import { copy } from "@/app/order/orderCopy";
-import type { PromotionItem } from "@/app/order/types";
+import type { LoginPreviewCard } from "@/lib/loginPreview";
 
 export type Lang = "en" | "zh" | "ko" | "vi";
 
-export type ShowcasePromoFields = Pick<
-  PromotionItem,
-  | "sku"
-  | "promoPrice"
-  | "promoNote"
-  | "buyQty"
-  | "getQtyFree"
-  | "priceTiers"
-  | "startDate"
-  | "endDate"
-  | "promoQty"
-  | "soldQty"
-  | "remainingQty"
->;
-
 export function formatShowcasePromoDisplay(
-  item: ShowcasePromoFields,
+  item: LoginPreviewCard,
   lang: Lang
 ): { priceLine: string; details: string[] } {
   const t = copy[lang];

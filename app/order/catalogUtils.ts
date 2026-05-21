@@ -128,7 +128,12 @@ export function formatPromoBuyXGetYPackHint(item: Pick<PromotionItem, "buyQty" |
   return t.promoBuyXGetYPackHint.replace("{pack}", String(pack));
 }
 
-export function formatPromoDetails(item: PromotionItem, t: PromoCopyStrings) {
+export type PromoDetailsFields = Pick<
+  PromotionItem,
+  "startDate" | "endDate" | "promoQty" | "soldQty" | "remainingQty"
+>;
+
+export function formatPromoDetails(item: PromoDetailsFields, t: PromoCopyStrings) {
   const parts: string[] = [];
 
   if (item.startDate || item.endDate) {
