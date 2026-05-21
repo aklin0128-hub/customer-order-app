@@ -3,6 +3,8 @@ import { getMergedCatalogProducts } from "@/lib/catalogMerge";
 import { getPromotionProducts, type PromotionProduct } from "@/lib/promotions";
 import type { CatalogItem } from "@/app/order/types";
 
+import type { PromoPriceTier } from "@/lib/promotions";
+
 export type LoginPreviewCard = {
   sku: string;
   name?: string;
@@ -11,6 +13,14 @@ export type LoginPreviewCard = {
   imageUrl?: string;
   promoPrice?: string;
   promoNote?: string;
+  buyQty?: number;
+  getQtyFree?: number;
+  priceTiers?: PromoPriceTier[];
+  startDate?: string;
+  endDate?: string;
+  promoQty?: number;
+  soldQty?: number;
+  remainingQty?: number | null;
 };
 
 export type ShowcaseData = {
@@ -38,6 +48,14 @@ function promoToCard(item: PromotionProduct): LoginPreviewCard {
     imageUrl: productImageUrl(sku, item.imageUrl),
     promoPrice: item.promoPrice,
     promoNote: item.promoNote,
+    buyQty: item.buyQty,
+    getQtyFree: item.getQtyFree,
+    priceTiers: item.priceTiers,
+    startDate: item.startDate,
+    endDate: item.endDate,
+    promoQty: item.promoQty,
+    soldQty: item.soldQty,
+    remainingQty: item.remainingQty,
   };
 }
 

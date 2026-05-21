@@ -163,6 +163,15 @@
   height: 88px;
 }
 
+.new-card .showcase-card-price {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.new-card .showcase-card-detail {
+  font-size: 11px;
+}
+
 .new-empty,
 .new-empty-all {
   padding: 32px 16px;

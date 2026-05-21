@@ -59,10 +59,15 @@
   color: #0f766e;
 }
 
-.showcase-card-note {
+.showcase-card-note,
+.showcase-card-detail {
   font-size: 10px;
   color: #6b7280;
   line-height: 1.35;
+}
+
+.showcase-card-detail + .showcase-card-detail {
+  margin-top: 2px;
 }
 
 .showcase-card-badge {

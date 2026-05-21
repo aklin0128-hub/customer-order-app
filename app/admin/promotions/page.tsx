@@ -25,6 +25,7 @@ import {
   StatGrid,
   Toast,
 } from "../_components/admin-utils";
+import { AdminPublicShowcaseHint } from "../_components/AdminPublicShowcaseHint";
 import { useAdminAuth } from "../_components/useAdminAuth";
 
 type PromotionStatus = "active" | "scheduled" | "expired" | "sold_out" | "ended";
@@ -319,7 +320,7 @@ export default function AdminPromotionsPage() {
     <AdminShell
       active="promotions"
       title="Promotions"
-      subtitle="Click a row to edit · form stays on the right. Same deal options as before."
+      subtitle="Click a row to edit · Active promos sync to /new/ and customer Weekly picks."
       onLogout={logout}
       actions={
         <BtnSecondary onClick={() => setForm(emptyForm())} disabled={busy}>
@@ -338,6 +339,8 @@ export default function AdminPromotionsPage() {
           },
         ]}
       />
+
+      <AdminPublicShowcaseHint variant="promotions" />
 
       {!promotionsLoaded && busy ? (
         <Panel title="Loading promotions">

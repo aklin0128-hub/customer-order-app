@@ -77,7 +77,7 @@ function readLang(): Lang {
 
 export default function PublicShowcaseClient({ data }: { data: ShowcaseData }) {
   const [lang, setLang] = useState<Lang>("en");
-  const [tab, setTab] = useState<Tab>("promo");
+  const [tab, setTab] = useState<Tab>("new");
 
   useEffect(() => {
     setLang(readLang());
@@ -88,8 +88,8 @@ export default function PublicShowcaseClient({ data }: { data: ShowcaseData }) {
   }, [lang]);
 
   useEffect(() => {
-    if (data.promotionTotal === 0 && data.newItemTotal > 0) {
-      setTab("new");
+    if (data.newItemTotal === 0 && data.promotionTotal > 0) {
+      setTab("promo");
     }
   }, [data.promotionTotal, data.newItemTotal]);
 

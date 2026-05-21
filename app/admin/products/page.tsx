@@ -16,6 +16,7 @@ import {
   StatGrid,
   Toast,
 } from "../_components/admin-utils";
+import { AdminPublicShowcaseHint } from "../_components/AdminPublicShowcaseHint";
 import { useAdminAuth } from "../_components/useAdminAuth";
 import { CATEGORY_OPTIONS } from "@/lib/inferCategory";
 
@@ -460,7 +461,7 @@ export default function AdminProductsPage() {
     <AdminShell
       active="products"
       title="Products"
-      subtitle="Search a SKU, edit details, and save overrides to Redis."
+      subtitle="Search a SKU, edit details · New flag syncs to /new/ and customer catalog."
       onLogout={logout}
       actions={
         <BtnSecondary onClick={() => { clearForm(); notify("Enter a SKU to add or edit."); }}>
@@ -476,6 +477,8 @@ export default function AdminProductsPage() {
           { label: "New items", value: products.filter((p) => isNewProduct(p)).length },
         ]}
       />
+
+      <AdminPublicShowcaseHint variant="products" />
 
       {!productsLoaded && busy ? (
         <Panel title="Loading products">
@@ -744,6 +747,14 @@ export default function AdminProductsPage() {
               >
                 <input type="checkbox" checked={isNew} onChange={(e) => { setIsNew(e.target.checked); markDirty(); }} />
                 Show this SKU in customer “New items”
+                <span style={{ fontWeight: 600, color: "#c2410c" }}>
+                  {" "}
+                  (also on{" "}
+                  <a href="/new/" target="_blank" rel="noopener noreferrer" style={{ color: "#1d4ed8" }}>
+                    /new/
+                  </a>
+                  )
+                </span>
               </label>
               <div>
                 <label style={labelStyle}>Size</label>

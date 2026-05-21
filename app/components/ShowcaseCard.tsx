@@ -1,18 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
-import { formatMoneyPrice } from "@/lib/promoFormat";
+import { formatShowcasePromoDisplay, type Lang } from "@/lib/showcasePromoFormat";
 import type { LoginPreviewCard } from "@/lib/loginPreview";
-
-type Lang = "en" | "zh" | "ko" | "vi";
-
-const promoPriceLabel: Record<Lang, string> = {
-  en: "Promo",
-  zh: "特价",
-  ko: "행사가",
-  vi: "Khuyến mãi",
-};
 
 export function ShowcaseCard({
   item,
@@ -28,6 +19,11 @@ export function ShowcaseCard({
   badge?: string | null;
 }) {
   const [imgError, setImgError] = useState(false);
+
+  const promoDisplay = useMemo(
+    () => (showPromo ? formatShowcasePromoDisplay(item, lang) : null),
+    [showPromo, item, lang]
+  );
 
   return (
     <article className={className}>
@@ -48,14 +44,14 @@ export function ShowcaseCard({
       {item.brand ? <div className="showcase-card-brand">{item.brand}</div> : null}
       <div className="showcase-card-name">{item.name || "—"}</div>
       {item.size ? <div className="showcase-card-size">{item.size}</div> : null}
-      {showPromo && item.promoPrice ? (
-        <div className="showcase-card-price">
-          {promoPriceLabel[lang]}: {formatMoneyPrice(item.promoPrice)}
+      {promoDisplay?.priceLine ? (
+        <div className="showcase-card-price">{promoDisplay.priceLine}</div>
+      ) : null}
+      {promoDisplay?.details.map((line, index) => (
+        <div key={`${index}-${line}`} className="showcase-card-detail">
+          {line}
         </div>
-      ) : null}
-      {showPromo && item.promoNote ? (
-        <div className="showcase-card-note">{item.promoNote}</div>
-      ) : null}
+      ))}
       {badge ? <div className="showcase-card-badge">{badge}</div> : null}
     </article>
   );
