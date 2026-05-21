@@ -1,17 +1,7 @@
 "use client";
 
-import type { CSSProperties } from "react";
-
 import { copy } from "../orderCopy";
 import type { Lang } from "../types";
-
-const bannerStyle: CSSProperties = {
-  borderRadius: 12,
-  padding: "10px 12px",
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-};
 
 /** Clearance-only cart nudge (weekly bulk-add prompts removed). */
 export function OrderShopNudge({
@@ -32,41 +22,15 @@ export function OrderShopNudge({
   if (clearanceMissing <= 0) return null;
 
   return (
-    <div style={{ ...bannerStyle, border: "1px solid #fdba74", background: "#fff7ed" }}>
-      <div style={{ fontSize: 12, fontWeight: 800, color: "#9a3412", lineHeight: 1.4 }}>
+    <div className="order-cart-nudge">
+      <p className="order-cart-nudge-text">
         {t.clearanceReviewReminder.replace("{count}", String(clearanceDealCount))}
-      </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button
-          type="button"
-          onClick={onAddClearanceMissing}
-          style={{
-            border: "1px solid #ea580c",
-            background: "#ea580c",
-            color: "#fff",
-            borderRadius: 999,
-            padding: "7px 12px",
-            fontSize: 11,
-            fontWeight: 900,
-            cursor: "pointer",
-          }}
-        >
+      </p>
+      <div className="order-cart-nudge-actions">
+        <button type="button" onClick={onAddClearanceMissing} className="order-cart-nudge-btn is-primary">
           {t.addMissingClearanceBar.replace("{count}", String(clearanceMissing))}
         </button>
-        <button
-          type="button"
-          onClick={onViewClearance}
-          style={{
-            border: "1px solid #fdba74",
-            background: "#fff",
-            color: "#c2410c",
-            borderRadius: 999,
-            padding: "7px 12px",
-            fontSize: 11,
-            fontWeight: 800,
-            cursor: "pointer",
-          }}
-        >
+        <button type="button" onClick={onViewClearance} className="order-cart-nudge-btn is-secondary">
           {t.viewClearance}
         </button>
       </div>

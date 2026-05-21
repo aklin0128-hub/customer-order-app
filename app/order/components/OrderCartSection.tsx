@@ -9,15 +9,10 @@ import {
   cartListScrollStyle,
   cartQtyStripWrapStyle,
   dangerSmallButtonStyle,
-  emptyStyle,
-  cardStyle,
   reviewQtyButtonStyle,
   reviewQtyControlStyle,
   reviewQtyInputStyle,
-  sectionTitleStyle,
-  sectionToggleStyle,
   clearancePolicyStyle,
-  toggleTextStyle,
 } from "../orderStyles";
 import type { CartItem, Lang } from "../types";
 import { ProductImage } from "./ProductImage";
@@ -66,20 +61,18 @@ export function OrderCartSection({
     <section
       id="order-cart"
       className={`order-cart-card${lineCount === 0 ? " is-empty" : ""}`}
-      style={{ ...cardStyle, overflow: "visible" }}
+      style={{ overflow: "visible" }}
     >
-      <button type="button" onClick={onToggleExpanded} style={sectionToggleStyle}>
-        <div style={sectionTitleStyle}>
-          {t.orderCart} ({lineCount}) · {totalCases} {t.cases}
-        </div>
-        <div style={toggleTextStyle}>{expanded ? t.hideCart : t.showCart}</div>
+      <button type="button" onClick={onToggleExpanded} className="order-cart-header-btn">
+        <span className="order-cart-header-title">{t.orderCart}</span>
+        <span className="order-cart-header-action">{expanded ? t.hideCart : t.showCart}</span>
       </button>
 
-      {expanded && nudge ? <div style={{ marginTop: 10 }}>{nudge}</div> : null}
+      {expanded && nudge ? nudge : null}
 
       {expanded ? (
         items.length === 0 ? (
-          <div style={emptyStyle}>{t.noItems}</div>
+          <p className="order-cart-empty-hint">{t.noItems}</p>
         ) : (
           <div style={cartListScrollStyle}>
             {items.map((item) => {
@@ -128,7 +121,7 @@ export function OrderCartSection({
         )
       ) : null}
 
-      {expanded && tools ? <div className="order-cart-tools">{tools}</div> : null}
+      {expanded && tools ? tools : null}
     </section>
   );
 }

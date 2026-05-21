@@ -44,10 +44,8 @@ import { copy } from "./orderCopy";
 import {
   brandSelectStyle,
   cardStyle,
-  cartSummaryTextStyle,
   categoryBarStyle,
   categoryButtonStyle,
-  dangerButtonStyle,
   emptyStyle,
   filterBlockStyle,
   filterLabelStyle,
@@ -1805,30 +1803,40 @@ export default function OrderPage() {
           onRemove={removeSkuFromOrder}
           nudge={
             clearanceUpsellLines.length > 0 ? (
-              <OrderShopNudge
-                lang={lang}
-                clearanceMissing={clearanceUpsellLines.length}
-                clearanceDealCount={clearanceItems.length}
-                onAddClearanceMissing={addAllMissingClearanceUpsell}
-                onViewClearance={() => changeMode("clearance")}
-              />
+              <details className="order-cart-nudge-fold" open={cartItemCount > 0}>
+                <summary>
+                  {t.clearanceMode} ({clearanceItems.length})
+                </summary>
+                <OrderShopNudge
+                  lang={lang}
+                  clearanceMissing={clearanceUpsellLines.length}
+                  clearanceDealCount={clearanceItems.length}
+                  onAddClearanceMissing={addAllMissingClearanceUpsell}
+                  onViewClearance={() => changeMode("clearance")}
+                />
+              </details>
             ) : null
           }
           tools={
-            <>
+            <div className="order-cart-tools">
               <div className="order-cart-tools-row">
-                <button type="button" onClick={downloadCsv} style={secondaryButtonStyle}>
+                <button type="button" onClick={downloadCsv} className="order-cart-tool-btn" style={secondaryButtonStyle}>
                   {t.downloadCsv}
                 </button>
-                <button type="button" onClick={() => fileInputRef.current?.click()} style={secondaryButtonStyle}>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="order-cart-tool-btn"
+                  style={secondaryButtonStyle}
+                >
                   {t.uploadCsv}
+                </button>
+                <button type="button" onClick={clearOrder} className="order-cart-clear-btn">
+                  {t.clearOrder}
                 </button>
                 <input ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleUploadCsv} />
               </div>
-              <button type="button" onClick={clearOrder} style={dangerButtonStyle}>
-                {t.clearOrder}
-              </button>
-            </>
+            </div>
           }
         />
 
@@ -1841,45 +1849,40 @@ export default function OrderPage() {
                 {submitMsg}
               </div>
             ) : null}
-            <button
-              type="button"
-              onClick={scrollToCart}
-              style={{
-                ...cartSummaryTextStyle,
-                border: "none",
-                background: "transparent",
-                padding: 0,
-                textAlign: "left",
-                cursor: cartItemCount > 0 ? "pointer" : "default",
-                width: "100%",
-              }}
-            >
-              <div>
-                {t.cartSummary}: {cartItemCount} {t.lines} / {totalCases} {t.cases}
-                {cartItemCount > 0 ? (
-                  <span style={{ marginLeft: 6, fontSize: 11, color: "#2563eb", fontWeight: 800 }}>· {t.jumpToCart}</span>
-                ) : null}
-              </div>
-              {weeklyInCartCount > 0 || clearanceInCartCount > 0 ? (
-                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2, fontWeight: 700 }}>
-                  {t.cartSalesSummary
-                    .replace("{weekly}", String(weeklyInCartCount))
-                    .replace("{clearance}", String(clearanceInCartCount))}
-                </div>
-              ) : null}
-            </button>
-            <div className="order-fixed-actions">
-              <button type="button" onClick={openReview} disabled={submitting || cartItemCount === 0} style={secondaryButtonStyle}>
-                {t.reviewCart}
-              </button>
+            <div className={`order-fixed-bar-layout${cartItemCount > 0 || submitting ? " has-actions" : ""}`}>
               <button
                 type="button"
-                onClick={openReview}
-                disabled={submitting || cartItemCount === 0}
-                style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}
+                onClick={scrollToCart}
+                className="order-fixed-summary-btn"
+                style={{ cursor: cartItemCount > 0 ? "pointer" : "default" }}
               >
-                {submitting ? t.submitting : t.submitOrder}
+                <span>
+                  {t.cartSummary}: {cartItemCount} {t.lines} / {totalCases} {t.cases}
+                  {cartItemCount > 0 ? (
+                    <span style={{ marginLeft: 6, fontSize: 11, color: "#2563eb", fontWeight: 800 }}>· {t.jumpToCart}</span>
+                  ) : null}
+                </span>
+                {weeklyInCartCount > 0 || clearanceInCartCount > 0 ? (
+                  <span style={{ display: "block", fontSize: 11, color: "#6b7280", marginTop: 2, fontWeight: 700 }}>
+                    {t.cartSalesSummary
+                      .replace("{weekly}", String(weeklyInCartCount))
+                      .replace("{clearance}", String(clearanceInCartCount))}
+                  </span>
+                ) : null}
               </button>
+              <div className="order-fixed-actions">
+                <button type="button" onClick={openReview} disabled={submitting || cartItemCount === 0} style={secondaryButtonStyle}>
+                  {t.reviewCart}
+                </button>
+                <button
+                  type="button"
+                  onClick={openReview}
+                  disabled={submitting || cartItemCount === 0}
+                  style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}
+                >
+                  {submitting ? t.submitting : t.submitOrder}
+                </button>
+              </div>
             </div>
           </div>
         </div>
