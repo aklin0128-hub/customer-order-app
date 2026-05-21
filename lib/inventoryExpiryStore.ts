@@ -44,6 +44,7 @@ export async function saveInventoryCsvUpload(
   const blob = await put(INVENTORY_BY_ITEM_BLOB_PATH, csvText, {
     access: "private",
     addRandomSuffix: false,
+    allowOverwrite: true,
     contentType: "text/csv",
   });
 

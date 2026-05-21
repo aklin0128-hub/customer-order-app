@@ -14,10 +14,7 @@ import { RecommendedStrip } from "./components/RecommendedStrip";
 import { OrderInput } from "./components/OrderInput";
 import { OrderReviewModal } from "./components/OrderReviewModal";
 import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
-import {
-  buildClearanceUpsellLines,
-  buildWeeklyUpsellLines,
-} from "./salesFlow";
+import { buildClearanceUpsellLines } from "./salesFlow";
 import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog } from "./catalogState";
 import {
@@ -726,11 +723,6 @@ export default function OrderPage() {
     [catalogItemsForSubmit]
   );
 
-  const weeklyUpsellLines = useMemo(
-    () => buildWeeklyUpsellLines(lang, promotionItems, cartSkuSet, t),
-    [lang, promotionItems, cartSkuSet, t]
-  );
-
   const clearanceUpsellLines = useMemo(
     () => buildClearanceUpsellLines(lang, clearanceItems, cartSkuSet, t),
     [lang, clearanceItems, cartSkuSet, t]
@@ -745,12 +737,6 @@ export default function OrderPage() {
     () => catalogItemsForSubmit.filter((item) => clearanceSkuSet.has(item.sku.toUpperCase())).length,
     [catalogItemsForSubmit, clearanceSkuSet]
   );
-
-  const postSubmitSuggestLines = useMemo(() => {
-    if (!lastSubmittedRef || lastSubmittedItems.length === 0) return [];
-    const submittedSkus = new Set(lastSubmittedItems.map((item) => item.sku.toUpperCase()));
-    return buildWeeklyUpsellLines(lang, promotionItems, submittedSkus, t);
-  }, [lastSubmittedRef, lastSubmittedItems, promotionItems, lang, t]);
 
   const showNewItemsReviewReminder = useMemo(() => {
     if (newItemCount === 0 || catalogItemsForSubmit.length === 0) return false;
@@ -835,16 +821,8 @@ export default function OrderPage() {
     }
   };
 
-  const addAllMissingWeeklyUpsell = () => {
-    for (const line of weeklyUpsellLines) adjustQtyForSku(line.sku, 1);
-  };
-
   const addAllMissingClearanceUpsell = () => {
     for (const line of clearanceUpsellLines) adjustQtyForSku(line.sku, 1);
-  };
-
-  const addAllPostSubmitSuggest = () => {
-    for (const line of postSubmitSuggestLines) adjustQtyForSku(line.sku, 1);
   };
 
   useEffect(() => {
@@ -1224,11 +1202,6 @@ export default function OrderPage() {
             >
               {t.promotionMode}
               {promotionItems.length > 0 ? ` (${promotionItems.length})` : ""}
-              {weeklyUpsellLines.length > 0 && mode !== "promotion" ? (
-                <span style={{ marginLeft: 4, fontSize: 10, fontWeight: 900, color: "#0f766e" }}>
-                  {t.modeTabMissing.replace("{count}", String(weeklyUpsellLines.length))}
-                </span>
-              ) : null}
             </button>
             <button
               type="button"
@@ -1237,11 +1210,6 @@ export default function OrderPage() {
             >
               {t.clearanceMode}
               {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
-              {clearanceUpsellLines.length > 0 && mode !== "clearance" ? (
-                <span style={{ marginLeft: 4, fontSize: 10, fontWeight: 900, color: "#c2410c" }}>
-                  {t.modeTabMissing.replace("{count}", String(clearanceUpsellLines.length))}
-                </span>
-              ) : null}
             </button>
             <button type="button" onClick={() => changeMode("catalog")} style={modeButtonStyle(mode === "catalog")}>
               {t.catalogMode}
@@ -1723,31 +1691,13 @@ export default function OrderPage() {
           </section>
         )}
 
-        {cartItemCount > 0 ? (
+        {clearanceUpsellLines.length > 0 ? (
           <section style={cardStyle}>
             <OrderShopNudge
               lang={lang}
-              weeklyMissing={weeklyUpsellLines.length}
               clearanceMissing={clearanceUpsellLines.length}
               clearanceDealCount={clearanceItems.length}
-              weeklyInCart={weeklyInCartCount}
-              onAddWeeklyMissing={addAllMissingWeeklyUpsell}
               onAddClearanceMissing={addAllMissingClearanceUpsell}
-              onViewWeekly={() => changeMode("promotion")}
-              onViewClearance={() => changeMode("clearance")}
-            />
-          </section>
-        ) : promotionItems.length > 0 || clearanceItems.length > 0 ? (
-          <section style={cardStyle}>
-            <OrderShopNudge
-              lang={lang}
-              weeklyMissing={0}
-              clearanceMissing={0}
-              clearanceDealCount={clearanceItems.length}
-              weeklyInCart={0}
-              onAddWeeklyMissing={addAllMissingWeeklyUpsell}
-              onAddClearanceMissing={addAllMissingClearanceUpsell}
-              onViewWeekly={() => changeMode("promotion")}
               onViewClearance={() => changeMode("clearance")}
             />
           </section>
@@ -1807,27 +1757,6 @@ export default function OrderPage() {
               </div>
             ) : null}
           </button>
-          {weeklyUpsellLines.length > 0 ? (
-            <button
-              type="button"
-              disabled={submitting}
-              onClick={addAllMissingWeeklyUpsell}
-              style={{
-                width: "100%",
-                marginTop: 8,
-                border: "1px solid #5eead4",
-                background: "#f0fdfa",
-                color: "#0f766e",
-                borderRadius: 10,
-                padding: "8px 10px",
-                fontSize: 11,
-                fontWeight: 900,
-                cursor: submitting ? "not-allowed" : "pointer",
-              }}
-            >
-              {t.addMissingPicksBar.replace("{count}", String(weeklyUpsellLines.length))}
-            </button>
-          ) : null}
           <div style={{ display: "grid", gridTemplateColumns: "0.9fr 1.1fr", gap: 8, marginTop: 8 }}>
             <button type="button" onClick={openReview} disabled={submitting || cartItemCount === 0} style={secondaryButtonStyle}>
               {t.reviewCart}
@@ -1849,10 +1778,8 @@ export default function OrderPage() {
           lang={lang}
           items={catalogItemsForSubmit}
           warnings={orderReviewWarnings}
-          weeklyUpsellLines={weeklyUpsellLines}
           clearanceUpsellLines={clearanceUpsellLines}
           onAddUpsellCase={(sku) => adjustQtyForSku(sku, 1)}
-          onAddAllWeeklyUpsell={addAllMissingWeeklyUpsell}
           onAddAllClearanceUpsell={addAllMissingClearanceUpsell}
           clearanceSkus={clearanceSkuSet}
           promoDealBySku={promoDealBySku}
@@ -1887,15 +1814,6 @@ export default function OrderPage() {
           lang={lang}
           orderRef={lastSubmittedRef}
           items={lastSubmittedItems}
-          suggestLines={postSubmitSuggestLines}
-          onAddSuggestCase={(sku) => adjustQtyForSku(sku, 1)}
-          onAddAllSuggest={addAllPostSubmitSuggest}
-          onBrowseWeeklyPicks={() => {
-            setLastSubmittedRef("");
-            setLastSubmittedItems([]);
-            changeMode("promotion");
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }}
         />
 
         {orderHistory.length > 0 ? (
