@@ -1,5 +1,6 @@
 "use client";
 
+import { getDisplayStatus, getStatusBadgeStyle, isNormalItem } from "../catalogUtils";
 import type { CatalogItem } from "../types";
 import {
   catalogCardStyle,
@@ -105,6 +106,21 @@ export function CatalogQtyCard({
       <div style={{ fontSize: 11, fontWeight: 800, color: "#374151" }}>{item.brand || "-"}</div>
       <div style={catalogNameStyle}>{item.name || "-"}</div>
       {item.size ? <div style={{ fontSize: 10, color: "#6b7280" }}>{item.size}</div> : null}
+      {!isNormalItem(item) && getDisplayStatus(item.status) ? (
+        <span
+          style={{
+            display: "inline-block",
+            marginTop: 4,
+            padding: "2px 7px",
+            borderRadius: 999,
+            fontSize: 10,
+            fontWeight: 700,
+            ...getStatusBadgeStyle(item.status),
+          }}
+        >
+          {getDisplayStatus(item.status)}
+        </span>
+      ) : null}
       {promoDealLabel ? (
         <div style={promoDealStyle}>
           <div>{promoDealLabel}</div>

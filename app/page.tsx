@@ -26,8 +26,8 @@ const copy = {
     footer: "Weekly picks · Clearance · Draft auto-save · EN / 中文 / 한국어 / Tiếng Việt",
     featPromo: "Weekly picks",
     featClearance: "Clearance",
-    featCatalog: "Shop all",
-    featSearch: "Quick replenish",
+    featCatalog: "Catalog order",
+    featSearch: "Quick order",
     featDraft: "Save draft",
   },
   zh: {
@@ -50,8 +50,8 @@ const copy = {
     footer: "本周主推 · 临期特价 · 自动保存草稿 · 多语言",
     featPromo: "本周主推",
     featClearance: "临期特价",
-    featCatalog: "全品选购",
-    featSearch: "快速补货",
+    featCatalog: "目录订货",
+    featSearch: "快速下单",
     featDraft: "保存草稿",
   },
   ko: {
@@ -74,8 +74,8 @@ const copy = {
     footer: "이번 주 추천 · 임박 특가 · 임시 저장 · 다국어",
     featPromo: "이번 주 추천",
     featClearance: "임박 특가",
-    featCatalog: "전체 상품",
-    featSearch: "빠른 보충",
+    featCatalog: "카탈로그 주문",
+    featSearch: "빠른 주문",
     featDraft: "임시 저장",
   },
   vi: {
@@ -98,8 +98,8 @@ const copy = {
     footer: "Nổi bật tuần · Thanh lý · Tự lưu nháp · Đa ngôn ngữ",
     featPromo: "Nổi bật tuần",
     featClearance: "Thanh lý",
-    featCatalog: "Mua tất cả",
-    featSearch: "Bổ hàng nhanh",
+    featCatalog: "Đặt theo danh mục",
+    featSearch: "Đặt nhanh",
     featDraft: "Lưu nháp",
   },
 };

@@ -473,18 +473,19 @@ export default function OrderPage() {
       .slice(0, 60);
   }, [normalizedSkuInput, showAvailableOnly, catalogVersion]);
 
-  const orderableBaseItems = useMemo(() => {
+  const catalogBrowseBase = useMemo(() => {
+    if (!showAvailableOnly) return catalog;
     return catalog.filter((item) => isNormalItem(item));
-  }, [catalogVersion]);
+  }, [catalogVersion, showAvailableOnly]);
 
   const brandSplit = useMemo(
-    () => splitBrandFilters(orderableBaseItems),
-    [orderableBaseItems]
+    () => splitBrandFilters(catalogBrowseBase),
+    [catalogBrowseBase]
   );
 
   const newItemCount = useMemo(
-    () => orderableBaseItems.filter((item) => isNewItem(item)).length,
-    [orderableBaseItems]
+    () => catalogBrowseBase.filter((item) => isNewItem(item)).length,
+    [catalogBrowseBase]
   );
 
   const [invoiceFrequentSkus, setInvoiceFrequentSkus] = useState<string[]>([]);
@@ -535,24 +536,25 @@ export default function OrderPage() {
   }, [orderHistory, recentItems, invoiceFrequentSkus]);
 
   const recommendedItemCount = useMemo(
-    () => orderableBaseItems.filter((item) => recommendedSkuSet.has(item.sku?.toUpperCase() || "")).length,
-    [orderableBaseItems, recommendedSkuSet]
+    () => catalogBrowseBase.filter((item) => recommendedSkuSet.has(item.sku?.toUpperCase() || "")).length,
+    [catalogBrowseBase, recommendedSkuSet]
   );
 
   const activeCatalogFilterCount = useMemo(() => {
     let count = 0;
+    if (showAvailableOnly) count += 1;
     if (categoryFilter !== "ALL") count += 1;
     if (brandFilter !== "ALL") count += 1;
     if (catalogShowNewOnly) count += 1;
     if (catalogShowRecommendedOnly) count += 1;
     if (catalogShowSelectedOnly) count += 1;
     return count;
-  }, [brandFilter, catalogShowNewOnly, catalogShowRecommendedOnly, catalogShowSelectedOnly, categoryFilter]);
+  }, [brandFilter, catalogShowNewOnly, catalogShowRecommendedOnly, catalogShowSelectedOnly, categoryFilter, showAvailableOnly]);
 
   const orderableCatalogItems = useMemo(() => {
     const q = catalogSearch.trim().toUpperCase();
 
-    return orderableBaseItems
+    return catalogBrowseBase
       .filter((item) => {
         if (catalogShowSelectedOnly) {
           const sku = (item.sku || "").toUpperCase();
@@ -574,8 +576,13 @@ export default function OrderPage() {
           item.upc?.toUpperCase().includes(q)
         );
       })
-      .sort((a, b) => (a.sku || "").localeCompare(b.sku || ""));
-  }, [catalogSearch, categoryFilter, brandFilter, catalogQtyMap, orderableBaseItems, catalogShowSelectedOnly, catalogShowNewOnly, catalogShowRecommendedOnly, recommendedSkuSet]);
+      .sort((a, b) => {
+        const aNormal = isNormalItem(a);
+        const bNormal = isNormalItem(b);
+        if (aNormal !== bNormal) return aNormal ? -1 : 1;
+        return (a.sku || "").localeCompare(b.sku || "");
+      });
+  }, [catalogSearch, categoryFilter, brandFilter, catalogQtyMap, catalogBrowseBase, catalogShowSelectedOnly, catalogShowNewOnly, catalogShowRecommendedOnly, recommendedSkuSet]);
 
   useEffect(() => {
     if (brandFilter !== "ALL" && !isKnownBrandFilter(brandSplit, brandFilter)) {
@@ -586,12 +593,8 @@ export default function OrderPage() {
   const catalogItemsForSubmit = useMemo(() => {
     return Object.entries(catalogQtyMap)
       .map(([sku, qty]) => ({ sku: sku.toUpperCase(), qty: String(qty || "").trim() }))
-      .filter((item) => item.qty && Number(item.qty) > 0)
-      .filter((item) => {
-        const catalogItem = getCatalogItemBySku(item.sku);
-        return !catalogItem || isNormalItem(catalogItem);
-      });
-  }, [catalogQtyMap, catalogVersion]);
+      .filter((item) => item.qty && Number(item.qty) > 0);
+  }, [catalogQtyMap]);
 
   const cartItemCount = catalogItemsForSubmit.length;
 
@@ -845,12 +848,6 @@ export default function OrderPage() {
     const finalSku = sku.trim().toUpperCase();
     if (!finalSku) return;
 
-    const item = getCatalogItemBySku(finalSku);
-    if (item && !isNormalItem(item)) {
-      alert(t.unavailable);
-      return;
-    }
-
     const finalQty = String(qty || "").trim() || "1";
     const duplicated = cart.some((x) => x.sku.toUpperCase() === finalSku);
     if (duplicated && !confirm(`${finalSku} ${t.duplicate}`)) return;
@@ -881,10 +878,6 @@ export default function OrderPage() {
   };
 
   const addSkuFromSearch = (item: CatalogItem, qty = "1") => {
-    if (!isNormalItem(item)) {
-      alert(t.unavailable);
-      return;
-    }
     addSkuToCart(item.sku, qty);
   };
 
@@ -915,12 +908,13 @@ export default function OrderPage() {
 
   const reorderItems = (items: CartItem[]) => {
     const valid = items.filter((item) => {
-      const catalogItem = getCatalogItemBySku(item.sku);
-      return !catalogItem || isNormalItem(catalogItem);
+      const sku = String(item.sku || "").trim().toUpperCase();
+      const qty = String(item.qty || "").trim();
+      return sku && qty && Number(qty) > 0;
     });
 
     if (valid.length === 0) {
-      alert(t.unavailable);
+      alert(t.noValidRows);
       return;
     }
 
@@ -1043,9 +1037,6 @@ export default function OrderPage() {
         const qty = parts.slice(1).join(",").trim().toUpperCase();
         if (!sku || !qty) continue;
 
-        const catalogItem = getCatalogItemBySku(sku);
-        if (catalogItem && !isNormalItem(catalogItem)) continue;
-
         parsed.push({ sku, qty });
         if (Number(qty) > 0) parsedMap[sku] = String(Number(qty));
       }
@@ -1078,18 +1069,6 @@ export default function OrderPage() {
 
     if (items.length === 0) {
       alert(t.addAtLeast);
-      return;
-    }
-
-    const unavailableItems = items.filter((item) => {
-      const catalogItem = getCatalogItemBySku(item.sku);
-      return catalogItem && !isNormalItem(catalogItem);
-    });
-
-    if (unavailableItems.length > 0) {
-      alert(`${t.unavailable}
-
-${unavailableItems.map((item) => item.sku).join(", ")}`);
       return;
     }
 
@@ -1529,6 +1508,25 @@ ${unavailableItems.map((item) => item.sku).join(", ")}`);
                 <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
                   {t.selected}: {cartItemCount} · {orderableCatalogItems.length} {t.catalogCount}
                 </div>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: "#374151",
+                    marginTop: 8,
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={showAvailableOnly}
+                    onChange={(e) => setShowAvailableOnly(e.target.checked)}
+                  />
+                  {t.availableOnly}
+                </label>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                 <button
