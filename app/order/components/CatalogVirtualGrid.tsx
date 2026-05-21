@@ -7,11 +7,11 @@ import { catalogVirtualScrollStyle } from "../orderStyles";
 import type { CatalogItem } from "../types";
 import { CatalogQtyCard } from "./CatalogQtyCard";
 
-const GAP = 14;
+const GAP = 8;
 const MAX_CATALOG_WIDTH = 1280;
 const DESKTOP_COLUMNS = 6;
-/** Approximate row height for cards (image + text + stepper); keeps scrolling smooth */
-const ROW_HEIGHT = 360;
+/** Initial row height before measure; kept close to real card height to avoid huge gaps */
+const ROW_HEIGHT = 268;
 
 function columnCountForWidth(rawWidth: number) {
   const width =
@@ -90,8 +90,8 @@ export function CatalogVirtualGrid({
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_HEIGHT,
-    overscan: 3,
+    estimateSize: () => ROW_HEIGHT + GAP,
+    overscan: 2,
   });
 
   useEffect(() => {
@@ -109,6 +109,7 @@ export function CatalogVirtualGrid({
           return (
             <div
               key={vr.key}
+              ref={rowVirtualizer.measureElement}
               data-index={vr.index}
               style={{
                 position: "absolute",
@@ -120,7 +121,6 @@ export function CatalogVirtualGrid({
                 gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
                 columnGap: GAP,
                 rowGap: GAP,
-                paddingBottom: GAP,
               }}
             >
               {rowItems.map((item) => {

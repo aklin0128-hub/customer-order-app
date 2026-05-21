@@ -113,7 +113,7 @@ export function CatalogQtyCard({
       ) : null}
 
       <div className="catalog-card-image-wrap" style={{ paddingTop: promoNote || highlight ? 4 : 0 }}>
-        <ProductImage sku={item.sku} alt={item.name || item.sku} size={108} imageUrl={item.imageUrl} />
+        <ProductImage sku={item.sku} alt={item.name || item.sku} size={96} imageUrl={item.imageUrl} />
       </div>
 
       <div style={{ fontSize: 13, fontWeight: 900, color: "#111827", lineHeight: 1.2 }}>{item.sku}</div>

@@ -1799,6 +1799,15 @@ export default function OrderPage() {
       </div>
 
       {showCart ? (
+        <button
+          type="button"
+          className="order-cart-scrim"
+          aria-label={t.hideCart}
+          onClick={toggleCartPanel}
+        />
+      ) : null}
+
+      {showCart ? (
         <div className="order-cart-sheet" aria-label={t.orderCart}>
           <div className="order-cart-sheet-inner">
             <OrderCartSection

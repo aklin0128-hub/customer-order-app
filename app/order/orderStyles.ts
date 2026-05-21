@@ -167,6 +167,7 @@ export const cartListScrollStyle: CSSProperties = {
   WebkitOverflowScrolling: "touch",
   marginTop: 10,
   paddingRight: 4,
+  background: "#ffffff",
 };
 export const cartItemStyle: CSSProperties = {
   border: "1px solid #e5e7eb",
@@ -217,14 +218,14 @@ export const wideInputStyle: CSSProperties = {
 export const promoGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
-  gap: 14,
+  gap: 8,
 };
 export const catalogCardStyle: CSSProperties = {
-  borderRadius: 16,
-  padding: 12,
+  borderRadius: 12,
+  padding: 8,
   display: "flex",
   flexDirection: "column",
-  gap: 6,
+  gap: 4,
   overflow: "visible",
   position: "relative",
   minWidth: 0,
@@ -233,8 +234,8 @@ export const catalogCardStyle: CSSProperties = {
 export const catalogNameStyle: CSSProperties = {
   fontSize: 12,
   color: "#4b5563",
-  lineHeight: 1.35,
-  maxHeight: 52,
+  lineHeight: 1.3,
+  maxHeight: 40,
   overflow: "hidden",
   display: "-webkit-box",
   WebkitBoxOrient: "vertical",
@@ -289,15 +290,15 @@ export const inCartTagStyle: CSSProperties = {
 };
 export const catalogStepperStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "42px 1fr 42px",
-  gap: 8,
+  gridTemplateColumns: "38px 1fr 38px",
+  gap: 6,
   alignItems: "center",
-  marginTop: "auto",
-  paddingTop: 4,
+  marginTop: 4,
+  paddingTop: 0,
 };
 export const catalogStepBtnStyle: CSSProperties = {
-  width: 42,
-  height: 42,
+  width: 38,
+  height: 38,
   borderRadius: 10,
   border: "1px solid #d1d5db",
   background: "#f9fafb",
@@ -308,11 +309,11 @@ export const catalogStepBtnStyle: CSSProperties = {
 };
 export const catalogStepInputStyle: CSSProperties = {
   width: "100%",
-  height: 42,
+  height: 38,
   borderRadius: 10,
   border: "1px solid #d1d5db",
   textAlign: "center",
-  fontSize: 16,
+  fontSize: 15,
   fontWeight: 900,
   outline: "none",
   boxSizing: "border-box",

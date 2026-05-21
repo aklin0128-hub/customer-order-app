@@ -61,7 +61,7 @@ export function OrderCartSection({
     <section
       id="order-cart"
       className={`order-cart-card${lineCount === 0 ? " is-empty" : ""}`}
-      style={{ overflow: "visible" }}
+      style={{ overflow: "hidden" }}
     >
       <button type="button" onClick={onToggleExpanded} className="order-cart-header-btn">
         <span className="order-cart-header-title">{t.orderCart}</span>
