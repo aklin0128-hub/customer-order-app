@@ -1,5 +1,7 @@
-import catalogData from "@/data/catalog_sku_master_extracted.json";
+import { isNewItem } from "@/app/order/catalogUtils";
+import { getMergedCatalogProducts } from "@/lib/catalogMerge";
 import { getPromotionProducts, type PromotionProduct } from "@/lib/promotions";
+import type { CatalogItem } from "@/app/order/types";
 
 export type LoginPreviewCard = {
   sku: string;
@@ -11,24 +13,17 @@ export type LoginPreviewCard = {
   promoNote?: string;
 };
 
-const PREVIEW_LIMIT = 24;
+export type ShowcaseData = {
+  promotions: LoginPreviewCard[];
+  newItems: LoginPreviewCard[];
+  promotionTotal: number;
+  newItemTotal: number;
+};
 
 function productImageUrl(sku: string, imageUrl?: string) {
   const custom = String(imageUrl || "").trim();
   if (custom) return custom;
   return `/product/${sku}.jpg`;
-}
-
-function isNewCatalogItem(item: Record<string, unknown>) {
-  if (typeof item.isNew === "boolean") return item.isNew;
-
-  const text = [item.name, item.size, item["name_k"]]
-    .filter(Boolean)
-    .join(" ")
-    .toUpperCase()
-    .replace(/[_-]+/g, " ");
-
-  return /(^|\s)NEW(\s|$)/.test(text);
 }
 
 function promoToCard(item: PromotionProduct): LoginPreviewCard {
@@ -59,39 +54,33 @@ function catalogToCard(item: Record<string, unknown>): LoginPreviewCard {
   };
 }
 
-async function countAndSampleNewItems(promoSkus: Set<string>) {
-  const samples: LoginPreviewCard[] = [];
-  let total = 0;
+async function listNewItemCards(cardLimit?: number) {
+  const products = await getMergedCatalogProducts();
+  const cards: LoginPreviewCard[] = [];
 
-  const consider = (raw: Record<string, unknown>) => {
-    const sku = String(raw.sku || "")
-      .trim()
-      .toUpperCase();
-    if (!sku || sku.includes(" ")) return;
-    if (!isNewCatalogItem(raw)) return;
-
-    total += 1;
-    if (samples.length < PREVIEW_LIMIT) {
-      samples.push(catalogToCard(raw));
-    }
-  };
-
-  for (const item of catalogData as Record<string, unknown>[]) {
-    consider(item);
+  for (const item of products) {
+    if (!isNewItem(item as CatalogItem)) continue;
+    cards.push(catalogToCard(item));
   }
 
-  return { samples, total };
+  return {
+    cards: cardLimit != null ? cards.slice(0, cardLimit) : cards,
+    total: cards.length,
+  };
 }
 
-export async function getLoginPreviewData() {
+/** Public showcase and login preview share this loader. */
+export async function getShowcaseData(options?: { cardLimit?: number }): Promise<ShowcaseData> {
+  const cardLimit = options?.cardLimit;
   const promotions = await getPromotionProducts({ activeOnly: true });
-  const promoSkus = new Set(promotions.map((p) => p.sku.toUpperCase()));
-  const { samples: newItems, total: newItemTotal } = await countAndSampleNewItems(promoSkus);
+  const promoCards = promotions.map(promoToCard);
+  const { cards: newItems, total: newItemTotal } = await listNewItemCards(cardLimit);
 
   return {
-    promotions: promotions.slice(0, PREVIEW_LIMIT).map(promoToCard),
+    promotions: cardLimit != null ? promoCards.slice(0, cardLimit) : promoCards,
     newItems,
     promotionTotal: promotions.length,
     newItemTotal,
   };
 }
+

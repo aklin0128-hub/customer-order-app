@@ -1,0 +1,48 @@
+import catalogData from "@/data/catalog_sku_master_extracted.json";
+import { redis } from "@/lib/redis";
+
+export type MergedCatalogProduct = {
+  sku: string;
+  name?: string;
+  brand?: string;
+  status?: string;
+  size?: string;
+  imageUrl?: string;
+  isNew?: boolean;
+  name_k?: string;
+  [key: string]: unknown;
+};
+
+/** Same JSON + Redis merge as GET /api/catalog. */
+export async function getMergedCatalogProducts(): Promise<MergedCatalogProduct[]> {
+  const map = new Map<string, MergedCatalogProduct>();
+
+  for (const item of catalogData as MergedCatalogProduct[]) {
+    const sku = String(item.sku || "")
+      .trim()
+      .toUpperCase();
+    if (!sku || sku.includes(" ")) continue;
+
+    map.set(sku, {
+      ...item,
+      sku,
+    });
+  }
+
+  const keys = await redis.keys("product:*");
+  const redisProducts = await Promise.all(keys.map((key) => redis.get<MergedCatalogProduct>(key)));
+
+  for (const item of redisProducts) {
+    if (!item?.sku) continue;
+
+    const sku = String(item.sku).toUpperCase();
+
+    map.set(sku, {
+      ...(map.get(sku) || {}),
+      ...item,
+      sku,
+    });
+  }
+
+  return Array.from(map.values()).sort((a, b) => a.sku.localeCompare(b.sku));
+}

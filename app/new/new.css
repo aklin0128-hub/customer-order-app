@@ -1,0 +1,239 @@
+.new-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(ellipse 90% 45% at 50% -5%, rgba(37, 99, 235, 0.14), transparent),
+    linear-gradient(180deg, #f8fafc 0%, #eef2ff 40%, #f8fafc 100%);
+  padding: max(12px, env(safe-area-inset-top)) 14px 88px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  box-sizing: border-box;
+}
+
+.new-header {
+  max-width: 1280px;
+  margin: 0 auto 16px;
+  width: 100%;
+}
+
+.new-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.new-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.new-logo {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 13px;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.28);
+}
+
+.new-brand-text {
+  font-size: 14px;
+  font-weight: 800;
+  color: #374151;
+}
+
+.new-lang-row {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: #fff;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.new-lang-btn {
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.new-lang-btn.is-active {
+  background: #2563eb;
+  color: #fff;
+}
+
+.new-title {
+  margin: 0;
+  font-size: clamp(22px, 4vw, 30px);
+  font-weight: 900;
+  color: #111827;
+  letter-spacing: -0.02em;
+}
+
+.new-subtitle {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #4b5563;
+  font-weight: 600;
+  max-width: 52ch;
+}
+
+.new-updated {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: #9ca3af;
+  font-weight: 700;
+}
+
+.new-main {
+  flex: 1;
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.new-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.new-tab {
+  border-radius: 999px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+}
+
+.new-tab.is-promo.is-active {
+  border-color: #14b8a6;
+  background: #f0fdfa;
+  color: #0f766e;
+}
+
+.new-tab.is-new.is-active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.new-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.new-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 10px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+.new-card .showcase-card-img-wrap {
+  min-height: 96px;
+}
+
+.new-card .showcase-card-img-wrap img {
+  width: 88px;
+  height: 88px;
+}
+
+.new-empty,
+.new-empty-all {
+  padding: 32px 16px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #9ca3af;
+  background: #fff;
+  border-radius: 16px;
+  border: 1px dashed #e5e7eb;
+}
+
+.new-empty-all p {
+  margin: 0 0 8px;
+}
+
+.new-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 10px 14px max(12px, env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: center;
+  z-index: 20;
+}
+
+.new-sign-in-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: min(100%, 320px);
+  padding: 12px 20px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 900;
+  text-decoration: none;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
+}
+
+@media (min-width: 640px) {
+  .new-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+
+@media (min-width: 900px) {
+  .new-page {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .new-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .new-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .new-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}

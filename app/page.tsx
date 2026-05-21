@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { LoginPreviewSection } from "./components/LoginPreviewSection";
 import "./login.css";
 
 type Lang = "en" | "zh" | "ko" | "vi";
@@ -231,29 +230,28 @@ export default function LoginPage() {
 
   return (
     <main className="login-page">
-      <div className="login-shell">
-        <header className="login-top-bar">
-          <div className="login-brand-row">
-            <div className="login-logo">CO</div>
-            <span className="login-brand-text">{t.brandName}</span>
-          </div>
-          <div className="login-lang-row" role="group" aria-label="Language">
-            {(["en", "zh", "ko", "vi"] as Lang[]).map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => changeLang(item)}
-                aria-pressed={lang === item}
-                className={`login-lang-btn${lang === item ? " is-active" : ""}`}
-              >
-                {langLabels[item]}
-              </button>
-            ))}
-          </div>
-        </header>
+      <header className="login-top-bar">
+        <div className="login-brand-row">
+          <div className="login-logo">CO</div>
+          <span className="login-brand-text">{t.brandName}</span>
+        </div>
+        <div className="login-lang-row" role="group" aria-label="Language">
+          {(["en", "zh", "ko", "vi"] as Lang[]).map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => changeLang(item)}
+              aria-pressed={lang === item}
+              className={`login-lang-btn${lang === item ? " is-active" : ""}`}
+            >
+              {langLabels[item]}
+            </button>
+          ))}
+        </div>
+      </header>
 
-        <div className="login-card-wrap">
-          <section className="login-card">
+      <div className="login-card-wrap">
+        <section className="login-card">
             <div style={heroStyle}>
               <h1 style={titleStyle}>{t.title}</h1>
               <p style={subtitleStyle}>{t.subtitle}</p>
@@ -335,13 +333,10 @@ export default function LoginPage() {
                 {loading ? t.signingIn : t.signIn}
               </button>
             </form>
-          </section>
-        </div>
-
-        <LoginPreviewSection lang={lang} />
-
-        <p className="login-footer">{t.footer}</p>
+        </section>
       </div>
+
+      <p className="login-footer">{t.footer}</p>
     </main>
   );
 }

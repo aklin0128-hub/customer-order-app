@@ -1,0 +1,77 @@
+.showcase-card-img-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 88px;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #eef2f7;
+}
+
+.showcase-card-img-wrap img {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+}
+
+.showcase-card-img-fallback {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #9ca3af;
+}
+
+.showcase-card-sku {
+  font-size: 12px;
+  font-weight: 900;
+  color: #111827;
+}
+
+.showcase-card-brand {
+  font-size: 11px;
+  font-weight: 800;
+  color: #374151;
+}
+
+.showcase-card-name {
+  font-size: 11px;
+  color: #4b5563;
+  line-height: 1.3;
+  max-height: 42px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.showcase-card-size {
+  font-size: 10px;
+  color: #6b7280;
+}
+
+.showcase-card-price {
+  font-size: 11px;
+  font-weight: 900;
+  color: #0f766e;
+}
+
+.showcase-card-note {
+  font-size: 10px;
+  color: #6b7280;
+  line-height: 1.35;
+}
+
+.showcase-card-badge {
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #6b7280;
+  text-align: center;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: #f3f4f6;
+}
