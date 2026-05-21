@@ -11,6 +11,7 @@ export type Lang = "en" | "zh" | "ko" | "vi";
 
 export type ShowcasePromoFields = Pick<
   PromotionItem,
+  | "sku"
   | "promoPrice"
   | "promoNote"
   | "buyQty"
