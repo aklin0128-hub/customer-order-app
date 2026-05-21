@@ -1,5 +1,3 @@
-import fs from "fs";
-
 export type InventoryLot = {
   sku: string;
   description?: string;
@@ -210,30 +208,12 @@ function setCache(sourceKey: string, rows: InventoryLot[]) {
   };
 }
 
-export function getInventoryCsvPath(filePath?: string) {
-  return (
-    filePath ||
-    process.env.INVENTORY_BY_ITEM_CSV_PATH ||
-    `${process.cwd()}/data/inventory-by-item.csv`
-  );
-}
-
-/** Load from a local file path (tests / dev). */
-export function loadInventoryLotsFromFile(filePath?: string): InventoryLot[] {
-  const resolved = getInventoryCsvPath(filePath);
-  if (!fs.existsSync(resolved)) return [];
-
-  const stat = fs.statSync(resolved);
-  const sourceKey = `file:${resolved}:${stat.mtimeMs}`;
-  if (cached?.sourceKey === sourceKey) return cached.rows;
-
-  const raw = fs.readFileSync(resolved, "utf-8");
-  const rows = parseInventoryCsvText(raw);
+/** Used by tests via inventoryExpiry.local.ts only. */
+export function replaceInventoryCache(sourceKey: string, rows: InventoryLot[]) {
   setCache(sourceKey, rows);
-  return rows;
 }
 
-/** Load uploaded CSV (Redis/Blob) or local fallback file. */
+/** Load uploaded CSV from Vercel Blob (via Redis meta). */
 export async function loadInventoryLots(): Promise<InventoryLot[]> {
   const { getInventoryCsvMeta, loadUploadedInventoryCsvText } = await import(
     "@/lib/inventoryExpiryStore"
@@ -242,9 +222,7 @@ export async function loadInventoryLots(): Promise<InventoryLot[]> {
   const text = await loadUploadedInventoryCsvText();
   const sourceKey = meta
     ? `blob:${meta.blobPathname}:${meta.uploadedAt}`
-    : text
-      ? `local:${getInventoryCsvPath()}:${text.length}`
-      : "empty";
+    : "empty";
 
   if (cached?.sourceKey === sourceKey) return cached.rows;
   if (!text?.trim()) {
@@ -259,7 +237,10 @@ export async function loadInventoryLots(): Promise<InventoryLot[]> {
 
 async function getIndex(filePath?: string) {
   if (filePath) {
-    loadInventoryLotsFromFile(filePath);
+    const { loadInventoryLotsFromFile } = await import(
+      /* webpackIgnore: true */ "@/lib/inventoryExpiry.local"
+    );
+    await loadInventoryLotsFromFile(filePath);
   } else {
     await loadInventoryLots();
   }

@@ -6,11 +6,11 @@ import { test } from "node:test";
 
 import {
   getSkuExpiration,
-  loadInventoryLotsFromFile,
   normalizeInventorySku,
   parseInventoryCsvText,
   skuLookupKeys,
 } from "@/lib/inventoryExpiry";
+import { loadInventoryLotsFromFile } from "@/lib/inventoryExpiry.local";
 
 const SAMPLE_CSV = `Loc Item,Loc Item Desc,Loc Qty UM,Loc Inventory Status,Loc Received Date,Loc Expire Date,Loc On Hand Qty
 000020,"PREMIUM MEDIUM GRAIN RICE",BG,Available,2/11/2026,2/10/2028,100
@@ -34,7 +34,7 @@ test("getSkuExpiration returns lots and sorted expire dates", async () => {
   assert.equal(result.lots.length, 1);
   assert.equal(result.earliestExpireDate, "2028-02-10");
 
-  loadInventoryLotsFromFile(filePath);
+  await loadInventoryLotsFromFile(filePath);
   assert.equal(normalizeInventorySku(" 000030 "), "000030");
 });
 

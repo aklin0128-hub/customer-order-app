@@ -73,18 +73,6 @@ export function OrderReviewModal({
   onRemove: (sku: string) => void;
   onSubmit: () => void | Promise<void>;
 }) {
-  const t = copy[lang];
-  const [hideWarnings, setHideWarnings] = useState(false);
-  const [hideWeeklyUpsell, setHideWeeklyUpsell] = useState(false);
-  const [hideClearanceUpsell, setHideClearanceUpsell] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setHideWarnings(false);
-    setHideWeeklyUpsell(false);
-    setHideClearanceUpsell(false);
-  }, [open]);
-
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -105,6 +93,57 @@ export function OrderReviewModal({
   }, [open, submitting, onClose]);
 
   if (!open) return null;
+
+  return (
+    <OrderReviewModalContent
+      lang={lang}
+      items={items}
+      warnings={warnings}
+      weeklyUpsellLines={weeklyUpsellLines}
+      clearanceUpsellLines={clearanceUpsellLines}
+      onAddUpsellCase={onAddUpsellCase}
+      onAddAllWeeklyUpsell={onAddAllWeeklyUpsell}
+      onAddAllClearanceUpsell={onAddAllClearanceUpsell}
+      clearanceSkus={clearanceSkus}
+      promoDealBySku={promoDealBySku}
+      newItemsReminder={newItemsReminder}
+      accountNo={accountNo}
+      storeName={storeName}
+      submitting={submitting}
+      onAdjustQty={onAdjustQty}
+      onQtyInput={onQtyInput}
+      onRemove={onRemove}
+      onSubmit={onSubmit}
+      onClose={onClose}
+    />
+  );
+}
+
+function OrderReviewModalContent({
+  onClose,
+  lang,
+  items,
+  warnings = [],
+  weeklyUpsellLines,
+  clearanceUpsellLines,
+  onAddUpsellCase,
+  onAddAllWeeklyUpsell,
+  onAddAllClearanceUpsell,
+  clearanceSkus,
+  promoDealBySku,
+  newItemsReminder,
+  accountNo,
+  storeName,
+  submitting,
+  onAdjustQty,
+  onQtyInput,
+  onRemove,
+  onSubmit,
+}: Omit<Parameters<typeof OrderReviewModal>[0], "open">) {
+  const t = copy[lang];
+  const [hideWarnings, setHideWarnings] = useState(false);
+  const [hideWeeklyUpsell, setHideWeeklyUpsell] = useState(false);
+  const [hideClearanceUpsell, setHideClearanceUpsell] = useState(false);
 
   const hasClearanceInOrder = clearanceSkus
     ? items.some((item) => clearanceSkus.has(item.sku.toUpperCase()))
