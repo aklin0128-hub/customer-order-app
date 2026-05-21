@@ -54,7 +54,6 @@ import {
   newItemsButtonStyle,
   primarySmallButtonStyle,
   productSmallButtonStyle,
-  promoGridStyle,
   clearanceModeButtonStyle,
   promoModeButtonStyle,
   qtyButtonStyle,
@@ -583,10 +582,6 @@ export default function OrderPage() {
   }, [catalogQtyMap]);
 
   const cartItemCount = catalogItemsForSubmit.length;
-
-  useEffect(() => {
-    if (cartItemCount > 0) setShowCart(true);
-  }, [cartItemCount]);
 
   const totalCases = useMemo(() => {
     return catalogItemsForSubmit.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
@@ -1565,7 +1560,7 @@ export default function OrderPage() {
             ) : promotionItems.length === 0 ? (
               <div style={emptyStyle}>{t.noPromotions}</div>
             ) : (
-              <div style={promoGridStyle}>
+              <div className="order-promo-grid">
                 {promotionItems.map((item) => {
                   const sku = item.sku?.toUpperCase() || "";
                   const qty = catalogQtyMap[sku] || "";
@@ -1643,7 +1638,7 @@ export default function OrderPage() {
             ) : clearanceItems.length === 0 ? (
               <div style={emptyStyle}>{t.noClearance}</div>
             ) : (
-              <div style={promoGridStyle}>
+              <div className="order-promo-grid">
                 {clearanceItems.map((item) => {
                   const sku = item.sku?.toUpperCase() || "";
                   const qty = catalogQtyMap[sku] || "";

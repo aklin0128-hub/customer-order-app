@@ -216,7 +216,7 @@ export const wideInputStyle: CSSProperties = {
 };
 export const promoGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+  gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
   gap: 14,
 };
 export const catalogCardStyle: CSSProperties = {
