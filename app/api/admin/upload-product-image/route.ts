@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
+import { productRedisKey, saveRedisProduct } from "@/lib/productRedisStore";
 import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
@@ -46,9 +47,9 @@ export async function POST(req: Request) {
     });
     const imageUrl = `/api/blob?pathname=${encodeURIComponent(blob.pathname)}`;
 
-    const existing = (await redis.get<any>(`product:${sku}`)) || {};
+    const existing = (await redis.get<Record<string, unknown>>(productRedisKey(sku))) || {};
 
-    await redis.set(`product:${sku}`, {
+    await saveRedisProduct({
       ...existing,
       sku,
       imageUrl,
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
       blobPathname: blob.pathname,
       source: "Redis",
       updatedAt: new Date().toISOString(),
-    });
+    } as { sku: string });
 
     return NextResponse.json({
       success: true,

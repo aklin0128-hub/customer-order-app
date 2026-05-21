@@ -62,7 +62,7 @@ const statusOptions = [
 ];
 
 const categoryOptions = ["", ...CATEGORY_OPTIONS.filter((c) => c !== "ALL")];
-const AUTO_SAVE_DELAY_MS = 0;
+const AUTO_SAVE_DELAY_MS = 1200;
 
 function productImageSrc(sku: string, imageUrl?: string) {
   if (imageUrl) return imageUrl;

@@ -1,5 +1,5 @@
 import catalogData from "@/data/catalog_sku_master_extracted.json";
-import { redis } from "@/lib/redis";
+import { loadRedisProducts } from "@/lib/productRedisStore";
 
 export type MergedCatalogProduct = {
   sku: string;
@@ -29,8 +29,7 @@ export async function getMergedCatalogProducts(): Promise<MergedCatalogProduct[]
     });
   }
 
-  const keys = await redis.keys("product:*");
-  const redisProducts = await Promise.all(keys.map((key) => redis.get<MergedCatalogProduct>(key)));
+  const redisProducts = await loadRedisProducts<MergedCatalogProduct>();
 
   for (const item of redisProducts) {
     if (!item?.sku) continue;

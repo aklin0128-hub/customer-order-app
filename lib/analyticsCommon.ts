@@ -2,6 +2,7 @@ import catalogData from "@/data/catalog_sku_master_extracted.json";
 import { cleanSku, parseQty } from "@/lib/analyticsPure";
 import { analyticsCacheKey, cachedAnalytics } from "@/lib/analyticsCache";
 import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
+import { loadRedisProducts } from "@/lib/productRedisStore";
 import { listOrderHistoryAccounts } from "@/lib/redisIndexes";
 import { redis } from "@/lib/redis";
 
@@ -105,10 +106,9 @@ export async function buildCatalogMap(skus?: string[]) {
     map.set(sku, { ...item, sku });
   }
 
-  const keys = wanted
-    ? Array.from(wanted).map((sku) => `product:${sku}`)
-    : await redis.keys("product:*");
-  const redisItems = await Promise.all(keys.map((key) => redis.get<CatalogProduct>(key)));
+  const redisItems = await loadRedisProducts<CatalogProduct>(
+    wanted ? Array.from(wanted) : undefined
+  );
 
   for (const item of redisItems) {
     const sku = cleanSku(item?.sku);

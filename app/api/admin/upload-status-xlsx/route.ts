@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
+import { listRedisProductSkus, productRedisKey, saveRedisProduct } from "@/lib/productRedisStore";
 import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
@@ -73,10 +74,8 @@ export async function POST(req: Request) {
         .map((item) => safeString(item.sku).toUpperCase())
         .filter(Boolean)
     );
-    const redisProductKeys = await redis.keys("product:*");
-    for (const key of redisProductKeys) {
-      const sku = safeString(key).replace(/^product:/, "").toUpperCase();
-      if (sku) knownSkus.add(sku);
+    for (const sku of await listRedisProductSkus()) {
+      knownSkus.add(sku);
     }
 
     const updated: { sku: string; status: string }[] = [];
@@ -101,8 +100,8 @@ export async function POST(req: Request) {
         continue;
       }
 
-      const existing = (await redis.get<Product>(`product:${sku}`)) || { sku };
-      await redis.set(`product:${sku}`, {
+      const existing = (await redis.get<Product>(productRedisKey(sku))) || { sku };
+      await saveRedisProduct({
         ...existing,
         sku,
         status,

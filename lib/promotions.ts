@@ -1,3 +1,4 @@
+import { loadRedisProducts } from "@/lib/productRedisStore";
 import { redis } from "@/lib/redis";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
 export const PROMOTIONS_KEY = "promotions:list";
@@ -220,10 +221,9 @@ async function buildCatalogMap(skus?: string[]) {
     map.set(sku, { ...item, sku });
   }
 
-  const keys = wantedSkus
-    ? Array.from(wantedSkus).map((sku) => `product:${sku}`)
-    : await redis.keys("product:*");
-  const redisItems = await Promise.all(keys.map((key) => redis.get<PromotionProduct>(key)));
+  const redisItems = await loadRedisProducts<PromotionProduct>(
+    wantedSkus ? Array.from(wantedSkus) : undefined
+  );
 
   for (const item of redisItems) {
     if (!item?.sku) continue;

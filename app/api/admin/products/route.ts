@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { redis } from "@/lib/redis";
+import { loadRedisProducts, saveRedisProduct } from "@/lib/productRedisStore";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
 
 export const dynamic = "force-dynamic";
@@ -47,8 +47,7 @@ export async function GET(req: Request) {
       });
     }
 
-    const keys = await redis.keys("product:*");
-    const redisProducts = await Promise.all(keys.map((key) => redis.get<Product>(key)));
+    const redisProducts = await loadRedisProducts<Product>();
 
     for (const item of redisProducts) {
       if (!item?.sku) continue;
@@ -119,7 +118,7 @@ export async function POST(req: Request) {
       updatedAt: new Date().toISOString(),
     };
 
-    await redis.set(`product:${sku}`, product);
+    await saveRedisProduct(product);
 
     return NextResponse.json({
       success: true,
