@@ -30,17 +30,21 @@ export function RecommendedStrip({
   lang,
   items,
   onAddOne,
+  hideTitle = false,
 }: {
   lang: Lang;
   items: CatalogItem[];
   onAddOne: (sku: string) => void;
+  hideTitle?: boolean;
 }) {
   const t = copy[lang];
   if (items.length === 0) return null;
 
   return (
-    <div style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 13, fontWeight: 900, color: "#1d4ed8", marginBottom: 8 }}>{t.recommendedStripTitle}</div>
+    <div style={{ marginBottom: hideTitle ? 4 : 12, marginTop: hideTitle ? 6 : 0 }}>
+      {hideTitle ? null : (
+        <div style={{ fontSize: 13, fontWeight: 900, color: "#1d4ed8", marginBottom: 8 }}>{t.recommendedStripTitle}</div>
+      )}
       <div style={stripStyle}>
         {items.map((item) => {
           const catalogItem = getCatalogItemBySku(item.sku) || item;

@@ -51,7 +51,6 @@ import {
   emptyStyle,
   filterBlockStyle,
   filterLabelStyle,
-  langButtonStyle,
   limitedBadgeStyle,
   modeButtonStyle,
   newItemsButtonStyle,
@@ -1163,39 +1162,45 @@ export default function OrderPage() {
   return (
     <main className="order-page">
       <div className="order-container">
-        <section style={cardStyle} className="order-top-card">
-          <div className="order-lang-row">
-            {(["en", "zh", "ko", "vi"] as Lang[]).map((item) => (
-              <button key={item} type="button" onClick={() => changeLang(item)} style={langButtonStyle(lang === item)}>
-                {ORDER_LANG_LABELS[item]}
-              </button>
-            ))}
-          </div>
-
-          <div className="order-top-head">
-            <div>
-              <div className="order-top-title">{t.title}</div>
-              <div className="order-top-meta">
-                {accountNo} · {storeName}
+        <section style={cardStyle} className="order-top-card order-compact-card">
+          <div className="order-header-bar">
+            <div className="order-header-main">
+              <div className="order-top-title-line">
+                <span className="order-top-title">{t.title}</span>
+                <span className="order-top-meta">
+                  {accountNo} · {storeName}
+                </span>
               </div>
             </div>
-            <button type="button" onClick={logout} style={smallButtonStyle}>
+            <div className="order-lang-inline" role="group" aria-label="Language">
+              {(["en", "zh", "ko", "vi"] as Lang[]).map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => changeLang(item)}
+                  className={`order-lang-btn${lang === item ? " is-active" : ""}`}
+                >
+                  {ORDER_LANG_LABELS[item]}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className={`order-header-link${showCustomerInfo ? " is-open" : ""}`}
+              onClick={() => setShowCustomerInfo((prev) => !prev)}
+            >
+              {t.customerInfo}
+            </button>
+            <button type="button" onClick={logout} className="order-header-logout" style={smallButtonStyle}>
               {t.logout}
             </button>
           </div>
-
-          <div className="order-customer-fold">
-            <button type="button" className="order-customer-toggle" onClick={() => setShowCustomerInfo((prev) => !prev)}>
-              <span>{t.customerInfo}</span>
-              <span style={{ color: "#2563eb", fontWeight: 900 }}>{showCustomerInfo ? t.hide : t.show}</span>
-            </button>
-            {showCustomerInfo ? (
-              <div className="order-customer-fields">
-                <OrderInput fullWidth label={t.phone} value={phone} onChange={setPhone} placeholder="" />
-                <OrderInput fullWidth label={t.note} value={note} onChange={setNote} placeholder="" />
-              </div>
-            ) : null}
-          </div>
+          {showCustomerInfo ? (
+            <div className="order-customer-fields">
+              <OrderInput fullWidth label={t.phone} value={phone} onChange={setPhone} placeholder="" />
+              <OrderInput fullWidth label={t.note} value={note} onChange={setNote} placeholder="" />
+            </div>
+          ) : null}
         </section>
 
         <div className="order-sticky-bar">
@@ -1263,6 +1268,43 @@ export default function OrderPage() {
                     {catalogFiltersOpen ? t.hideFilters : t.showFilters}
                     {activeCatalogFilterCount > 0 ? ` (${activeCatalogFilterCount})` : ""}
                   </button>
+                </div>
+                <div className="order-sticky-catalog-chips">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCatalogShowRecommendedOnly((prev) => !prev);
+                      setCatalogShowNewOnly(false);
+                    }}
+                    style={categoryButtonStyle(catalogShowRecommendedOnly)}
+                  >
+                    {t.recommended} ({recommendedItemCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCatalogShowNewOnly((prev) => !prev);
+                      setCatalogShowRecommendedOnly(false);
+                    }}
+                    style={newItemsButtonStyle(catalogShowNewOnly)}
+                  >
+                    {t.newItems} ({newItemCount})
+                  </button>
+                  <label style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 800, color: "#374151", cursor: "pointer", whiteSpace: "nowrap" }}>
+                    <input
+                      type="checkbox"
+                      checked={catalogShowSelectedOnly}
+                      onChange={(e) => setCatalogShowSelectedOnly(e.target.checked)}
+                    />
+                    {t.selectedOnly} ({cartItemCount})
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 800, color: "#374151", cursor: "pointer", whiteSpace: "nowrap" }}>
+                    <input type="checkbox" checked={showAvailableOnly} onChange={(e) => setShowAvailableOnly(e.target.checked)} />
+                    {t.availableOnly}
+                  </label>
+                </div>
+                <div className="order-sticky-catalog-meta">
+                  {t.selected}: {cartItemCount} · {t.showing} {orderableCatalogItems.length} {t.catalogCount}
                 </div>
                 {catalogFiltersOpen ? (
                   <div className="order-sticky-filters">
@@ -1352,11 +1394,11 @@ export default function OrderPage() {
           </div>
         </div>
 
-        {(mode === "search" || mode === "catalog") && recentItems.length > 0 ? (
-          <section style={cardStyle}>
-            <button type="button" onClick={() => setShowRecent((prev) => !prev)} style={sectionToggleStyle}>
-              <div style={sectionTitleStyle}>{t.recent}</div>
-              <div style={toggleTextStyle}>{showRecent ? t.hide : t.show}</div>
+        {mode === "search" && recentItems.length > 0 ? (
+          <section style={cardStyle} className="order-compact-fold">
+            <button type="button" onClick={() => setShowRecent((prev) => !prev)} className="order-compact-fold-btn">
+              <span className="order-compact-fold-title">{t.recent}</span>
+              <span className="order-compact-fold-action">{showRecent ? t.hide : t.show}</span>
             </button>
 
             {showRecent ? (
@@ -1620,58 +1662,19 @@ export default function OrderPage() {
           </section>
         ) : (
           <section style={cardStyle} className="order-shop-card">
-            <div className="order-catalog-toolbar">
-              <div>
-                <div style={sectionTitleStyle}>{t.allOrderable}</div>
-                <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
-                  {t.selected}: {cartItemCount} · {t.showing} {orderableCatalogItems.length} {t.catalogCount}
-                </div>
-              </div>
-              <div className="order-catalog-chips">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCatalogShowRecommendedOnly((prev) => !prev);
-                    setCatalogShowNewOnly(false);
-                  }}
-                  style={categoryButtonStyle(catalogShowRecommendedOnly)}
-                >
-                  {t.recommended} ({recommendedItemCount})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCatalogShowNewOnly((prev) => !prev);
-                    setCatalogShowRecommendedOnly(false);
-                  }}
-                  style={newItemsButtonStyle(catalogShowNewOnly)}
-                >
-                  {t.newItems} ({newItemCount})
-                </button>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: "#374151", cursor: "pointer", whiteSpace: "nowrap" }}>
-                  <input
-                    type="checkbox"
-                    checked={catalogShowSelectedOnly}
-                    onChange={(e) => setCatalogShowSelectedOnly(e.target.checked)}
-                  />
-                  {t.selectedOnly} ({cartItemCount})
-                </label>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: "#374151", cursor: "pointer", whiteSpace: "nowrap" }}>
-                  <input
-                    type="checkbox"
-                    checked={showAvailableOnly}
-                    onChange={(e) => setShowAvailableOnly(e.target.checked)}
-                  />
-                  {t.availableOnly}
-                </label>
-              </div>
-            </div>
-
-            <RecommendedStrip
-              lang={lang}
-              items={recommendedStripItems}
-              onAddOne={(sku) => adjustCatalogQty(sku, 1)}
-            />
+            {recommendedStripItems.length > 0 ? (
+              <details className="order-details-fold">
+                <summary>
+                  {t.recommendedStripTitle} ({recommendedStripItems.length})
+                </summary>
+                <RecommendedStrip
+                  lang={lang}
+                  items={recommendedStripItems}
+                  onAddOne={(sku) => adjustCatalogQty(sku, 1)}
+                  hideTitle
+                />
+              </details>
+            ) : null}
 
             <CatalogVirtualGrid
               items={orderableCatalogItems}
@@ -1696,10 +1699,10 @@ export default function OrderPage() {
         )}
 
         {orderHistory.length > 0 ? (
-          <section style={cardStyle} className="order-secondary-section">
-            <button type="button" onClick={() => setShowHistory((prev) => !prev)} style={sectionToggleStyle}>
-              <div style={sectionTitleStyle}>{t.history}</div>
-              <div style={toggleTextStyle}>{showHistory ? t.hide : t.show}</div>
+          <section style={cardStyle} className="order-secondary-section order-compact-fold">
+            <button type="button" onClick={() => setShowHistory((prev) => !prev)} className="order-compact-fold-btn">
+              <span className="order-compact-fold-title">{t.history}</span>
+              <span className="order-compact-fold-action">{showHistory ? t.hide : t.show}</span>
             </button>
 
             {showHistory ? (
