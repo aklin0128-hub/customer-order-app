@@ -7,6 +7,7 @@ import {
   validatePromotionInput,
   type PromotionRecord,
 } from "@/lib/promotions";
+import { bustServerDataCache, SERVER_CACHE } from "@/lib/serverDataCache";
 
 export const dynamic = "force-dynamic";
 
@@ -102,6 +103,8 @@ export async function POST(req: Request) {
     const next: PromotionRecord[] = [nextRecord, ...without];
 
     await savePromotionRecords(next);
+    bustServerDataCache(SERVER_CACHE.promotions);
+    bustServerDataCache(SERVER_CACHE.showcase);
 
     return NextResponse.json({
       success: true,
@@ -136,6 +139,8 @@ export async function DELETE(req: Request) {
     const current = await getPromotionRecords();
     const next = current.filter((p) => p.sku !== sku);
     await savePromotionRecords(next);
+    bustServerDataCache(SERVER_CACHE.promotions);
+    bustServerDataCache(SERVER_CACHE.showcase);
 
     return NextResponse.json({
       success: true,

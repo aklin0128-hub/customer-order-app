@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadRedisProducts, saveRedisProduct } from "@/lib/productRedisStore";
+import { bustServerDataCache, SERVER_CACHE } from "@/lib/serverDataCache";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
 
 export const dynamic = "force-dynamic";
@@ -119,6 +120,9 @@ export async function POST(req: Request) {
     };
 
     await saveRedisProduct(product);
+
+    bustServerDataCache(SERVER_CACHE.catalog);
+    bustServerDataCache(SERVER_CACHE.showcase);
 
     return NextResponse.json({
       success: true,

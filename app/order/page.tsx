@@ -87,6 +87,7 @@ export default function OrderPage() {
   const skuInputRef = useRef<HTMLInputElement | null>(null);
   const submitLockRef = useRef(false);
   const autoLoadedRef = useRef(false);
+  const clearanceFetchedRef = useRef(false);
   const draftSnapshotRef = useRef({
     accountNo: "",
     storeName: "",
@@ -145,7 +146,7 @@ export default function OrderPage() {
 
     const loadCatalog = async () => {
       try {
-        const res = await fetch("/api/catalog", { cache: "no-store" });
+        const res = await fetch("/api/catalog");
         const data = await res.json();
         if (res.ok && Array.isArray(data.products)) {
           replaceCatalog(data.products);
@@ -162,7 +163,7 @@ export default function OrderPage() {
     const loadPromotions = async () => {
       setPromotionsLoading(true);
       try {
-        const res = await fetch("/api/promotions", { cache: "no-store" });
+        const res = await fetch("/api/promotions");
         const data = await res.json();
         if (res.ok && Array.isArray(data.products)) {
           setPromotionItems(
@@ -175,10 +176,17 @@ export default function OrderPage() {
       }
     };
 
+    void loadPromotions();
+  }, [ready]);
+
+  useEffect(() => {
+    if (!ready || mode !== "clearance" || clearanceFetchedRef.current) return;
+
     const loadClearance = async () => {
+      clearanceFetchedRef.current = true;
       setClearanceLoading(true);
       try {
-        const res = await fetch("/api/clearance", { cache: "no-store" });
+        const res = await fetch("/api/clearance");
         const data = await res.json();
         if (res.ok && Array.isArray(data.products)) {
           setClearanceItems(
@@ -186,14 +194,14 @@ export default function OrderPage() {
           );
         }
       } catch {
+        clearanceFetchedRef.current = false;
       } finally {
         setClearanceLoading(false);
       }
     };
 
-    loadPromotions();
-    loadClearance();
-  }, [ready]);
+    void loadClearance();
+  }, [ready, mode]);
 
   useEffect(() => {
     const saved = localStorage.getItem("lang") as Lang | null;

@@ -7,6 +7,7 @@ import {
   validateClearanceInput,
   type ClearanceRecord,
 } from "@/lib/clearance";
+import { bustServerDataCache, SERVER_CACHE } from "@/lib/serverDataCache";
 
 export const dynamic = "force-dynamic";
 
@@ -86,6 +87,7 @@ export async function POST(req: Request) {
     const next: ClearanceRecord[] = [nextRecord, ...without];
 
     await saveClearanceRecords(next);
+    bustServerDataCache(SERVER_CACHE.clearance);
 
     return NextResponse.json({
       success: true,
@@ -120,6 +122,7 @@ export async function DELETE(req: Request) {
     const current = await getClearanceRecords();
     const next = current.filter((p) => p.sku !== sku);
     await saveClearanceRecords(next);
+    bustServerDataCache(SERVER_CACHE.clearance);
 
     return NextResponse.json({
       success: true,

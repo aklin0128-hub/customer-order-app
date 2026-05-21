@@ -1,6 +1,7 @@
 import { isNewItem } from "@/app/order/catalogUtils";
 import { getMergedCatalogProducts } from "@/lib/catalogMerge";
 import { getPromotionProducts, type PromotionProduct } from "@/lib/promotions";
+import { cachedServerData, SERVER_CACHE } from "@/lib/serverDataCache";
 import type { CatalogItem } from "@/app/order/types";
 
 import type { PromoPriceTier } from "@/lib/promotions";
@@ -88,7 +89,7 @@ async function listNewItemCards(cardLimit?: number) {
 }
 
 /** Public showcase and login preview share this loader. */
-export async function getShowcaseData(options?: { cardLimit?: number }): Promise<ShowcaseData> {
+export async function getShowcaseDataUncached(options?: { cardLimit?: number }): Promise<ShowcaseData> {
   const cardLimit = options?.cardLimit;
   const promotions = await getPromotionProducts({ activeOnly: true });
   const promoCards = promotions.map(promoToCard);
@@ -100,5 +101,10 @@ export async function getShowcaseData(options?: { cardLimit?: number }): Promise
     promotionTotal: promotions.length,
     newItemTotal,
   };
+}
+
+export async function getShowcaseData(options?: { cardLimit?: number }): Promise<ShowcaseData> {
+  const key = options?.cardLimit != null ? `limit:${options.cardLimit}` : "full";
+  return cachedServerData(SERVER_CACHE.showcase, key, () => getShowcaseDataUncached(options));
 }
 
