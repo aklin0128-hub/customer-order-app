@@ -292,8 +292,8 @@ export const catalogStepperStyle: CSSProperties = {
   marginTop: "auto",
 };
 export const catalogStepBtnStyle: CSSProperties = {
-  width: 36,
-  height: 36,
+  width: 40,
+  height: 40,
   borderRadius: 10,
   border: "1px solid #d1d5db",
   background: "#f9fafb",
@@ -320,8 +320,8 @@ export const stepperStyle: CSSProperties = {
   alignItems: "center",
 };
 export const stepButtonStyle: CSSProperties = {
-  width: 30,
-  height: 32,
+  width: 40,
+  height: 40,
   borderRadius: 10,
   border: "1px solid #d1d5db",
   background: "#f9fafb",

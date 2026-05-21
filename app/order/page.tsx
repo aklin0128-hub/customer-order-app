@@ -9,6 +9,8 @@ import { CATEGORY_OPTIONS, inferCategory } from "@/lib/inferCategory";
 import { CatalogVirtualGrid } from "./components/CatalogVirtualGrid";
 import { CatalogQtyCard } from "./components/CatalogQtyCard";
 import { OrderCartSection } from "./components/OrderCartSection";
+import { OrderShopNudge } from "./components/OrderShopNudge";
+import { RecommendedStrip } from "./components/RecommendedStrip";
 import { OrderInput } from "./components/OrderInput";
 import { OrderReviewModal } from "./components/OrderReviewModal";
 import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
@@ -24,6 +26,7 @@ import {
   formatPromoBuyXGetY,
   formatPromoBuyXGetYPackHint,
   formatPromoDetails,
+  getPromoBogoPackSize,
   formatPromotionDealReviewLabel,
   getPromotionDealHighlight,
   generateOrderRef,
@@ -757,6 +760,34 @@ export default function OrderPage() {
     });
   }, [catalogItemsForSubmit, newItemCount]);
 
+  const recommendedStripItems = useMemo(() => {
+    if (mode !== "catalog" || catalogShowRecommendedOnly) return [];
+    return catalogBrowseBase
+      .filter((item) => recommendedSkuSet.has((item.sku || "").toUpperCase()))
+      .filter((item) => Number(catalogQtyMap[(item.sku || "").toUpperCase()] || 0) <= 0)
+      .slice(0, 8);
+  }, [mode, catalogBrowseBase, recommendedSkuSet, catalogQtyMap, catalogShowRecommendedOnly]);
+
+  const scrollToCart = () => {
+    setShowCart(true);
+    document.getElementById("order-cart")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const roundUpBogoQty = (sku: string, pack: number) => {
+    const cleanSku = sku.trim().toUpperCase();
+    const current = Number(catalogQtyMap[cleanSku] || 0);
+    if (!pack || current <= 0) return;
+    const remainder = current % pack;
+    if (remainder === 0) return;
+    setQtyForSku(cleanSku, String(current + (pack - remainder)));
+  };
+
+  const applyQuickQtyToSelected = (qty: string) => {
+    const target = selectedItem || matchedItems[0];
+    if (!target?.sku) return;
+    setQtyForSku(target.sku, qty);
+  };
+
   const adjustQtyForSku = (sku: string, delta: number) => {
     const cleanSku = sku.trim().toUpperCase();
     const current = Number(catalogQtyMap[cleanSku] || 0);
@@ -811,6 +842,16 @@ export default function OrderPage() {
   const addAllMissingClearanceUpsell = () => {
     for (const line of clearanceUpsellLines) adjustQtyForSku(line.sku, 1);
   };
+
+  const addAllPostSubmitSuggest = () => {
+    for (const line of postSubmitSuggestLines) adjustQtyForSku(line.sku, 1);
+  };
+
+  useEffect(() => {
+    if (cartItemCount === 0 && recentItems.length > 0) {
+      setShowRecent(true);
+    }
+  }, [cartItemCount, recentItems.length]);
 
   useEffect(() => {
     if (!normalizedSkuInput) {
@@ -1183,6 +1224,11 @@ export default function OrderPage() {
             >
               {t.promotionMode}
               {promotionItems.length > 0 ? ` (${promotionItems.length})` : ""}
+              {weeklyUpsellLines.length > 0 && mode !== "promotion" ? (
+                <span style={{ marginLeft: 4, fontSize: 10, fontWeight: 900, color: "#0f766e" }}>
+                  {t.modeTabMissing.replace("{count}", String(weeklyUpsellLines.length))}
+                </span>
+              ) : null}
             </button>
             <button
               type="button"
@@ -1191,6 +1237,11 @@ export default function OrderPage() {
             >
               {t.clearanceMode}
               {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
+              {clearanceUpsellLines.length > 0 && mode !== "clearance" ? (
+                <span style={{ marginLeft: 4, fontSize: 10, fontWeight: 900, color: "#c2410c" }}>
+                  {t.modeTabMissing.replace("{count}", String(clearanceUpsellLines.length))}
+                </span>
+              ) : null}
             </button>
             <button type="button" onClick={() => changeMode("catalog")} style={modeButtonStyle(mode === "catalog")}>
               {t.catalogMode}
@@ -1346,10 +1397,10 @@ export default function OrderPage() {
                         <button type="button" onClick={() => adjustCatalogQty(item.sku, 1)} style={{ ...stepButtonStyle, width: 36 }}>+</button>
                         <button
                           type="button"
-                          onClick={() => addSkuFromSearch(item, qtyInput || "1")}
-                          style={{ flex: 1, border: "none", borderRadius: 10, background: "#2563eb", color: "#fff", fontWeight: 800, padding: "8px 10px", cursor: "pointer" }}
+                          onClick={() => adjustCatalogQty(item.sku, 1)}
+                          style={{ flex: 1, border: "none", borderRadius: 10, background: "#2563eb", color: "#fff", fontWeight: 800, padding: "8px 10px", cursor: "pointer", minHeight: 40 }}
                         >
-                          {t.add}
+                          {t.addOneCase}
                         </button>
                       </div>
                     </div>
@@ -1359,17 +1410,16 @@ export default function OrderPage() {
             ) : null}
 
             <div style={{ marginTop: 12 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>{t.qty} ({t.quickAdd})</label>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>
+                {t.qty} — {t.quickAddSelected}
+              </label>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
                 {quickQtyButtons.map((qty) => (
-                  <button key={qty} type="button" onClick={() => setQtyInput(qty)} style={qtyButtonStyle}>
+                  <button key={qty} type="button" onClick={() => applyQuickQtyToSelected(qty)} style={qtyButtonStyle}>
                     {qty}
                   </button>
                 ))}
               </div>
-              <button type="button" onClick={addItem} style={{ ...primarySmallButtonStyle, width: "100%", marginTop: 10, maxWidth: "none" }}>
-                {t.addItem}
-              </button>
             </div>
           </section>
         ) : mode === "promotion" ? (
@@ -1419,6 +1469,7 @@ export default function OrderPage() {
                     : item.remainingQty !== null && item.remainingQty !== undefined
                       ? `${t.promoRemaining}: ${item.remainingQty}`
                       : undefined;
+                  const bogoPack = soldOut ? null : getPromoBogoPackSize(item);
                   return (
                     <CatalogQtyCard
                       key={item.sku}
@@ -1430,6 +1481,9 @@ export default function OrderPage() {
                       promoPrice={promoPriceLabel}
                       promoDetails={promoDetailsLabel}
                       promoRemaining={promoRemainingLabel}
+                      bogoPackSize={bogoPack}
+                      roundUpBogoLabel={bogoPack ? t.roundUpBogo.replace("{pack}", String(bogoPack)) : undefined}
+                      onRoundUpBogo={bogoPack ? () => roundUpBogoQty(sku, bogoPack) : undefined}
                       inCartLabel={t.inCart}
                       promoBadgeLabel={t.promoBadge}
                       editLabel={t.editProduct}
@@ -1641,6 +1695,12 @@ export default function OrderPage() {
               {t.showing} {orderableCatalogItems.length} {t.catalogCount}
             </p>
 
+            <RecommendedStrip
+              lang={lang}
+              items={recommendedStripItems}
+              onAddOne={(sku) => adjustCatalogQty(sku, 1)}
+            />
+
             <CatalogVirtualGrid
               items={orderableCatalogItems}
               catalogQtyMap={catalogQtyMap}
@@ -1662,6 +1722,37 @@ export default function OrderPage() {
             ) : null}
           </section>
         )}
+
+        {cartItemCount > 0 ? (
+          <section style={cardStyle}>
+            <OrderShopNudge
+              lang={lang}
+              weeklyMissing={weeklyUpsellLines.length}
+              clearanceMissing={clearanceUpsellLines.length}
+              clearanceDealCount={clearanceItems.length}
+              weeklyInCart={weeklyInCartCount}
+              onAddWeeklyMissing={addAllMissingWeeklyUpsell}
+              onAddClearanceMissing={addAllMissingClearanceUpsell}
+              onViewWeekly={() => changeMode("promotion")}
+              onViewClearance={() => changeMode("clearance")}
+            />
+          </section>
+        ) : promotionItems.length > 0 || clearanceItems.length > 0 ? (
+          <section style={cardStyle}>
+            <OrderShopNudge
+              lang={lang}
+              weeklyMissing={0}
+              clearanceMissing={0}
+              clearanceDealCount={clearanceItems.length}
+              weeklyInCart={0}
+              onAddWeeklyMissing={addAllMissingWeeklyUpsell}
+              onAddClearanceMissing={addAllMissingClearanceUpsell}
+              onViewWeekly={() => changeMode("promotion")}
+              onViewClearance={() => changeMode("clearance")}
+            />
+          </section>
+        ) : null}
+
         <OrderCartSection
           lang={lang}
           items={catalogItemsForSubmit}
@@ -1689,8 +1780,25 @@ export default function OrderPage() {
         </section>
 
         <div style={fixedSubmitBarStyle}>
-          <div style={cartSummaryTextStyle}>
-            <div>{t.cartSummary}: {cartItemCount} {t.lines} / {totalCases} {t.cases}</div>
+          <button
+            type="button"
+            onClick={scrollToCart}
+            style={{
+              ...cartSummaryTextStyle,
+              border: "none",
+              background: "transparent",
+              padding: 0,
+              textAlign: "left",
+              cursor: cartItemCount > 0 ? "pointer" : "default",
+              width: "100%",
+            }}
+          >
+            <div>
+              {t.cartSummary}: {cartItemCount} {t.lines} / {totalCases} {t.cases}
+              {cartItemCount > 0 ? (
+                <span style={{ marginLeft: 6, fontSize: 11, color: "#2563eb", fontWeight: 800 }}>· {t.jumpToCart}</span>
+              ) : null}
+            </div>
             {weeklyInCartCount > 0 || clearanceInCartCount > 0 ? (
               <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2, fontWeight: 700 }}>
                 {t.cartSalesSummary
@@ -1698,12 +1806,38 @@ export default function OrderPage() {
                   .replace("{clearance}", String(clearanceInCartCount))}
               </div>
             ) : null}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "0.9fr 1.1fr", gap: 8 }}>
-            <button type="button" onClick={openReview} disabled={submitting} style={secondaryButtonStyle}>
+          </button>
+          {weeklyUpsellLines.length > 0 ? (
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={addAllMissingWeeklyUpsell}
+              style={{
+                width: "100%",
+                marginTop: 8,
+                border: "1px solid #5eead4",
+                background: "#f0fdfa",
+                color: "#0f766e",
+                borderRadius: 10,
+                padding: "8px 10px",
+                fontSize: 11,
+                fontWeight: 900,
+                cursor: submitting ? "not-allowed" : "pointer",
+              }}
+            >
+              {t.addMissingPicksBar.replace("{count}", String(weeklyUpsellLines.length))}
+            </button>
+          ) : null}
+          <div style={{ display: "grid", gridTemplateColumns: "0.9fr 1.1fr", gap: 8, marginTop: 8 }}>
+            <button type="button" onClick={openReview} disabled={submitting || cartItemCount === 0} style={secondaryButtonStyle}>
               {t.reviewCart}
             </button>
-            <button type="button" onClick={openReview} disabled={submitting} style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}>
+            <button
+              type="button"
+              onClick={openReview}
+              disabled={submitting || cartItemCount === 0}
+              style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}
+            >
               {submitting ? t.submitting : `${t.submitOrder}`}
             </button>
           </div>
@@ -1754,6 +1888,8 @@ export default function OrderPage() {
           orderRef={lastSubmittedRef}
           items={lastSubmittedItems}
           suggestLines={postSubmitSuggestLines}
+          onAddSuggestCase={(sku) => adjustQtyForSku(sku, 1)}
+          onAddAllSuggest={addAllPostSubmitSuggest}
           onBrowseWeeklyPicks={() => {
             setLastSubmittedRef("");
             setLastSubmittedItems([]);

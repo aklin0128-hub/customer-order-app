@@ -43,6 +43,12 @@ type SkuLookupResult = {
   totalOnHandQty: number;
 };
 
+function formatInventoryDate(iso?: string) {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "—";
+  const [y, m, d] = iso.split("-");
+  return `${Number(m)}/${Number(d)}/${y}`;
+}
+
 function formatUploadedAt(iso?: string) {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -195,9 +201,11 @@ export default function AdminInventoryPage() {
       <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
         <Panel title="Upload weekly file">
           <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 12px", lineHeight: 1.45 }}>
-            Upload the <strong>By Item</strong> sheet as <strong>.xlsx</strong> (original Excel) or{" "}
-            <strong>.csv</strong>. Required columns: <code>Loc Item</code>,{" "}
-            <code>Loc Expire Date</code>. Replaces the previous upload.
+            Upload the <strong>By Item</strong> sheet as <strong>.xlsx</strong> or <strong>.csv</strong>.
+            Column titles should match your export:
+            <code>Loc Item</code>, <code>Loc Item Desc</code>, <code>Loc Qty UM</code>,{" "}
+            <code>Loc Inventory Status</code>, <code>Loc Received Date</code>,{" "}
+            <code>Loc Expire Date</code>, <code>Loc On Hand Qty</code>. Replaces the previous upload.
           </p>
           <label style={labelStyle}>CSV or Excel file</label>
           <input
@@ -261,7 +269,7 @@ export default function AdminInventoryPage() {
           <div style={panelTitle}>
             {lookup.found ? (
               <>
-                {lookup.sku} · earliest {lookup.earliestExpireDate || "—"} · {lookup.lots.length} lot
+                {lookup.sku} · earliest {formatInventoryDate(lookup.earliestExpireDate || undefined)} · {lookup.lots.length} lot
                 {lookup.lots.length === 1 ? "" : "s"} · on hand {lookup.totalOnHandQty}
               </>
             ) : (
@@ -288,8 +296,8 @@ export default function AdminInventoryPage() {
                     <tr key={`${lot.sku}-${i}`} style={{ borderBottom: "1px solid #f3f4f6" }}>
                       <td style={{ padding: "8px 10px", fontWeight: 800 }}>{lot.sku}</td>
                       <td style={{ padding: "8px 10px" }}>{lot.status || "—"}</td>
-                      <td style={{ padding: "8px 10px" }}>{lot.receivedDate || "—"}</td>
-                      <td style={{ padding: "8px 10px", fontWeight: 700 }}>{lot.expireDate || "—"}</td>
+                      <td style={{ padding: "8px 10px" }}>{formatInventoryDate(lot.receivedDate)}</td>
+                      <td style={{ padding: "8px 10px", fontWeight: 700 }}>{formatInventoryDate(lot.expireDate)}</td>
                       <td style={{ padding: "8px 10px" }}>{lot.onHandQty ?? "—"}</td>
                       <td style={{ padding: "8px 10px" }}>{lot.qtyUm || "—"}</td>
                       <td style={{ padding: "8px 10px", color: "#4b5563" }}>{lot.description || "—"}</td>

@@ -59,7 +59,7 @@ export function OrderCartSection({
   };
 
   return (
-    <section style={{ ...cardStyle, overflow: "visible" }}>
+    <section id="order-cart" style={{ ...cardStyle, overflow: "visible" }}>
       <button type="button" onClick={onToggleExpanded} style={sectionToggleStyle}>
         <div style={sectionTitleStyle}>
           {t.orderCart} ({lineCount}) · {totalCases} {t.cases}

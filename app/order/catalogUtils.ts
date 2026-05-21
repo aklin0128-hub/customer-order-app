@@ -115,11 +115,16 @@ export function formatPromoTierQtyWarning(
     .replace("{cs}", t.casesAbbr);
 }
 
-export function formatPromoBuyXGetYPackHint(item: Pick<PromotionItem, "buyQty" | "getQtyFree">, t: Pick<PromoCopyStrings, "promoBuyXGetYPackHint">) {
+export function getPromoBogoPackSize(item: Pick<PromotionItem, "buyQty" | "getQtyFree">) {
   const buy = item.buyQty;
   const free = item.getQtyFree;
-  if (!buy || !free || buy <= 0 || free <= 0) return "";
-  const pack = buy + free;
+  if (!buy || !free || buy <= 0 || free <= 0) return null;
+  return buy + free;
+}
+
+export function formatPromoBuyXGetYPackHint(item: Pick<PromotionItem, "buyQty" | "getQtyFree">, t: Pick<PromoCopyStrings, "promoBuyXGetYPackHint">) {
+  const pack = getPromoBogoPackSize(item);
+  if (!pack) return "";
   return t.promoBuyXGetYPackHint.replace("{pack}", String(pack));
 }
 

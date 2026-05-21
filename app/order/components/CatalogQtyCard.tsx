@@ -31,6 +31,9 @@ export function CatalogQtyCard({
   promoBadgeLabel,
   onAdjust,
   onUpdateQty,
+  bogoPackSize,
+  roundUpBogoLabel,
+  onRoundUpBogo,
   highlight,
   disabled,
   showAdminEdit,
@@ -49,12 +52,23 @@ export function CatalogQtyCard({
   promoBadgeLabel: string;
   onAdjust: (sku: string, delta: number) => void;
   onUpdateQty: (sku: string, value: string) => void;
+  bogoPackSize?: number | null;
+  roundUpBogoLabel?: string;
+  onRoundUpBogo?: () => void;
   highlight?: boolean;
   disabled?: boolean;
   showAdminEdit?: boolean;
   editLabel?: string;
 }) {
   const hasQty = Number(qty) > 0;
+  const qtyNum = Number(qty) || 0;
+  const showBogoRoundUp =
+    !disabled &&
+    bogoPackSize &&
+    bogoPackSize > 1 &&
+    qtyNum > 0 &&
+    qtyNum % bogoPackSize !== 0 &&
+    onRoundUpBogo;
 
   return (
     <div
@@ -150,6 +164,26 @@ export function CatalogQtyCard({
           +
         </button>
       </div>
+      {showBogoRoundUp ? (
+        <button
+          type="button"
+          onClick={onRoundUpBogo}
+          style={{
+            marginTop: 6,
+            width: "100%",
+            border: "1px solid #fbbf24",
+            background: "#fffbeb",
+            color: "#92400e",
+            borderRadius: 999,
+            padding: "6px 8px",
+            fontSize: 10,
+            fontWeight: 800,
+            cursor: "pointer",
+          }}
+        >
+          {roundUpBogoLabel}
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -20,13 +20,36 @@ export type SkuExpirationResult = {
 };
 
 const HEADER_ALIASES: Record<keyof Omit<InventoryLot, "sku"> | "sku", string[]> = {
-  sku: ["LOC ITEM", "SKU", "ITEM", "LOC_ITEM"],
+  sku: ["LOC ITEM", "SKU", "ITEM", "LOC_ITEM", "LOCAL ITEM"],
   description: ["LOC ITEM DESC", "ITEM DESC", "DESCRIPTION", "DESC"],
   qtyUm: ["LOC QTY UM", "QTY UM", "UM"],
   status: ["LOC INVENTORY STATUS", "INVENTORY STATUS", "STATUS"],
-  receivedDate: ["LOC RECEIVED DATE", "RECEIVED DATE"],
-  expireDate: ["LOC EXPIRE DATE", "EXPIRE DATE", "EXPIRATION DATE", "EXPIRY DATE"],
+  receivedDate: [
+    "LOC RECEIVED DATE",
+    "LOCA RECEIVED DATE",
+    "LOCAL RECEIVED DATE",
+    "RECEIVED DATE",
+    "DATE RECEIVED",
+  ],
+  expireDate: [
+    "LOC EXPIRE DATE",
+    "LOCA EXPIRE DATE",
+    "LOCAL EXPIRE DATE",
+    "LOC EXPIRATION DATE",
+    "EXPIRE DATE",
+    "EXPIRATION DATE",
+    "EXPIRY DATE",
+  ],
   onHandQty: ["LOC ON HAND QTY", "ON HAND QTY", "QTY", "ON HAND"],
+};
+
+const HEADER_FUZZY: Partial<
+  Record<keyof Omit<InventoryLot, "sku"> | "sku", (norm: string) => boolean>
+> = {
+  receivedDate: (norm) =>
+    (norm.includes("RECEIVED") || norm.includes("RECV")) && norm.includes("DATE"),
+  expireDate: (norm) =>
+    norm.includes("EXPIR") || (norm.includes("EXPIRE") && norm.includes("DATE")),
 };
 
 let cached: {
@@ -66,19 +89,106 @@ export function skuLookupKeys(sku: string) {
   return [...keys];
 }
 
+function normalizeHeaderKey(key: string) {
+  return key.trim().toUpperCase().replace(/[^A-Z0-9]+/g, " ");
+}
+
+function compactHeaderKey(key: string) {
+  return key.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+/** Excel 1900 date system (Windows) — serial day number to YYYY-MM-DD. */
+function excelSerialToIso(serial: number): string | null {
+  if (!Number.isFinite(serial) || serial < 1 || serial > 200000) return null;
+  const ms = Math.round((serial - 25569) * 86400 * 1000);
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
 function parseUsDate(value: string): string | null {
   const text = safeString(value);
   if (!text) return null;
 
-  const slash = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const slash = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (slash) {
     const [, m, d, y] = slash;
     return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
 
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const dash = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (dash) return `${dash[1]}-${dash[2]}-${dash[3]}`;
 
   return null;
+}
+
+/** Parse cell values from CSV text or Excel (serial numbers, Date objects). */
+export function parseInventoryDate(value: unknown): string | null {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  if (typeof value === "number") {
+    const fromSerial = excelSerialToIso(value);
+    if (fromSerial) return fromSerial;
+  }
+
+  const text = safeString(value);
+  if (!text) return null;
+
+  const asNumber = Number(text);
+  if (text === String(asNumber) && asNumber > 30000 && asNumber < 200000) {
+    const fromSerial = excelSerialToIso(asNumber);
+    if (fromSerial) return fromSerial;
+  }
+
+  return parseUsDate(text);
+}
+
+function getFieldFromRecord(row: Record<string, unknown>, field: keyof typeof HEADER_ALIASES) {
+  const aliases = HEADER_ALIASES[field];
+  const fuzzy = HEADER_FUZZY[field];
+
+  const entries = Object.entries(row);
+  const byCompact = new Map(entries.map(([k]) => [compactHeaderKey(k), k]));
+
+  for (const alias of aliases) {
+    const key = byCompact.get(compactHeaderKey(alias));
+    if (key != null && safeString(row[key])) return row[key];
+  }
+
+  if (fuzzy) {
+    for (const [key, val] of entries) {
+      if (fuzzy(compactHeaderKey(key)) && safeString(val)) return val;
+    }
+  }
+
+  return undefined;
+}
+
+function recordsHaveRequiredColumns(records: Record<string, unknown>[]) {
+  if (records.length === 0) return false;
+  const keys = Object.keys(records[0] || {});
+  const compact = keys.map(compactHeaderKey);
+  const hasSku = compact.some(
+    (k) =>
+      k.length >= 3 &&
+      (HEADER_ALIASES.sku.some((a) => {
+        const ca = compactHeaderKey(a);
+        return k === ca || (k.length >= 4 && ca.length >= 4 && k.includes(ca));
+      }) ||
+        (k.includes("LOC") && k.includes("ITEM")))
+  );
+  const hasExpire = compact.some(
+    (k) =>
+      k.length >= 6 &&
+      (HEADER_FUZZY.expireDate?.(k) ||
+        HEADER_ALIASES.expireDate.some((a) => {
+          const ca = compactHeaderKey(a);
+          return k === ca || k.includes(ca);
+        }))
+  );
+  return hasSku && hasExpire;
 }
 
 function parseQty(value: string) {
@@ -115,24 +225,95 @@ function parseCsvLine(line: string): string[] {
 }
 
 function resolveHeaderIndex(headers: string[]) {
-  const normalized = headers.map((h) => h.trim().toUpperCase());
-  const pick = (aliases: string[]) => {
-    for (const alias of aliases) {
-      const idx = normalized.indexOf(alias);
-      if (idx >= 0) return idx;
+  const compact = headers.map(compactHeaderKey);
+  const pick = (field: keyof typeof HEADER_ALIASES) => {
+    for (let i = 0; i < compact.length; i++) {
+      const norm = compact[i]!;
+      if (norm.length < 2) continue;
+      for (const alias of HEADER_ALIASES[field]) {
+        const a = compactHeaderKey(alias);
+        if (norm === a) return i;
+        if (norm.length >= 4 && a.length >= 4 && (norm.includes(a) || a.includes(norm))) return i;
+      }
+      if (norm.length >= 6 && HEADER_FUZZY[field]?.(norm)) return i;
     }
     return -1;
   };
 
   return {
-    sku: pick(HEADER_ALIASES.sku),
-    description: pick(HEADER_ALIASES.description),
-    qtyUm: pick(HEADER_ALIASES.qtyUm),
-    status: pick(HEADER_ALIASES.status),
-    receivedDate: pick(HEADER_ALIASES.receivedDate),
-    expireDate: pick(HEADER_ALIASES.expireDate),
-    onHandQty: pick(HEADER_ALIASES.onHandQty),
+    sku: pick("sku"),
+    description: pick("description"),
+    qtyUm: pick("qtyUm"),
+    status: pick("status"),
+    receivedDate: pick("receivedDate"),
+    expireDate: pick("expireDate"),
+    onHandQty: pick("onHandQty"),
   };
+}
+
+/** Parse rows from Excel sheet_to_json or similar. */
+export function parseInventoryRecords(records: Record<string, unknown>[]): InventoryLot[] {
+  if (!recordsHaveRequiredColumns(records)) {
+    throw new Error(
+      "File must include Loc Item and Loc Expire Date columns (By Item export)."
+    );
+  }
+
+  const rows: InventoryLot[] = [];
+
+  for (const record of records) {
+    const sku = normalizeInventorySku(safeString(getFieldFromRecord(record, "sku")));
+    if (!sku) continue;
+
+    const receivedRaw = getFieldFromRecord(record, "receivedDate");
+    const expireRaw = getFieldFromRecord(record, "expireDate");
+
+    rows.push({
+      sku,
+      description: safeString(getFieldFromRecord(record, "description")) || undefined,
+      qtyUm: safeString(getFieldFromRecord(record, "qtyUm")) || undefined,
+      status: safeString(getFieldFromRecord(record, "status")) || undefined,
+      receivedDate: parseInventoryDate(receivedRaw) || undefined,
+      expireDate: parseInventoryDate(expireRaw) || undefined,
+      onHandQty: parseQty(safeString(getFieldFromRecord(record, "onHandQty"))) || undefined,
+    });
+  }
+
+  return rows;
+}
+
+/** Serialize parsed lots for Blob storage (stable US dates). */
+export function serializeInventoryLotsToCsv(rows: InventoryLot[]): string {
+  const header =
+    "Loc Item,Loc Item Desc,Loc Qty UM,Loc Inventory Status,Loc Received Date,Loc Expire Date,Loc On Hand Qty";
+  const lines = [header];
+
+  for (const row of rows) {
+    const fmt = (iso?: string) => {
+      if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
+      const [y, m, d] = iso.split("-");
+      return `${Number(m)}/${Number(d)}/${y}`;
+    };
+    const cells = [
+      row.sku,
+      row.description || "",
+      row.qtyUm || "",
+      row.status || "",
+      fmt(row.receivedDate),
+      fmt(row.expireDate),
+      row.onHandQty != null ? String(row.onHandQty) : "",
+    ];
+    lines.push(
+      cells
+        .map((c) => {
+          const s = String(c);
+          return s.includes(",") || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+        })
+        .join(",")
+    );
+  }
+
+  return lines.join("\n");
 }
 
 function lotDedupeKey(lot: InventoryLot) {
@@ -186,9 +367,11 @@ export function parseInventoryCsvText(raw: string): InventoryLot[] {
       qtyUm: cols.qtyUm >= 0 ? safeString(cells[cols.qtyUm]) : undefined,
       status: cols.status >= 0 ? safeString(cells[cols.status]) : undefined,
       receivedDate:
-        cols.receivedDate >= 0 ? parseUsDate(cells[cols.receivedDate] || "") || undefined : undefined,
+        cols.receivedDate >= 0
+          ? parseInventoryDate(cells[cols.receivedDate] || "") || undefined
+          : undefined,
       expireDate:
-        cols.expireDate >= 0 ? parseUsDate(cells[cols.expireDate] || "") || undefined : undefined,
+        cols.expireDate >= 0 ? parseInventoryDate(cells[cols.expireDate] || "") || undefined : undefined,
       onHandQty: cols.onHandQty >= 0 ? parseQty(cells[cols.onHandQty] || "") : undefined,
     });
   }

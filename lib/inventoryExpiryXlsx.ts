@@ -1,6 +1,10 @@
 import * as XLSX from "xlsx";
 
-import { parseInventoryCsvText, type InventoryLot } from "@/lib/inventoryExpiry";
+import {
+  parseInventoryRecords,
+  serializeInventoryLotsToCsv,
+  type InventoryLot,
+} from "@/lib/inventoryExpiry";
 
 const BY_ITEM_SHEET_NAMES = ["by item", "byitem", "by_item"];
 
@@ -17,6 +21,9 @@ function pickByItemSheet(workbook: XLSX.WorkBook): XLSX.WorkSheet | null {
   const fuzzy = workbook.SheetNames.find((name) => /by\s*item/i.test(name));
   if (fuzzy && workbook.Sheets[fuzzy]) return workbook.Sheets[fuzzy];
 
+  const exp = workbook.SheetNames.find((name) => /inventory|exp/i.test(name));
+  if (exp && workbook.Sheets[exp]) return workbook.Sheets[exp];
+
   const first = workbook.SheetNames[0];
   return first ? workbook.Sheets[first] : null;
 }
@@ -29,8 +36,12 @@ export function parseInventoryXlsxBuffer(buffer: Buffer): { csvText: string; row
     throw new Error("No worksheet found in the Excel file.");
   }
 
-  const csvText = XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
-  const rows = parseInventoryCsvText(csvText);
+  const records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+    defval: "",
+    raw: true,
+  });
+
+  const rows = parseInventoryRecords(records);
 
   if (rows.length === 0) {
     throw new Error(
@@ -38,5 +49,6 @@ export function parseInventoryXlsxBuffer(buffer: Buffer): { csvText: string; row
     );
   }
 
+  const csvText = serializeInventoryLotsToCsv(rows);
   return { csvText, rows };
 }

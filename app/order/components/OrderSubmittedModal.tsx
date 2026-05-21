@@ -24,6 +24,8 @@ export function OrderSubmittedModal({
   orderRef,
   items,
   suggestLines = [],
+  onAddSuggestCase,
+  onAddAllSuggest,
   onBrowseWeeklyPicks,
 }: {
   open: boolean;
@@ -32,6 +34,8 @@ export function OrderSubmittedModal({
   orderRef: string;
   items: CartItem[];
   suggestLines?: UpsellLine[];
+  onAddSuggestCase?: (sku: string) => void;
+  onAddAllSuggest?: () => void;
   onBrowseWeeklyPicks?: () => void;
 }) {
   const t = copy[lang];
@@ -117,6 +121,26 @@ export function OrderSubmittedModal({
           >
             <div style={{ fontSize: 14, fontWeight: 900, color: "#115e59" }}>{t.postSubmitSuggestTitle}</div>
             <div style={{ fontSize: 12, color: "#0f766e", marginTop: 4, lineHeight: 1.45 }}>{t.postSubmitSuggestHint}</div>
+            {onAddAllSuggest ? (
+              <button
+                type="button"
+                onClick={onAddAllSuggest}
+                style={{
+                  marginTop: 10,
+                  width: "100%",
+                  border: "1px solid #0f766e",
+                  background: "#0f766e",
+                  color: "#fff",
+                  borderRadius: 999,
+                  padding: "8px 12px",
+                  fontSize: 12,
+                  fontWeight: 900,
+                  cursor: "pointer",
+                }}
+              >
+                {t.postSubmitAddAll.replace("{count}", String(suggestLines.length))}
+              </button>
+            ) : null}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
               {suggestLines.map((line) => (
                 <div
@@ -140,6 +164,25 @@ export function OrderSubmittedModal({
                     ) : null}
                   </div>
                   {line.badge ? <span style={{ ...promoTagStyle, fontSize: 9 }}>{line.badge}</span> : null}
+                  {onAddSuggestCase ? (
+                    <button
+                      type="button"
+                      onClick={() => onAddSuggestCase(line.sku)}
+                      style={{
+                        border: "1px solid #0f766e",
+                        background: "#ccfbf1",
+                        color: "#0f766e",
+                        borderRadius: 999,
+                        padding: "6px 10px",
+                        fontSize: 11,
+                        fontWeight: 900,
+                        cursor: "pointer",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {t.addOneCase}
+                    </button>
+                  ) : null}
                 </div>
               ))}
             </div>
