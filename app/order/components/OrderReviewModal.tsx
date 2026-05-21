@@ -33,10 +33,8 @@ export function OrderReviewModal({
   lang,
   items,
   warnings = [],
-  weeklyUpsellLines,
   clearanceUpsellLines,
   onAddUpsellCase,
-  onAddAllWeeklyUpsell,
   onAddAllClearanceUpsell,
   clearanceSkus,
   promoDealBySku,
@@ -54,10 +52,8 @@ export function OrderReviewModal({
   lang: Lang;
   items: CartItem[];
   warnings?: string[];
-  weeklyUpsellLines?: UpsellLine[];
   clearanceUpsellLines?: UpsellLine[];
   onAddUpsellCase: (sku: string) => void;
-  onAddAllWeeklyUpsell: () => void;
   onAddAllClearanceUpsell: () => void;
   clearanceSkus?: Set<string>;
   promoDealBySku?: Record<string, string>;
@@ -99,10 +95,8 @@ export function OrderReviewModal({
       lang={lang}
       items={items}
       warnings={warnings}
-      weeklyUpsellLines={weeklyUpsellLines}
       clearanceUpsellLines={clearanceUpsellLines}
       onAddUpsellCase={onAddUpsellCase}
-      onAddAllWeeklyUpsell={onAddAllWeeklyUpsell}
       onAddAllClearanceUpsell={onAddAllClearanceUpsell}
       clearanceSkus={clearanceSkus}
       promoDealBySku={promoDealBySku}
@@ -124,10 +118,8 @@ function OrderReviewModalContent({
   lang,
   items,
   warnings = [],
-  weeklyUpsellLines,
   clearanceUpsellLines,
   onAddUpsellCase,
-  onAddAllWeeklyUpsell,
   onAddAllClearanceUpsell,
   clearanceSkus,
   promoDealBySku,
@@ -142,14 +134,12 @@ function OrderReviewModalContent({
 }: Omit<Parameters<typeof OrderReviewModal>[0], "open">) {
   const t = copy[lang];
   const [hideWarnings, setHideWarnings] = useState(false);
-  const [hideWeeklyUpsell, setHideWeeklyUpsell] = useState(false);
   const [hideClearanceUpsell, setHideClearanceUpsell] = useState(false);
 
   const hasClearanceInOrder = clearanceSkus
     ? items.some((item) => clearanceSkus.has(item.sku.toUpperCase()))
     : false;
 
-  const showWeeklyUpsell = !hideWeeklyUpsell && weeklyUpsellLines && weeklyUpsellLines.length > 0;
   const showClearanceUpsell = !hideClearanceUpsell && clearanceUpsellLines && clearanceUpsellLines.length > 0;
   const showWarnings = !hideWarnings && warnings.length > 0;
 
@@ -225,19 +215,6 @@ function OrderReviewModalContent({
               ))}
               {warnings.length > 6 ? <div>• ...</div> : null}
             </div>
-          ) : null}
-
-          {showWeeklyUpsell ? (
-            <SalesUpsellPanel
-              lang={lang}
-              title={t.missingWeeklyPicksTitle}
-              lines={weeklyUpsellLines}
-              disabled={submitting}
-              onAddOne={onAddUpsellCase}
-              onAddAll={onAddAllWeeklyUpsell}
-              onSkip={() => setHideWeeklyUpsell(true)}
-              skipLabel={t.skipWeeklyUpsell}
-            />
           ) : null}
 
           {showClearanceUpsell ? (
