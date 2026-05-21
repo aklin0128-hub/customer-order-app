@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AdminLogin } from "../_components/AdminLogin";
+import { AdminDataTable } from "../_components/AdminDataTable";
 import { AdminShell } from "../_components/AdminShell";
+import { AdminSkuAutocomplete } from "../_components/AdminSkuAutocomplete";
 import { inputStyle, labelStyle, panel, panelTitle } from "../_components/admin-styles";
 import {
   BtnPrimary,
@@ -205,7 +207,9 @@ export default function AdminInventoryPage() {
             Column titles should match your export:
             <code>Loc Item</code>, <code>Loc Item Desc</code>, <code>Loc Qty UM</code>,{" "}
             <code>Loc Inventory Status</code>, <code>Loc Received Date</code>,{" "}
-            <code>Loc Expire Date</code>, <code>Loc On Hand Qty</code>. Replaces the previous upload.
+            <code>Loc Expire Date</code>, <code>Loc On Hand Qty</code>. Replaces the previous upload. If
+            Received/Expires show as blank, <strong>re-upload</strong> the file after updating the app so dates are
+            parsed correctly.
           </p>
           <label style={labelStyle}>CSV or Excel file</label>
           <input
@@ -226,18 +230,15 @@ export default function AdminInventoryPage() {
 
         <Panel title="SKU lookup">
           <label style={labelStyle}>SKU</label>
-          <input
-            value={sku}
-            onChange={(e) => setSku(e.target.value.toUpperCase())}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                void searchSku();
-              }
-            }}
-            placeholder="e.g. 00002D or 000020"
-            style={{ ...inputStyle, marginBottom: 10 }}
-          />
+          <div style={{ marginBottom: 10 }}>
+            <AdminSkuAutocomplete
+              value={sku}
+              onChange={setSku}
+              includeInventory
+              placeholder="e.g. 299 or 00002D"
+              onEnter={() => void searchSku()}
+            />
+          </div>
 
           <label style={{ ...labelStyle, marginTop: 8 }}>Status filter (optional)</label>
           <select
@@ -278,34 +279,32 @@ export default function AdminInventoryPage() {
           </div>
 
           {lookup.found ? (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead>
-                  <tr style={{ textAlign: "left", borderBottom: "2px solid #e5e7eb" }}>
-                    <th style={{ padding: "8px 10px" }}>SKU</th>
-                    <th style={{ padding: "8px 10px" }}>Status</th>
-                    <th style={{ padding: "8px 10px" }}>Received</th>
-                    <th style={{ padding: "8px 10px" }}>Expires</th>
-                    <th style={{ padding: "8px 10px" }}>On hand</th>
-                    <th style={{ padding: "8px 10px" }}>UM</th>
-                    <th style={{ padding: "8px 10px" }}>Description</th>
+            <AdminDataTable maxHeight="min(480px, 60vh)">
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Status</th>
+                  <th>Received</th>
+                  <th>Expires</th>
+                  <th>On hand</th>
+                  <th>UM</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lookup.lots.map((lot, i) => (
+                  <tr key={`${lot.sku}-${i}`}>
+                    <td style={{ fontWeight: 800 }}>{lot.sku}</td>
+                    <td>{lot.status || "—"}</td>
+                    <td>{formatInventoryDate(lot.receivedDate)}</td>
+                    <td style={{ fontWeight: 700 }}>{formatInventoryDate(lot.expireDate)}</td>
+                    <td>{lot.onHandQty ?? "—"}</td>
+                    <td>{lot.qtyUm || "—"}</td>
+                    <td style={{ color: "#4b5563" }}>{lot.description || "—"}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {lookup.lots.map((lot, i) => (
-                    <tr key={`${lot.sku}-${i}`} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                      <td style={{ padding: "8px 10px", fontWeight: 800 }}>{lot.sku}</td>
-                      <td style={{ padding: "8px 10px" }}>{lot.status || "—"}</td>
-                      <td style={{ padding: "8px 10px" }}>{formatInventoryDate(lot.receivedDate)}</td>
-                      <td style={{ padding: "8px 10px", fontWeight: 700 }}>{formatInventoryDate(lot.expireDate)}</td>
-                      <td style={{ padding: "8px 10px" }}>{lot.onHandQty ?? "—"}</td>
-                      <td style={{ padding: "8px 10px" }}>{lot.qtyUm || "—"}</td>
-                      <td style={{ padding: "8px 10px", color: "#4b5563" }}>{lot.description || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </AdminDataTable>
           ) : (
             <EmptyState title="SKU not in file" detail="Try catalog format (00002D) or inventory format (000020)." />
           )}

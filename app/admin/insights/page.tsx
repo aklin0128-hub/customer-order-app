@@ -15,6 +15,7 @@ import {
 } from "../_components/admin-analytics-ui";
 import { AdminLogin } from "../_components/AdminLogin";
 import { AdminShell } from "../_components/AdminShell";
+import { AdminSkuAutocomplete } from "../_components/AdminSkuAutocomplete";
 import { inputStyle, panel, panelTitle } from "../_components/admin-styles";
 import {
   BtnPrimary,
@@ -205,8 +206,6 @@ function AdminInsightsPageInner() {
   const [priceDays, setPriceDays] = useState("180");
   const [price, setPrice] = useState<PriceData | null>(null);
   const [busyPrice, setBusyPrice] = useState(false);
-  const [skuHints, setSkuHints] = useState<string[]>([]);
-
   const loadHealth = useCallback(
     async (force = false) => {
       if (healthFetched.current && !force && health) return;
@@ -278,23 +277,6 @@ function AdminInsightsPageInner() {
     if (!authed || tab !== "brands") return;
     void loadBrands();
   }, [authed, tab, brandDays, brandGroup, loadBrands]);
-
-  useEffect(() => {
-    if (!authed) return;
-    void (async () => {
-      try {
-        const res = await fetch("/api/admin/top-skus?limit=80&days=90", {
-          headers: adminHeaders(),
-        });
-        const json = await res.json();
-        if (res.ok && Array.isArray(json.rows)) {
-          setSkuHints(json.rows.map((r: { sku: string }) => r.sku).filter(Boolean));
-        }
-      } catch {
-        /* optional hints */
-      }
-    })();
-  }, [authed, adminHeaders]);
 
   const filteredHealth = useMemo(() => {
     if (!health) return [];
@@ -614,19 +596,12 @@ function AdminInsightsPageInner() {
           <section style={panel}>
             <h2 style={panelTitle}>SKU lookup</h2>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 140px auto", gap: 8 }}>
-              <input
+              <AdminSkuAutocomplete
                 value={priceSku}
-                onChange={(e) => setPriceSku(e.target.value.toUpperCase())}
-                list="insights-sku-hints"
-                placeholder="SKU"
-                style={inputStyle}
-                onKeyDown={(e) => e.key === "Enter" && void loadPrice()}
+                onChange={setPriceSku}
+                placeholder="Type SKU or name…"
+                onEnter={() => void loadPrice()}
               />
-              <datalist id="insights-sku-hints">
-                {skuHints.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
               <select value={priceDays} onChange={(e) => setPriceDays(e.target.value)} style={inputStyle}>
                 <option value="90">90 days</option>
                 <option value="180">180 days</option>

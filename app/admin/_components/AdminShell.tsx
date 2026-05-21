@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   brandSub,
   brandTitle,
@@ -33,6 +34,38 @@ export type AdminNav =
   | "activeCarts"
   | "inventory";
 
+function NavLinks({ active, onNavigate }: { active: AdminNav; onNavigate?: () => void }) {
+  return (
+    <>
+      {ADMIN_NAV_GROUPS.map((group) => (
+        <div key={group.title} className="admin-nav-group">
+          <span className="admin-nav-group-label">{group.title}</span>
+          {group.items.map((item) => {
+            const isActive = active === item.id;
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                className={`admin-nav-link${isActive ? " admin-nav-link--active" : ""}`}
+                aria-current={isActive ? "page" : undefined}
+                onClick={onNavigate}
+              >
+                <span className="admin-nav-icon" aria-hidden>
+                  {item.icon}
+                </span>
+                <span className="admin-nav-text">
+                  <span className="admin-nav-label">{item.label}</span>
+                  <span className="admin-nav-hint">{item.hint}</span>
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      ))}
+    </>
+  );
+}
+
 export function AdminShell({
   active,
   title,
@@ -48,42 +81,58 @@ export function AdminShell({
   children: ReactNode;
   actions?: ReactNode;
 }) {
+  const pathname = usePathname();
+  const [navOpen, setNavOpen] = useState(false);
+
+  useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [navOpen]);
+
   return (
     <div className="admin-shell" style={shell}>
-      <aside style={sidebar} className="admin-sidebar">
+      {navOpen ? (
+        <button
+          type="button"
+          className="admin-nav-overlay"
+          aria-label="Close menu"
+          onClick={() => setNavOpen(false)}
+        />
+      ) : null}
+
+      <aside
+        style={sidebar}
+        className={`admin-sidebar${navOpen ? " admin-sidebar--open" : ""}`}
+        aria-label="Admin navigation"
+      >
         <div className="admin-sidebar-brand">
-          <div style={logo}>RB</div>
+          <div style={logo} className="admin-sidebar-logo">
+            RB
+          </div>
           <div className="admin-brand-text">
             <div style={brandTitle}>Rhee Bros</div>
             <div style={brandSub}>Admin</div>
           </div>
+          <button
+            type="button"
+            className="admin-nav-close"
+            aria-label="Close menu"
+            onClick={() => setNavOpen(false)}
+          >
+            ×
+          </button>
         </div>
 
         <div className="admin-nav-scroll">
-          {ADMIN_NAV_GROUPS.map((group) => (
-            <div key={group.title} className="admin-nav-group">
-              <span className="admin-nav-group-label">{group.title}</span>
-              {group.items.map((item) => {
-                const isActive = active === item.id;
-                return (
-                  <Link
-                    key={item.id}
-                    href={item.href}
-                    className={`admin-nav-link${isActive ? " admin-nav-link--active" : ""}`}
-                    aria-current={isActive ? "page" : undefined}
-                  >
-                    <span className="admin-nav-icon" aria-hidden>
-                      {item.icon}
-                    </span>
-                    <span className="admin-nav-text">
-                      <span className="admin-nav-label">{item.label}</span>
-                      <span className="admin-nav-hint">{item.hint}</span>
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
+          <NavLinks active={active} onNavigate={() => setNavOpen(false)} />
         </div>
 
         <button type="button" onClick={onLogout} className="admin-logout-btn">
@@ -91,19 +140,32 @@ export function AdminShell({
         </button>
       </aside>
 
-      <div style={mainArea}>
-        <header style={topBar}>
-          <div>
-            <h1 style={pageTitle}>{title}</h1>
-            {subtitle ? <p style={pageSubtitle}>{subtitle}</p> : null}
+      <div style={mainArea} className="admin-main">
+        <header className="admin-topbar" style={topBar}>
+          <div className="admin-topbar-head">
+            <button
+              type="button"
+              className="admin-menu-btn"
+              aria-label="Open menu"
+              aria-expanded={navOpen}
+              onClick={() => setNavOpen(true)}
+            >
+              ☰
+            </button>
+            <div className="admin-topbar-titles">
+              <h1 style={pageTitle}>{title}</h1>
+              {subtitle ? <p style={pageSubtitle}>{subtitle}</p> : null}
+            </div>
           </div>
-          <div style={{ ...topActions, flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+          <div className="admin-topbar-actions" style={topActions}>
             <AdminGlobalSearch />
             {actions}
           </div>
         </header>
 
-        <div style={content}>{children}</div>
+        <div style={content} className="admin-content">
+          {children}
+        </div>
       </div>
     </div>
   );

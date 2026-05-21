@@ -78,6 +78,33 @@ test("parseInventoryXlsxBuffer reads By Item sheet", () => {
   assert.equal(rows[0]?.expireDate, "2028-02-10");
 });
 
+test("parseInventoryXlsxBuffer skips title rows before headers", () => {
+  const workbook = XLSX.utils.book_new();
+  const sheet = XLSX.utils.aoa_to_sheet([
+    ["Inventory Exp Report"],
+    ["Generated", "5/12/2026"],
+    [],
+    [
+      "Loc Item",
+      "Loc Item Desc",
+      "Loc Qty UM",
+      "Loc Inventory Status",
+      "Loc Received Date",
+      "Loc Expire Date",
+      "Loc On Hand Qty",
+    ],
+    ["29931V", "SAMPLE PRODUCT", "CS", "Available", "2/11/2026", "2/10/2028", 859],
+  ]);
+  XLSX.utils.book_append_sheet(workbook, sheet, "Inventory Exp Report");
+  const buffer = Buffer.from(XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }));
+
+  const { rows } = parseInventoryXlsxBuffer(buffer);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.sku, "29931V");
+  assert.equal(rows[0]?.receivedDate, "2026-02-11");
+  assert.equal(rows[0]?.expireDate, "2028-02-10");
+});
+
 test("parseInventoryXlsxBuffer reads Loca/Local column headers", () => {
   const workbook = XLSX.utils.book_new();
   const sheet = XLSX.utils.aoa_to_sheet([

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { AdminLogin } from "../_components/AdminLogin";
 import { AdminShell } from "../_components/AdminShell";
+import { AdminSkuAutocomplete } from "../_components/AdminSkuAutocomplete";
 import {
   FieldLabel,
   FormSection,
@@ -439,12 +440,10 @@ export default function AdminPromotionsPage() {
               <div style={formGrid}>
                 <div>
                   <FieldLabel required>SKU</FieldLabel>
-                  <input
+                  <AdminSkuAutocomplete
                     value={form.sku}
-                    onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value.toUpperCase() }))}
-                    placeholder="00003D"
-                    style={inputStyle}
-                    autoFocus={!editingSku}
+                    onChange={(v) => setForm((f) => ({ ...f, sku: v }))}
+                    placeholder="Type SKU or name…"
                   />
                   <SkuPreview sku={form.sku} product={selectedProduct} />
                 </div>

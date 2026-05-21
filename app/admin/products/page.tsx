@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AdminLogin } from "../_components/AdminLogin";
 import { AdminShell } from "../_components/AdminShell";
+import { AdminSkuAutocomplete } from "../_components/AdminSkuAutocomplete";
 import { formGrid, inputStyle, labelStyle, splitForm, splitLayout, splitList } from "../_components/admin-styles";
 import {
   BtnPrimary,
@@ -654,7 +655,7 @@ export default function AdminProductsPage() {
           </div>
         </Panel>
 
-        <div style={splitForm}>
+        <div style={splitForm} className="admin-catalog-form-sticky">
           <Panel title={sku ? `Edit ${sku}` : "SKU details"}>
             {autoSaveStatus ? (
               <div
@@ -688,11 +689,10 @@ export default function AdminProductsPage() {
             <div style={formGrid}>
               <div>
                 <label style={labelStyle}>SKU</label>
-                <input
+                <AdminSkuAutocomplete
                   value={sku}
-                  onChange={(e) => updateText(setSku, e.target.value.toUpperCase())}
-                  placeholder="00003D"
-                  style={inputStyle}
+                  onChange={(v) => updateText(setSku, v)}
+                  placeholder="Type SKU or name…"
                 />
               </div>
               <div>

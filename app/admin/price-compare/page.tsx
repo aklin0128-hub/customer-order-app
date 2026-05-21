@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useState, type CSSProperties } from "react";
 import { AdminLogin } from "../_components/AdminLogin";
 import { AdminShell } from "../_components/AdminShell";
+import { AdminSkuAutocomplete } from "../_components/AdminSkuAutocomplete";
 import { inputStyle, labelStyle, panel, panelTitle } from "../_components/admin-styles";
 import { Toast } from "../_components/admin-utils";
 import { useAdminAuth } from "../_components/useAdminAuth";
@@ -187,7 +188,7 @@ export default function AdminPriceComparePage() {
           </div>
           <div>
             <label style={labelStyle}>SKU</label>
-            <input value={priceSku} onChange={(e) => setPriceSku(e.target.value.toUpperCase())} placeholder="00003D" style={inputStyle} />
+            <AdminSkuAutocomplete value={priceSku} onChange={setPriceSku} placeholder="Type SKU or name…" />
           </div>
           <div>
             <label style={labelStyle}>Date range</label>
@@ -312,7 +313,7 @@ export default function AdminPriceComparePage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
           <div>
             <label style={labelStyle}>SKU</label>
-            <input value={buyerSku} onChange={(e) => setBuyerSku(e.target.value.toUpperCase())} placeholder="00003D" style={inputStyle} />
+            <AdminSkuAutocomplete value={buyerSku} onChange={setBuyerSku} placeholder="Type SKU or name…" />
           </div>
           <div>
             <label style={labelStyle}>Date range</label>

@@ -446,7 +446,7 @@ export default function AdminCustomersPage() {
           </div>
         </Panel>
 
-        <div style={splitForm}>
+        <div style={splitForm} className="admin-catalog-form-sticky">
           <Panel title={accountNo ? `Edit ${accountNo}` : "New customer"}>
             <div style={formGrid}>
               <Field label="Account No" hint="e.g. FL111">

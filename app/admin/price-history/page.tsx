@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useState, type CSSProperties } from "react";
 import { AdminLogin } from "../_components/AdminLogin";
 import { AdminShell } from "../_components/AdminShell";
+import { AdminSkuAutocomplete } from "../_components/AdminSkuAutocomplete";
 import { inputStyle, labelStyle, panel, panelTitle } from "../_components/admin-styles";
 import { Toast } from "../_components/admin-utils";
 import { useAdminAuth } from "../_components/useAdminAuth";
@@ -129,7 +130,7 @@ export default function AdminPriceHistoryPage() {
           </div>
           <div>
             <label style={labelStyle}>SKU</label>
-            <input value={sku} onChange={(e) => setSku(e.target.value.toUpperCase())} placeholder="06194C" style={inputStyle} />
+            <AdminSkuAutocomplete value={sku} onChange={setSku} placeholder="Type SKU or name…" />
           </div>
           <div>
             <label style={labelStyle}>Date range</label>

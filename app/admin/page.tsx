@@ -60,11 +60,11 @@ type DashboardData = {
   }[];
 };
 
-const ALERT_STYLE: Record<string, { bg: string; border: string; color: string }> = {
-  danger: { bg: "#fef2f2", border: "#fecaca", color: "#b91c1c" },
-  warn: { bg: "#fffbeb", border: "#fde68a", color: "#b45309" },
-  default: { bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8" },
-};
+function alertToneClass(tone: string): string {
+  if (tone === "danger") return "admin-alert-card--danger";
+  if (tone === "warn") return "admin-alert-card--warn";
+  return "admin-alert-card--default";
+}
 
 export default function AdminDashboardPage() {
   const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
@@ -182,33 +182,17 @@ export default function AdminDashboardPage() {
           {data.alerts.length ? (
             <section style={panel}>
               <h2 style={panelTitle}>Needs attention</h2>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                  gap: 10,
-                }}
-              >
-                {data.alerts.map((a) => {
-                  const style = ALERT_STYLE[a.tone] || ALERT_STYLE.default;
-                  return (
-                    <Link
-                      key={a.id}
-                      href={a.href}
-                      style={{
-                        textDecoration: "none",
-                        border: `1px solid ${style.border}`,
-                        background: style.bg,
-                        borderRadius: 12,
-                        padding: "12px 14px",
-                        color: style.color,
-                      }}
-                    >
-                      <div style={{ fontSize: 22, fontWeight: 900 }}>{a.count}</div>
-                      <div style={{ fontSize: 13, fontWeight: 800 }}>{a.label}</div>
-                    </Link>
-                  );
-                })}
+              <div className="admin-alert-grid">
+                {data.alerts.map((a) => (
+                  <Link
+                    key={a.id}
+                    href={a.href}
+                    className={`admin-alert-card ${alertToneClass(a.tone)}`}
+                  >
+                    <div className="admin-alert-card-count">{a.count}</div>
+                    <div className="admin-alert-card-label">{a.label}</div>
+                  </Link>
+                ))}
               </div>
             </section>
           ) : null}

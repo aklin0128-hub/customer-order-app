@@ -28,17 +28,25 @@ const HEADER_ALIASES: Record<keyof Omit<InventoryLot, "sku"> | "sku", string[]> 
     "LOC RECEIVED DATE",
     "LOCA RECEIVED DATE",
     "LOCAL RECEIVED DATE",
+    "LOC RECV DATE",
+    "LOC RCVD DATE",
+    "LOC RCV DATE",
+    "LOC REC DATE",
     "RECEIVED DATE",
     "DATE RECEIVED",
+    "RECV DATE",
   ],
   expireDate: [
     "LOC EXPIRE DATE",
     "LOCA EXPIRE DATE",
     "LOCAL EXPIRE DATE",
     "LOC EXPIRATION DATE",
+    "LOC EXP DATE",
+    "LOC EXPIRY DATE",
     "EXPIRE DATE",
     "EXPIRATION DATE",
     "EXPIRY DATE",
+    "EXP DATE",
   ],
   onHandQty: ["LOC ON HAND QTY", "ON HAND QTY", "QTY", "ON HAND"],
 };
@@ -49,7 +57,9 @@ const HEADER_FUZZY: Partial<
   receivedDate: (norm) =>
     (norm.includes("RECEIVED") || norm.includes("RECV")) && norm.includes("DATE"),
   expireDate: (norm) =>
-    norm.includes("EXPIR") || (norm.includes("EXPIRE") && norm.includes("DATE")),
+    norm.includes("EXPIR") ||
+    (norm.includes("EXPIRE") && norm.includes("DATE")) ||
+    (norm.includes("LOC") && norm.includes("EXP") && norm.includes("DATE")),
 };
 
 let cached: {
@@ -89,11 +99,11 @@ export function skuLookupKeys(sku: string) {
   return [...keys];
 }
 
-function normalizeHeaderKey(key: string) {
+export function normalizeHeaderKey(key: string) {
   return key.trim().toUpperCase().replace(/[^A-Z0-9]+/g, " ");
 }
 
-function compactHeaderKey(key: string) {
+export function compactHeaderKey(key: string) {
   return key.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
@@ -107,17 +117,28 @@ function excelSerialToIso(serial: number): string | null {
 }
 
 function parseUsDate(value: string): string | null {
-  const text = safeString(value);
-  if (!text) return null;
+  const text = safeString(value).replace(/\s+/g, " ");
+  if (!text || text === "-" || text === "—") return null;
 
-  const slash = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (slash) {
-    const [, m, d, y] = slash;
+  const slash4 = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (slash4) {
+    const [, m, d, y] = slash4;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+
+  const slash2 = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  if (slash2) {
+    const [, m, d, yy] = slash2;
+    const yNum = Number(yy);
+    const y = yNum >= 70 ? 1900 + yNum : 2000 + yNum;
     return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
   }
 
   const dash = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (dash) return `${dash[1]}-${dash[2]}-${dash[3]}`;
+
+  const isoSpace = text.match(/^(\d{4})-(\d{2})-(\d{2})[ T]/);
+  if (isoSpace) return `${isoSpace[1]}-${isoSpace[2]}-${isoSpace[3]}`;
 
   return null;
 }
@@ -159,7 +180,19 @@ function getFieldFromRecord(row: Record<string, unknown>, field: keyof typeof HE
 
   if (fuzzy) {
     for (const [key, val] of entries) {
-      if (fuzzy(compactHeaderKey(key)) && safeString(val)) return val;
+      const norm = compactHeaderKey(key);
+      if (fuzzy(norm) && (safeString(val) || val instanceof Date || typeof val === "number")) {
+        return val;
+      }
+    }
+  }
+
+  for (const [key, val] of entries) {
+    const norm = normalizeHeaderKey(key);
+    for (const alias of aliases) {
+      if (norm === normalizeHeaderKey(alias) && (safeString(val) || val instanceof Date || typeof val === "number")) {
+        return val;
+      }
     }
   }
 

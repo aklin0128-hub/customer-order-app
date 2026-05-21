@@ -51,7 +51,7 @@ export function AdminGlobalSearch() {
   if (!authed) return null;
 
   return (
-    <div ref={wrapRef} className="admin-global-search" style={{ position: "relative", minWidth: 200, flex: 1, maxWidth: 360 }}>
+    <div ref={wrapRef} className="admin-global-search">
       <input
         type="search"
         placeholder="Search account or SKU…"
@@ -61,29 +61,12 @@ export function AdminGlobalSearch() {
           setOpen(true);
         }}
         onFocus={() => setOpen(true)}
+        className="admin-global-search-input"
         style={{ ...inputStyle, width: "100%", fontSize: 13 }}
         aria-label="Admin search"
       />
       {open && q.trim().length >= 2 && results.length > 0 ? (
-        <ul
-          className="admin-search-results"
-          style={{
-            position: "absolute",
-            top: "100%",
-            left: 0,
-            right: 0,
-            margin: "6px 0 0",
-            padding: 6,
-            listStyle: "none",
-            background: "#fff",
-            border: "1px solid #e5e7eb",
-            borderRadius: 12,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
-            zIndex: 50,
-            maxHeight: 280,
-            overflowY: "auto",
-          }}
-        >
+        <ul className="admin-search-results">
           {results.map((r) => (
             <li key={r.type === "account" ? r.accountNo : r.sku}>
               <Link
