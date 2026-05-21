@@ -1,5 +1,7 @@
-import { indexOrderHistoryAccount } from "@/lib/redisIndexes";
+import { indexOrderHistoryAccount, listOrderHistoryAccounts } from "@/lib/redisIndexes";
 import { redis } from "@/lib/redis";
+
+const MGET_CHUNK = 100;
 
 export type OrderHistoryEntry = {
   accountNo: string;
@@ -36,4 +38,29 @@ export async function prependOrderHistory(entry: OrderHistoryEntry) {
 
   await redis.set(`orderHistory:${accountNo}`, next);
   await indexOrderHistoryAccount(accountNo);
+}
+
+/** Batch-load order histories (1 MGET per chunk, not 1 GET per account). */
+export async function loadAllOrderHistories(): Promise<
+  { accountNo: string; entries: OrderHistoryEntry[] }[]
+> {
+  const accounts = await listOrderHistoryAccounts();
+  if (!accounts.length) return [];
+
+  const results: { accountNo: string; entries: OrderHistoryEntry[] }[] = [];
+
+  for (let i = 0; i < accounts.length; i += MGET_CHUNK) {
+    const chunk = accounts.slice(i, i + MGET_CHUNK);
+    const keys = chunk.map((accountNo) => `orderHistory:${accountNo}`);
+    const rows = (await redis.mget<(OrderHistoryEntry[] | null)[]>(...keys)) || [];
+
+    for (let j = 0; j < chunk.length; j += 1) {
+      results.push({
+        accountNo: chunk[j],
+        entries: rows[j] || [],
+      });
+    }
+  }
+
+  return results;
 }

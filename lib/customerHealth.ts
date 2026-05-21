@@ -73,7 +73,7 @@ function classifyHealth(
 }
 
 export async function getCustomerHealth(): Promise<CustomerHealthResult> {
-  return cachedAnalytics("customerHealth", () => computeCustomerHealth());
+  return cachedAnalytics("customerHealth", () => computeCustomerHealth(), 30 * 60 * 1000);
 }
 
 export async function getCustomerHealthRow(accountNo: string): Promise<CustomerHealthRow | null> {

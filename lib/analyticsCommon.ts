@@ -3,7 +3,7 @@ import { cleanSku, parseQty } from "@/lib/analyticsPure";
 import { analyticsCacheKey, cachedAnalytics } from "@/lib/analyticsCache";
 import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
 import { loadRedisProducts } from "@/lib/productRedisStore";
-import { listOrderHistoryAccounts } from "@/lib/redisIndexes";
+import { loadAllOrderHistories } from "@/lib/orderHistory";
 import { redis } from "@/lib/redis";
 
 export type CatalogProduct = {
@@ -135,7 +135,7 @@ export async function collectSaleEvents(options?: {
     invoicesOnly ? "1" : "0",
   ]);
 
-  return cachedAnalytics(cacheKey, () => collectSaleEventsUncached(since, until, invoicesOnly));
+  return cachedAnalytics(cacheKey, () => collectSaleEventsUncached(since, until, invoicesOnly), 30 * 60 * 1000);
 }
 
 async function collectSaleEventsUncached(
@@ -176,13 +176,7 @@ async function collectSaleEventsUncached(
 
   if (invoicesOnly) return events;
 
-  const accounts = await listOrderHistoryAccounts();
-  const histories = await Promise.all(
-    accounts.map(async (accountNo) => ({
-      accountNo,
-      entries: (await redis.get<OrderHistoryEntry[]>(`orderHistory:${accountNo}`)) || [],
-    }))
-  );
+  const histories = await loadAllOrderHistories();
 
   for (const { accountNo: keyAccountNo, entries } of histories) {
     for (const entry of entries) {

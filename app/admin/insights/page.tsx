@@ -353,7 +353,7 @@ function AdminInsightsPageInner() {
     <AdminShell
       active="insights"
       title="Insights"
-      subtitle="Health · brand share · SKU pricing — export CSV for review."
+      subtitle="Health · brand share · SKU pricing. Sale data is cached ~30 min on the server — use Refresh to reload."
       onLogout={logout}
     >
       <section style={panel}>

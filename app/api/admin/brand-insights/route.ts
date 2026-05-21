@@ -25,7 +25,9 @@ export async function GET(req: Request) {
 
     const result = await getBrandInsights({ days, groupBy });
 
-    return NextResponse.json({ success: true, ...result });
+    const res = NextResponse.json({ success: true, ...result });
+    res.headers.set("Cache-Control", "private, max-age=300");
+    return res;
   } catch (error: any) {
     return NextResponse.json(
       { error: error?.message || "Failed to load brand insights." },

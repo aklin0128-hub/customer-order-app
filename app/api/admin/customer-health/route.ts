@@ -16,7 +16,9 @@ export async function GET(req: Request) {
 
   try {
     const result = await getCustomerHealth();
-    return NextResponse.json({ success: true, ...result });
+    const res = NextResponse.json({ success: true, ...result });
+    res.headers.set("Cache-Control", "private, max-age=300");
+    return res;
   } catch (error: any) {
     return NextResponse.json(
       { error: error?.message || "Failed to load customer health." },
