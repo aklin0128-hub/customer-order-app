@@ -30,7 +30,8 @@ export type AdminNav =
   | "account"
   | "market"
   | "insights"
-  | "activeCarts";
+  | "activeCarts"
+  | "inventory";
 
 export function AdminShell({
   active,

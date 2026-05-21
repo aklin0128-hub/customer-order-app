@@ -25,6 +25,8 @@ export function SalesUpsellPanel({
   disabled,
   onAddOne,
   onAddAll,
+  onSkip,
+  skipLabel,
 }: {
   lang: Lang;
   title: string;
@@ -32,6 +34,8 @@ export function SalesUpsellPanel({
   disabled?: boolean;
   onAddOne: (sku: string) => void;
   onAddAll: () => void;
+  onSkip?: () => void;
+  skipLabel?: string;
 }) {
   const t = copy[lang];
   if (lines.length === 0) return null;
@@ -51,24 +55,45 @@ export function SalesUpsellPanel({
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", alignItems: "flex-start", marginBottom: 8 }}>
         <div style={{ fontWeight: 900, flex: "1 1 200px" }}>{title}</div>
-        <button
-          type="button"
-          onClick={onAddAll}
-          disabled={disabled}
-          style={{
-            border: "1px solid #0f766e",
-            background: "#ccfbf1",
-            color: "#0f766e",
-            borderRadius: 999,
-            padding: "7px 12px",
-            fontSize: 12,
-            fontWeight: 900,
-            cursor: disabled ? "not-allowed" : "pointer",
-            flexShrink: 0,
-          }}
-        >
-          {t.addAllMissingPicks.replace("{count}", String(lines.length))}
-        </button>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {onSkip ? (
+            <button
+              type="button"
+              onClick={onSkip}
+              disabled={disabled}
+              style={{
+                border: "1px solid #99f6e4",
+                background: "#ffffff",
+                color: "#0f766e",
+                borderRadius: 999,
+                padding: "7px 12px",
+                fontSize: 12,
+                fontWeight: 800,
+                cursor: disabled ? "not-allowed" : "pointer",
+              }}
+            >
+              {skipLabel || t.skipSection}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onAddAll}
+            disabled={disabled}
+            style={{
+              border: "1px solid #0f766e",
+              background: "#ccfbf1",
+              color: "#0f766e",
+              borderRadius: 999,
+              padding: "7px 12px",
+              fontSize: 12,
+              fontWeight: 900,
+              cursor: disabled ? "not-allowed" : "pointer",
+              flexShrink: 0,
+            }}
+          >
+            {t.addAllMissingPicks.replace("{count}", String(lines.length))}
+          </button>
+        </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {lines.slice(0, 6).map((line) => (

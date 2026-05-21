@@ -33,6 +33,13 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { id: "products", label: "Products", href: "/admin/products", hint: "SKU settings", icon: "📦" },
       { id: "promotions", label: "Promotions", href: "/admin/promotions", hint: "Featured sales", icon: "🏷️" },
       { id: "clearance", label: "Clearance", href: "/admin/clearance", hint: "Sell as is", icon: "⏳" },
+      {
+        id: "inventory",
+        label: "Inventory expiry",
+        href: "/admin/inventory",
+        hint: "Weekly CSV · SKU dates",
+        icon: "📅",
+      },
     ],
   },
   {

@@ -444,6 +444,14 @@ export const reviewModalStyle: CSSProperties = {
   flexDirection: "column",
   boxSizing: "border-box",
 };
+export const reviewModalBodyStyle: CSSProperties = {
+  flex: 1,
+  minHeight: 0,
+  overflowY: "auto",
+  paddingRight: 4,
+  WebkitOverflowScrolling: "touch",
+};
+
 export const reviewModalHeaderStyle: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
@@ -456,10 +464,6 @@ export const reviewListStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 8,
-  overflowY: "auto",
-  paddingRight: 4,
-  flex: 1,
-  minHeight: 0,
 };
 export const reviewModalFooterStyle: CSSProperties = {
   display: "grid",

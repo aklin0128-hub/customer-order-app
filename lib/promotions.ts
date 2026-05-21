@@ -2,7 +2,7 @@ import { redis } from "@/lib/redis";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
 export const PROMOTIONS_KEY = "promotions:list";
 
-export type PromotionStatus = "active" | "scheduled" | "expired" | "sold_out";
+export type PromotionStatus = "active" | "scheduled" | "expired" | "sold_out" | "ended";
 
 export type PromoPriceTier = {
   minQty: number;
@@ -26,6 +26,8 @@ export type PromotionRecord = {
   getQtyFree?: number;
   /** Up to 3 min-qty price breaks (mutually exclusive with bogo). */
   priceTiers?: PromoPriceTier[];
+  /** Admin manually ended — hides from store even before end date. */
+  ended?: boolean;
   updatedAt?: string;
 };
 
@@ -108,6 +110,12 @@ export function normalizePromotionRecord(entry: unknown): PromotionRecord | null
   const getQtyFree = parsePositiveInt(raw.getQtyFree);
   const priceTiers = normalizePriceTiers(raw.priceTiers);
 
+  const ended =
+    raw.ended === true ||
+    String(raw.ended || "")
+      .trim()
+      .toLowerCase() === "true";
+
   const record: PromotionRecord = {
     sku,
     note: String(raw.note || "").trim() || undefined,
@@ -119,6 +127,7 @@ export function normalizePromotionRecord(entry: unknown): PromotionRecord | null
     buyQty,
     getQtyFree,
     priceTiers,
+    ended: ended || undefined,
     updatedAt: String(raw.updatedAt || "").trim() || undefined,
   };
 
@@ -157,6 +166,8 @@ export function getPromotionRemainingQty(record: PromotionRecord): number | null
 }
 
 export function getPromotionStatus(record: PromotionRecord, now = new Date()): PromotionStatus {
+  if (record.ended) return "ended";
+
   const remaining = getPromotionRemainingQty(record);
   if (remaining !== null && remaining <= 0) return "sold_out";
 

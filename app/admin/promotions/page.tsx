@@ -26,7 +26,7 @@ import {
 } from "../_components/admin-utils";
 import { useAdminAuth } from "../_components/useAdminAuth";
 
-type PromotionStatus = "active" | "scheduled" | "expired" | "sold_out";
+type PromotionStatus = "active" | "scheduled" | "expired" | "sold_out" | "ended";
 type StatusFilter = "all" | PromotionStatus;
 
 type PromoPriceTier = { minQty: number; price: string };
@@ -43,6 +43,7 @@ type PromotionRecord = {
   buyQty?: number;
   getQtyFree?: number;
   priceTiers?: PromoPriceTier[];
+  ended?: boolean;
   promoStatus?: PromotionStatus;
 };
 
@@ -55,6 +56,7 @@ const statusStyle: Record<PromotionStatus, CSSProperties> = {
   scheduled: { background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" },
   expired: { background: "#f3f4f6", color: "#4b5563", border: "1px solid #d1d5db" },
   sold_out: { background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca" },
+  ended: { background: "#f5f3ff", color: "#6d28d9", border: "1px solid #ddd6fe" },
 };
 
 const statusLabel: Record<PromotionStatus, string> = {
@@ -62,6 +64,7 @@ const statusLabel: Record<PromotionStatus, string> = {
   scheduled: "Scheduled",
   expired: "Expired",
   sold_out: "Sold out",
+  ended: "Ended",
 };
 
 function emptyTierRows(): TierFormRow[] {
@@ -108,6 +111,7 @@ function emptyForm() {
     getQtyFree: "",
     tiers: emptyTierRows(),
     resetSoldQty: false,
+    promotionEnded: false,
   };
 }
 
@@ -224,6 +228,7 @@ export default function AdminPromotionsPage() {
       getQtyFree: record.getQtyFree ? String(record.getQtyFree) : "",
       tiers,
       resetSoldQty: false,
+      promotionEnded: Boolean(record.ended),
     });
   };
 
@@ -253,6 +258,7 @@ export default function AdminPromotionsPage() {
                   .filter((tier) => tier.minQty && tier.price)
               : undefined,
           resetSoldQty: form.resetSoldQty,
+          ended: form.promotionEnded,
         }),
       });
       const data = await res.json();
@@ -354,6 +360,7 @@ export default function AdminPromotionsPage() {
               { id: "active", label: "Active" },
               { id: "scheduled", label: "Scheduled" },
               { id: "expired", label: "Expired" },
+              { id: "ended", label: "Ended" },
               { id: "sold_out", label: "Sold out" },
             ]}
           />
@@ -584,6 +591,24 @@ export default function AdminPromotionsPage() {
                 </div>
               ) : null}
             </FormSection>
+
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 13,
+                fontWeight: 700,
+                marginBottom: 8,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={form.promotionEnded}
+                onChange={(e) => setForm((f) => ({ ...f, promotionEnded: e.target.checked }))}
+              />
+              Promotion ended (hide from store weekly picks)
+            </label>
 
             <label
               style={{

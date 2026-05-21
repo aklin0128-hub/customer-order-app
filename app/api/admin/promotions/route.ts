@@ -81,6 +81,7 @@ export async function POST(req: Request) {
     const existing = current.find((p) => p.sku === sku);
 
     const resetSoldQty = Boolean(body?.resetSoldQty);
+    const ended = Boolean(body?.ended);
 
     const nextRecord: PromotionRecord = {
       sku,
@@ -92,6 +93,7 @@ export async function POST(req: Request) {
       buyQty,
       getQtyFree,
       priceTiers,
+      ended: ended || undefined,
       soldQty: resetSoldQty ? 0 : existing?.soldQty || 0,
       updatedAt: new Date().toISOString(),
     };

@@ -25,7 +25,6 @@ import {
   formatPromoBuyXGetYPackHint,
   formatPromoDetails,
   formatPromotionDealReviewLabel,
-  formatPromoTierQtyWarning,
   getPromotionDealHighlight,
   generateOrderRef,
   getCatalogItemBySku,
@@ -677,11 +676,6 @@ export default function OrderPage() {
               .replace("{qty}", String(qty))
           );
         }
-      }
-
-      if (promo?.priceTiers?.length && qty > 0) {
-        const tierWarning = formatPromoTierQtyWarning(cleanSku, qty, promo.priceTiers, t);
-        if (tierWarning) warnings.push(tierWarning);
       }
 
       if (promo?.endDate) {
