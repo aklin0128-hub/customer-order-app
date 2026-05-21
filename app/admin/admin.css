@@ -140,21 +140,75 @@
   background: #eff6ff;
 }
 
+.admin-search-result-link {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #111827;
+  text-decoration: none;
+  line-height: 1.35;
+}
+
+.admin-search-result-link:hover,
+.admin-search-result-link--active {
+  background: #eff6ff;
+}
+
+.admin-search-result-type {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+  margin-bottom: 2px;
+}
+
+.admin-search-results--empty {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.admin-list-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.admin-list-pager-meta {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.admin-list-pager-btns {
+  display: flex;
+  gap: 8px;
+}
+
 .admin-search-results {
   position: absolute;
   top: 100%;
   left: 0;
   right: 0;
   margin: 6px 0 0;
-  padding: 6px;
+  padding: 4px;
   list-style: none;
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
   z-index: 50;
-  max-height: 280px;
+  max-height: min(360px, 55vh);
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .admin-sidebar-brand {

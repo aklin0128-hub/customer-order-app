@@ -20,6 +20,7 @@ import {
 import { downloadCsv } from "../_components/admin-analytics-ui";
 import { MARKET_REGIONS, marketRegionLabel } from "@/lib/customerRegion";
 import { guessRegionFromText } from "@/lib/regionGuess";
+import { AdminListPager } from "../_components/AdminListPager";
 import { useAdminAuth } from "../_components/useAdminAuth";
 
 type Customer = {
@@ -44,6 +45,9 @@ export default function AdminCustomersPage() {
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
+  const [listPage, setListPage] = useState(1);
+  const [listTotal, setListTotal] = useState(0);
+  const [listTotalPages, setListTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const [accountNo, setAccountNo] = useState("");
@@ -69,16 +73,24 @@ export default function AdminCustomersPage() {
     setMsgTone(tone);
   };
 
-  const loadCustomers = async () => {
+  const loadCustomers = async (page = listPage) => {
     setBusy(true);
     try {
-      const res = await fetch("/api/admin/customers", {
+      const params = new URLSearchParams({ page: String(page), limit: "50" });
+      if (search.trim()) params.set("q", search.trim());
+      if (statusFilter !== "all") params.set("status", statusFilter);
+      if (regionFilter !== "all") params.set("region", regionFilter);
+
+      const res = await fetch(`/api/admin/customers?${params}`, {
         cache: "no-store",
         headers: adminHeaders(),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to load customers.");
       setCustomers(Array.isArray(data.customers) ? data.customers : []);
+      setListTotal(data.total ?? 0);
+      setListTotalPages(data.totalPages ?? 1);
+      setListPage(data.page ?? page);
     } catch (err: any) {
       notify(err?.message || "Failed to load customers.", "error");
     } finally {
@@ -87,50 +99,50 @@ export default function AdminCustomersPage() {
   };
 
   useEffect(() => {
-    if (authed) loadCustomers();
+    if (!authed) return;
+    const t = setTimeout(() => void loadCustomers(listPage), search ? 300 : 0);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed]);
+  }, [authed, search, statusFilter, regionFilter, listPage]);
 
   useEffect(() => {
-    if (urlAccountHandled || !customers.length) return;
-    const acct = new URLSearchParams(window.location.search).get("accountNo")?.trim().toUpperCase();
+    if (urlAccountHandled) return;
+    const params = new URLSearchParams(window.location.search);
+    const acct = params.get("accountNo")?.trim().toUpperCase();
+    const region = params.get("region");
+    if (region === "unassigned") setRegionFilter("unassigned");
     if (!acct) {
       setUrlAccountHandled(true);
       return;
     }
-    const match = customers.find((c) => c.accountNo.toUpperCase() === acct);
-    if (match) {
-      setAccountNo(match.accountNo);
-      setStoreName(match.storeName || "");
-      setPassword(match.password || "");
-      setActive(match.active !== false);
-      setEmail(match.email || "");
-      setPhone(match.phone || "");
-      setNote(match.note || "");
-      setRegion(match.region || "");
-    } else {
-      setAccountNo(acct);
-    }
     setSearch(acct);
-    setUrlAccountHandled(true);
-  }, [customers, urlAccountHandled]);
+    setAccountNo(acct);
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/admin/customers?accountNo=${encodeURIComponent(acct)}`,
+          { headers: adminHeaders() }
+        );
+        const data = await res.json();
+        const match = data.customers?.[0];
+        if (match) {
+          setStoreName(match.storeName || "");
+          setPassword(match.password || "");
+          setActive(match.active !== false);
+          setEmail(match.email || "");
+          setPhone(match.phone || "");
+          setNote(match.note || "");
+          setRegion(match.region || "");
+        }
+      } catch {
+        /* list load will follow */
+      }
+      setUrlAccountHandled(true);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlAccountHandled, authed]);
 
-  const filteredCustomers = useMemo(() => {
-    const q = search.trim().toUpperCase();
-    return customers.filter((c) => {
-      if (statusFilter === "active" && c.active === false) return false;
-      if (statusFilter === "inactive" && c.active !== false) return false;
-      if (regionFilter === "unassigned" && c.region) return false;
-      if (regionFilter !== "all" && regionFilter !== "unassigned" && c.region !== regionFilter) return false;
-      if (!q) return true;
-      return (
-        c.accountNo?.toUpperCase().includes(q) ||
-        c.storeName?.toUpperCase().includes(q) ||
-        c.email?.toUpperCase().includes(q) ||
-        c.phone?.toUpperCase().includes(q)
-      );
-    });
-  }, [customers, search, statusFilter, regionFilter]);
+  const filteredCustomers = customers;
 
   const toggleSelect = (acct: string) => {
     setSelected((prev) => {
@@ -305,16 +317,22 @@ export default function AdminCustomersPage() {
       />
 
       <div style={splitLayout} className="admin-split">
-        <Panel title={`Customer list (${filteredCustomers.length})`}>
+        <Panel title={`Customer list (${listTotal})`}>
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setListPage(1);
+            }}
             placeholder="Search account, store, email, phone..."
             style={{ ...inputStyle, marginBottom: 8 }}
           />
           <FilterChips
             value={statusFilter}
-            onChange={setStatusFilter}
+            onChange={(v) => {
+              setStatusFilter(v);
+              setListPage(1);
+            }}
             options={[
               { id: "all", label: "All" },
               { id: "active", label: "Active" },
@@ -323,7 +341,10 @@ export default function AdminCustomersPage() {
           />
           <FilterChips
             value={regionFilter}
-            onChange={setRegionFilter}
+            onChange={(v) => {
+              setRegionFilter(v);
+              setListPage(1);
+            }}
             options={[
               { id: "all", label: "All regions" },
               ...MARKET_REGIONS.map((r) => ({ id: r.id, label: r.label })),
@@ -444,6 +465,13 @@ export default function AdminCustomersPage() {
               <EmptyState title="No customers found" detail="Try a different search or add a new account." />
             ) : null}
           </div>
+          <AdminListPager
+            page={listPage}
+            totalPages={listTotalPages}
+            total={listTotal}
+            onPageChange={setListPage}
+            disabled={busy}
+          />
         </Panel>
 
         <div style={splitForm} className="admin-catalog-form-sticky">

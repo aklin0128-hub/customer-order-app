@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { matchesQuery, paginateList, parseAdminListQuery } from "@/lib/adminListQuery";
 import {
   getAllCustomers,
   normalizeAccountNo,
@@ -24,11 +25,45 @@ export async function GET(req: Request) {
   }
 
   try {
-    const customers = await getAllCustomers();
+    const url = new URL(req.url);
+    const query = parseAdminListQuery(url, 50);
+    const accountNo = (url.searchParams.get("accountNo") || "").trim().toUpperCase();
+    const status = url.searchParams.get("status") || "all";
+    const region = url.searchParams.get("region") || "all";
+
+    let customers = await getAllCustomers();
+
+    if (accountNo) {
+      const one = customers.find((c) => c.accountNo.toUpperCase() === accountNo);
+      return NextResponse.json({
+        success: true,
+        customers: one ? [one] : [],
+        total: one ? 1 : 0,
+        page: 1,
+        totalPages: 1,
+      });
+    }
+
+    customers = customers.filter((c) => {
+      if (status === "active" && c.active === false) return false;
+      if (status === "inactive" && c.active !== false) return false;
+      if (region === "unassigned" && c.region) return false;
+      if (region !== "all" && region !== "unassigned" && c.region !== region) return false;
+      if (!query.q) return true;
+      const hay = `${c.accountNo} ${c.storeName} ${c.email || ""} ${c.phone || ""}`;
+      return matchesQuery(hay, query.q);
+    });
+
+    customers.sort((a, b) => a.accountNo.localeCompare(b.accountNo));
+    const page = paginateList(customers, query);
 
     return NextResponse.json({
       success: true,
-      customers,
+      customers: page.items,
+      total: page.total,
+      page: page.page,
+      totalPages: page.totalPages,
+      limit: page.limit,
     });
   } catch (error: any) {
     return NextResponse.json(

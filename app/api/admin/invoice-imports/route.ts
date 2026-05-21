@@ -1,3 +1,4 @@
+import { matchesQuery, paginateList, parseAdminListQuery } from "@/lib/adminListQuery";
 import { NextResponse } from "next/server";
 import { del } from "@vercel/blob";
 import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
@@ -18,8 +19,54 @@ export async function GET(req: Request) {
   }
 
   try {
+    const url = new URL(req.url);
+    const query = parseAdminListQuery(url, 30);
     const list = (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
-    return NextResponse.json({ success: true, imports: list });
+
+    const unknownSkuSet = new Set<string>();
+    let last30Days = 0;
+    let missingAccount = 0;
+    let zeroLines = 0;
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+    for (const row of list) {
+      if (new Date(row.uploadedAt).getTime() >= cutoff) last30Days += 1;
+      if (!row.accountNo?.trim()) missingAccount += 1;
+      if (!row.lineCount) zeroLines += 1;
+      for (const line of row.lines || []) {
+        if (!line.inCatalog && line.sku) unknownSkuSet.add(line.sku.toUpperCase());
+      }
+    }
+
+    const filtered = list.filter((row) => {
+      const hay = `${row.id} ${row.accountNo} ${row.invoiceNo || ""} ${row.supplierOrderNo || ""}`;
+      return matchesQuery(hay, query.q);
+    });
+
+    filtered.sort((a, b) => String(b.uploadedAt || "").localeCompare(String(a.uploadedAt || "")));
+
+    const summaries = filtered.map(({ lines, ...rest }) => ({
+      ...rest,
+      unknownSkuCount: (lines || []).filter((l) => !l.inCatalog && l.sku).length,
+    }));
+
+    const page = paginateList(summaries, query);
+
+    return NextResponse.json({
+      success: true,
+      imports: page.items,
+      total: page.total,
+      page: page.page,
+      totalPages: page.totalPages,
+      limit: page.limit,
+      quality: {
+        total: list.length,
+        last30Days,
+        missingAccount,
+        zeroLines,
+        unknownSkus: Array.from(unknownSkuSet).sort(),
+      },
+    });
   } catch (error: any) {
     return NextResponse.json(
       { error: error?.message || "Failed to load imports." },

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { AdminAccountAutocomplete } from "../_components/AdminAccountAutocomplete";
 import { AdminLogin } from "../_components/AdminLogin";
 import { AdminShell } from "../_components/AdminShell";
 import { GrowthCell } from "../_components/admin-analytics-ui";
@@ -81,13 +82,14 @@ function Account360Content() {
       <section style={panel}>
         <h2 style={panelTitle}>Look up account</h2>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <input
-            value={accountInput}
-            onChange={(e) => setAccountInput(e.target.value.toUpperCase())}
-            placeholder="FL123"
-            style={{ ...inputStyle, flex: "1 1 200px", margin: 0 }}
-            onKeyDown={(e) => e.key === "Enter" && void load()}
-          />
+          <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+            <AdminAccountAutocomplete
+              value={accountInput}
+              onChange={setAccountInput}
+              placeholder="Account # or store…"
+              onEnter={() => void load()}
+            />
+          </div>
           <BtnPrimary onClick={() => void load()} disabled={busy}>
             {busy ? "Loading…" : "Load"}
           </BtnPrimary>

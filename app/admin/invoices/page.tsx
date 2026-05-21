@@ -6,6 +6,7 @@ import { downloadCsv } from "../_components/admin-analytics-ui";
 import { AdminLogin } from "../_components/AdminLogin";
 import { AdminShell } from "../_components/AdminShell";
 import { inputStyle, panel, panelTitle } from "../_components/admin-styles";
+import { AdminListPager } from "../_components/AdminListPager";
 import { Toast } from "../_components/admin-utils";
 import { useAdminAuth } from "../_components/useAdminAuth";
 
@@ -62,6 +63,17 @@ export default function AdminInvoicesPage() {
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
   const [imports, setImports] = useState<ImportRecord[]>([]);
+  const [search, setSearch] = useState("");
+  const [listPage, setListPage] = useState(1);
+  const [listTotal, setListTotal] = useState(0);
+  const [listTotalPages, setListTotalPages] = useState(1);
+  const [quality, setQuality] = useState({
+    total: 0,
+    last30Days: 0,
+    missingAccount: 0,
+    zeroLines: 0,
+    unknownSkus: [] as string[],
+  });
   const [sortField, setSortField] = useState<InvoiceSortField>("uploadedAt");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -75,15 +87,21 @@ export default function AdminInvoicesPage() {
   const [batchResults, setBatchResults] = useState<BatchUploadResult[]>([]);
   const [selectedImportIds, setSelectedImportIds] = useState<string[]>([]);
 
-  const loadImports = async () => {
+  const loadImports = async (page = listPage) => {
     try {
-      const res = await fetch("/api/admin/invoice-imports", {
+      const params = new URLSearchParams({ page: String(page), limit: "30" });
+      if (search.trim()) params.set("q", search.trim());
+      const res = await fetch(`/api/admin/invoice-imports?${params}`, {
         cache: "no-store",
         headers: adminHeaders(),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to load imports.");
       setImports(Array.isArray(data.imports) ? data.imports : []);
+      setListTotal(data.total ?? 0);
+      setListTotalPages(data.totalPages ?? 1);
+      setListPage(data.page ?? page);
+      if (data.quality) setQuality(data.quality);
       setSelectedImportIds((prev) => prev.filter((id) => Array.isArray(data.imports) && data.imports.some((row: ImportRecord) => row.id === id)));
     } catch (err: any) {
       setMsg(err?.message || "Failed to load invoice history.");
@@ -92,9 +110,18 @@ export default function AdminInvoicesPage() {
   };
 
   useEffect(() => {
-    if (authed) loadImports();
+    if (!authed) return;
+    const q = new URLSearchParams(window.location.search).get("q");
+    if (q && q !== "unknown") setSearch(q);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
+
+  useEffect(() => {
+    if (!authed) return;
+    const t = setTimeout(() => void loadImports(listPage), search ? 300 : 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed, search, listPage]);
 
   const upload = async () => {
     if (files.length === 0) {
@@ -216,22 +243,7 @@ export default function AdminInvoicesPage() {
   });
   const allVisibleSelected = imports.length > 0 && selectedImportIds.length === imports.length;
 
-  const invoiceQuality = useMemo(() => {
-    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    const unknownSkus = new Set<string>();
-    let last30Days = 0;
-    let missingAccount = 0;
-    let zeroLines = 0;
-    for (const record of imports) {
-      if (new Date(record.uploadedAt).getTime() >= cutoff) last30Days += 1;
-      if (!record.accountNo?.trim()) missingAccount += 1;
-      if (!record.lineCount) zeroLines += 1;
-      for (const line of record.lines || []) {
-        if (!line.inCatalog && line.sku) unknownSkus.add(line.sku.toUpperCase());
-      }
-    }
-    return { total: imports.length, last30Days, missingAccount, zeroLines, unknownSkus: Array.from(unknownSkus).sort() };
-  }, [imports]);
+  const invoiceQuality = quality;
 
   const toggleImportSelection = (id: string) => {
     setSelectedImportIds((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]);
@@ -471,9 +483,18 @@ export default function AdminInvoicesPage() {
       ) : null}
 
       <section style={panel}>
-        <h2 style={panelTitle}>Recent imports (Redis, last {imports.length})</h2>
+        <h2 style={panelTitle}>Recent imports ({listTotal})</h2>
+        <input
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setListPage(1);
+          }}
+          placeholder="Search account, invoice #, import id…"
+          style={{ ...inputStyle, marginTop: 10, marginBottom: 10 }}
+        />
         {imports.length > 0 ? (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 0 }}>
             <select value={sortField} onChange={(e) => setSortField(e.target.value as InvoiceSortField)} style={{ ...inputStyle, width: "auto", minWidth: 170 }}>
               <option value="uploadedAt">Sort by upload date</option>
               <option value="account">Sort by account #</option>
@@ -627,6 +648,13 @@ export default function AdminInvoicesPage() {
             ))
           )}
         </div>
+        <AdminListPager
+          page={listPage}
+          totalPages={listTotalPages}
+          total={listTotal}
+          onPageChange={setListPage}
+          disabled={busy}
+        />
       </section>
     </AdminShell>
   );

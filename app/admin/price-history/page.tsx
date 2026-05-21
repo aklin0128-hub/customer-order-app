@@ -118,7 +118,12 @@ export default function AdminPriceHistoryPage() {
   }
 
   return (
-    <AdminShell active="insights" title="Price History" subtitle="Check one account's unit price history for one SKU." onLogout={logout}>
+    <AdminShell
+      active="priceCompare"
+      title="Price History"
+      subtitle="Legacy view — use Price Compare in the sidebar for account + SKU tools."
+      onLogout={logout}
+    >
       {msg ? <Toast tone="error" message={msg} /> : null}
 
       <section style={panel}>

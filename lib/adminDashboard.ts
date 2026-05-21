@@ -110,7 +110,7 @@ export async function getAdminDashboardKpis(): Promise<AdminDashboardKpis> {
       id: "regions",
       label: "Missing city region",
       count: unassignedRegions,
-      href: "/admin/customers",
+      href: "/admin/customers?region=unassigned",
       tone: "warn",
     });
   }
@@ -119,7 +119,7 @@ export async function getAdminDashboardKpis(): Promise<AdminDashboardKpis> {
       id: "unknown_sku",
       label: "Unknown SKUs on invoices",
       count: invoiceQuality.unknownSkuSet.length,
-      href: "/admin/invoices",
+      href: "/admin/invoices?q=unknown",
       tone: "warn",
     });
   }
@@ -128,7 +128,7 @@ export async function getAdminDashboardKpis(): Promise<AdminDashboardKpis> {
       id: "stale_carts",
       label: "Stale carts (3+ days)",
       count: cartStats.staleCarts,
-      href: "/admin/active-carts",
+      href: "/admin/active-carts?stale=1",
       tone: "warn",
     });
   }

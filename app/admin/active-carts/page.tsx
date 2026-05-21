@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AdminLogin } from "../_components/AdminLogin";
 import { AdminShell } from "../_components/AdminShell";
 import { inputStyle, panel, panelTitle } from "../_components/admin-styles";
 import { downloadCsv } from "../_components/admin-analytics-ui";
-import { BtnSecondary, EmptyState, StatGrid, Toast, downloadOrderCsv, formatDate } from "../_components/admin-utils";
+import { BtnSecondary, EmptyState, FilterChips, StatGrid, Toast, downloadOrderCsv, formatDate } from "../_components/admin-utils";
 import { useAdminAuth } from "../_components/useAdminAuth";
 
 type ActiveCart = {
@@ -20,11 +21,22 @@ type ActiveCart = {
   totalCases: number;
 };
 
-export default function AdminActiveCartsPage() {
+type StaleFilter = "all" | "stale";
+
+function isStaleCart(cart: ActiveCart) {
+  const t = cart.updatedAt ? new Date(cart.updatedAt).getTime() : 0;
+  return t > 0 && Date.now() - t >= 3 * 24 * 60 * 60 * 1000;
+}
+
+function AdminActiveCartsContent() {
+  const searchParams = useSearchParams();
   const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
   const [passwordInput, setPasswordInput] = useState("");
   const [carts, setCarts] = useState<ActiveCart[]>([]);
   const [search, setSearch] = useState("");
+  const [staleFilter, setStaleFilter] = useState<StaleFilter>(
+    searchParams.get("stale") === "1" ? "stale" : "all"
+  );
   const [expandedAccount, setExpandedAccount] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -54,13 +66,16 @@ export default function AdminActiveCartsPage() {
 
   const filteredCarts = useMemo(() => {
     const q = search.trim().toUpperCase();
-    if (!q) return carts;
-    return carts.filter((cart) =>
-      cart.accountNo.includes(q) ||
-      cart.storeName?.toUpperCase().includes(q) ||
-      cart.items.some((item) => item.sku.includes(q))
-    );
-  }, [carts, search]);
+    return carts.filter((cart) => {
+      if (staleFilter === "stale" && !isStaleCart(cart)) return false;
+      if (!q) return true;
+      return (
+        cart.accountNo.includes(q) ||
+        cart.storeName?.toUpperCase().includes(q) ||
+        cart.items.some((item) => item.sku.includes(q))
+      );
+    });
+  }, [carts, search, staleFilter]);
 
   if (!ready) return null;
 
@@ -119,16 +134,21 @@ export default function AdminActiveCartsPage() {
           { label: "Total cases", value: filteredCarts.reduce((sum, cart) => sum + cart.totalCases, 0) },
           {
             label: "Stale (3d+)",
-            value: filteredCarts.filter((c) => {
-              const t = c.updatedAt ? new Date(c.updatedAt).getTime() : 0;
-              return t && Date.now() - t >= 3 * 24 * 60 * 60 * 1000;
-            }).length,
+            value: carts.filter(isStaleCart).length,
           },
         ]}
       />
 
       <section style={panel}>
         <h2 style={panelTitle}>Carts with items</h2>
+        <FilterChips
+          value={staleFilter}
+          onChange={setStaleFilter}
+          options={[
+            { id: "all", label: "All carts" },
+            { id: "stale", label: "Stale 3d+" },
+          ]}
+        />
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -146,7 +166,7 @@ export default function AdminActiveCartsPage() {
               .map((cart) => {
               const expanded = expandedAccount === cart.accountNo;
               const updatedMs = cart.updatedAt ? new Date(cart.updatedAt).getTime() : 0;
-              const stale = updatedMs > 0 && Date.now() - updatedMs >= 3 * 24 * 60 * 60 * 1000;
+              const stale = isStaleCart(cart);
               return (
                 <article
                   key={cart.accountNo}
@@ -230,5 +250,13 @@ export default function AdminActiveCartsPage() {
         )}
       </section>
     </AdminShell>
+  );
+}
+
+export default function AdminActiveCartsPage() {
+  return (
+    <Suspense fallback={null}>
+      <AdminActiveCartsContent />
+    </Suspense>
   );
 }

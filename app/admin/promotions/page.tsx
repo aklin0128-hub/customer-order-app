@@ -646,6 +646,7 @@ export default function AdminPromotionsPage() {
       </div>
 
       {promoRoi.length ? (
+        <section id="promo-roi" style={{ scrollMarginTop: 72 }}>
         <Panel title="Promo ROI (28d vs same-brand non-promo volume)">
           <div style={{ fontSize: 13, lineHeight: 1.55 }}>
             {promoRoi.slice(0, 8).map((r) => (
@@ -656,6 +657,7 @@ export default function AdminPromotionsPage() {
             ))}
           </div>
         </Panel>
+        </section>
       ) : null}
     </AdminShell>
   );

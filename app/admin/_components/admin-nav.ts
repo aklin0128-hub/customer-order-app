@@ -46,6 +46,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     title: "Reports",
     items: [
       { id: "invoices", label: "Invoices", href: "/admin/invoices", hint: "Import & quality", icon: "📄" },
+      { id: "priceCompare", label: "Price Compare", href: "/admin/price-compare", hint: "Account vs SKU price", icon: "💲" },
       { id: "insights", label: "Insights", href: "/admin/insights", hint: "Health · brands · price", icon: "💡" },
       { id: "market", label: "Market", href: "/admin/market", hint: "City growth", icon: "🌴" },
       { id: "topSkus", label: "Top SKUs", href: "/admin/top-skus", hint: "Rank · buyers", icon: "📊" },

@@ -12,6 +12,7 @@ import {
   downloadOrderCsv,
   formatDate,
 } from "../_components/admin-utils";
+import { AdminListPager } from "../_components/AdminListPager";
 import { useAdminAuth } from "../_components/useAdminAuth";
 
 type OrderItem = { sku: string; qty: string };
@@ -35,6 +36,9 @@ export default function AdminOrdersPage() {
 
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [search, setSearch] = useState("");
+  const [listPage, setListPage] = useState(1);
+  const [listTotal, setListTotal] = useState(0);
+  const [listTotalPages, setListTotalPages] = useState(1);
   const [sortField, setSortField] = useState<OrderSortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
@@ -43,17 +47,22 @@ export default function AdminOrdersPage() {
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
 
-  const loadOrders = async () => {
+  const loadOrders = async (page = listPage) => {
     setBusy(true);
     setMsg("");
     try {
-      const res = await fetch("/api/admin/orders", {
+      const params = new URLSearchParams({ page: String(page), limit: "40" });
+      if (search.trim()) params.set("q", search.trim());
+      const res = await fetch(`/api/admin/orders?${params}`, {
         cache: "no-store",
         headers: adminHeaders(),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to load orders.");
       setOrders(Array.isArray(data.orders) ? data.orders : []);
+      setListTotal(data.total ?? 0);
+      setListTotalPages(data.totalPages ?? 1);
+      setListPage(data.page ?? page);
       setSelectedOrderKeys([]);
     } catch (err: any) {
       setMsg(err?.message || "Failed to load orders.");
@@ -64,27 +73,27 @@ export default function AdminOrdersPage() {
   };
 
   useEffect(() => {
-    if (authed) loadOrders();
+    if (!authed) return;
+    const q = new URLSearchParams(window.location.search).get("q");
+    if (q) setSearch(q);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
 
-  const filteredOrders = useMemo(() => {
-    const q = search.trim().toUpperCase();
-    const list = !q ? orders : orders.filter((o) => {
-      return (
-        o.accountNo?.toUpperCase().includes(q) ||
-        o.storeName?.toUpperCase().includes(q) ||
-        o.orderRef?.toUpperCase().includes(q)
-      );
-    });
+  useEffect(() => {
+    if (!authed) return;
+    const t = setTimeout(() => void loadOrders(listPage), search ? 300 : 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed, search, listPage]);
 
-    return [...list].sort((a, b) => {
+  const filteredOrders = useMemo(() => {
+    return [...orders].sort((a, b) => {
       const av = sortField === "account" ? a.accountNo || "" : sortField === "ref" ? a.orderRef || "" : a.createdAt || "";
       const bv = sortField === "account" ? b.accountNo || "" : sortField === "ref" ? b.orderRef || "" : b.createdAt || "";
       const result = String(av).localeCompare(String(bv), undefined, { numeric: true });
       return sortDir === "asc" ? result : -result;
     });
-  }, [orders, search, sortDir, sortField]);
+  }, [orders, sortDir, sortField]);
 
   const todayCount = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -189,7 +198,7 @@ export default function AdminOrdersPage() {
     >
       <StatGrid
         items={[
-          { label: "Total shown", value: filteredOrders.length },
+          { label: "Total matching", value: listTotal },
           { label: "Today", value: todayCount },
           { label: "Accounts", value: new Set(orders.map((o) => o.accountNo)).size },
         ]}
@@ -200,7 +209,10 @@ export default function AdminOrdersPage() {
 
         <input
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setListPage(1);
+          }}
           placeholder="Search account, store name, or order ref..."
           style={{ ...inputStyle, marginBottom: 10 }}
         />
@@ -444,6 +456,13 @@ export default function AdminOrdersPage() {
             })}
           </div>
         )}
+        <AdminListPager
+          page={listPage}
+          totalPages={listTotalPages}
+          total={listTotal}
+          onPageChange={setListPage}
+          disabled={busy}
+        />
       </section>
     </AdminShell>
   );

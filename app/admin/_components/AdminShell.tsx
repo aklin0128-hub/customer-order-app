@@ -32,7 +32,9 @@ export type AdminNav =
   | "market"
   | "insights"
   | "activeCarts"
-  | "inventory";
+  | "inventory"
+  | "priceCompare"
+  | "priceHistory";
 
 function NavLinks({ active, onNavigate }: { active: AdminNav; onNavigate?: () => void }) {
   return (

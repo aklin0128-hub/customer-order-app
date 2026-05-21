@@ -1,3 +1,4 @@
+import { matchesQuery, paginateList, parseAdminListQuery } from "@/lib/adminListQuery";
 import { NextResponse } from "next/server";
 import { redis } from "@/lib/redis";
 
@@ -27,6 +28,8 @@ export async function GET(req: Request) {
   }
 
   try {
+    const url = new URL(req.url);
+    const query = parseAdminListQuery(url, 40);
     const keys = await redis.keys("orderHistory:*");
     const orders: OrderRecord[] = [];
 
@@ -36,7 +39,7 @@ export async function GET(req: Request) {
 
       for (const entry of history) {
         const items = Array.isArray(entry?.items) ? entry.items : [];
-        orders.push({
+        const row: OrderRecord = {
           accountNo: String(entry?.accountNo || accountNo).trim().toUpperCase(),
           storeName: entry?.storeName || "",
           orderRef: entry?.orderRef || "",
@@ -44,7 +47,10 @@ export async function GET(req: Request) {
           note: entry?.note || "",
           items,
           createdAt: entry?.createdAt || "",
-        });
+        };
+        const hay = `${row.accountNo} ${row.storeName} ${row.orderRef} ${row.phone}`;
+        if (!matchesQuery(hay, query.q)) continue;
+        orders.push(row);
       }
     }
 
@@ -52,10 +58,15 @@ export async function GET(req: Request) {
       String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
     );
 
+    const page = paginateList(orders, query);
+
     return NextResponse.json({
       success: true,
-      orders: orders.slice(0, 500),
-      total: orders.length,
+      orders: page.items,
+      total: page.total,
+      page: page.page,
+      totalPages: page.totalPages,
+      limit: page.limit,
     });
   } catch (error: any) {
     return NextResponse.json(

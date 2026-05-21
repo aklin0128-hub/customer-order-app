@@ -235,8 +235,8 @@ export default function AdminDashboardPage() {
               ) : (
                 <p style={{ fontSize: 13, color: "#6b7280" }}>No active promotions.</p>
               )}
-              <Link href="/admin/promotions">
-                <BtnSecondary>Manage promotions</BtnSecondary>
+              <Link href="/admin/promotions#promo-roi">
+                <BtnSecondary>Promo ROI →</BtnSecondary>
               </Link>
             </section>
 
@@ -321,25 +321,21 @@ export default function AdminDashboardPage() {
               ) : (
                 <p style={{ fontSize: 13, color: "#6b7280" }}>No leads right now.</p>
               )}
-              <Link href="/admin/promotions">
-                <BtnSecondary>Promo ROI →</BtnSecondary>
-              </Link>
             </section>
           </div>
 
           <section style={panel}>
             <h2 style={panelTitle}>Quick links</h2>
             <div className="admin-quick-links-compact">
-              <Link href="/admin/customers">Customers</Link>
-              <Link href="/admin/products">Products</Link>
-              <Link href="/admin/promotions">Promotions</Link>
-              <Link href="/admin/clearance">Clearance</Link>
-              <Link href="/admin/orders">Orders</Link>
+              <Link href="/admin/account">Account 360</Link>
+              <Link href="/admin/inventory">Inventory expiry</Link>
+              <Link href="/admin/active-carts?stale=1">Stale carts</Link>
+              <Link href="/admin/price-compare">Price compare</Link>
               <Link href="/admin/invoices">Invoices</Link>
               <Link href="/admin/insights">Insights</Link>
-              <Link href="/admin/market">Market</Link>
-              <Link href="/admin/top-skus">Top SKUs</Link>
-              <Link href="/admin/active-carts">Active carts</Link>
+              <Link href="/admin/promotions">Promotions</Link>
+              <Link href="/admin/orders">Orders</Link>
+              <Link href="/admin/customers">Customers</Link>
             </div>
           </section>
         </>

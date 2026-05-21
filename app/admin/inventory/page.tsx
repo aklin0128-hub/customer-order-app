@@ -101,6 +101,42 @@ export default function AdminInventoryPage() {
     if (authed) void loadMeta().catch((err: Error) => notify(err.message, "error"));
   }, [authed, loadMeta]);
 
+  useEffect(() => {
+    if (!authed || !meta) return;
+    const fromUrl = new URLSearchParams(window.location.search).get("sku")?.trim();
+    if (!fromUrl) return;
+    setSku(fromUrl.toUpperCase());
+    void (async () => {
+      setBusy(true);
+      setLookup(null);
+      try {
+        const params = new URLSearchParams({ sku: fromUrl });
+        if (statusFilter) params.set("status", statusFilter);
+        if (onlyFuture) params.set("onlyFuture", "1");
+        const res = await fetch(`/api/admin/inventory-by-item?${params}`, {
+          cache: "no-store",
+          headers: adminHeaders(),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Lookup failed.");
+        setLookup({
+          sku: data.sku,
+          found: Boolean(data.found),
+          lots: Array.isArray(data.lots) ? data.lots : [],
+          expireDates: Array.isArray(data.expireDates) ? data.expireDates : [],
+          earliestExpireDate: data.earliestExpireDate || null,
+          latestExpireDate: data.latestExpireDate || null,
+          totalOnHandQty: Number(data.totalOnHandQty) || 0,
+        });
+      } catch (err: unknown) {
+        notify(err instanceof Error ? err.message : "Lookup failed.", "error");
+      } finally {
+        setBusy(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authed, meta]);
+
   const upload = async () => {
     if (!file) {
       notify("Choose a CSV or Excel file first.", "error");
