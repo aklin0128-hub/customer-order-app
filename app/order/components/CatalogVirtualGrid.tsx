@@ -9,8 +9,21 @@ import { CatalogQtyCard } from "./CatalogQtyCard";
 
 const MIN_COL_WIDTH = 136;
 const GAP = 12;
+const MAX_CATALOG_WIDTH = 980;
 /** Approximate row height for cards (image + text + stepper); keeps scrolling smooth */
 const ROW_HEIGHT = 300;
+
+function columnCountForWidth(rawWidth: number) {
+  const width =
+    rawWidth > 0
+      ? rawWidth
+      : typeof window !== "undefined"
+        ? Math.min(MAX_CATALOG_WIDTH, window.innerWidth - 40)
+        : MAX_CATALOG_WIDTH;
+  const calculated = Math.max(1, Math.floor((width + GAP) / (MIN_COL_WIDTH + GAP)));
+  if (width >= 760) return Math.max(3, calculated);
+  return calculated;
+}
 
 export function CatalogVirtualGrid({
   items,
@@ -47,18 +60,29 @@ export function CatalogVirtualGrid({
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(el.offsetWidth));
-    ro.observe(el);
-    setWidth(el.offsetWidth);
-    return () => ro.disconnect();
-  }, []);
 
-  const columnCount = useMemo(() => {
-    if (width <= 0) return 2;
-    const calculated = Math.max(1, Math.floor((width + GAP) / (MIN_COL_WIDTH + GAP)));
-    if (width >= 760) return Math.max(3, calculated);
-    return calculated;
-  }, [width]);
+    const measure = () => {
+      const next = el.offsetWidth;
+      if (next > 0) setWidth(next);
+    };
+
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+
+    const raf = requestAnimationFrame(measure);
+    const timer = window.setTimeout(measure, 100);
+    window.addEventListener("resize", measure);
+
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(raf);
+      window.clearTimeout(timer);
+      window.removeEventListener("resize", measure);
+    };
+  }, [items.length]);
+
+  const columnCount = useMemo(() => columnCountForWidth(width), [width]);
 
   const rowCount = Math.max(1, Math.ceil(items.length / columnCount));
 
@@ -68,6 +92,10 @@ export function CatalogVirtualGrid({
     estimateSize: () => ROW_HEIGHT,
     overscan: 3,
   });
+
+  useEffect(() => {
+    rowVirtualizer.measure();
+  }, [columnCount, rowCount]);
 
   if (items.length === 0) return null;
 

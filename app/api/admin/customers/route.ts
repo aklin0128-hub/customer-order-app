@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import {
   getAllCustomers,
   normalizeAccountNo,
+  removeCustomerAccess,
   type CustomerRecord,
 } from "@/lib/customers";
 import { normalizeMarketRegion } from "@/lib/customerRegion";
-import { loadCustomers } from "@/lib/loadCustomers";
 import { bustAnalyticsCache } from "@/lib/analyticsCache";
-import { indexCustomerAccount, unindexCustomerAccount } from "@/lib/redisIndexes";
+import { indexCustomerAccount } from "@/lib/redisIndexes";
 import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
@@ -120,32 +120,12 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Missing account number." }, { status: 400 });
     }
 
-    const existingRedis = await redis.get<CustomerRecord>(`customer:${accountNo}`);
-
-    if (existingRedis) {
-      await redis.del(`customer:${accountNo}`);
-      await unindexCustomerAccount(accountNo);
-    } else {
-      const local = loadCustomers().find((c) => normalizeAccountNo(c.accountNo) === accountNo);
-      if (!local) {
-        return NextResponse.json({ error: "Customer not found." }, { status: 404 });
-      }
-
-      await redis.set(`customer:${accountNo}`, {
-        accountNo,
-        storeName: local.storeName,
-        password: local.password,
-        active: false,
-        note: "Disabled in admin (CSV account)",
-        updatedAt: new Date().toISOString(),
-        source: "redis",
-      });
-      await indexCustomerAccount(accountNo);
-    }
+    const result = await removeCustomerAccess(accountNo);
 
     return NextResponse.json({
       success: true,
-      deleted: accountNo,
+      accountNo: result.accountNo,
+      mode: result.mode,
     });
   } catch (error: any) {
     return NextResponse.json(

@@ -1,7 +1,8 @@
 import { resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
 import { normalizeMarketRegion, type MarketRegionId } from "@/lib/customerRegion";
 import { loadCustomers } from "@/lib/loadCustomers";
-import { indexCustomerAccount, listRedisCustomerAccounts } from "@/lib/redisIndexes";
+import { bustAnalyticsCache } from "@/lib/analyticsCache";
+import { indexCustomerAccount, listRedisCustomerAccounts, unindexCustomerAccount } from "@/lib/redisIndexes";
 import { redis } from "@/lib/redis";
 
 export type CustomerRecord = {
@@ -17,6 +18,8 @@ export type CustomerRecord = {
   updatedAt?: string;
   /** local = from data/customers.csv only; redis = stored or overridden in Redis */
   source: "local" | "redis";
+  /** True when account still has a row in data/customers.csv */
+  csvBacked?: boolean;
 };
 
 export function normalizeAccountNo(accountNo: string) {
@@ -106,6 +109,7 @@ export async function getAllCustomers(): Promise<CustomerRecord[]> {
       password: row.password || "",
       active: row.active,
       source: "local",
+      csvBacked: true,
     });
   }
 
@@ -128,8 +132,44 @@ export async function getAllCustomers(): Promise<CustomerRecord[]> {
       region: normalizeMarketRegion(item.region),
       updatedAt: String(item.updatedAt || "").trim() || undefined,
       source: "redis",
+      csvBacked: Boolean(local),
     });
   }
 
   return Array.from(map.values()).sort((a, b) => a.accountNo.localeCompare(b.accountNo));
+}
+
+/** Block login. CSV-backed accounts stay in the file; Redis-only accounts are removed. */
+export async function removeCustomerAccess(accountNo: string) {
+  const acct = normalizeAccountNo(accountNo);
+  if (!acct) throw new Error("Missing account number.");
+
+  const local = loadCustomers().find((c) => normalizeAccountNo(c.accountNo) === acct);
+  const existingRedis = await redis.get<Partial<CustomerRecord>>(`customer:${acct}`);
+
+  if (!local && !existingRedis) {
+    throw new Error("Customer not found.");
+  }
+
+  if (local) {
+    await redis.set(`customer:${acct}`, {
+      accountNo: acct,
+      storeName: String(existingRedis?.storeName || local.storeName || "").trim(),
+      password: String(existingRedis?.password ?? local.password ?? "").trim(),
+      active: false,
+      email: String(existingRedis?.email || "").trim() || undefined,
+      phone: String(existingRedis?.phone || "").trim() || undefined,
+      note: String(existingRedis?.note || "").trim() || "Disabled in admin (CSV account)",
+      updatedAt: new Date().toISOString(),
+      source: "redis",
+    });
+    await indexCustomerAccount(acct);
+    bustAnalyticsCache();
+    return { mode: "disabled" as const, accountNo: acct };
+  }
+
+  await redis.del(`customer:${acct}`);
+  await unindexCustomerAccount(acct);
+  bustAnalyticsCache();
+  return { mode: "deleted" as const, accountNo: acct };
 }

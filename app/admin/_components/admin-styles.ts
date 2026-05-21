@@ -337,6 +337,7 @@ export const listItem: CSSProperties = {
   padding: 12,
   textAlign: "left",
   cursor: "pointer",
+  outline: "none",
 };
 
 export const listItemSelected: CSSProperties = {

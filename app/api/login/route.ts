@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
 import { getCustomerByAccount, normalizeAccountNo } from "@/lib/customers";
-import { loadCustomers } from "@/lib/loadCustomers";
 
 export async function POST(req: Request) {
   try {
@@ -19,37 +18,18 @@ export async function POST(req: Request) {
 
     const customer = await getCustomerByAccount(accountNo);
 
-    if (customer) {
-      if (!customer.active) {
-        return NextResponse.json({ error: "Account inactive." }, { status: 401 });
-      }
-
-      if (String(customer.password || "").trim() !== password) {
-        return NextResponse.json(
-          { error: "Invalid account number or password." },
-          { status: 401 }
-        );
-      }
-
-      return NextResponse.json({
-        success: true,
-        customer: {
-          accountNo,
-          storeName: customer.storeName || "",
-          orderEmail: resolveCustomerOrderEmail(customer.email),
-          phone: customer.phone || "",
-        },
-      });
+    if (!customer) {
+      return NextResponse.json(
+        { error: "Invalid account number or password." },
+        { status: 401 }
+      );
     }
 
-    const csvCustomer = loadCustomers().find(
-      (c) =>
-        c.active &&
-        normalizeAccountNo(c.accountNo) === accountNo &&
-        String(c.password || "").trim() === password
-    );
+    if (!customer.active) {
+      return NextResponse.json({ error: "Account inactive." }, { status: 401 });
+    }
 
-    if (!csvCustomer) {
+    if (String(customer.password || "").trim() !== password) {
       return NextResponse.json(
         { error: "Invalid account number or password." },
         { status: 401 }
@@ -59,10 +39,10 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       customer: {
-        accountNo: csvCustomer.accountNo,
-        storeName: csvCustomer.storeName,
-        orderEmail: resolveCustomerOrderEmail(),
-        phone: "",
+        accountNo,
+        storeName: customer.storeName || "",
+        orderEmail: resolveCustomerOrderEmail(customer.email),
+        phone: customer.phone || "",
       },
     });
   } catch (error: any) {

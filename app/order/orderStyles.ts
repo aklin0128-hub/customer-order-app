@@ -578,8 +578,10 @@ export const submittedOrderListStyle: CSSProperties = {
 
 /** Scroll area for virtualized catalog grid */
 export const catalogVirtualScrollStyle: CSSProperties = {
+  width: "100%",
   height: "min(70vh, 900px)",
   overflow: "auto",
   marginTop: 4,
   WebkitOverflowScrolling: "touch",
+  boxSizing: "border-box",
 };

@@ -34,7 +34,7 @@ export const copy = {
     promoSoldOut: "Sold out",
     promoDateRange: "Valid",
     promoBuyXGetY: "Buy {buy} Get {free} FREE",
-    promoVolumeTiers: "VOLUME CASE PRICING",
+    promoVolumeTiers: "Volume Sale",
     promoBuyXGetYPackHint: "Deal = {pack} cases per set (buy + free)",
     promoBogoQtyWarning: "{sku}: Buy {buy} Get {free} free — qty {qty} is not a full set of {pack} cases.",
     promoTierQtyWarning: "{sku}: Qty {qty} is below the lowest volume tier ({min} {cs}).",

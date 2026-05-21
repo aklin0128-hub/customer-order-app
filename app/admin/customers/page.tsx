@@ -33,6 +33,7 @@ type Customer = {
   region?: string;
   updatedAt?: string;
   source?: "local" | "redis";
+  csvBacked?: boolean;
 };
 
 type StatusFilter = "all" | "active" | "inactive";
@@ -225,10 +226,20 @@ export default function AdminCustomersPage() {
     }
   };
 
+  const selectedCustomer = useMemo(
+    () => customers.find((c) => c.accountNo.toUpperCase() === accountNo.trim().toUpperCase()) || null,
+    [customers, accountNo]
+  );
+
   const deleteCustomer = async () => {
     const finalAccount = accountNo.trim().toUpperCase();
     if (!finalAccount) return;
-    if (!confirm(`Delete customer ${finalAccount}? They will no longer be able to log in.`)) return;
+
+    const csvBacked = selectedCustomer?.csvBacked ?? selectedCustomer?.source === "local";
+    const confirmText = csvBacked
+      ? `Disable login for ${finalAccount}? The row stays in data/customers.csv but the store cannot sign in.`
+      : `Delete customer ${finalAccount}? They will no longer be able to log in.`;
+    if (!confirm(confirmText)) return;
 
     setBusy(true);
     try {
@@ -238,7 +249,11 @@ export default function AdminCustomersPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to delete customer.");
-      notify(`Deleted ${finalAccount}`);
+      notify(
+        data.mode === "disabled"
+          ? `Disabled login for ${finalAccount} (still in customers.csv)`
+          : `Deleted ${finalAccount}`
+      );
       clearForm();
       await loadCustomers();
     } catch (err: any) {
@@ -268,7 +283,7 @@ export default function AdminCustomersPage() {
     <AdminShell
       active="customers"
       title="Customers"
-      subtitle="Shows accounts from data/customers.csv and Redis. Saving writes to Redis and overrides CSV for that account."
+      subtitle="CSV accounts cannot be removed from the file here — Delete disables login via Redis. Redis-only accounts are removed entirely."
       onLogout={logout}
       actions={
         <BtnSecondary onClick={() => { clearForm(); notify("New customer form ready."); }}>
@@ -492,6 +507,12 @@ export default function AdminCustomersPage() {
               </Field>
             </div>
 
+            {selectedCustomer?.csvBacked ? (
+              <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 10px", lineHeight: 1.45 }}>
+                This account is in customers.csv. Use Disable login to block sign-in without editing the CSV file.
+              </p>
+            ) : null}
+
             <BtnRow>
               <BtnPrimary onClick={saveCustomer} disabled={busy}>
                 {busy ? "Saving..." : "Save customer"}
@@ -505,7 +526,11 @@ export default function AdminCustomersPage() {
               <BtnSecondary onClick={loadCustomers} disabled={busy}>
                 Refresh
               </BtnSecondary>
-              {accountNo ? <BtnDanger onClick={deleteCustomer} disabled={busy}>Delete</BtnDanger> : null}
+              {accountNo ? (
+                <BtnDanger onClick={deleteCustomer} disabled={busy}>
+                  {selectedCustomer?.csvBacked || selectedCustomer?.source === "local" ? "Disable login" : "Delete"}
+                </BtnDanger>
+              ) : null}
             </BtnRow>
 
             <Toast message={msg} tone={msgTone} />

@@ -225,6 +225,24 @@
   align-items: start;
 }
 
+/* Customer / product list rows (ListItemButton) */
+.admin-list-item {
+  outline: none;
+}
+
+.admin-list-item:focus {
+  outline: none;
+}
+
+.admin-list-item:focus-visible {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+}
+
+.admin-list-item--selected:focus-visible {
+  box-shadow: 0 0 0 1px #2563eb, 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
 /* Scrollable promo/clearance/customer lists — children must not flex-shrink */
 .admin-split-list {
   max-height: calc(100vh - 220px);
