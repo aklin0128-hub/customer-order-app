@@ -47,7 +47,6 @@ import {
   cartSummaryTextStyle,
   categoryBarStyle,
   categoryButtonStyle,
-  compactCatalogToolsRowStyle,
   dangerButtonStyle,
   emptyStyle,
   filterBlockStyle,
@@ -68,10 +67,8 @@ import {
   smallButtonStyle,
   stepButtonStyle,
   stepInputStyle,
-  stickyCatalogToolsStyle,
   submitButtonStyle,
   toggleTextStyle,
-  wideInputStyle,
 } from "./orderStyles";
 import type { CartItem, CatalogItem, ClearanceItem, Lang, OrderHistoryItem, OrderMode, PromotionItem } from "./types";
 
@@ -1187,51 +1184,6 @@ export default function OrderPage() {
             </button>
           </div>
 
-          <div className="order-mode-tabs" role="tablist" aria-label="Order mode">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "promotion"}
-              onClick={() => changeMode("promotion")}
-              className="order-mode-tab"
-              style={promoModeButtonStyle(mode === "promotion")}
-            >
-              {t.promotionMode}
-              {promotionItems.length > 0 ? ` (${promotionItems.length})` : ""}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "clearance"}
-              onClick={() => changeMode("clearance")}
-              className="order-mode-tab"
-              style={clearanceModeButtonStyle(mode === "clearance")}
-            >
-              {t.clearanceMode}
-              {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "catalog"}
-              onClick={() => changeMode("catalog")}
-              className="order-mode-tab"
-              style={modeButtonStyle(mode === "catalog")}
-            >
-              {t.catalogMode}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "search"}
-              onClick={() => changeMode("search")}
-              className="order-mode-tab"
-              style={modeButtonStyle(mode === "search")}
-            >
-              {t.searchMode}
-            </button>
-          </div>
-
           <div className="order-customer-fold">
             <button type="button" className="order-customer-toggle" onClick={() => setShowCustomerInfo((prev) => !prev)}>
               <span>{t.customerInfo}</span>
@@ -1245,6 +1197,160 @@ export default function OrderPage() {
             ) : null}
           </div>
         </section>
+
+        <div className="order-sticky-bar">
+          <div className="order-sticky-bar-inner">
+            <div className="order-mode-tabs" role="tablist" aria-label="Order mode">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === "promotion"}
+                onClick={() => changeMode("promotion")}
+                className="order-mode-tab"
+                style={promoModeButtonStyle(mode === "promotion")}
+              >
+                {t.promotionMode}
+                {promotionItems.length > 0 ? ` (${promotionItems.length})` : ""}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === "clearance"}
+                onClick={() => changeMode("clearance")}
+                className="order-mode-tab"
+                style={clearanceModeButtonStyle(mode === "clearance")}
+              >
+                {t.clearanceMode}
+                {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === "catalog"}
+                onClick={() => changeMode("catalog")}
+                className="order-mode-tab"
+                style={modeButtonStyle(mode === "catalog")}
+              >
+                {t.catalogMode}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === "search"}
+                onClick={() => changeMode("search")}
+                className="order-mode-tab"
+                style={modeButtonStyle(mode === "search")}
+              >
+                {t.searchMode}
+              </button>
+            </div>
+
+            {mode === "catalog" ? (
+              <>
+                <div className="order-sticky-search-row">
+                  <input
+                    value={catalogSearch}
+                    onChange={(e) => setCatalogSearch(e.target.value)}
+                    placeholder={t.catalogSearch}
+                    className="order-sticky-search-input"
+                    aria-label={t.catalogSearch}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setCatalogFiltersOpen((prev) => !prev)}
+                    style={categoryButtonStyle(catalogFiltersOpen || activeCatalogFilterCount > 0)}
+                  >
+                    {catalogFiltersOpen ? t.hideFilters : t.showFilters}
+                    {activeCatalogFilterCount > 0 ? ` (${activeCatalogFilterCount})` : ""}
+                  </button>
+                </div>
+                {catalogFiltersOpen ? (
+                  <div className="order-sticky-filters">
+                    <div style={filterBlockStyle}>
+                      <div style={filterLabelStyle}>{t.category}</div>
+                      <div style={categoryBarStyle}>
+                        {categoryOptions.map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setCategoryFilter(cat)}
+                            style={categoryButtonStyle(categoryFilter === cat)}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {(brandSplit.topBrands.length > 0 || brandSplit.moreBrands.length > 0) ? (
+                      <div style={filterBlockStyle}>
+                        <div style={filterLabelStyle}>{t.brand}</div>
+                        <div style={categoryBarStyle}>
+                          <button
+                            type="button"
+                            onClick={() => setBrandFilter("ALL")}
+                            style={categoryButtonStyle(brandFilter === "ALL")}
+                          >
+                            {t.allBrands}
+                          </button>
+                          {brandSplit.topBrands.slice(0, 8).map((brand) => (
+                            <button
+                              key={brand}
+                              type="button"
+                              onClick={() => setBrandFilter(brand)}
+                              style={categoryButtonStyle(brandFilter === brand)}
+                            >
+                              {formatBrandLabel(brand)}
+                            </button>
+                          ))}
+                          {brandSplit.moreBrands.length > 0 ? (
+                            <select
+                              aria-label={t.moreBrandsPick}
+                              value={
+                                brandFilter !== "ALL" && brandSplit.moreBrands.includes(brandFilter)
+                                  ? brandFilter
+                                  : ""
+                              }
+                              onChange={(e) => setBrandFilter(e.target.value ? e.target.value : "ALL")}
+                              style={brandSelectStyle}
+                            >
+                              <option value="">{t.moreBrandsPick}</option>
+                              {brandSplit.moreBrands.map((brand) => (
+                                <option key={brand} value={brand}>
+                                  {formatBrandLabel(brand)}
+                                </option>
+                              ))}
+                            </select>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+
+            {mode === "search" ? (
+              <div className="order-sticky-search-row is-single">
+                <input
+                  ref={skuInputRef}
+                  value={skuInput}
+                  onChange={(e) => setSkuInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addItem();
+                    }
+                  }}
+                  placeholder={t.searchPlaceholder}
+                  autoCapitalize="characters"
+                  className="order-sticky-search-input"
+                  aria-label={t.skuItem}
+                />
+              </div>
+            ) : null}
+          </div>
+        </div>
 
         {(mode === "search" || mode === "catalog") && recentItems.length > 0 ? (
           <section style={cardStyle}>
@@ -1282,17 +1388,6 @@ export default function OrderPage() {
               <input type="checkbox" checked={showAvailableOnly} onChange={(e) => setShowAvailableOnly(e.target.checked)} />
               {t.availableOnly}
             </label>
-
-            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>{t.skuItem}</label>
-            <input
-              ref={skuInputRef}
-              value={skuInput}
-              onChange={(e) => setSkuInput(e.target.value.toUpperCase())}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addItem(); } }}
-              placeholder={t.searchPlaceholder}
-              autoCapitalize="characters"
-              style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "1px solid #d1d5db", fontSize: 16, fontWeight: 700, boxSizing: "border-box" }}
-            />
 
             {normalizedSkuInput && matchedItems.length === 0 ? (
               <div style={{ marginTop: 10, padding: 12, borderRadius: 10, background: "#f9fafb", color: "#6b7280", fontSize: 13, textAlign: "center" }}>
@@ -1570,89 +1665,6 @@ export default function OrderPage() {
                   {t.availableOnly}
                 </label>
               </div>
-            </div>
-
-            <div style={stickyCatalogToolsStyle}>
-              <div style={compactCatalogToolsRowStyle}>
-                <input
-                  value={catalogSearch}
-                  onChange={(e) => setCatalogSearch(e.target.value)}
-                  placeholder={t.catalogSearch}
-                  style={{ ...wideInputStyle, marginBottom: 0 }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setCatalogFiltersOpen((prev) => !prev)}
-                  style={categoryButtonStyle(catalogFiltersOpen || activeCatalogFilterCount > 0)}
-                >
-                  {catalogFiltersOpen ? t.hideFilters : t.showFilters}
-                  {activeCatalogFilterCount > 0 ? ` (${activeCatalogFilterCount})` : ""}
-                </button>
-              </div>
-
-              {catalogFiltersOpen ? (
-                <div style={{ marginTop: 8 }}>
-                  <div style={filterBlockStyle}>
-                    <div style={filterLabelStyle}>{t.category}</div>
-                    <div style={categoryBarStyle}>
-                      {categoryOptions.map((cat) => (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => setCategoryFilter(cat)}
-                          style={categoryButtonStyle(categoryFilter === cat)}
-                        >
-                          {cat}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {(brandSplit.topBrands.length > 0 || brandSplit.moreBrands.length > 0) ? (
-                    <div style={filterBlockStyle}>
-                      <div style={filterLabelStyle}>{t.brand}</div>
-                      <div style={categoryBarStyle}>
-                        <button
-                          type="button"
-                          onClick={() => setBrandFilter("ALL")}
-                          style={categoryButtonStyle(brandFilter === "ALL")}
-                        >
-                          {t.allBrands}
-                        </button>
-                        {brandSplit.topBrands.slice(0, 8).map((brand) => (
-                          <button
-                            key={brand}
-                            type="button"
-                            onClick={() => setBrandFilter(brand)}
-                            style={categoryButtonStyle(brandFilter === brand)}
-                          >
-                            {formatBrandLabel(brand)}
-                          </button>
-                        ))}
-                        {brandSplit.moreBrands.length > 0 ? (
-                          <select
-                            aria-label={t.moreBrandsPick}
-                            value={
-                              brandFilter !== "ALL" && brandSplit.moreBrands.includes(brandFilter)
-                                ? brandFilter
-                                : ""
-                            }
-                            onChange={(e) => setBrandFilter(e.target.value ? e.target.value : "ALL")}
-                            style={brandSelectStyle}
-                          >
-                            <option value="">{t.moreBrandsPick}</option>
-                            {brandSplit.moreBrands.map((brand) => (
-                              <option key={brand} value={brand}>
-                                {formatBrandLabel(brand)}
-                              </option>
-                            ))}
-                          </select>
-                        ) : null}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
             </div>
 
             <RecommendedStrip
