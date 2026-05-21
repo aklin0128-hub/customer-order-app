@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { countDraftItems, mergeOrderDrafts } from "@/lib/orderDraft";
+import { buildCatalogQtyMapFromDraft, countDraftItems, mergeOrderDrafts } from "@/lib/orderDraft";
 
 test("mergeOrderDrafts prefers newer empty local draft over older cloud cart", () => {
   const local = {
@@ -37,4 +37,13 @@ test("mergeOrderDrafts keeps cloud cart when local empty draft is older", () => 
 
   const merged = mergeOrderDrafts(local, cloud);
   assert.equal(countDraftItems(merged), 1);
+});
+
+test("buildCatalogQtyMapFromDraft uses cart lines when catalogQtyMap is empty", () => {
+  const map = buildCatalogQtyMapFromDraft({
+    cart: [{ sku: "0013d", qty: "2" }],
+    catalogQtyMap: {},
+  });
+  assert.deepEqual(map, { "0013D": "2" });
+  assert.equal(countDraftItems({ cart: [{ sku: "0013d", qty: "2" }], catalogQtyMap: {} }), 1);
 });

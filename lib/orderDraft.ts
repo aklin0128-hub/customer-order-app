@@ -9,11 +9,42 @@ export type OrderDraftPayload = {
   updatedAt?: string;
 };
 
+/** Single source of truth: merge legacy `cart[]` with `catalogQtyMap` for display and submit. */
+export function buildCatalogQtyMapFromDraft(
+  draft: OrderDraftPayload | null | undefined
+): Record<string, string> {
+  if (!draft) return {};
+
+  const map: Record<string, string> =
+    draft.catalogQtyMap && typeof draft.catalogQtyMap === "object"
+      ? { ...draft.catalogQtyMap }
+      : {};
+
+  for (const item of draft.cart || []) {
+    const sku = String(item?.sku || "")
+      .trim()
+      .toUpperCase();
+    const qty = String(item?.qty || "")
+      .trim()
+      .replace(/[^0-9]/g, "");
+    if (sku && Number(qty) > 0) map[sku] = qty;
+  }
+
+  for (const [sku, qty] of Object.entries(map)) {
+    if (!Number(String(qty || "").trim())) delete map[sku];
+  }
+
+  return map;
+}
+
+export function cartItemsFromQtyMap(map: Record<string, string>) {
+  return Object.entries(map)
+    .filter(([, qty]) => Number(qty) > 0)
+    .map(([sku, qty]) => ({ sku: sku.toUpperCase(), qty: String(qty) }));
+}
+
 export function countDraftItems(draft: OrderDraftPayload | null | undefined) {
-  if (!draft) return 0;
-  const cartLen = Array.isArray(draft.cart) ? draft.cart.length : 0;
-  const mapCount = Object.values(draft.catalogQtyMap || {}).filter((qty) => Number(qty) > 0).length;
-  return Math.max(cartLen, mapCount);
+  return Object.keys(buildCatalogQtyMapFromDraft(draft)).length;
 }
 
 export function draftTimestamp(draft: OrderDraftPayload | null | undefined) {

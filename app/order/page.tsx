@@ -35,6 +35,8 @@ import {
 } from "./catalogUtils";
 import { DEFAULT_ORDER_EMAIL, isValidOrderEmail, resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
 import {
+  buildCatalogQtyMapFromDraft,
+  cartItemsFromQtyMap,
   countDraftItems,
   mergeOrderDrafts,
   normalizeOrderDraft,
@@ -273,10 +275,9 @@ export default function OrderPage() {
     const applyDraft = (draft: OrderDraftPayload) => {
       setPhone(draft.phone || "");
       setNote(draft.note || "");
-      setCart(Array.isArray(draft.cart) ? draft.cart : []);
-      setCatalogQtyMap(
-        draft.catalogQtyMap && typeof draft.catalogQtyMap === "object" ? draft.catalogQtyMap : {}
-      );
+      const map = buildCatalogQtyMapFromDraft(draft);
+      setCatalogQtyMap(map);
+      setCart(cartItemsFromQtyMap(map));
     };
 
     const loadDrafts = async () => {
@@ -582,6 +583,10 @@ export default function OrderPage() {
   }, [catalogQtyMap]);
 
   const cartItemCount = catalogItemsForSubmit.length;
+
+  useEffect(() => {
+    if (cartItemCount === 0) setShowCart(false);
+  }, [cartItemCount]);
 
   const totalCases = useMemo(() => {
     return catalogItemsForSubmit.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
@@ -946,6 +951,7 @@ export default function OrderPage() {
 
     setCart([]);
     setCatalogQtyMap({});
+    setShowCart(false);
     setSkuInput("");
     setQtyInput("");
     setSelectedItem(null);
