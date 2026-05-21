@@ -1238,9 +1238,9 @@ export default function OrderPage() {
               <span style={{ color: "#2563eb", fontWeight: 900 }}>{showCustomerInfo ? t.hide : t.show}</span>
             </button>
             {showCustomerInfo ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
-                <OrderInput label={t.phone} value={phone} onChange={setPhone} placeholder="" />
-                <OrderInput label={t.note} value={note} onChange={setNote} placeholder="" />
+              <div className="order-customer-fields">
+                <OrderInput fullWidth label={t.phone} value={phone} onChange={setPhone} placeholder="" />
+                <OrderInput fullWidth label={t.note} value={note} onChange={setNote} placeholder="" />
               </div>
             ) : null}
           </div>

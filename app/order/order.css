@@ -115,6 +115,20 @@
   border-top: 1px solid #f3f4f6;
 }
 
+.order-customer-fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+@media (min-width: 520px) {
+  .order-customer-fields {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
 .order-customer-toggle {
   width: 100%;
   border: none;
