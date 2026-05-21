@@ -279,9 +279,6 @@ export default function OrderPage() {
 
     const applyDraft = (draft: OrderDraftPayload) => {
       setPhone(draft.phone || "");
-      if (draft.orderEmail) {
-        setOrderEmail(resolveCustomerOrderEmail(draft.orderEmail));
-      }
       setNote(draft.note || "");
       setCart(Array.isArray(draft.cart) ? draft.cart : []);
       setCatalogQtyMap(
@@ -290,7 +287,6 @@ export default function OrderPage() {
     };
 
     const loadDrafts = async () => {
-      let draftHasEmail = false;
       let localParsed: OrderDraftPayload | null = null;
       let cloudParsed: OrderDraftPayload | null = null;
 
@@ -298,7 +294,6 @@ export default function OrderPage() {
       if (localDraft) {
         try {
           localParsed = normalizeOrderDraft(accountNo, JSON.parse(localDraft));
-          if (localParsed.orderEmail) draftHasEmail = true;
         } catch {}
       }
 
@@ -307,32 +302,30 @@ export default function OrderPage() {
         const data = await res.json();
         if (res.ok && data?.draft) {
           cloudParsed = normalizeOrderDraft(accountNo, data.draft);
-          if (cloudParsed.orderEmail) draftHasEmail = true;
         }
       } catch {}
 
       const merged = mergeOrderDrafts(localParsed, cloudParsed);
       if (merged) {
         applyDraft(merged);
-        if (merged.orderEmail) draftHasEmail = true;
         localStorage.setItem(`draft_${accountNo}`, JSON.stringify(merged));
         if (countDraftItems(merged) > 0) {
           setSubmitMsg(t.loadedDraft);
         }
       }
 
-      if (!draftHasEmail) {
-        try {
-          const profileRes = await fetch(
-            `/api/customer-profile?accountNo=${encodeURIComponent(accountNo)}`,
-            { cache: "no-store" }
-          );
-          const profileData = await profileRes.json();
-          if (profileRes.ok && profileData?.orderEmail) {
-            setOrderEmail(resolveCustomerOrderEmail(profileData.orderEmail));
-          }
-        } catch {}
-      }
+      try {
+        const profileRes = await fetch(
+          `/api/customer-profile?accountNo=${encodeURIComponent(accountNo)}`,
+          { cache: "no-store" }
+        );
+        const profileData = await profileRes.json();
+        if (profileRes.ok && profileData?.orderEmail) {
+          const resolved = resolveCustomerOrderEmail(profileData.orderEmail);
+          setOrderEmail(resolved);
+          sessionStorage.setItem("customer_order_email", resolved);
+        }
+      } catch {}
 
       await loadRecentAndHistory(accountNo);
       setAutoLoaded(true);
@@ -386,7 +379,6 @@ export default function OrderPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             accountNo,
-            email: orderEmail.trim(),
             phone: phone.trim(),
           }),
         });
@@ -831,12 +823,6 @@ export default function OrderPage() {
   };
 
   useEffect(() => {
-    if (cartItemCount === 0 && recentItems.length > 0) {
-      setShowRecent(true);
-    }
-  }, [cartItemCount, recentItems.length]);
-
-  useEffect(() => {
     if (!normalizedSkuInput) {
       setSelectedItem(null);
       return;
@@ -1253,17 +1239,6 @@ export default function OrderPage() {
             </button>
             {showCustomerInfo ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
-                <OrderInput
-                  label={t.orderEmail}
-                  value={orderEmail}
-                  onChange={setOrderEmail}
-                  placeholder={DEFAULT_ORDER_EMAIL}
-                  type="email"
-                  inputMode="email"
-                />
-                <p style={{ margin: "-4px 0 0", fontSize: 11, color: "#6b7280", lineHeight: 1.4 }}>
-                  {t.orderEmailHint}
-                </p>
                 <OrderInput label={t.phone} value={phone} onChange={setPhone} placeholder="" />
                 <OrderInput label={t.note} value={note} onChange={setNote} placeholder="" />
               </div>

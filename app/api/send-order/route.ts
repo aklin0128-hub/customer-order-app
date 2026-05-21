@@ -7,12 +7,8 @@ import {
   incrementClearanceSold,
 } from "@/lib/clearance";
 import { incrementPromotionSold } from "@/lib/promotions";
-import {
-  emailForCustomerStorage,
-  isValidOrderEmail,
-  resolveCustomerOrderEmail,
-} from "@/lib/customerOrderEmail";
-import { upsertCustomerContact } from "@/lib/customers";
+import { isValidOrderEmail, resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
+import { getCustomerByAccount, upsertCustomerContact } from "@/lib/customers";
 import { mergeRecentItems } from "@/lib/recentItems";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -89,7 +85,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const orderEmail = resolveCustomerOrderEmail(orderEmailRaw);
+    const customer = await getCustomerByAccount(accountNo);
+    const orderEmail = resolveCustomerOrderEmail(customer?.email || orderEmailRaw);
     if (!isValidOrderEmail(orderEmail)) {
       return NextResponse.json({ error: "Invalid order email address." }, { status: 400 });
     }
@@ -119,10 +116,7 @@ export async function POST(req: Request) {
     };
 
     try {
-      await upsertCustomerContact(accountNo, {
-        email: emailForCustomerStorage(orderEmail),
-        phone,
-      });
+      await upsertCustomerContact(accountNo, { phone });
     } catch {
       // Order still sends if profile save fails (e.g. missing customer record).
     }

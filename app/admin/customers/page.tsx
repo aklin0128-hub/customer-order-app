@@ -18,6 +18,11 @@ import {
   Toast,
 } from "../_components/admin-utils";
 import { downloadCsv } from "../_components/admin-analytics-ui";
+import {
+  DEFAULT_ORDER_EMAIL,
+  getOrderEmailSelectOptions,
+  resolveCustomerOrderEmail,
+} from "@/lib/customerOrderEmail";
 import { MARKET_REGIONS, marketRegionLabel } from "@/lib/customerRegion";
 import { guessRegionFromText } from "@/lib/regionGuess";
 import { AdminListPager } from "../_components/AdminListPager";
@@ -63,6 +68,9 @@ export default function AdminCustomersPage() {
   const [bulkRegion, setBulkRegion] = useState("");
   const [regionFilter, setRegionFilter] = useState("all");
   const [urlAccountHandled, setUrlAccountHandled] = useState(false);
+  const orderEmailOptions = useMemo(() => getOrderEmailSelectOptions(), []);
+  const resolvedOrderEmail = resolveCustomerOrderEmail(email);
+  const orderEmailInList = orderEmailOptions.some((opt) => opt.value === resolvedOrderEmail);
 
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -524,8 +532,27 @@ export default function AdminCustomersPage() {
                   <option value="inactive">Inactive — blocked</option>
                 </select>
               </Field>
-              <Field label="Email (optional)">
-                <input value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
+              <Field
+                label="Order recipient email"
+                hint="Orders from this store are sent to this inbox. Default is the company inbox."
+              >
+                <select
+                  value={resolvedOrderEmail}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setEmail(next === DEFAULT_ORDER_EMAIL ? "" : next);
+                  }}
+                  style={inputStyle}
+                >
+                  {!orderEmailInList && email ? (
+                    <option value={resolvedOrderEmail}>{resolvedOrderEmail} (not in list — pick below)</option>
+                  ) : null}
+                  {orderEmailOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
               </Field>
               <Field label="Phone (optional)">
                 <input value={phone} onChange={(e) => setPhone(e.target.value)} style={inputStyle} />

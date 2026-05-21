@@ -6,6 +6,11 @@ import {
   removeCustomerAccess,
   type CustomerRecord,
 } from "@/lib/customers";
+import {
+  emailForCustomerStorage,
+  isAllowedOrderRecipientEmail,
+  isValidOrderEmail,
+} from "@/lib/customerOrderEmail";
 import { normalizeMarketRegion } from "@/lib/customerRegion";
 import { bustAnalyticsCache } from "@/lib/analyticsCache";
 import { indexCustomerAccount } from "@/lib/redisIndexes";
@@ -85,7 +90,24 @@ export async function POST(req: Request) {
     const storeName = String(body?.storeName || "").trim();
     const password = String(body?.password || "").trim();
     const active = body?.active !== false;
-    const email = String(body?.email || "").trim();
+    const emailRaw = String(body?.email || "").trim();
+    let email: string | undefined;
+    if (emailRaw) {
+      if (!isValidOrderEmail(emailRaw)) {
+        return NextResponse.json({ error: "Invalid order recipient email." }, { status: 400 });
+      }
+      if (!isAllowedOrderRecipientEmail(emailRaw)) {
+        return NextResponse.json(
+          { error: "Email is not in the allowed order recipient list." },
+          { status: 400 }
+        );
+      }
+      try {
+        email = emailForCustomerStorage(emailRaw);
+      } catch (err: any) {
+        return NextResponse.json({ error: err?.message || "Invalid email." }, { status: 400 });
+      }
+    }
     const phone = String(body?.phone || "").trim();
     const note = String(body?.note || "").trim();
     const regionRaw = body?.region;

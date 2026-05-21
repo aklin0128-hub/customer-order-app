@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  emailForCustomerStorage,
-  isValidOrderEmail,
-  resolveCustomerOrderEmail,
-} from "@/lib/customerOrderEmail";
+import { resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
 import { getCustomerByAccount, normalizeAccountNo, upsertCustomerContact } from "@/lib/customers";
 
 export const dynamic = "force-dynamic";
@@ -46,25 +42,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing account number." }, { status: 400 });
     }
 
-    const hasEmail = body?.email !== undefined && body?.email !== null;
     const hasPhone = body?.phone !== undefined && body?.phone !== null;
 
-    if (!hasEmail && !hasPhone) {
+    if (!hasPhone) {
       return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
     }
 
-    let storedEmail: string | undefined;
-    if (hasEmail) {
-      const raw = String(body.email || "").trim();
-      if (raw && !isValidOrderEmail(raw)) {
-        return NextResponse.json({ error: "Invalid email address." }, { status: 400 });
-      }
-      storedEmail = emailForCustomerStorage(raw);
-    }
-
     const updated = await upsertCustomerContact(accountNo, {
-      ...(hasEmail ? { email: storedEmail } : {}),
-      ...(hasPhone ? { phone: String(body.phone || "").trim() } : {}),
+      phone: String(body.phone || "").trim(),
     });
 
     return NextResponse.json({
