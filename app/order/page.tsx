@@ -48,17 +48,13 @@ import {
   categoryBarStyle,
   categoryButtonStyle,
   compactCatalogToolsRowStyle,
-  containerStyle,
   dangerButtonStyle,
   emptyStyle,
   filterBlockStyle,
   filterLabelStyle,
-  fixedSubmitBarStyle,
   langButtonStyle,
   limitedBadgeStyle,
-  mainStyle,
   modeButtonStyle,
-  modeTabsStyle,
   newItemsButtonStyle,
   primarySmallButtonStyle,
   productSmallButtonStyle,
@@ -133,7 +129,7 @@ export default function OrderPage() {
   const [showRecent, setShowRecent] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [expandedHistoryKey, setExpandedHistoryKey] = useState("");
-  const [showCart, setShowCart] = useState(true);
+  const [showCart, setShowCart] = useState(false);
   const [catalogShowSelectedOnly, setCatalogShowSelectedOnly] = useState(false);
   const [catalogShowNewOnly, setCatalogShowNewOnly] = useState(false);
   const [catalogShowRecommendedOnly, setCatalogShowRecommendedOnly] = useState(false);
@@ -601,6 +597,10 @@ export default function OrderPage() {
   }, [catalogQtyMap]);
 
   const cartItemCount = catalogItemsForSubmit.length;
+
+  useEffect(() => {
+    if (cartItemCount > 0) setShowCart(true);
+  }, [cartItemCount]);
 
   const totalCases = useMemo(() => {
     return catalogItemsForSubmit.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
@@ -1178,10 +1178,10 @@ export default function OrderPage() {
   if (!ready) return null;
 
   return (
-    <main style={mainStyle}>
-      <div style={containerStyle}>
-        <section style={cardStyle}>
-          <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 12 }}>
+    <main className="order-page">
+      <div className="order-container">
+        <section style={cardStyle} className="order-top-card">
+          <div className="order-lang-row">
             {(["en", "zh", "ko", "vi"] as Lang[]).map((item) => (
               <button key={item} type="button" onClick={() => changeLang(item)} style={langButtonStyle(lang === item)}>
                 {ORDER_LANG_LABELS[item]}
@@ -1189,20 +1189,25 @@ export default function OrderPage() {
             ))}
           </div>
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div className="order-top-head">
             <div>
-              <div style={{ fontSize: 21, fontWeight: 800, color: "#111827", lineHeight: 1.15 }}>{t.title}</div>
-              <div style={{ marginTop: 4, fontSize: 12, color: "#9ca3af" }}>{accountNo} | {storeName}</div>
+              <div className="order-top-title">{t.title}</div>
+              <div className="order-top-meta">
+                {accountNo} · {storeName}
+              </div>
             </div>
-            <button type="button" onClick={logout} style={smallButtonStyle}>{t.logout}</button>
+            <button type="button" onClick={logout} style={smallButtonStyle}>
+              {t.logout}
+            </button>
           </div>
-        </section>
 
-        <section style={cardStyle}>
-          <div style={modeTabsStyle}>
+          <div className="order-mode-tabs" role="tablist" aria-label="Order mode">
             <button
               type="button"
+              role="tab"
+              aria-selected={mode === "promotion"}
               onClick={() => changeMode("promotion")}
+              className="order-mode-tab"
               style={promoModeButtonStyle(mode === "promotion")}
             >
               {t.promotionMode}
@@ -1210,44 +1215,60 @@ export default function OrderPage() {
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={mode === "clearance"}
               onClick={() => changeMode("clearance")}
+              className="order-mode-tab"
               style={clearanceModeButtonStyle(mode === "clearance")}
             >
               {t.clearanceMode}
               {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
             </button>
-            <button type="button" onClick={() => changeMode("catalog")} style={modeButtonStyle(mode === "catalog")}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "catalog"}
+              onClick={() => changeMode("catalog")}
+              className="order-mode-tab"
+              style={modeButtonStyle(mode === "catalog")}
+            >
               {t.catalogMode}
             </button>
-            <button type="button" onClick={() => changeMode("search")} style={modeButtonStyle(mode === "search")}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "search"}
+              onClick={() => changeMode("search")}
+              className="order-mode-tab"
+              style={modeButtonStyle(mode === "search")}
+            >
               {t.searchMode}
             </button>
           </div>
-        </section>
 
-        <section style={cardStyle}>
-          <button type="button" onClick={() => setShowCustomerInfo((prev) => !prev)} style={sectionToggleStyle}>
-            <div style={sectionTitleStyle}>{t.customerInfo}</div>
-            <div style={toggleTextStyle}>{showCustomerInfo ? t.hide : t.show}</div>
-          </button>
-
-          {showCustomerInfo ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 12 }}>
-              <OrderInput
-                label={t.orderEmail}
-                value={orderEmail}
-                onChange={setOrderEmail}
-                placeholder={DEFAULT_ORDER_EMAIL}
-                type="email"
-                inputMode="email"
-              />
-              <p style={{ margin: "-4px 0 0", fontSize: 11, color: "#6b7280", lineHeight: 1.4, textAlign: "center" }}>
-                {t.orderEmailHint}
-              </p>
-              <OrderInput label={t.phone} value={phone} onChange={setPhone} placeholder="" />
-              <OrderInput label={t.note} value={note} onChange={setNote} placeholder="" />
-            </div>
-          ) : null}
+          <div className="order-customer-fold">
+            <button type="button" className="order-customer-toggle" onClick={() => setShowCustomerInfo((prev) => !prev)}>
+              <span>{t.customerInfo}</span>
+              <span style={{ color: "#2563eb", fontWeight: 900 }}>{showCustomerInfo ? t.hide : t.show}</span>
+            </button>
+            {showCustomerInfo ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
+                <OrderInput
+                  label={t.orderEmail}
+                  value={orderEmail}
+                  onChange={setOrderEmail}
+                  placeholder={DEFAULT_ORDER_EMAIL}
+                  type="email"
+                  inputMode="email"
+                />
+                <p style={{ margin: "-4px 0 0", fontSize: 11, color: "#6b7280", lineHeight: 1.4 }}>
+                  {t.orderEmailHint}
+                </p>
+                <OrderInput label={t.phone} value={phone} onChange={setPhone} placeholder="" />
+                <OrderInput label={t.note} value={note} onChange={setNote} placeholder="" />
+              </div>
+            ) : null}
+          </div>
         </section>
 
         {(mode === "search" || mode === "catalog") && recentItems.length > 0 ? (
@@ -1278,7 +1299,7 @@ export default function OrderPage() {
         ) : null}
 
         {mode === "search" ? (
-          <section style={cardStyle}>
+          <section style={cardStyle} className="order-shop-card">
             <div style={{ ...sectionTitleStyle, marginBottom: 8 }}>{t.addItems}</div>
             <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 10px", lineHeight: 1.45 }}>{t.searchModeHint}</p>
 
@@ -1396,7 +1417,10 @@ export default function OrderPage() {
             </div>
           </section>
         ) : mode === "promotion" ? (
-          <section style={{ ...cardStyle, border: "1px solid #5eead4", background: "linear-gradient(180deg, #f0fdfa 0%, #ffffff 40%)" }}>
+          <section
+            className="order-shop-card"
+            style={{ ...cardStyle, border: "1px solid #5eead4", background: "linear-gradient(180deg, #f0fdfa 0%, #ffffff 40%)" }}
+          >
             <div style={sectionTitleStyle}>{t.promotionMode}</div>
             <p style={{ fontSize: 13, color: "#115e59", margin: "4px 0 10px", lineHeight: 1.45 }}>{t.weeklyPicksHero}</p>
             {promotionItems.length > 0 ? (
@@ -1472,7 +1496,10 @@ export default function OrderPage() {
             )}
           </section>
         ) : mode === "clearance" ? (
-          <section style={{ ...cardStyle, border: "1px solid #fdba74", background: "linear-gradient(180deg, #fff7ed 0%, #ffffff 40%)" }}>
+          <section
+            className="order-shop-card"
+            style={{ ...cardStyle, border: "1px solid #fdba74", background: "linear-gradient(180deg, #fff7ed 0%, #ffffff 40%)" }}
+          >
             <div style={sectionTitleStyle}>{t.clearanceMode}</div>
             <p style={{ fontSize: 13, color: "#9a3412", margin: "4px 0 10px", lineHeight: 1.45 }}>{t.clearanceHint}</p>
             {clearanceItems.length > 0 ? (
@@ -1522,34 +1549,15 @@ export default function OrderPage() {
             )}
           </section>
         ) : (
-          <section style={cardStyle}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+          <section style={cardStyle} className="order-shop-card">
+            <div className="order-catalog-toolbar">
               <div>
                 <div style={sectionTitleStyle}>{t.allOrderable}</div>
                 <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
-                  {t.selected}: {cartItemCount} · {orderableCatalogItems.length} {t.catalogCount}
+                  {t.selected}: {cartItemCount} · {t.showing} {orderableCatalogItems.length} {t.catalogCount}
                 </div>
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    fontSize: 12,
-                    fontWeight: 800,
-                    color: "#374151",
-                    marginTop: 8,
-                    cursor: "pointer",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={showAvailableOnly}
-                    onChange={(e) => setShowAvailableOnly(e.target.checked)}
-                  />
-                  {t.availableOnly}
-                </label>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <div className="order-catalog-chips">
                 <button
                   type="button"
                   onClick={() => {
@@ -1570,13 +1578,21 @@ export default function OrderPage() {
                 >
                   {t.newItems} ({newItemCount})
                 </button>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: "#374151", cursor: "pointer" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: "#374151", cursor: "pointer", whiteSpace: "nowrap" }}>
                   <input
                     type="checkbox"
                     checked={catalogShowSelectedOnly}
                     onChange={(e) => setCatalogShowSelectedOnly(e.target.checked)}
                   />
                   {t.selectedOnly} ({cartItemCount})
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, color: "#374151", cursor: "pointer", whiteSpace: "nowrap" }}>
+                  <input
+                    type="checkbox"
+                    checked={showAvailableOnly}
+                    onChange={(e) => setShowAvailableOnly(e.target.checked)}
+                  />
+                  {t.availableOnly}
                 </label>
               </div>
             </div>
@@ -1664,10 +1680,6 @@ export default function OrderPage() {
               ) : null}
             </div>
 
-            <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 10px" }}>
-              {t.showing} {orderableCatalogItems.length} {t.catalogCount}
-            </p>
-
             <RecommendedStrip
               lang={lang}
               items={recommendedStripItems}
@@ -1696,133 +1708,8 @@ export default function OrderPage() {
           </section>
         )}
 
-        {clearanceUpsellLines.length > 0 ? (
-          <section style={cardStyle}>
-            <OrderShopNudge
-              lang={lang}
-              clearanceMissing={clearanceUpsellLines.length}
-              clearanceDealCount={clearanceItems.length}
-              onAddClearanceMissing={addAllMissingClearanceUpsell}
-              onViewClearance={() => changeMode("clearance")}
-            />
-          </section>
-        ) : null}
-
-        <OrderCartSection
-          lang={lang}
-          items={catalogItemsForSubmit}
-          clearanceSkus={clearanceSkuSet}
-          expanded={showCart}
-          onToggleExpanded={() => setShowCart((prev) => !prev)}
-          lineCount={cartItemCount}
-          totalCases={totalCases}
-          onAdjustQty={adjustQtyForSku}
-          onQtyInput={updateCatalogQty}
-          onRemove={removeSkuFromOrder}
-        />
-
-        <section style={cardStyle}>
-          <div style={{ display: "grid", gap: 8 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              <button type="button" onClick={downloadCsv} style={secondaryButtonStyle}>{t.downloadCsv}</button>
-              <button type="button" onClick={() => fileInputRef.current?.click()} style={secondaryButtonStyle}>{t.uploadCsv}</button>
-              <input ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleUploadCsv} />
-            </div>
-            <button type="button" onClick={clearOrder} style={dangerButtonStyle}>{t.clearOrder}</button>
-            
-            {submitMsg ? <div style={{ marginTop: 4, fontSize: 13, fontWeight: 700, color: submitMsg.toLowerCase().includes("failed") ? "#b91c1c" : "#15803d", textAlign: "center" }}>{submitMsg}</div> : null}
-          </div>
-        </section>
-
-        <div style={fixedSubmitBarStyle}>
-          <button
-            type="button"
-            onClick={scrollToCart}
-            style={{
-              ...cartSummaryTextStyle,
-              border: "none",
-              background: "transparent",
-              padding: 0,
-              textAlign: "left",
-              cursor: cartItemCount > 0 ? "pointer" : "default",
-              width: "100%",
-            }}
-          >
-            <div>
-              {t.cartSummary}: {cartItemCount} {t.lines} / {totalCases} {t.cases}
-              {cartItemCount > 0 ? (
-                <span style={{ marginLeft: 6, fontSize: 11, color: "#2563eb", fontWeight: 800 }}>· {t.jumpToCart}</span>
-              ) : null}
-            </div>
-            {weeklyInCartCount > 0 || clearanceInCartCount > 0 ? (
-              <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2, fontWeight: 700 }}>
-                {t.cartSalesSummary
-                  .replace("{weekly}", String(weeklyInCartCount))
-                  .replace("{clearance}", String(clearanceInCartCount))}
-              </div>
-            ) : null}
-          </button>
-          <div style={{ display: "grid", gridTemplateColumns: "0.9fr 1.1fr", gap: 8, marginTop: 8 }}>
-            <button type="button" onClick={openReview} disabled={submitting || cartItemCount === 0} style={secondaryButtonStyle}>
-              {t.reviewCart}
-            </button>
-            <button
-              type="button"
-              onClick={openReview}
-              disabled={submitting || cartItemCount === 0}
-              style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}
-            >
-              {submitting ? t.submitting : `${t.submitOrder}`}
-            </button>
-          </div>
-        </div>
-
-        <OrderReviewModal
-          open={showReview}
-          onClose={() => setShowReview(false)}
-          lang={lang}
-          items={catalogItemsForSubmit}
-          warnings={orderReviewWarnings}
-          clearanceUpsellLines={clearanceUpsellLines}
-          onAddUpsellCase={(sku) => adjustQtyForSku(sku, 1)}
-          onAddAllClearanceUpsell={addAllMissingClearanceUpsell}
-          clearanceSkus={clearanceSkuSet}
-          promoDealBySku={promoDealBySku}
-          newItemsReminder={
-            showNewItemsReviewReminder
-              ? {
-                  count: newItemCount,
-                  onView: () => {
-                    setShowReview(false);
-                    setCatalogShowNewOnly(true);
-                    changeMode("catalog");
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  },
-                }
-              : null
-          }
-          accountNo={accountNo}
-          storeName={storeName}
-          submitting={submitting}
-          onAdjustQty={adjustQtyForSku}
-          onQtyInput={updateCatalogQty}
-          onRemove={removeSkuFromOrder}
-          onSubmit={submitOrder}
-        />
-
-        <OrderSubmittedModal
-          open={Boolean(lastSubmittedRef)}
-          onDone={() => {
-            setLastSubmittedRef("");
-            setLastSubmittedItems([]);
-          }}
-          lang={lang}
-          orderRef={lastSubmittedRef}
-          items={lastSubmittedItems}
-        />
-
         {orderHistory.length > 0 ? (
-          <section style={cardStyle}>
+          <section style={cardStyle} className="order-secondary-section">
             <button type="button" onClick={() => setShowHistory((prev) => !prev)} style={sectionToggleStyle}>
               <div style={sectionTitleStyle}>{t.history}</div>
               <div style={toggleTextStyle}>{showHistory ? t.hide : t.show}</div>
@@ -1914,6 +1801,143 @@ export default function OrderPage() {
             ) : null}
           </section>
         ) : null}
+
+        <OrderCartSection
+          lang={lang}
+          items={catalogItemsForSubmit}
+          clearanceSkus={clearanceSkuSet}
+          expanded={showCart}
+          onToggleExpanded={() => setShowCart((prev) => !prev)}
+          lineCount={cartItemCount}
+          totalCases={totalCases}
+          onAdjustQty={adjustQtyForSku}
+          onQtyInput={updateCatalogQty}
+          onRemove={removeSkuFromOrder}
+          nudge={
+            clearanceUpsellLines.length > 0 ? (
+              <OrderShopNudge
+                lang={lang}
+                clearanceMissing={clearanceUpsellLines.length}
+                clearanceDealCount={clearanceItems.length}
+                onAddClearanceMissing={addAllMissingClearanceUpsell}
+                onViewClearance={() => changeMode("clearance")}
+              />
+            ) : null
+          }
+          tools={
+            <>
+              <div className="order-cart-tools-row">
+                <button type="button" onClick={downloadCsv} style={secondaryButtonStyle}>
+                  {t.downloadCsv}
+                </button>
+                <button type="button" onClick={() => fileInputRef.current?.click()} style={secondaryButtonStyle}>
+                  {t.uploadCsv}
+                </button>
+                <input ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleUploadCsv} />
+              </div>
+              <button type="button" onClick={clearOrder} style={dangerButtonStyle}>
+                {t.clearOrder}
+              </button>
+            </>
+          }
+        />
+
+        <div className="order-fixed-bar">
+          <div className="order-fixed-bar-inner">
+            {submitMsg ? (
+              <div
+                className={`order-fixed-msg${submitMsg.toLowerCase().includes("failed") ? " is-error" : " is-ok"}`}
+              >
+                {submitMsg}
+              </div>
+            ) : null}
+            <button
+              type="button"
+              onClick={scrollToCart}
+              style={{
+                ...cartSummaryTextStyle,
+                border: "none",
+                background: "transparent",
+                padding: 0,
+                textAlign: "left",
+                cursor: cartItemCount > 0 ? "pointer" : "default",
+                width: "100%",
+              }}
+            >
+              <div>
+                {t.cartSummary}: {cartItemCount} {t.lines} / {totalCases} {t.cases}
+                {cartItemCount > 0 ? (
+                  <span style={{ marginLeft: 6, fontSize: 11, color: "#2563eb", fontWeight: 800 }}>· {t.jumpToCart}</span>
+                ) : null}
+              </div>
+              {weeklyInCartCount > 0 || clearanceInCartCount > 0 ? (
+                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2, fontWeight: 700 }}>
+                  {t.cartSalesSummary
+                    .replace("{weekly}", String(weeklyInCartCount))
+                    .replace("{clearance}", String(clearanceInCartCount))}
+                </div>
+              ) : null}
+            </button>
+            <div className="order-fixed-actions">
+              <button type="button" onClick={openReview} disabled={submitting || cartItemCount === 0} style={secondaryButtonStyle}>
+                {t.reviewCart}
+              </button>
+              <button
+                type="button"
+                onClick={openReview}
+                disabled={submitting || cartItemCount === 0}
+                style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}
+              >
+                {submitting ? t.submitting : t.submitOrder}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <OrderReviewModal
+          open={showReview}
+          onClose={() => setShowReview(false)}
+          lang={lang}
+          items={catalogItemsForSubmit}
+          warnings={orderReviewWarnings}
+          clearanceUpsellLines={clearanceUpsellLines}
+          onAddUpsellCase={(sku) => adjustQtyForSku(sku, 1)}
+          onAddAllClearanceUpsell={addAllMissingClearanceUpsell}
+          clearanceSkus={clearanceSkuSet}
+          promoDealBySku={promoDealBySku}
+          newItemsReminder={
+            showNewItemsReviewReminder
+              ? {
+                  count: newItemCount,
+                  onView: () => {
+                    setShowReview(false);
+                    setCatalogShowNewOnly(true);
+                    changeMode("catalog");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  },
+                }
+              : null
+          }
+          accountNo={accountNo}
+          storeName={storeName}
+          submitting={submitting}
+          onAdjustQty={adjustQtyForSku}
+          onQtyInput={updateCatalogQty}
+          onRemove={removeSkuFromOrder}
+          onSubmit={submitOrder}
+        />
+
+        <OrderSubmittedModal
+          open={Boolean(lastSubmittedRef)}
+          onDone={() => {
+            setLastSubmittedRef("");
+            setLastSubmittedItems([]);
+          }}
+          lang={lang}
+          orderRef={lastSubmittedRef}
+          items={lastSubmittedItems}
+        />
+
       </div>
     </main>
   );

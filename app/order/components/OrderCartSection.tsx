@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import { getCatalogItemBySku } from "../catalogUtils";
 import { copy } from "../orderCopy";
@@ -33,6 +33,8 @@ export function OrderCartSection({
   onQtyInput,
   onRemove,
   clearanceSkus,
+  nudge,
+  tools,
 }: {
   lang: Lang;
   items: CartItem[];
@@ -44,6 +46,8 @@ export function OrderCartSection({
   onAdjustQty: (sku: string, delta: number) => void;
   onQtyInput: (sku: string, value: string) => void;
   onRemove: (sku: string) => void;
+  nudge?: ReactNode;
+  tools?: ReactNode;
 }) {
   const t = copy[lang];
 
@@ -59,13 +63,19 @@ export function OrderCartSection({
   };
 
   return (
-    <section id="order-cart" style={{ ...cardStyle, overflow: "visible" }}>
+    <section
+      id="order-cart"
+      className={`order-cart-card${lineCount === 0 ? " is-empty" : ""}`}
+      style={{ ...cardStyle, overflow: "visible" }}
+    >
       <button type="button" onClick={onToggleExpanded} style={sectionToggleStyle}>
         <div style={sectionTitleStyle}>
           {t.orderCart} ({lineCount}) · {totalCases} {t.cases}
         </div>
         <div style={toggleTextStyle}>{expanded ? t.hideCart : t.showCart}</div>
       </button>
+
+      {expanded && nudge ? <div style={{ marginTop: 10 }}>{nudge}</div> : null}
 
       {expanded ? (
         items.length === 0 ? (
@@ -117,6 +127,8 @@ export function OrderCartSection({
           </div>
         )
       ) : null}
+
+      {expanded && tools ? <div className="order-cart-tools">{tools}</div> : null}
     </section>
   );
 }
