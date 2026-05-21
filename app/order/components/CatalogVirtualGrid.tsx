@@ -7,11 +7,11 @@ import { catalogVirtualScrollStyle } from "../orderStyles";
 import type { CatalogItem } from "../types";
 import { CatalogQtyCard } from "./CatalogQtyCard";
 
-const MIN_COL_WIDTH = 136;
-const GAP = 12;
+const MIN_COL_WIDTH = 200;
+const GAP = 14;
 const MAX_CATALOG_WIDTH = 1280;
 /** Approximate row height for cards (image + text + stepper); keeps scrolling smooth */
-const ROW_HEIGHT = 300;
+const ROW_HEIGHT = 360;
 
 function columnCountForWidth(rawWidth: number) {
   const width =
@@ -21,9 +21,10 @@ function columnCountForWidth(rawWidth: number) {
         ? Math.min(MAX_CATALOG_WIDTH, window.innerWidth - 40)
         : MAX_CATALOG_WIDTH;
   const calculated = Math.max(1, Math.floor((width + GAP) / (MIN_COL_WIDTH + GAP)));
-  if (width >= 1100) return Math.max(5, calculated);
-  if (width >= 760) return Math.max(3, calculated);
-  return calculated;
+  if (width < 480) return Math.min(2, calculated);
+  if (width >= 1200) return Math.min(4, calculated);
+  if (width >= 768) return Math.min(3, calculated);
+  return Math.min(3, calculated);
 }
 
 export function CatalogVirtualGrid({

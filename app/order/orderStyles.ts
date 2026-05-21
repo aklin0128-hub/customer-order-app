@@ -216,26 +216,29 @@ export const wideInputStyle: CSSProperties = {
 };
 export const promoGridStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-  gap: 12,
+  gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+  gap: 14,
 };
 export const catalogCardStyle: CSSProperties = {
   borderRadius: 16,
-  padding: 10,
+  padding: 12,
   display: "flex",
   flexDirection: "column",
-  gap: 8,
+  gap: 6,
   overflow: "visible",
   position: "relative",
   minWidth: 0,
   boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
 };
 export const catalogNameStyle: CSSProperties = {
-  fontSize: 11,
+  fontSize: 12,
   color: "#4b5563",
   lineHeight: 1.35,
-  maxHeight: 40,
+  maxHeight: 52,
   overflow: "hidden",
+  display: "-webkit-box",
+  WebkitBoxOrient: "vertical",
+  WebkitLineClamp: 3,
 };
 export const promoTagStyle: CSSProperties = {
   alignSelf: "flex-start",
@@ -286,29 +289,30 @@ export const inCartTagStyle: CSSProperties = {
 };
 export const catalogStepperStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "36px 1fr 36px",
-  gap: 6,
+  gridTemplateColumns: "42px 1fr 42px",
+  gap: 8,
   alignItems: "center",
   marginTop: "auto",
+  paddingTop: 4,
 };
 export const catalogStepBtnStyle: CSSProperties = {
-  width: 40,
-  height: 40,
+  width: 42,
+  height: 42,
   borderRadius: 10,
   border: "1px solid #d1d5db",
   background: "#f9fafb",
-  fontSize: 20,
+  fontSize: 22,
   fontWeight: 900,
   cursor: "pointer",
   lineHeight: 1,
 };
 export const catalogStepInputStyle: CSSProperties = {
   width: "100%",
-  height: 36,
+  height: 42,
   borderRadius: 10,
   border: "1px solid #d1d5db",
   textAlign: "center",
-  fontSize: 15,
+  fontSize: 16,
   fontWeight: 900,
   outline: "none",
   boxSizing: "border-box",

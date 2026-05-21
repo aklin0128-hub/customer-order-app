@@ -112,14 +112,14 @@ export function CatalogQtyCard({
         </div>
       ) : null}
 
-      <div style={{ textAlign: "center", paddingTop: promoNote || highlight ? 4 : 0 }}>
-        <ProductImage sku={item.sku} alt={item.name || item.sku} size={76} imageUrl={item.imageUrl} />
+      <div className="catalog-card-image-wrap" style={{ paddingTop: promoNote || highlight ? 4 : 0 }}>
+        <ProductImage sku={item.sku} alt={item.name || item.sku} size={108} imageUrl={item.imageUrl} />
       </div>
 
-      <div style={{ fontSize: 12, fontWeight: 900, color: "#111827", lineHeight: 1.2 }}>{item.sku}</div>
-      <div style={{ fontSize: 11, fontWeight: 800, color: "#374151" }}>{item.brand || "-"}</div>
+      <div style={{ fontSize: 13, fontWeight: 900, color: "#111827", lineHeight: 1.2 }}>{item.sku}</div>
+      <div style={{ fontSize: 12, fontWeight: 800, color: "#374151" }}>{item.brand || "-"}</div>
       <div style={catalogNameStyle}>{item.name || "-"}</div>
-      {item.size ? <div style={{ fontSize: 10, color: "#6b7280" }}>{item.size}</div> : null}
+      {item.size ? <div style={{ fontSize: 11, color: "#6b7280" }}>{item.size}</div> : null}
       {!isNormalItem(item) && getDisplayStatus(item.status) ? (
         <span
           style={{

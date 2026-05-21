@@ -16,14 +16,14 @@ const stripStyle: CSSProperties = {
 };
 
 const cardStyle: CSSProperties = {
-  flex: "0 0 148px",
+  flex: "0 0 176px",
   border: "1px solid #bfdbfe",
   background: "#eff6ff",
   borderRadius: 12,
   padding: 10,
   display: "flex",
   flexDirection: "column",
-  gap: 6,
+  gap: 8,
 };
 
 export function RecommendedStrip({
@@ -50,13 +50,13 @@ export function RecommendedStrip({
           const catalogItem = getCatalogItemBySku(item.sku) || item;
           return (
             <div key={item.sku} style={cardStyle}>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <ProductImage sku={item.sku} alt={item.sku} size={44} imageUrl={catalogItem.imageUrl} />
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 12, fontWeight: 900 }}>{item.sku}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", textAlign: "center" }}>
+                <ProductImage sku={item.sku} alt={item.sku} size={72} imageUrl={catalogItem.imageUrl} />
+                <div style={{ minWidth: 0, width: "100%" }}>
+                  <div style={{ fontSize: 13, fontWeight: 900 }}>{item.sku}</div>
                   <div
                     style={{
-                      fontSize: 10,
+                      fontSize: 11,
                       color: "#4b5563",
                       lineHeight: 1.3,
                       overflow: "hidden",

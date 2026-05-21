@@ -747,7 +747,13 @@ export default function OrderPage() {
 
   const scrollToCart = () => {
     setShowCart(true);
-    document.getElementById("order-cart")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    requestAnimationFrame(() => {
+      document.getElementById("order-cart")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  };
+
+  const toggleCartPanel = () => {
+    setShowCart((prev) => !prev);
   };
 
   const roundUpBogoQty = (sku: string, pack: number) => {
@@ -1789,103 +1795,114 @@ export default function OrderPage() {
             ) : null}
           </section>
         ) : null}
+      </div>
 
-        <OrderCartSection
-          lang={lang}
-          items={catalogItemsForSubmit}
-          clearanceSkus={clearanceSkuSet}
-          expanded={showCart}
-          onToggleExpanded={() => setShowCart((prev) => !prev)}
-          lineCount={cartItemCount}
-          totalCases={totalCases}
-          onAdjustQty={adjustQtyForSku}
-          onQtyInput={updateCatalogQty}
-          onRemove={removeSkuFromOrder}
-          nudge={
-            clearanceUpsellLines.length > 0 ? (
-              <details className="order-cart-nudge-fold" open={cartItemCount > 0}>
-                <summary>
-                  {t.clearanceMode} ({clearanceItems.length})
-                </summary>
-                <OrderShopNudge
-                  lang={lang}
-                  clearanceMissing={clearanceUpsellLines.length}
-                  clearanceDealCount={clearanceItems.length}
-                  onAddClearanceMissing={addAllMissingClearanceUpsell}
-                  onViewClearance={() => changeMode("clearance")}
-                />
-              </details>
-            ) : null
-          }
-          tools={
-            <div className="order-cart-tools">
-              <div className="order-cart-tools-row">
-                <button type="button" onClick={downloadCsv} className="order-cart-tool-btn" style={secondaryButtonStyle}>
-                  {t.downloadCsv}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="order-cart-tool-btn"
-                  style={secondaryButtonStyle}
-                >
-                  {t.uploadCsv}
-                </button>
-                <button type="button" onClick={clearOrder} className="order-cart-clear-btn">
-                  {t.clearOrder}
-                </button>
-                <input ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleUploadCsv} />
-              </div>
-            </div>
-          }
-        />
-
-        <div className="order-fixed-bar">
-          <div className="order-fixed-bar-inner">
-            {submitMsg ? (
-              <div
-                className={`order-fixed-msg${submitMsg.toLowerCase().includes("failed") ? " is-error" : " is-ok"}`}
-              >
-                {submitMsg}
-              </div>
-            ) : null}
-            <div className={`order-fixed-bar-layout${cartItemCount > 0 || submitting ? " has-actions" : ""}`}>
-              <button
-                type="button"
-                onClick={scrollToCart}
-                className="order-fixed-summary-btn"
-                style={{ cursor: cartItemCount > 0 ? "pointer" : "default" }}
-              >
-                <span>
-                  {t.cartSummary}: {cartItemCount} {t.lines} / {totalCases} {t.cases}
-                  {cartItemCount > 0 ? (
-                    <span style={{ marginLeft: 6, fontSize: 11, color: "#2563eb", fontWeight: 800 }}>· {t.jumpToCart}</span>
-                  ) : null}
-                </span>
-                {weeklyInCartCount > 0 || clearanceInCartCount > 0 ? (
-                  <span style={{ display: "block", fontSize: 11, color: "#6b7280", marginTop: 2, fontWeight: 700 }}>
-                    {t.cartSalesSummary
-                      .replace("{weekly}", String(weeklyInCartCount))
-                      .replace("{clearance}", String(clearanceInCartCount))}
-                  </span>
-                ) : null}
-              </button>
-              <div className="order-fixed-actions">
-                <button type="button" onClick={openReview} disabled={submitting || cartItemCount === 0} style={secondaryButtonStyle}>
-                  {t.reviewCart}
-                </button>
-                <button
-                  type="button"
-                  onClick={openReview}
-                  disabled={submitting || cartItemCount === 0}
-                  style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}
-                >
-                  {submitting ? t.submitting : t.submitOrder}
-                </button>
-              </div>
-            </div>
+      {showCart ? (
+        <div className="order-cart-sheet" aria-label={t.orderCart}>
+          <div className="order-cart-sheet-inner">
+            <OrderCartSection
+              lang={lang}
+              items={catalogItemsForSubmit}
+              clearanceSkus={clearanceSkuSet}
+              expanded
+              onToggleExpanded={toggleCartPanel}
+              lineCount={cartItemCount}
+              totalCases={totalCases}
+              onAdjustQty={adjustQtyForSku}
+              onQtyInput={updateCatalogQty}
+              onRemove={removeSkuFromOrder}
+              nudge={
+                clearanceUpsellLines.length > 0 ? (
+                  <details className="order-cart-nudge-fold" open={cartItemCount > 0}>
+                    <summary>
+                      {t.clearanceMode} ({clearanceItems.length})
+                    </summary>
+                    <OrderShopNudge
+                      lang={lang}
+                      clearanceMissing={clearanceUpsellLines.length}
+                      clearanceDealCount={clearanceItems.length}
+                      onAddClearanceMissing={addAllMissingClearanceUpsell}
+                      onViewClearance={() => changeMode("clearance")}
+                    />
+                  </details>
+                ) : null
+              }
+              tools={
+                <div className="order-cart-tools">
+                  <div className="order-cart-tools-row">
+                    <button type="button" onClick={downloadCsv} className="order-cart-tool-btn" style={secondaryButtonStyle}>
+                      {t.downloadCsv}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="order-cart-tool-btn"
+                      style={secondaryButtonStyle}
+                    >
+                      {t.uploadCsv}
+                    </button>
+                    <button type="button" onClick={clearOrder} className="order-cart-clear-btn">
+                      {t.clearOrder}
+                    </button>
+                    <input ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleUploadCsv} />
+                  </div>
+                </div>
+              }
+            />
           </div>
         </div>
+      ) : null}
+
+      <div className="order-fixed-bar">
+        <div className="order-fixed-bar-inner">
+          {submitMsg ? (
+            <div className={`order-fixed-msg${submitMsg.toLowerCase().includes("failed") ? " is-error" : " is-ok"}`}>
+              {submitMsg}
+            </div>
+          ) : null}
+          <div className="order-fixed-bar-layout">
+            <button
+              type="button"
+              onClick={() => (showCart ? scrollToCart() : setShowCart(true))}
+              className="order-fixed-summary-btn"
+            >
+              <span>
+                {t.cartSummary}: {cartItemCount} {t.lines} / {totalCases} {t.cases}
+                {!showCart ? (
+                  <span className="order-fixed-inline-link">· {t.showCart}</span>
+                ) : cartItemCount > 0 ? (
+                  <span className="order-fixed-inline-link">· {t.jumpToCart}</span>
+                ) : null}
+              </span>
+              {weeklyInCartCount > 0 || clearanceInCartCount > 0 ? (
+                <span style={{ display: "block", fontSize: 10, color: "#6b7280", marginTop: 1, fontWeight: 700 }}>
+                  {t.cartSalesSummary
+                    .replace("{weekly}", String(weeklyInCartCount))
+                    .replace("{clearance}", String(clearanceInCartCount))}
+                </span>
+              ) : null}
+            </button>
+            <button
+              type="button"
+              onClick={openReview}
+              disabled={submitting || cartItemCount === 0}
+              className="order-fixed-btn"
+              style={secondaryButtonStyle}
+            >
+              {t.reviewCart}
+            </button>
+            <button
+              type="button"
+              onClick={openReview}
+              disabled={submitting || cartItemCount === 0}
+              className="order-fixed-btn is-submit"
+              style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}
+            >
+              {submitting ? t.submitting : t.submitOrder}
+            </button>
+          </div>
+        </div>
+      </div>
 
         <OrderReviewModal
           open={showReview}
@@ -1930,8 +1947,6 @@ export default function OrderPage() {
           orderRef={lastSubmittedRef}
           items={lastSubmittedItems}
         />
-
-      </div>
     </main>
   );
 }
