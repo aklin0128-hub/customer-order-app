@@ -9,7 +9,7 @@ import { CatalogQtyCard } from "./CatalogQtyCard";
 
 const MIN_COL_WIDTH = 136;
 const GAP = 12;
-const MAX_CATALOG_WIDTH = 980;
+const MAX_CATALOG_WIDTH = 1280;
 /** Approximate row height for cards (image + text + stepper); keeps scrolling smooth */
 const ROW_HEIGHT = 300;
 
@@ -21,6 +21,7 @@ function columnCountForWidth(rawWidth: number) {
         ? Math.min(MAX_CATALOG_WIDTH, window.innerWidth - 40)
         : MAX_CATALOG_WIDTH;
   const calculated = Math.max(1, Math.floor((width + GAP) / (MIN_COL_WIDTH + GAP)));
+  if (width >= 1100) return Math.max(5, calculated);
   if (width >= 760) return Math.max(3, calculated);
   return calculated;
 }
