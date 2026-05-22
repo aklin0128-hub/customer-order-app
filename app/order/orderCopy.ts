@@ -89,6 +89,8 @@ export const copy = {
     submitOrder: "Confirm order",
     submitting: "Placing order...",
     unavailable: "This item is currently unavailable",
+    orderNotAvailable:
+      "{sku} cannot be ordered (status: {status}). Only NORMAL, NORMAL NOBR, and TBD items can be added.",
     enterSku: "Please enter SKU.",
     duplicate: "is already in cart.\n\nDo you want to add it again?",
     clearConfirm: "Please confirm clear current order.",
@@ -242,6 +244,7 @@ export const copy = {
     submitOrder: "确认订货",
     submitting: "提交中...",
     unavailable: "此商品目前无法下单",
+    orderNotAvailable: "{sku} 无法下单（状态：{status}）。仅 NORMAL、NORMAL NOBR、TBD 可加入订单。",
     enterSku: "请输入 SKU。",
     duplicate: "已经在购物车里。\n\n是否还要再添加一次？",
     clearConfirm: "请确认是否清空当前订单？",
@@ -395,6 +398,8 @@ export const copy = {
     submitOrder: "주문 확정",
     submitting: "주문 중...",
     unavailable: "현재 주문할 수 없는 상품입니다",
+    orderNotAvailable:
+      "{sku} 주문 불가(상태: {status}). NORMAL, NORMAL NOBR, TBD만 주문할 수 있습니다.",
     enterSku: "SKU를 입력해 주세요.",
     duplicate: "이미 카트에 있습니다.\n\n다시 추가하시겠습니까?",
     clearConfirm: "현재 주문을 모두 삭제하시겠습니까?",
@@ -548,6 +553,8 @@ export const copy = {
     submitOrder: "Xác nhận đơn",
     submitting: "Đang đặt…",
     unavailable: "Sản phẩm hiện không thể đặt",
+    orderNotAvailable:
+      "{sku} không thể đặt (trạng thái: {status}). Chỉ NORMAL, NORMAL NOBR, TBD mới đặt được.",
     enterSku: "Vui lòng nhập SKU.",
     duplicate: "đã có trong giỏ.\n\nBạn có muốn thêm lại không?",
     clearConfirm: "Xác nhận xóa toàn bộ đơn hiện tại?",

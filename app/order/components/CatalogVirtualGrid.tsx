@@ -38,6 +38,8 @@ export function CatalogVirtualGrid({
   newBadgeLabel,
   editLabel,
   showAdminEdit,
+  canOrderItem,
+  orderBlockedMessage,
   onAdjust,
   onUpdateQty,
 }: {
@@ -52,6 +54,8 @@ export function CatalogVirtualGrid({
   newBadgeLabel?: string;
   editLabel?: string;
   showAdminEdit?: boolean;
+  canOrderItem?: (item: CatalogItem) => boolean;
+  orderBlockedMessage?: (item: CatalogItem) => string;
   onAdjust: (sku: string, delta: number) => void;
   onUpdateQty: (sku: string, value: string) => void;
 }) {
@@ -136,6 +140,7 @@ export function CatalogVirtualGrid({
                     : isNew
                       ? newBadgeLabel
                       : undefined;
+                const canOrder = canOrderItem?.(item) ?? true;
                 return (
                   <CatalogQtyCard
                     key={item.sku}
@@ -147,6 +152,8 @@ export function CatalogVirtualGrid({
                     highlight={Boolean(isWeekly || isClearance)}
                     editLabel={editLabel}
                     showAdminEdit={showAdminEdit}
+                    disabled={!canOrder}
+                    unavailableNote={!canOrder ? orderBlockedMessage?.(item) : undefined}
                     onAdjust={onAdjust}
                     onUpdateQty={onUpdateQty}
                   />

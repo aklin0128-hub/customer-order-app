@@ -30,8 +30,9 @@ import {
   getCatalogItemBySku,
   getDisplayStatus,
   getStatusBadgeStyle,
+  formatOrderNotAvailableMessage,
   isNewItem,
-  isNormalItem,
+  isOrderableItem,
 } from "./catalogUtils";
 import { DEFAULT_ORDER_EMAIL, isValidOrderEmail, resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
 import {
@@ -166,9 +167,7 @@ export default function OrderPage() {
         const res = await fetch("/api/promotions");
         const data = await res.json();
         if (res.ok && Array.isArray(data.products)) {
-          setPromotionItems(
-            data.products.filter((item: PromotionItem) => isNormalItem(item))
-          );
+          setPromotionItems(data.products);
         }
       } catch {
       } finally {
@@ -189,9 +188,7 @@ export default function OrderPage() {
         const res = await fetch("/api/clearance");
         const data = await res.json();
         if (res.ok && Array.isArray(data.products)) {
-          setClearanceItems(
-            data.products.filter((item: ClearanceItem) => isNormalItem(item))
-          );
+          setClearanceItems(data.products);
         }
       } catch {
         clearanceFetchedRef.current = false;
@@ -455,10 +452,10 @@ export default function OrderPage() {
     return catalog
       .map((item) => ({ item, score: scoreItem(item) }))
       .filter((x) => x.score >= 0)
-      .filter((x) => (showAvailableOnly ? isNormalItem(x.item) : true))
+      .filter((x) => (showAvailableOnly ? isOrderableItem(x.item) : true))
       .sort((a, b) => {
-        const aNormal = isNormalItem(a.item);
-        const bNormal = isNormalItem(b.item);
+        const aNormal = isOrderableItem(a.item);
+        const bNormal = isOrderableItem(b.item);
         if (aNormal !== bNormal) return aNormal ? -1 : 1;
         if (b.score !== a.score) return b.score - a.score;
         return (a.item.sku || "").localeCompare(b.item.sku || "");
@@ -469,7 +466,7 @@ export default function OrderPage() {
 
   const catalogBrowseBase = useMemo(() => {
     if (!showAvailableOnly) return catalog;
-    return catalog.filter((item) => isNormalItem(item));
+    return catalog.filter((item) => isOrderableItem(item));
   }, [catalogVersion, showAvailableOnly]);
 
   const brandSplit = useMemo(
@@ -571,8 +568,8 @@ export default function OrderPage() {
         );
       })
       .sort((a, b) => {
-        const aNormal = isNormalItem(a);
-        const bNormal = isNormalItem(b);
+        const aNormal = isOrderableItem(a);
+        const bNormal = isOrderableItem(b);
         if (aNormal !== bNormal) return aNormal ? -1 : 1;
         return (a.sku || "").localeCompare(b.sku || "");
       });
@@ -600,9 +597,26 @@ export default function OrderPage() {
     return catalogItemsForSubmit.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
   }, [catalogItemsForSubmit]);
 
+  const blockAddForSku = (cleanSku: string) => {
+    const catalogItem = getCatalogItemBySku(cleanSku);
+    if (!catalogItem) {
+      alert(`${cleanSku} is not in the catalog.`);
+      return true;
+    }
+    if (!isOrderableItem(catalogItem)) {
+      alert(formatOrderNotAvailableMessage(cleanSku, catalogItem.status, t));
+      return true;
+    }
+    return false;
+  };
+
   const setQtyForSku = (sku: string, value: string) => {
     const cleanSku = sku.trim().toUpperCase();
     const cleanQty = String(value || "").replace(/[^0-9]/g, "");
+
+    if (cleanQty && Number(cleanQty) > 0 && blockAddForSku(cleanSku)) {
+      return;
+    }
 
     setCatalogQtyMap((prev) => {
       const next = { ...prev };
@@ -655,7 +669,9 @@ export default function OrderPage() {
       const clearanceRemaining = getClearanceRemainingForSku(cleanSku);
 
       if (qty >= 100) warnings.push(t.highQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(qty)));
-      if (catalogItem && !isNormalItem(catalogItem)) warnings.push(t.statusWarning.replace("{sku}", cleanSku).replace("{status}", status || "-"));
+      if (catalogItem && !isOrderableItem(catalogItem)) {
+        warnings.push(formatOrderNotAvailableMessage(cleanSku, catalogItem.status, t));
+      }
       if (limitedQty > 0 && qty > limitedQty) warnings.push(t.limitedQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(limitedQty)));
       if (promoRemaining !== null && qty > promoRemaining) warnings.push(t.promoQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(promoRemaining)));
       if (clearanceRemaining !== null && qty > clearanceRemaining) {
@@ -784,6 +800,10 @@ export default function OrderPage() {
     const current = Number(catalogQtyMap[cleanSku] || 0);
     let next = Math.max(0, current + delta);
 
+    if (delta > 0 && next > 0 && current <= 0 && blockAddForSku(cleanSku)) {
+      return;
+    }
+
     const promoRemaining = getPromoRemainingForSku(cleanSku);
     if (delta > 0 && promoRemaining !== null && next > promoRemaining) {
       alert(t.promoLimitAlert.replace("{sku}", cleanSku).replace("{qty}", String(promoRemaining)));
@@ -814,7 +834,10 @@ export default function OrderPage() {
     for (const item of promotionItems) {
       if (item.remainingQty === 0) continue;
       const sku = item.sku?.toUpperCase();
-      if (sku) adjustQtyForSku(sku, 1);
+      if (!sku) continue;
+      const catalogItem = getCatalogItemBySku(sku) || item;
+      if (!isOrderableItem(catalogItem)) continue;
+      adjustQtyForSku(sku, 1);
     }
   };
 
@@ -822,7 +845,10 @@ export default function OrderPage() {
     for (const item of clearanceItems) {
       if (item.remainingQty === 0) continue;
       const sku = item.sku?.toUpperCase();
-      if (sku) adjustQtyForSku(sku, 1);
+      if (!sku) continue;
+      const catalogItem = getCatalogItemBySku(sku) || item;
+      if (!isOrderableItem(catalogItem)) continue;
+      adjustQtyForSku(sku, 1);
     }
   };
 
@@ -837,7 +863,7 @@ export default function OrderPage() {
     }
 
     const exactMatch = catalog.find((item) => item.sku?.toUpperCase() === normalizedSkuInput) || null;
-    if (exactMatch && (!showAvailableOnly || isNormalItem(exactMatch))) {
+    if (exactMatch && (!showAvailableOnly || isOrderableItem(exactMatch))) {
       setSelectedItem(exactMatch);
       return;
     }
@@ -897,6 +923,10 @@ export default function OrderPage() {
     const cleanSku = sku.toUpperCase();
     const clean = value.replace(/[^0-9]/g, "");
 
+    if (clean && Number(clean) > 0 && blockAddForSku(cleanSku)) {
+      return;
+    }
+
     const catalogItem = getCatalogItemBySku(cleanSku);
     const limitedQty = Number(String(catalogItem?.limitedQty || "").replace(/[^0-9]/g, ""));
     if (clean && limitedQty > 0 && Number(clean) > limitedQty) {
@@ -930,16 +960,28 @@ export default function OrderPage() {
       return;
     }
 
-    setCart((prev) => [...prev, ...valid]);
+    const orderable = valid.filter((item) => {
+      const sku = item.sku.toUpperCase();
+      const catalogItem = getCatalogItemBySku(sku);
+      if (!catalogItem || !isOrderableItem(catalogItem)) {
+        alert(formatOrderNotAvailableMessage(sku, catalogItem?.status, t));
+        return false;
+      }
+      return true;
+    });
+
+    if (orderable.length === 0) return;
+
+    setCart((prev) => [...prev, ...orderable]);
     setCatalogQtyMap((prev) => {
       const next = { ...prev };
-      for (const item of valid) {
+      for (const item of orderable) {
         const qtyNumber = Number(String(item.qty || "").replace(/[^0-9]/g, ""));
         if (qtyNumber > 0) next[item.sku.toUpperCase()] = String(Number(next[item.sku.toUpperCase()] || 0) + qtyNumber);
       }
       return next;
     });
-    setSubmitMsg(`${valid.length} ${t.items} added.`);
+    setSubmitMsg(`${orderable.length} ${t.items} added.`);
     // Do not auto-focus SKU input; prevents page from jumping.
   };
 
@@ -1083,6 +1125,14 @@ export default function OrderPage() {
     if (items.length === 0) {
       alert(t.addAtLeast);
       return;
+    }
+
+    for (const item of items) {
+      const catalogItem = getCatalogItemBySku(item.sku);
+      if (catalogItem && !isOrderableItem(catalogItem)) {
+        alert(formatOrderNotAvailableMessage(item.sku, catalogItem.status, t));
+        return;
+      }
     }
 
     setShowReview(true);
@@ -1455,15 +1505,17 @@ export default function OrderPage() {
                 {matchedItems.slice(0, 40).map((item, index) => {
                   const isActive = selectedItem?.sku === item.sku || (!selectedItem && index === 0);
                   const inCart = Number(catalogQtyMap[(item.sku || "").toUpperCase()] || 0) > 0;
+                  const canOrder = isOrderableItem(item);
                   return (
                     <div
                       key={item.sku}
                       style={{
                         position: "relative",
                         border: isActive ? "2px solid #2563eb" : "1px solid #e5e7eb",
-                        background: inCart ? "#ecfdf5" : isActive ? "#eff6ff" : "#ffffff",
+                        background: inCart ? "#ecfdf5" : isActive ? "#eff6ff" : canOrder ? "#ffffff" : "#f3f4f6",
                         borderRadius: 12,
                         padding: 10,
+                        opacity: canOrder ? 1 : 0.72,
                       }}
                     >
                       {showAdminEditLinks ? (
@@ -1501,23 +1553,30 @@ export default function OrderPage() {
                             </div>
                             <div style={{ fontSize: 12, color: "#374151", marginTop: 3, lineHeight: 1.4 }}>{item.name || "-"}</div>
                             {renderProductMeta(item)}
+                            {!canOrder ? (
+                              <div style={{ marginTop: 6, fontSize: 11, fontWeight: 800, color: "#b91c1c", lineHeight: 1.35 }}>
+                                {formatOrderNotAvailableMessage(item.sku || "", item.status, t)}
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                       </button>
                       <div style={{ display: "flex", gap: 6, marginTop: 8, alignItems: "center" }}>
-                        <button type="button" onClick={() => adjustCatalogQty(item.sku, -1)} style={{ ...stepButtonStyle, width: 36 }}>−</button>
+                        <button type="button" onClick={() => adjustCatalogQty(item.sku, -1)} disabled={!canOrder} style={{ ...stepButtonStyle, width: 36, opacity: canOrder ? 1 : 0.5 }}>−</button>
                         <input
                           value={catalogQtyMap[(item.sku || "").toUpperCase()] || ""}
                           onChange={(e) => updateCatalogQty(item.sku, e.target.value)}
                           placeholder="0"
                           inputMode="numeric"
-                          style={{ ...stepInputStyle, flex: 1 }}
+                          disabled={!canOrder}
+                          style={{ ...stepInputStyle, flex: 1, opacity: canOrder ? 1 : 0.5 }}
                         />
-                        <button type="button" onClick={() => adjustCatalogQty(item.sku, 1)} style={{ ...stepButtonStyle, width: 36 }}>+</button>
+                        <button type="button" onClick={() => adjustCatalogQty(item.sku, 1)} disabled={!canOrder} style={{ ...stepButtonStyle, width: 36, opacity: canOrder ? 1 : 0.5 }}>+</button>
                         <button
                           type="button"
                           onClick={() => adjustCatalogQty(item.sku, 1)}
-                          style={{ flex: 1, border: "none", borderRadius: 10, background: "#2563eb", color: "#fff", fontWeight: 800, padding: "8px 10px", cursor: "pointer", minHeight: 40 }}
+                          disabled={!canOrder}
+                          style={{ flex: 1, border: "none", borderRadius: 10, background: canOrder ? "#2563eb" : "#9ca3af", color: "#fff", fontWeight: 800, padding: "8px 10px", cursor: canOrder ? "pointer" : "not-allowed", minHeight: 40 }}
                         >
                           {t.addOneCase}
                         </button>
@@ -1592,6 +1651,8 @@ export default function OrderPage() {
                       ? `${t.promoRemaining}: ${item.remainingQty}`
                       : undefined;
                   const bogoPack = soldOut ? null : getPromoBogoPackSize(item);
+                  const catalogItem = getCatalogItemBySku(sku) || item;
+                  const notOrderable = !isOrderableItem(catalogItem);
                   return (
                     <CatalogQtyCard
                       key={item.sku}
@@ -1611,7 +1672,10 @@ export default function OrderPage() {
                       editLabel={t.editProduct}
                       showAdminEdit={showAdminEditLinks}
                       highlight
-                      disabled={soldOut}
+                      disabled={soldOut || notOrderable}
+                      unavailableNote={
+                        notOrderable ? formatOrderNotAvailableMessage(sku, catalogItem.status, t) : undefined
+                      }
                       onAdjust={adjustCatalogQty}
                       onUpdateQty={updateCatalogQty}
                     />
@@ -1660,13 +1724,18 @@ export default function OrderPage() {
                   const priceLabel = item.clearancePrice ? `${t.clearancePrice}: ${item.clearancePrice}` : undefined;
                   const detailsLabel = soldOut ? t.clearanceSoldOut : formatClearanceDetails(item, t);
                   const remainingLabel = soldOut ? t.clearanceSoldOut : item.remainingQty !== null && item.remainingQty !== undefined ? `${t.clearanceRemaining}: ${item.remainingQty}` : undefined;
+                  const catalogItem = getCatalogItemBySku(sku) || item;
+                  const notOrderable = !isOrderableItem(catalogItem);
                   return (
                     <CatalogQtyCard key={item.sku} item={item} qty={qty}
                       promoNote={soldOut ? t.clearanceSoldOut : item.clearanceNote || t.clearanceBadge}
                       promoPrice={priceLabel} promoDetails={detailsLabel} promoRemaining={remainingLabel}
                       policyNote={soldOut ? undefined : t.clearanceNoReturn}
                       inCartLabel={t.inCart} promoBadgeLabel={t.clearanceBadge} editLabel={t.editProduct}
-                      showAdminEdit={showAdminEditLinks} highlight disabled={soldOut}
+                      showAdminEdit={showAdminEditLinks} highlight disabled={soldOut || notOrderable}
+                      unavailableNote={
+                        notOrderable ? formatOrderNotAvailableMessage(sku, catalogItem.status, t) : undefined
+                      }
                       onAdjust={adjustCatalogQty} onUpdateQty={updateCatalogQty} />
                   );
                 })}
@@ -1701,6 +1770,8 @@ export default function OrderPage() {
               newBadgeLabel={t.newItems}
               editLabel={t.editProduct}
               showAdminEdit={showAdminEditLinks}
+              canOrderItem={isOrderableItem}
+              orderBlockedMessage={(item) => formatOrderNotAvailableMessage(item.sku || "", item.status, t)}
               onAdjust={adjustCatalogQty}
               onUpdateQty={updateCatalogQty}
             />

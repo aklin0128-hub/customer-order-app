@@ -1,6 +1,6 @@
 "use client";
 
-import { getDisplayStatus, getStatusBadgeStyle, isNormalItem } from "../catalogUtils";
+import { getDisplayStatus, getStatusBadgeStyle, isOrderableItem } from "../catalogUtils";
 import type { CatalogItem } from "../types";
 import {
   catalogCardStyle,
@@ -36,6 +36,7 @@ export function CatalogQtyCard({
   onRoundUpBogo,
   highlight,
   disabled,
+  unavailableNote,
   showAdminEdit,
   editLabel = "Edit",
 }: {
@@ -57,6 +58,7 @@ export function CatalogQtyCard({
   onRoundUpBogo?: () => void;
   highlight?: boolean;
   disabled?: boolean;
+  unavailableNote?: string;
   showAdminEdit?: boolean;
   editLabel?: string;
 }) {
@@ -120,7 +122,7 @@ export function CatalogQtyCard({
       <div style={{ fontSize: 12, fontWeight: 800, color: "#374151" }}>{item.brand || "-"}</div>
       <div style={catalogNameStyle}>{item.name || "-"}</div>
       {item.size ? <div style={{ fontSize: 11, color: "#6b7280" }}>{item.size}</div> : null}
-      {!isNormalItem(item) && getDisplayStatus(item.status) ? (
+      {!isOrderableItem(item) && getDisplayStatus(item.status) ? (
         <span
           style={{
             display: "inline-block",
@@ -134,6 +136,19 @@ export function CatalogQtyCard({
         >
           {getDisplayStatus(item.status)}
         </span>
+      ) : null}
+      {unavailableNote ? (
+        <div
+          style={{
+            marginTop: 4,
+            fontSize: 11,
+            fontWeight: 800,
+            color: "#b91c1c",
+            lineHeight: 1.35,
+          }}
+        >
+          {unavailableNote}
+        </div>
       ) : null}
       {promoDealLabel ? (
         <div style={promoDealStyle}>

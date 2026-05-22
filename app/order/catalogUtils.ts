@@ -1,5 +1,6 @@
 import { catalog } from "./catalogState";
 
+import { isOrderableCatalogStatus } from "@/lib/orderableCatalog";
 import { formatMoneyPrice, formatPromoTierPricesLine, getApplicablePromoTier } from "@/lib/promoFormat";
 import type { PromoPriceTier } from "@/lib/promotions";
 
@@ -181,16 +182,23 @@ export function getImageUrl(sku?: string) {
   return `/product/${sku}.jpg`;
 }
 
+/** Only these catalog statuses can be added to an order. */
+export function isOrderableItem(item?: CatalogItem | null) {
+  return isOrderableCatalogStatus(item?.status);
+}
+
+/** @deprecated Use isOrderableItem — kept for existing imports. */
 export function isNormalItem(item?: CatalogItem | null) {
-  const s = String(item?.status || "").trim().toUpperCase();
-  return (
-    s === "NORMAL" ||
-    s === "NORMAL_NOBR" ||
-    s === "NORMAL_NBR" ||
-    s === "TBD" ||
-    s === "NEW" ||
-    s === "LIMITED"
-  );
+  return isOrderableItem(item);
+}
+
+export function formatOrderNotAvailableMessage(
+  sku: string,
+  status: string | undefined,
+  t: { orderNotAvailable: string }
+) {
+  const label = getDisplayStatus(status) || String(status || "").trim().toUpperCase() || "-";
+  return t.orderNotAvailable.replace("{sku}", sku).replace("{status}", label);
 }
 
 export function isNewItem(item?: CatalogItem | null) {

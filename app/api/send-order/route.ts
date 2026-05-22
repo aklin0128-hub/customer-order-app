@@ -10,6 +10,8 @@ import { incrementPromotionSold } from "@/lib/promotions";
 import { isValidOrderEmail, resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
 import { getCustomerByAccount, upsertCustomerContact } from "@/lib/customers";
 import { mergeRecentItems } from "@/lib/recentItems";
+import { getMergedCatalogProducts } from "@/lib/catalogMerge";
+import { isOrderableCatalogStatus } from "@/lib/orderableCatalog";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -81,6 +83,24 @@ export async function POST(req: Request) {
     if (cleanedItems.length === 0) {
       return NextResponse.json(
         { error: "No valid items in order." },
+        { status: 400 }
+      );
+    }
+
+    const catalogProducts = await getMergedCatalogProducts();
+    const catalogBySku = new Map(
+      catalogProducts.map((p) => [String(p.sku || "").trim().toUpperCase(), p])
+    );
+    const notOrderable = cleanedItems.filter((item) => {
+      const product = catalogBySku.get(item.sku);
+      return !product || !isOrderableCatalogStatus(product.status);
+    });
+    if (notOrderable.length > 0) {
+      const skus = notOrderable.map((i) => i.sku).join(", ");
+      return NextResponse.json(
+        {
+          error: `These items are not available to order (only NORMAL, NORMAL NOBR, TBD): ${skus}`,
+        },
         { status: 400 }
       );
     }

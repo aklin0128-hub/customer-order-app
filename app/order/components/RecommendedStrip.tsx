@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from "react";
 
-import { getCatalogItemBySku } from "../catalogUtils";
+import { getCatalogItemBySku, isOrderableItem } from "../catalogUtils";
 import { copy } from "../orderCopy";
 import type { CatalogItem, Lang } from "../types";
 import { ProductImage } from "./ProductImage";
@@ -48,8 +48,9 @@ export function RecommendedStrip({
       <div style={stripStyle}>
         {items.map((item) => {
           const catalogItem = getCatalogItemBySku(item.sku) || item;
+          const canOrder = isOrderableItem(catalogItem);
           return (
-            <div key={item.sku} style={cardStyle}>
+            <div key={item.sku} style={{ ...cardStyle, opacity: canOrder ? 1 : 0.72 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", textAlign: "center" }}>
                 <ProductImage sku={item.sku} alt={item.sku} size={72} imageUrl={catalogItem.imageUrl} />
                 <div style={{ minWidth: 0, width: "100%" }}>
@@ -72,15 +73,16 @@ export function RecommendedStrip({
               <button
                 type="button"
                 onClick={() => onAddOne(item.sku)}
+                disabled={!canOrder}
                 style={{
                   border: "1px solid #2563eb",
-                  background: "#2563eb",
+                  background: canOrder ? "#2563eb" : "#9ca3af",
                   color: "#fff",
                   borderRadius: 999,
                   padding: "7px 10px",
+                  cursor: canOrder ? "pointer" : "not-allowed",
                   fontSize: 11,
                   fontWeight: 900,
-                  cursor: "pointer",
                   width: "100%",
                 }}
               >
