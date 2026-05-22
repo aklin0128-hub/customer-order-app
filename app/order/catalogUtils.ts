@@ -193,12 +193,11 @@ export function isNormalItem(item?: CatalogItem | null) {
 }
 
 export function formatOrderNotAvailableMessage(
-  sku: string,
-  status: string | undefined,
+  _sku: string,
+  _status: string | undefined,
   t: { orderNotAvailable: string }
 ) {
-  const label = getDisplayStatus(status) || String(status || "").trim().toUpperCase() || "-";
-  return t.orderNotAvailable.replace("{sku}", sku).replace("{status}", label);
+  return t.orderNotAvailable;
 }
 
 export function isNewItem(item?: CatalogItem | null) {
