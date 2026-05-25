@@ -7,6 +7,9 @@ export type MergedCatalogProduct = {
   brand?: string;
   status?: string;
   size?: string;
+  barcode?: string;
+  upc?: string;
+  palletSize?: string;
   imageUrl?: string;
   isNew?: boolean;
   name_k?: string;

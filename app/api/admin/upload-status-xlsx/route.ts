@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
+import { parsePalletSizeFromXlsxRow, parseUpcFromXlsxRow } from "@/lib/catalogXlsxFields";
 import { listRedisProductSkus, productRedisKey, saveRedisProduct } from "@/lib/productRedisStore";
 import { redis } from "@/lib/redis";
+import { bustServerDataCache, SERVER_CACHE } from "@/lib/serverDataCache";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +13,8 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "536678";
 type Product = {
   sku: string;
   status?: string;
+  upc?: string;
+  palletSize?: string;
   source?: string;
   updatedAt?: string;
 };
@@ -66,7 +70,7 @@ export async function POST(req: Request) {
 
     const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
       defval: "",
-      raw: false,
+      raw: true,
     });
 
     const knownSkus = new Set(
@@ -78,7 +82,7 @@ export async function POST(req: Request) {
       knownSkus.add(sku);
     }
 
-    const updated: { sku: string; status: string }[] = [];
+    const updated: { sku: string; status?: string; upc?: string; palletSize?: string }[] = [];
     const unknown: string[] = [];
     const skipped: string[] = [];
     const seen = new Set<string>();
@@ -86,9 +90,13 @@ export async function POST(req: Request) {
     for (const row of rows) {
       const sku = getAny(row, ["PID", "SKU", "Item No.", "Item No", "No.", "No", "Item", "Item Number"]).toUpperCase();
       const status = getAny(row, ["Status", "STATUS", "Item Status"]).toUpperCase();
+      const upc = parseUpcFromXlsxRow(row);
+      const palletSize = parsePalletSizeFromXlsxRow(row);
 
-      if (!sku || !status) {
-        if (sku || status) skipped.push(sku || "(missing SKU)");
+      if (!sku) continue;
+
+      if (!status && !upc && !palletSize) {
+        skipped.push("(missing SKU/status/UPC/pallet)");
         continue;
       }
 
@@ -101,16 +109,28 @@ export async function POST(req: Request) {
       }
 
       const existing = (await redis.get<Product>(productRedisKey(sku))) || { sku };
-      await saveRedisProduct({
+      const patch: Product = {
         ...existing,
         sku,
-        status,
         source: "Redis",
         updatedAt: new Date().toISOString(),
-      });
+      };
+      if (status) patch.status = status;
+      if (upc) patch.upc = upc;
+      if (palletSize) patch.palletSize = palletSize;
 
-      updated.push({ sku, status });
+      await saveRedisProduct(patch);
+
+      updated.push({
+        sku,
+        ...(status ? { status } : {}),
+        ...(upc ? { upc } : {}),
+        ...(palletSize ? { palletSize } : {}),
+      });
     }
+
+    bustServerDataCache(SERVER_CACHE.catalog);
+    bustServerDataCache(SERVER_CACHE.showcase);
 
     return NextResponse.json({
       success: true,

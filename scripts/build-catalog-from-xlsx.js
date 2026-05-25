@@ -26,6 +26,52 @@ function normalizeStatus(status) {
   return s;
 }
 
+function getAny(row, keys) {
+  for (const key of keys) {
+    const value = row[key];
+    if (safeString(value)) return safeString(value);
+  }
+
+  const normalized = new Map(
+    Object.keys(row).map((key) => [key.trim().toUpperCase(), key])
+  );
+
+  for (const key of keys) {
+    const actual = normalized.get(key.trim().toUpperCase());
+    if (actual && safeString(row[actual])) return safeString(row[actual]);
+  }
+
+  return "";
+}
+
+function normalizeUpc(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits || "";
+}
+
+function parseUpc(row) {
+  return normalizeUpc(getAny(row, ["UPC", "UPC CODE", "UPC Code", "UPC_CODE"]));
+}
+
+function formatPalletSize(value) {
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value === "number" && Number.isFinite(value)) return String(Math.round(value));
+  const text = safeString(value);
+  if (/^\d{1,4}$/.test(text)) return text;
+  const num = Number(text);
+  if (Number.isFinite(num) && num > 0 && num < 10000) return String(Math.round(num));
+  return text;
+}
+
+function parsePalletSize(row) {
+  for (const key of ["PL", "PALLETSIZE"]) {
+    if (row[key] !== undefined && row[key] !== null && row[key] !== "") {
+      return formatPalletSize(row[key]);
+    }
+  }
+  return formatPalletSize(getAny(row, ["PL", "PALLETSIZE"]));
+}
+
 function main() {
   if (!fs.existsSync(INPUT_XLSX)) {
     throw new Error(`Input file not found: ${INPUT_XLSX}`);
@@ -40,7 +86,7 @@ function main() {
 
   const rows = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName], {
     defval: "",
-    raw: false,
+    raw: true,
   });
 
   const catalog = rows
@@ -49,7 +95,10 @@ function main() {
 
       if (!sku || sku.includes(" ")) return null;
 
-      return {
+      const upc = parseUpc(row);
+      const palletSize = parsePalletSize(row);
+
+      const item = {
         sku,
         name: safeString(row["Description"]),
         name_k: safeString(row["Description K"]),
@@ -66,6 +115,11 @@ function main() {
         storage_type: safeString(row["S Type"]),
         country: safeString(row["CO"]),
       };
+
+      if (upc) item.upc = upc;
+      if (palletSize) item.palletSize = palletSize;
+
+      return item;
     })
     .filter(Boolean)
     .sort((a, b) => a.sku.localeCompare(b.sku));

@@ -11,6 +11,7 @@
     "seed:nongshim-promo": "node scripts/seed-nongshim-promotions.mjs",
     "assign-categories": "npx tsx scripts/assign-catalog-categories.ts",
     "catalog:export": "node scripts/build-catalog-from-xlsx.js",
+    "catalog:patch-upc-pallet": "node scripts/patch-upc-pallet-from-xlsx.js",
     "catalog:rebuild": "node scripts/build-catalog-from-xlsx.js && npx tsx scripts/assign-catalog-categories.ts"
   },
   "dependencies": {

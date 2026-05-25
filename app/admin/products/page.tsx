@@ -489,7 +489,7 @@ export default function AdminProductsPage() {
       <Panel title="Bulk tools">
         <details>
           <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 900, color: "#2563eb" }}>
-            Upload today_update.xlsx status update
+            Upload today_update.xlsx (status, UPC, pallet size)
           </summary>
           <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
             <input
