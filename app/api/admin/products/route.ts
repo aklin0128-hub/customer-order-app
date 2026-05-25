@@ -20,6 +20,7 @@ type Product = {
   imageUrl?: string;
   category?: string;
   isNew?: boolean;
+  justAdded?: boolean;
   source?: string;
   updatedAt?: string;
 };
@@ -97,6 +98,7 @@ export async function POST(req: Request) {
     const imageUrl = String(body?.imageUrl || "").trim();
     const category = String(body?.category || "").trim().toUpperCase();
     const isNew = Boolean(body?.isNew);
+    const justAdded = Boolean(body?.justAdded);
 
     if (!sku) {
       return NextResponse.json({ error: "Missing SKU." }, { status: 400 });
@@ -115,6 +117,7 @@ export async function POST(req: Request) {
       imageUrl,
       category,
       isNew,
+      justAdded,
       source: "Redis",
       updatedAt: new Date().toISOString(),
     };

@@ -17,7 +17,7 @@ import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
 import { buildClearanceUpsellLines } from "./salesFlow";
 import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog } from "./catalogState";
-import { compareCatalogByNewestImport } from "@/lib/catalogNewItems";
+import { compareCatalogForDisplay } from "@/lib/catalogNewItems";
 import {
   formatBrandLabel,
   formatClearanceDetails,
@@ -494,7 +494,7 @@ export default function OrderPage() {
           const aNormal = isOrderableItem(a);
           const bNormal = isOrderableItem(b);
           if (aNormal !== bNormal) return aNormal ? -1 : 1;
-          return compareCatalogByNewestImport(a, b);
+          return compareCatalogForDisplay(a, b);
         }),
     [catalogBrowseBase]
   );
@@ -591,7 +591,7 @@ export default function OrderPage() {
         const aNormal = isOrderableItem(a);
         const bNormal = isOrderableItem(b);
         if (aNormal !== bNormal) return aNormal ? -1 : 1;
-        return (a.sku || "").localeCompare(b.sku || "");
+        return compareCatalogForDisplay(a, b);
       });
   }, [catalogSearch, categoryFilter, brandFilter, catalogQtyMap, catalogBrowseBase, catalogShowSelectedOnly, catalogShowNewOnly, catalogShowRecommendedOnly, recommendedSkuSet]);
 

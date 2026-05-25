@@ -90,6 +90,17 @@ function main() {
   });
 
   const importedAt = new Date().toISOString();
+  const prevImported = new Map();
+  if (fs.existsSync(OUTPUT_JSON)) {
+    try {
+      for (const row of JSON.parse(fs.readFileSync(OUTPUT_JSON, "utf8"))) {
+        const sku = safeString(row.sku).toUpperCase();
+        if (sku && row.importedAt) prevImported.set(sku, row.importedAt);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
 
   const catalog = rows
     .map((row) => {
@@ -102,7 +113,7 @@ function main() {
 
       const item = {
         sku,
-        importedAt,
+        ...(prevImported.has(sku) ? { importedAt: prevImported.get(sku) } : { importedAt }),
         name: safeString(row["Description"]),
         name_k: safeString(row["Description K"]),
         brand: safeString(row["Brand"]),

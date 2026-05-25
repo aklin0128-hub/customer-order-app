@@ -18,13 +18,7 @@ import {
 } from "../_components/admin-utils";
 import { AdminPublicShowcaseHint } from "../_components/AdminPublicShowcaseHint";
 import { useAdminAuth } from "../_components/useAdminAuth";
-import {
-  isCatalogNewItem,
-  isJustAddedItem,
-  JUST_ADDED_DAYS,
-  NEW_ITEM_IMPORT_WINDOW_DAYS,
-  parseImportedAtMs,
-} from "@/lib/catalogNewItems";
+import { isJustAddedItem, parseImportedAtMs } from "@/lib/catalogNewItems";
 import { CATEGORY_OPTIONS } from "@/lib/inferCategory";
 
 type Product = {
@@ -40,6 +34,7 @@ type Product = {
   imageUrl?: string;
   category?: string;
   isNew?: boolean;
+  justAdded?: boolean;
   importedAt?: string;
   source?: string;
 };
@@ -55,7 +50,7 @@ type StatusUploadResult = {
   skippedPreview?: string[];
 };
 
-type ProductFilter = "all" | "redis" | "customized" | "new" | "statusNew" | "discontinued" | "noImage";
+type ProductFilter = "all" | "redis" | "customized" | "new" | "justAdded" | "statusNew" | "discontinued" | "noImage";
 
 const statusOptions = [
   "NORMAL",
@@ -79,7 +74,7 @@ function productImageSrc(sku: string, imageUrl?: string) {
 }
 
 function isNewProduct(p?: Product | null) {
-  return isCatalogNewItem(p);
+  return Boolean(p?.isNew);
 }
 
 function formatImportedAtLabel(value?: string) {
@@ -99,6 +94,7 @@ export default function AdminProductsPage() {
   const [bulkStatus, setBulkStatus] = useState("");
   const [bulkCategory, setBulkCategory] = useState("");
   const [bulkNewFlag, setBulkNewFlag] = useState<"keep" | "yes" | "no">("keep");
+  const [bulkJustAddedFlag, setBulkJustAddedFlag] = useState<"keep" | "yes" | "no">("keep");
   const [initialSkuFromQuery, setInitialSkuFromQuery] = useState("");
 
   const [sku, setSku] = useState("");
@@ -113,6 +109,7 @@ export default function AdminProductsPage() {
   const [palletSize, setPalletSize] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [isNew, setIsNew] = useState(false);
+  const [justAdded, setJustAdded] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [productsLoaded, setProductsLoaded] = useState(false);
@@ -180,9 +177,20 @@ export default function AdminProductsPage() {
     if (listFilter === "redis") {
       list = list.filter((p) => p.source === "Redis");
     } else if (listFilter === "customized") {
-      list = list.filter((p) => p.source === "Redis" || p.category || p.imageUrl || p.limitedQty || p.palletSize || typeof p.isNew === "boolean");
+      list = list.filter(
+        (p) =>
+          p.source === "Redis" ||
+          p.category ||
+          p.imageUrl ||
+          p.limitedQty ||
+          p.palletSize ||
+          typeof p.isNew === "boolean" ||
+          typeof p.justAdded === "boolean"
+      );
     } else if (listFilter === "new") {
       list = list.filter((p) => isNewProduct(p));
+    } else if (listFilter === "justAdded") {
+      list = list.filter((p) => isJustAddedItem(p));
     } else if (listFilter === "statusNew") {
       list = list.filter((p) => String(p.status || "").trim().toUpperCase() === "NEW");
     } else if (listFilter === "discontinued") {
@@ -220,6 +228,7 @@ export default function AdminProductsPage() {
     setPalletSize(p.palletSize || "");
     setImageUrl(p.imageUrl || "");
     setIsNew(typeof p.isNew === "boolean" ? p.isNew : false);
+    setJustAdded(Boolean(p.justAdded));
     setFormDirty(false);
     setAutoSaveStatus("");
     notify(`Editing ${p.sku}`);
@@ -241,7 +250,7 @@ export default function AdminProductsPage() {
 
   const applyBulkProductUpdate = async () => {
     if (selectedProducts.length === 0) return notify("Select SKUs first.", "error");
-    if (!bulkStatus && !bulkCategory && bulkNewFlag === "keep") {
+    if (!bulkStatus && !bulkCategory && bulkNewFlag === "keep" && bulkJustAddedFlag === "keep") {
       return notify("Choose a bulk change first.", "error");
     }
     if (!confirm(`Apply bulk update to ${selectedProducts.length} SKU(s)?`)) return;
@@ -256,6 +265,8 @@ export default function AdminProductsPage() {
           status: bulkStatus || product.status || "NORMAL",
           category: bulkCategory || product.category || "",
           isNew: bulkNewFlag === "keep" ? Boolean(product.isNew) : bulkNewFlag === "yes",
+          justAdded:
+            bulkJustAddedFlag === "keep" ? Boolean(product.justAdded) : bulkJustAddedFlag === "yes",
         };
 
         const res = await fetch("/api/admin/products", {
@@ -307,6 +318,7 @@ export default function AdminProductsPage() {
     setPalletSize("");
     setImageUrl("");
     setIsNew(false);
+    setJustAdded(false);
     setFormDirty(false);
     setAutoSaveStatus("");
     setMsg("");
@@ -343,6 +355,7 @@ export default function AdminProductsPage() {
           palletSize,
           imageUrl,
           isNew,
+          justAdded,
         }),
       });
       const data = await res.json();
@@ -386,7 +399,7 @@ export default function AdminProductsPage() {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, formDirty, sku, name, brand, status, category, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew]);
+  }, [authed, formDirty, sku, name, brand, status, category, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded]);
 
   const uploadProductImage = async (file: File | null) => {
     const finalSku = sku.trim().toUpperCase();
@@ -482,6 +495,7 @@ export default function AdminProductsPage() {
           { label: "Redis overrides", value: products.filter((p) => p.source === "Redis").length },
           { label: "With category", value: products.filter((p) => p.category).length },
           { label: "New items", value: products.filter((p) => isNewProduct(p)).length },
+          { label: "JUST ADDED pin", value: products.filter((p) => isJustAddedItem(p)).length },
         ]}
       />
 
@@ -553,6 +567,7 @@ export default function AdminProductsPage() {
             options={[
               { id: "all", label: "Browse" },
               { id: "new", label: "New items" },
+              { id: "justAdded", label: "JUST ADDED" },
               { id: "statusNew", label: "Status NEW" },
               { id: "discontinued", label: "Discontinued" },
               { id: "noImage", label: "No uploaded image" },
@@ -592,6 +607,15 @@ export default function AdminProductsPage() {
                 <option value="keep">Keep New flag</option>
                 <option value="yes">Set New items: Yes</option>
                 <option value="no">Set New items: No</option>
+              </select>
+              <select
+                value={bulkJustAddedFlag}
+                onChange={(e) => setBulkJustAddedFlag(e.target.value as "keep" | "yes" | "no")}
+                style={inputStyle}
+              >
+                <option value="keep">Keep JUST ADDED</option>
+                <option value="yes">JUST ADDED: On</option>
+                <option value="no">JUST ADDED: Off</option>
               </select>
               <button
                 type="button"
@@ -753,22 +777,45 @@ export default function AdminProductsPage() {
                 }}
               >
                 <input type="checkbox" checked={isNew} onChange={(e) => { setIsNew(e.target.checked); markDirty(); }} />
-                Always show in “New items” (manual override)
+                Show in customer “New items” (you set this — not read from name or Excel)
                 <span style={{ fontWeight: 600, color: "#c2410c" }}>
                   {" "}
-                  — otherwise new if imported within {NEW_ITEM_IMPORT_WINDOW_DAYS} days (
+                  (
                   <a href="/new/" target="_blank" rel="noopener noreferrer" style={{ color: "#1d4ed8" }}>
                     /new/
                   </a>
                   )
                 </span>
               </label>
+              <label
+                style={{
+                  gridColumn: "1 / -1",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  border: "1px solid #fca5a5",
+                  borderRadius: 12,
+                  padding: 12,
+                  background: justAdded ? "#fef2f2" : "#fff",
+                  color: "#991b1b",
+                  fontSize: 13,
+                  fontWeight: 900,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={justAdded}
+                  onChange={(e) => {
+                    setJustAdded(e.target.checked);
+                    markDirty();
+                  }}
+                />
+                JUST ADDED — pin to top on customer order (red badge)
+              </label>
               <div style={{ gridColumn: "1 / -1", fontSize: 11, color: "#6b7280", marginTop: -4 }}>
-                Catalog import time: {formatImportedAtLabel(products.find((p) => p.sku?.toUpperCase() === sku.toUpperCase())?.importedAt)}
-                {isNewProduct(products.find((p) => p.sku?.toUpperCase() === sku.toUpperCase()) || null) &&
-                typeof products.find((p) => p.sku?.toUpperCase() === sku.toUpperCase())?.isNew !== "boolean"
-                  ? ` · new (${NEW_ITEM_IMPORT_WINDOW_DAYS}d import)${isJustAddedItem(products.find((p) => p.sku?.toUpperCase() === sku.toUpperCase()) || null) ? ` · JUST ADDED (${JUST_ADDED_DAYS}d)` : ""}`
-                  : ""}
+                Catalog import time (reference only):{" "}
+                {formatImportedAtLabel(products.find((p) => p.sku?.toUpperCase() === sku.toUpperCase())?.importedAt)}
               </div>
               <div>
                 <label style={labelStyle}>Size</label>

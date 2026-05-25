@@ -14,7 +14,9 @@ export type CatalogItem = {
   imageUrl?: string;
   category?: string;
   isNew?: boolean;
-  /** ISO time when SKU last appeared in today_update.xlsx import */
+  /** Admin: show JUST ADDED badge and pin to top of lists */
+  justAdded?: boolean;
+  /** ISO time when SKU first appeared in catalog (import) */
   importedAt?: string;
 };
 

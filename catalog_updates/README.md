@@ -15,10 +15,12 @@ After saving a file with UPC / pallet columns:
 npm run catalog:patch-upc-pallet
 ```
 
-This also sets **`importedAt`** on every SKU in the spreadsheet.
+`importedAt` is set **only the first time** a SKU appears in the catalog (not on every UPC/PL refresh).
 
-- **New items** tab: imported within **60 days**
-- **JUST ADDED** badge on cards: imported within **14 days**
+- **New items** tab: only SKUs you check **Show in New items** in Admin → Products (not auto from Excel or `_NEW` in name)
+- **JUST ADDED**: separate optional flag in Admin → Products (pin to top + red badge)
+
+If every SKU was marked new after a bad import, run: `npm run catalog:fix-new-flags`
 
 Or full rebuild from Excel (status, inventory, UPC, pallet, etc.):
 

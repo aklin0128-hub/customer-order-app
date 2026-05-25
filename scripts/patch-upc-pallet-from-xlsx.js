@@ -97,21 +97,25 @@ function main() {
 
     const upc = parseUpc(row);
     const palletSize = parsePalletSize(row);
-    bySku.set(sku, { upc, palletSize, importedAt });
+    bySku.set(sku, { upc, palletSize });
   }
 
   const catalog = JSON.parse(fs.readFileSync(CATALOG_JSON, "utf8"));
+  const knownSkus = new Set(catalog.map((item) => safeString(item.sku).toUpperCase()).filter(Boolean));
   let upcCount = 0;
   let palletCount = 0;
-  let importStampCount = 0;
+  let newSkuCount = 0;
 
   const next = catalog.map((item) => {
     const sku = safeString(item.sku).toUpperCase();
     const patch = bySku.get(sku);
     if (!patch) return item;
 
-    const merged = { ...item, importedAt: patch.importedAt };
-    importStampCount += 1;
+    const merged = { ...item };
+    if (!merged.importedAt) {
+      merged.importedAt = importedAt;
+      newSkuCount += 1;
+    }
     if (patch.upc) {
       merged.upc = patch.upc;
       upcCount += 1;
@@ -123,9 +127,14 @@ function main() {
     return merged;
   });
 
+  for (const sku of bySku.keys()) {
+    if (knownSkus.has(sku)) continue;
+    newSkuCount += 1;
+  }
+
   fs.writeFileSync(CATALOG_JSON, `${JSON.stringify(next, null, 2)}\n`, "utf8");
 
-  console.log(`Stamped import time on ${importStampCount} SKUs (${importedAt}).`);
+  console.log(`First-time import stamp on ${newSkuCount} SKU(s) (${importedAt}).`);
   console.log(`Updated UPC on ${upcCount}, pallet on ${palletCount}.`);
   console.log(`XLSX SKUs in file: ${bySku.size}`);
   console.log(CATALOG_JSON);

@@ -66,7 +66,7 @@ export function CatalogQtyCard({
   editLabel?: string;
   /** e.g. "Pallet size" / "板数" — shown as `{label}: {value}` */
   palletLabel?: string;
-  /** e.g. "JUST ADDED" — shown when imported within JUST_ADDED_DAYS */
+  /** e.g. "JUST ADDED" — shown when admin sets justAdded on the SKU */
   justAddedLabel?: string;
 }) {
   const showJustAdded = Boolean(justAddedLabel && isJustAddedItem(item));
