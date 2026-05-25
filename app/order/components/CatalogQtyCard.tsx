@@ -42,6 +42,8 @@ export function CatalogQtyCard({
   editLabel = "Edit",
   palletLabel,
   justAddedLabel,
+  /** New-items tab: every card uses the red JUST ADDED pill (pin order still uses justAdded flag). */
+  uniformNewPill,
 }: {
   item: CatalogItem;
   qty: string;
@@ -68,8 +70,9 @@ export function CatalogQtyCard({
   palletLabel?: string;
   /** e.g. "JUST ADDED" — shown when admin sets justAdded on the SKU */
   justAddedLabel?: string;
+  uniformNewPill?: boolean;
 }) {
-  const showJustAdded = Boolean(justAddedLabel && isJustAddedItem(item));
+  const showJustAdded = Boolean(justAddedLabel && (uniformNewPill || isJustAddedItem(item)));
   const hasQty = Number(qty) > 0;
   const qtyNum = Number(qty) || 0;
   const showBogoRoundUp =
@@ -112,7 +115,7 @@ export function CatalogQtyCard({
       ) : null}
 
       {promoNote || showJustAdded || highlight || promoRemaining ? (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: showJustAdded || promoNote ? 4 : 0 }}>
           {showJustAdded ? <div style={justAddedTagStyle}>{justAddedLabel}</div> : null}
           {!showJustAdded && promoNote ? <div style={promoTagStyle}>{promoNote}</div> : null}
           {!showJustAdded && !promoNote && highlight ? <div style={promoTagStyle}>{promoBadgeLabel}</div> : null}

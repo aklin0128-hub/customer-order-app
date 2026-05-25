@@ -25,9 +25,9 @@ export function ShowcaseCard({
     [showPromo, item, lang]
   );
 
-  const justAddedBadge =
-    badge ||
-    (item.justAdded ? (lang === "zh" ? "刚刚上架" : lang === "ko" ? "방금 등록" : lang === "vi" ? "MỚI THÊM" : "JUST ADDED") : null);
+  const justAddedText =
+    lang === "zh" ? "刚刚上架" : lang === "ko" ? "방금 등록" : lang === "vi" ? "MỚI THÊM" : "JUST ADDED";
+  const justAddedBadge = badge ?? (item.justAdded ? justAddedText : null);
 
   return (
     <article className={className}>

@@ -549,20 +549,38 @@
 /* Customer / product list rows (ListItemButton) */
 .admin-list-item {
   outline: none;
-}
-
-.admin-list-item:focus {
-  outline: none;
-}
-
-.admin-list-item:focus-visible {
-  border-color: #93c5fd;
   box-shadow: none;
 }
 
-.admin-list-item--selected,
+.admin-list-item:focus,
+.admin-list-item:focus-visible,
+.admin-list-item:active {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: #e5e7eb;
+  background: #fff;
+}
+
+.admin-list-item--selected {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
 .admin-list-item--selected:focus,
-.admin-list-item--selected:focus-visible {
+.admin-list-item--selected:focus-visible,
+.admin-list-item--selected:active {
+  outline: none;
+  box-shadow: none;
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.admin-split-list input[type="checkbox"] {
+  outline: none;
+}
+
+.admin-split-list input[type="checkbox"]:focus,
+.admin-split-list input[type="checkbox"]:focus-visible {
   outline: none;
   box-shadow: none;
 }

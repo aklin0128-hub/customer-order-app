@@ -40,6 +40,7 @@ export function CatalogVirtualGrid({
   editLabel,
   palletLabel,
   justAddedLabel,
+  uniformNewPill,
   showAdminEdit,
   canOrderItem,
   orderBlockedMessage,
@@ -58,6 +59,7 @@ export function CatalogVirtualGrid({
   editLabel?: string;
   palletLabel?: string;
   justAddedLabel?: string;
+  uniformNewPill?: boolean;
   showAdminEdit?: boolean;
   canOrderItem?: (item: CatalogItem) => boolean;
   orderBlockedMessage?: (item: CatalogItem) => string;
@@ -137,15 +139,15 @@ export function CatalogVirtualGrid({
                 const qty = catalogQtyMap[sku] || "";
                 const isWeekly = weeklyPickSkus?.has(sku);
                 const isClearance = clearancePickSkus?.has(sku);
-                const isJustAdded = isJustAddedItem(item);
-                const showNewTag = !isJustAdded && Boolean(newItemChecker?.(item));
-                const promoNote = isWeekly
-                  ? promoBadgeLabel
-                  : isClearance
-                    ? clearanceBadgeLabel || promoBadgeLabel
-                    : showNewTag
-                      ? newBadgeLabel
-                      : undefined;
+                const promoNote = uniformNewPill
+                  ? undefined
+                  : isWeekly
+                    ? promoBadgeLabel
+                    : isClearance
+                      ? clearanceBadgeLabel || promoBadgeLabel
+                      : newItemChecker?.(item)
+                        ? newBadgeLabel
+                        : undefined;
                 const canOrder = canOrderItem?.(item) ?? true;
                 return (
                   <CatalogQtyCard
@@ -159,6 +161,7 @@ export function CatalogVirtualGrid({
                     editLabel={editLabel}
                     palletLabel={palletLabel}
                     justAddedLabel={justAddedLabel}
+                    uniformNewPill={uniformNewPill}
                     showAdminEdit={showAdminEdit}
                     disabled={!canOrder}
                     unavailableNote={!canOrder ? orderBlockedMessage?.(item) : undefined}

@@ -246,6 +246,9 @@ export default function AdminProductsPage() {
     setSelectedProductSkus((prev) =>
       prev.includes(clean) ? prev.filter((item) => item !== clean) : [...prev, clean]
     );
+    if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
   };
 
   const applyBulkProductUpdate = async () => {
@@ -634,6 +637,7 @@ export default function AdminProductsPage() {
                   type="checkbox"
                   checked={selectedProductSkus.includes(p.sku?.toUpperCase())}
                   onChange={() => toggleProductSelection(p.sku)}
+                  onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
                   style={{ position: "absolute", top: 10, left: 10, zIndex: 2 }}
                   aria-label={`Select ${p.sku}`}

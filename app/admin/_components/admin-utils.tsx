@@ -98,10 +98,10 @@ export function ListItemButton({
   return (
     <button
       type="button"
-      onClick={(e) => {
-        onClick();
-        e.currentTarget.blur();
+      onMouseDown={(e) => {
+        if (e.button === 0) e.preventDefault();
       }}
+      onClick={() => onClick()}
       className={`admin-list-item${selected ? " admin-list-item--selected" : ""}`}
       style={{ ...listItem, ...(selected ? listItemSelected : {}) }}
     >
