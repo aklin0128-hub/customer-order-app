@@ -4,6 +4,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { catalogVirtualScrollStyle } from "../orderStyles";
+import { isJustAddedItem } from "../catalogUtils";
 import type { CatalogItem } from "../types";
 import { CatalogQtyCard } from "./CatalogQtyCard";
 
@@ -38,6 +39,7 @@ export function CatalogVirtualGrid({
   newBadgeLabel,
   editLabel,
   palletLabel,
+  justAddedLabel,
   showAdminEdit,
   canOrderItem,
   orderBlockedMessage,
@@ -55,6 +57,7 @@ export function CatalogVirtualGrid({
   newBadgeLabel?: string;
   editLabel?: string;
   palletLabel?: string;
+  justAddedLabel?: string;
   showAdminEdit?: boolean;
   canOrderItem?: (item: CatalogItem) => boolean;
   orderBlockedMessage?: (item: CatalogItem) => string;
@@ -134,7 +137,8 @@ export function CatalogVirtualGrid({
                 const qty = catalogQtyMap[sku] || "";
                 const isWeekly = weeklyPickSkus?.has(sku);
                 const isClearance = clearancePickSkus?.has(sku);
-                const isNew = newItemChecker?.(item);
+                const isJustAdded = isJustAddedItem(item);
+                const isNew = !isJustAdded && newItemChecker?.(item);
                 const promoNote = isWeekly
                   ? promoBadgeLabel
                   : isClearance
@@ -154,6 +158,7 @@ export function CatalogVirtualGrid({
                     highlight={Boolean(isWeekly || isClearance)}
                     editLabel={editLabel}
                     palletLabel={palletLabel}
+                    justAddedLabel={justAddedLabel}
                     showAdminEdit={showAdminEdit}
                     disabled={!canOrder}
                     unavailableNote={!canOrder ? orderBlockedMessage?.(item) : undefined}

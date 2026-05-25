@@ -1,6 +1,6 @@
 "use client";
 
-import { getDisplayStatus, getStatusBadgeStyle, isOrderableItem } from "../catalogUtils";
+import { getDisplayStatus, getStatusBadgeStyle, isJustAddedItem, isOrderableItem } from "../catalogUtils";
 import type { CatalogItem } from "../types";
 import {
   catalogCardStyle,
@@ -14,6 +14,7 @@ import {
   promoDealStyle,
   promoPriceStyle,
   promoTagStyle,
+  justAddedTagStyle,
 } from "../orderStyles";
 import { ProductImage } from "./ProductImage";
 
@@ -40,6 +41,7 @@ export function CatalogQtyCard({
   showAdminEdit,
   editLabel = "Edit",
   palletLabel,
+  justAddedLabel,
 }: {
   item: CatalogItem;
   qty: string;
@@ -64,7 +66,10 @@ export function CatalogQtyCard({
   editLabel?: string;
   /** e.g. "Pallet size" / "板数" — shown as `{label}: {value}` */
   palletLabel?: string;
+  /** e.g. "JUST ADDED" — shown when imported within JUST_ADDED_DAYS */
+  justAddedLabel?: string;
 }) {
+  const showJustAdded = Boolean(justAddedLabel && isJustAddedItem(item));
   const hasQty = Number(qty) > 0;
   const qtyNum = Number(qty) || 0;
   const showBogoRoundUp =
@@ -106,9 +111,11 @@ export function CatalogQtyCard({
         </a>
       ) : null}
 
-      {promoNote || highlight || promoRemaining ? (
+      {promoNote || showJustAdded || highlight || promoRemaining ? (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-          {promoNote || highlight ? <div style={promoTagStyle}>{promoNote || promoBadgeLabel}</div> : null}
+          {promoNote ? <div style={promoTagStyle}>{promoNote}</div> : null}
+          {!promoNote && showJustAdded ? <div style={justAddedTagStyle}>{justAddedLabel}</div> : null}
+          {!promoNote && !showJustAdded && highlight ? <div style={promoTagStyle}>{promoBadgeLabel}</div> : null}
           {promoRemaining ? (
             <div style={{ ...promoTagStyle, background: disabled ? "#e5e7eb" : "#ffffff", color: disabled ? "#6b7280" : "#0f766e" }}>
               {promoRemaining}
@@ -117,7 +124,7 @@ export function CatalogQtyCard({
         </div>
       ) : null}
 
-      <div className="catalog-card-image-wrap" style={{ paddingTop: promoNote || highlight ? 4 : 0 }}>
+      <div className="catalog-card-image-wrap" style={{ paddingTop: promoNote || showJustAdded || highlight ? 4 : 0 }}>
         <ProductImage sku={item.sku} alt={item.name || item.sku} size={96} imageUrl={item.imageUrl} />
       </div>
 

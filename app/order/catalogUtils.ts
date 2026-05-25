@@ -1,5 +1,6 @@
 import { catalog } from "./catalogState";
 
+import { isCatalogNewItem, isJustAddedItem as isJustAddedCatalogItem } from "@/lib/catalogNewItems";
 import { isOrderableCatalogStatus } from "@/lib/orderableCatalog";
 import { formatMoneyPrice, formatPromoTierPricesLine, getApplicablePromoTier } from "@/lib/promoFormat";
 import type { PromoPriceTier } from "@/lib/promotions";
@@ -201,19 +202,11 @@ export function formatOrderNotAvailableMessage(
 }
 
 export function isNewItem(item?: CatalogItem | null) {
-  if (typeof item?.isNew === "boolean") return item.isNew;
+  return isCatalogNewItem(item);
+}
 
-  const text = [
-    item?.name,
-    item?.size,
-    (item as CatalogItem & { name_k?: string })?.name_k,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toUpperCase()
-    .replace(/[_-]+/g, " ");
-
-  return /(^|\s)NEW(\s|$)/.test(text);
+export function isJustAddedItem(item?: CatalogItem | null) {
+  return isJustAddedCatalogItem(item);
 }
 
 export function getDisplayStatus(status?: string) {

@@ -17,6 +17,7 @@ import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
 import { buildClearanceUpsellLines } from "./salesFlow";
 import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog } from "./catalogState";
+import { compareCatalogByNewestImport } from "@/lib/catalogNewItems";
 import {
   formatBrandLabel,
   formatClearanceDetails,
@@ -493,7 +494,7 @@ export default function OrderPage() {
           const aNormal = isOrderableItem(a);
           const bNormal = isOrderableItem(b);
           if (aNormal !== bNormal) return aNormal ? -1 : 1;
-          return (a.sku || "").localeCompare(b.sku || "");
+          return compareCatalogByNewestImport(a, b);
         }),
     [catalogBrowseBase]
   );
@@ -1386,14 +1387,9 @@ export default function OrderPage() {
                     type="button"
                     onClick={() => {
                       setCatalogShowRecommendedOnly(false);
-                      if (mode === "catalog") {
-                        setCatalogShowNewOnly((prev) => !prev);
-                      } else {
-                        setCatalogShowNewOnly(false);
-                        changeMode("newItems");
-                      }
+                      setCatalogShowNewOnly((prev) => !prev);
                     }}
-                    style={newItemsButtonStyle(mode === "newItems" || catalogShowNewOnly)}
+                    style={newItemsButtonStyle(catalogShowNewOnly)}
                   >
                     {t.newItems} ({newItemCount})
                   </button>
@@ -1680,6 +1676,7 @@ export default function OrderPage() {
                 catalogQtyMap={catalogQtyMap}
                 inCartLabel={t.inCart}
                 palletLabel={t.pallet}
+                justAddedLabel={t.justAdded}
                 promoBadgeLabel={t.newItems}
                 newBadgeLabel={t.newItems}
                 editLabel={t.editProduct}
@@ -1753,6 +1750,7 @@ export default function OrderPage() {
                       item={cardItem}
                       qty={qty}
                       palletLabel={t.pallet}
+                      justAddedLabel={t.justAdded}
                       promoNote={soldOut ? t.promoSoldOut : item.promoNote}
                       promoDealLabel={promoDealLabel}
                       promoDealDetail={promoDealDetail}
@@ -1827,6 +1825,7 @@ export default function OrderPage() {
                   return (
                     <CatalogQtyCard key={item.sku} item={cardItem} qty={qty}
                       palletLabel={t.pallet}
+                      justAddedLabel={t.justAdded}
                       promoNote={soldOut ? t.clearanceSoldOut : item.clearanceNote || t.clearanceBadge}
                       promoPrice={priceLabel} promoDetails={detailsLabel} promoRemaining={remainingLabel}
                       policyNote={soldOut ? undefined : t.clearanceNoReturn}
@@ -1862,6 +1861,7 @@ export default function OrderPage() {
               catalogQtyMap={catalogQtyMap}
               inCartLabel={t.inCart}
               palletLabel={t.pallet}
+              justAddedLabel={t.justAdded}
               promoBadgeLabel={t.promoBadge}
               weeklyPickSkus={promoSkuSet}
               clearancePickSkus={clearanceSkuSet}

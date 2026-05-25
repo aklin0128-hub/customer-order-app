@@ -15,6 +15,11 @@ After saving a file with UPC / pallet columns:
 npm run catalog:patch-upc-pallet
 ```
 
+This also sets **`importedAt`** on every SKU in the spreadsheet.
+
+- **New items** tab: imported within **60 days**
+- **JUST ADDED** badge on cards: imported within **14 days**
+
 Or full rebuild from Excel (status, inventory, UPC, pallet, etc.):
 
 ```bash

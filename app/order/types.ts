@@ -14,6 +14,8 @@ export type CatalogItem = {
   imageUrl?: string;
   category?: string;
   isNew?: boolean;
+  /** ISO time when SKU last appeared in today_update.xlsx import */
+  importedAt?: string;
 };
 
 export type PromoPriceTier = {

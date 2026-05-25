@@ -89,6 +89,8 @@ function main() {
     raw: true,
   });
 
+  const importedAt = new Date().toISOString();
+
   const catalog = rows
     .map((row) => {
       const sku = safeString(row["PID"]).toUpperCase();
@@ -100,6 +102,7 @@ function main() {
 
       const item = {
         sku,
+        importedAt,
         name: safeString(row["Description"]),
         name_k: safeString(row["Description K"]),
         brand: safeString(row["Brand"]),

@@ -18,6 +18,13 @@ import {
 } from "../_components/admin-utils";
 import { AdminPublicShowcaseHint } from "../_components/AdminPublicShowcaseHint";
 import { useAdminAuth } from "../_components/useAdminAuth";
+import {
+  isCatalogNewItem,
+  isJustAddedItem,
+  JUST_ADDED_DAYS,
+  NEW_ITEM_IMPORT_WINDOW_DAYS,
+  parseImportedAtMs,
+} from "@/lib/catalogNewItems";
 import { CATEGORY_OPTIONS } from "@/lib/inferCategory";
 
 type Product = {
@@ -33,6 +40,7 @@ type Product = {
   imageUrl?: string;
   category?: string;
   isNew?: boolean;
+  importedAt?: string;
   source?: string;
 };
 
@@ -71,14 +79,13 @@ function productImageSrc(sku: string, imageUrl?: string) {
 }
 
 function isNewProduct(p?: Product | null) {
-  if (typeof p?.isNew === "boolean") return p.isNew;
+  return isCatalogNewItem(p);
+}
 
-  const text = [p?.name, p?.size]
-    .filter(Boolean)
-    .join(" ")
-    .toUpperCase()
-    .replace(/[_-]+/g, " ");
-  return /(^|\s)NEW(\s|$)/.test(text);
+function formatImportedAtLabel(value?: string) {
+  const ms = parseImportedAtMs(value);
+  if (ms == null) return "—";
+  return new Date(ms).toLocaleString();
 }
 
 export default function AdminProductsPage() {
@@ -212,7 +219,7 @@ export default function AdminProductsPage() {
     setLimitedQty(p.limitedQty || "");
     setPalletSize(p.palletSize || "");
     setImageUrl(p.imageUrl || "");
-    setIsNew(isNewProduct(p));
+    setIsNew(typeof p.isNew === "boolean" ? p.isNew : false);
     setFormDirty(false);
     setAutoSaveStatus("");
     notify(`Editing ${p.sku}`);
@@ -645,7 +652,7 @@ export default function AdminProductsPage() {
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                    {isNewProduct(p) ? <NewBadge /> : null}
+                    {isJustAddedItem(p) ? <JustAddedBadge /> : isNewProduct(p) ? <NewBadge /> : null}
                     <StatusBadge status={p.status} />
                   </div>
                 </div>
@@ -746,16 +753,23 @@ export default function AdminProductsPage() {
                 }}
               >
                 <input type="checkbox" checked={isNew} onChange={(e) => { setIsNew(e.target.checked); markDirty(); }} />
-                Show this SKU in customer “New items”
+                Always show in “New items” (manual override)
                 <span style={{ fontWeight: 600, color: "#c2410c" }}>
                   {" "}
-                  (also on{" "}
+                  — otherwise new if imported within {NEW_ITEM_IMPORT_WINDOW_DAYS} days (
                   <a href="/new/" target="_blank" rel="noopener noreferrer" style={{ color: "#1d4ed8" }}>
                     /new/
                   </a>
                   )
                 </span>
               </label>
+              <div style={{ gridColumn: "1 / -1", fontSize: 11, color: "#6b7280", marginTop: -4 }}>
+                Catalog import time: {formatImportedAtLabel(products.find((p) => p.sku?.toUpperCase() === sku.toUpperCase())?.importedAt)}
+                {isNewProduct(products.find((p) => p.sku?.toUpperCase() === sku.toUpperCase()) || null) &&
+                typeof products.find((p) => p.sku?.toUpperCase() === sku.toUpperCase())?.isNew !== "boolean"
+                  ? ` · new (${NEW_ITEM_IMPORT_WINDOW_DAYS}d import)${isJustAddedItem(products.find((p) => p.sku?.toUpperCase() === sku.toUpperCase()) || null) ? ` · JUST ADDED (${JUST_ADDED_DAYS}d)` : ""}`
+                  : ""}
+              </div>
               <div>
                 <label style={labelStyle}>Size</label>
                 <input value={size} onChange={(e) => updateText(setSize, e.target.value)} style={inputStyle} />
@@ -849,6 +863,26 @@ function NewBadge() {
       }}
     >
       NEW
+    </span>
+  );
+}
+
+function JustAddedBadge() {
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        fontWeight: 950,
+        padding: "3px 8px",
+        borderRadius: 999,
+        whiteSpace: "nowrap",
+        background: "#dc2626",
+        color: "#ffffff",
+        border: "1px solid #b91c1c",
+        letterSpacing: "0.05em",
+      }}
+    >
+      JUST ADDED
     </span>
   );
 }

@@ -12,6 +12,7 @@ export type MergedCatalogProduct = {
   palletSize?: string;
   imageUrl?: string;
   isNew?: boolean;
+  importedAt?: string;
   name_k?: string;
   [key: string]: unknown;
 };
