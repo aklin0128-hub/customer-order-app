@@ -343,7 +343,6 @@ export const listItem: CSSProperties = {
 export const listItemSelected: CSSProperties = {
   borderColor: "#2563eb",
   background: "#eff6ff",
-  boxShadow: "0 0 0 1px #2563eb",
 };
 
 export const chipRow: CSSProperties = {

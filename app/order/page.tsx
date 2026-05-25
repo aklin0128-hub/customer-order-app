@@ -1653,11 +1653,15 @@ export default function OrderPage() {
                   const bogoPack = soldOut ? null : getPromoBogoPackSize(item);
                   const catalogItem = getCatalogItemBySku(sku) || item;
                   const notOrderable = !isOrderableItem(catalogItem);
+                  const cardItem = catalogItem.palletSize
+                    ? { ...item, palletSize: catalogItem.palletSize }
+                    : item;
                   return (
                     <CatalogQtyCard
                       key={item.sku}
-                      item={item}
+                      item={cardItem}
                       qty={qty}
+                      palletLabel={t.pallet}
                       promoNote={soldOut ? t.promoSoldOut : item.promoNote}
                       promoDealLabel={promoDealLabel}
                       promoDealDetail={promoDealDetail}
@@ -1726,8 +1730,12 @@ export default function OrderPage() {
                   const remainingLabel = soldOut ? t.clearanceSoldOut : item.remainingQty !== null && item.remainingQty !== undefined ? `${t.clearanceRemaining}: ${item.remainingQty}` : undefined;
                   const catalogItem = getCatalogItemBySku(sku) || item;
                   const notOrderable = !isOrderableItem(catalogItem);
+                  const cardItem = catalogItem.palletSize
+                    ? { ...item, palletSize: catalogItem.palletSize }
+                    : item;
                   return (
-                    <CatalogQtyCard key={item.sku} item={item} qty={qty}
+                    <CatalogQtyCard key={item.sku} item={cardItem} qty={qty}
+                      palletLabel={t.pallet}
                       promoNote={soldOut ? t.clearanceSoldOut : item.clearanceNote || t.clearanceBadge}
                       promoPrice={priceLabel} promoDetails={detailsLabel} promoRemaining={remainingLabel}
                       policyNote={soldOut ? undefined : t.clearanceNoReturn}
@@ -1762,6 +1770,7 @@ export default function OrderPage() {
               items={orderableCatalogItems}
               catalogQtyMap={catalogQtyMap}
               inCartLabel={t.inCart}
+              palletLabel={t.pallet}
               promoBadgeLabel={t.promoBadge}
               weeklyPickSkus={promoSkuSet}
               clearancePickSkus={clearanceSkuSet}

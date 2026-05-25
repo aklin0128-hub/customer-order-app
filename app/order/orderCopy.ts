@@ -107,7 +107,7 @@ export const copy = {
     failedSubmit: "Failed to place order.",
     size: "Size",
     limited: "Limited",
-    pallet: "Pallet",
+    pallet: "Pallet size",
     selected: "Selected",
     allOrderable: "Catalog order",
     noMatches: "No items match your search.",

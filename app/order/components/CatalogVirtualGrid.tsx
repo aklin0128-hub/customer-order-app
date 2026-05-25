@@ -37,6 +37,7 @@ export function CatalogVirtualGrid({
   clearanceBadgeLabel,
   newBadgeLabel,
   editLabel,
+  palletLabel,
   showAdminEdit,
   canOrderItem,
   orderBlockedMessage,
@@ -53,6 +54,7 @@ export function CatalogVirtualGrid({
   clearanceBadgeLabel?: string;
   newBadgeLabel?: string;
   editLabel?: string;
+  palletLabel?: string;
   showAdminEdit?: boolean;
   canOrderItem?: (item: CatalogItem) => boolean;
   orderBlockedMessage?: (item: CatalogItem) => string;
@@ -151,6 +153,7 @@ export function CatalogVirtualGrid({
                     promoBadgeLabel={promoBadgeLabel}
                     highlight={Boolean(isWeekly || isClearance)}
                     editLabel={editLabel}
+                    palletLabel={palletLabel}
                     showAdminEdit={showAdminEdit}
                     disabled={!canOrder}
                     unavailableNote={!canOrder ? orderBlockedMessage?.(item) : undefined}

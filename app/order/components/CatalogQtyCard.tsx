@@ -39,6 +39,7 @@ export function CatalogQtyCard({
   unavailableNote,
   showAdminEdit,
   editLabel = "Edit",
+  palletLabel,
 }: {
   item: CatalogItem;
   qty: string;
@@ -61,6 +62,8 @@ export function CatalogQtyCard({
   unavailableNote?: string;
   showAdminEdit?: boolean;
   editLabel?: string;
+  /** e.g. "Pallet size" / "板数" — shown as `{label}: {value}` */
+  palletLabel?: string;
 }) {
   const hasQty = Number(qty) > 0;
   const qtyNum = Number(qty) || 0;
@@ -122,6 +125,11 @@ export function CatalogQtyCard({
       <div style={{ fontSize: 12, fontWeight: 800, color: "#374151" }}>{item.brand || "-"}</div>
       <div style={catalogNameStyle}>{item.name || "-"}</div>
       {item.size ? <div style={{ fontSize: 11, color: "#6b7280" }}>{item.size}</div> : null}
+      {item.palletSize && palletLabel ? (
+        <div style={{ fontSize: 11, color: "#6b7280", marginTop: item.size ? 2 : 0 }}>
+          {palletLabel}: {item.palletSize}
+        </div>
+      ) : null}
       {!isOrderableItem(item) && getDisplayStatus(item.status) ? (
         <span
           style={{
