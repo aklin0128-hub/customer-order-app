@@ -25,8 +25,15 @@ export function ShowcaseCard({
     [showPromo, item, lang]
   );
 
+  const justAddedBadge =
+    badge ||
+    (item.justAdded ? (lang === "zh" ? "刚刚上架" : lang === "ko" ? "방금 등록" : lang === "vi" ? "MỚI THÊM" : "JUST ADDED") : null);
+
   return (
     <article className={className}>
+      {justAddedBadge ? (
+        <div className="showcase-card-badge showcase-card-badge--just-added">{justAddedBadge}</div>
+      ) : null}
       <div className="showcase-card-img-wrap">
         {imgError ? (
           <div className="showcase-card-img-fallback">SKU</div>
@@ -52,7 +59,7 @@ export function ShowcaseCard({
           {line}
         </div>
       ))}
-      {badge ? <div className="showcase-card-badge">{badge}</div> : null}
+      {badge && !item.justAdded ? <div className="showcase-card-badge">{badge}</div> : null}
     </article>
   );
 }

@@ -138,12 +138,12 @@ export function CatalogVirtualGrid({
                 const isWeekly = weeklyPickSkus?.has(sku);
                 const isClearance = clearancePickSkus?.has(sku);
                 const isJustAdded = isJustAddedItem(item);
-                const isNew = !isJustAdded && newItemChecker?.(item);
+                const showNewTag = !isJustAdded && Boolean(newItemChecker?.(item));
                 const promoNote = isWeekly
                   ? promoBadgeLabel
                   : isClearance
                     ? clearanceBadgeLabel || promoBadgeLabel
-                    : isNew
+                    : showNewTag
                       ? newBadgeLabel
                       : undefined;
                 const canOrder = canOrderItem?.(item) ?? true;

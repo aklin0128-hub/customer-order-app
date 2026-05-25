@@ -70,6 +70,17 @@
   margin-top: 2px;
 }
 
+.showcase-card-badge--just-added {
+  margin-top: 0;
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+  color: #fff;
+  background: #dc2626;
+  border: 1px solid #b91c1c;
+}
+
 .showcase-card-badge {
   margin-top: 2px;
   font-size: 10px;

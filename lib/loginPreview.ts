@@ -1,4 +1,5 @@
 import { isNewItem } from "@/app/order/catalogUtils";
+import { compareCatalogForDisplay } from "@/lib/catalogNewItems";
 import { getMergedCatalogProducts } from "@/lib/catalogMerge";
 import { getPromotionProducts, type PromotionProduct } from "@/lib/promotions";
 import { cachedServerData, SERVER_CACHE } from "@/lib/serverDataCache";
@@ -22,6 +23,7 @@ export type LoginPreviewCard = {
   promoQty?: number;
   soldQty?: number;
   remainingQty?: number | null;
+  justAdded?: boolean;
 };
 
 export type ShowcaseData = {
@@ -70,6 +72,7 @@ function catalogToCard(item: Record<string, unknown>): LoginPreviewCard {
     brand: String(item.brand || "").trim() || undefined,
     size: String(item.size || "").trim() || undefined,
     imageUrl: productImageUrl(sku, String(item.imageUrl || "").trim() || undefined),
+    justAdded: Boolean(item.justAdded),
   };
 }
 
@@ -81,6 +84,8 @@ async function listNewItemCards(cardLimit?: number) {
     if (!isNewItem(item as CatalogItem)) continue;
     cards.push(catalogToCard(item));
   }
+
+  cards.sort(compareCatalogForDisplay);
 
   return {
     cards: cardLimit != null ? cards.slice(0, cardLimit) : cards,

@@ -113,9 +113,9 @@ export function CatalogQtyCard({
 
       {promoNote || showJustAdded || highlight || promoRemaining ? (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-          {promoNote ? <div style={promoTagStyle}>{promoNote}</div> : null}
-          {!promoNote && showJustAdded ? <div style={justAddedTagStyle}>{justAddedLabel}</div> : null}
-          {!promoNote && !showJustAdded && highlight ? <div style={promoTagStyle}>{promoBadgeLabel}</div> : null}
+          {showJustAdded ? <div style={justAddedTagStyle}>{justAddedLabel}</div> : null}
+          {!showJustAdded && promoNote ? <div style={promoTagStyle}>{promoNote}</div> : null}
+          {!showJustAdded && !promoNote && highlight ? <div style={promoTagStyle}>{promoBadgeLabel}</div> : null}
           {promoRemaining ? (
             <div style={{ ...promoTagStyle, background: disabled ? "#e5e7eb" : "#ffffff", color: disabled ? "#6b7280" : "#0f766e" }}>
               {promoRemaining}
