@@ -96,6 +96,13 @@ export const clearanceModeButtonStyle = (active: boolean): CSSProperties => ({
   color: active ? "#c2410c" : "#9a3412",
   fontSize: 11,
 });
+export const newItemsModeButtonStyle = (active: boolean): CSSProperties => ({
+  ...modeButtonStyle(active),
+  border: active ? "1px solid #ea580c" : "1px solid #fdba74",
+  background: active ? "#ea580c" : "#fff7ed",
+  color: active ? "#ffffff" : "#c2410c",
+  fontSize: 11,
+});
 export const qtyButtonStyle: CSSProperties = {
   padding: "6px 0",
   borderRadius: 10,

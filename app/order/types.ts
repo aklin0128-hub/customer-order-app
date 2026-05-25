@@ -1,5 +1,5 @@
 export type Lang = "en" | "zh" | "ko" | "vi";
-export type OrderMode = "search" | "catalog" | "promotion" | "clearance";
+export type OrderMode = "search" | "catalog" | "promotion" | "clearance" | "newItems";
 
 export type CatalogItem = {
   sku: string;

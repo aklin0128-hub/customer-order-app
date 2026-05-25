@@ -55,6 +55,7 @@ import {
   limitedBadgeStyle,
   modeButtonStyle,
   newItemsButtonStyle,
+  newItemsModeButtonStyle,
   primarySmallButtonStyle,
   productSmallButtonStyle,
   clearanceModeButtonStyle,
@@ -205,7 +206,12 @@ export default function OrderPage() {
     if (saved === "en" || saved === "zh" || saved === "ko" || saved === "vi") setLang(saved);
 
     const savedMode = localStorage.getItem("order_mode") as OrderMode | null;
-    if (savedMode === "catalog" || savedMode === "promotion" || savedMode === "clearance") {
+    if (
+      savedMode === "catalog" ||
+      savedMode === "promotion" ||
+      savedMode === "clearance" ||
+      savedMode === "newItems"
+    ) {
       setMode(savedMode);
     } else if (savedMode === "search" || !savedMode) {
       setMode("promotion");
@@ -476,6 +482,19 @@ export default function OrderPage() {
 
   const newItemCount = useMemo(
     () => catalogBrowseBase.filter((item) => isNewItem(item)).length,
+    [catalogBrowseBase]
+  );
+
+  const newItemCatalogItems = useMemo(
+    () =>
+      catalogBrowseBase
+        .filter((item) => isNewItem(item))
+        .sort((a, b) => {
+          const aNormal = isOrderableItem(a);
+          const bNormal = isOrderableItem(b);
+          if (aNormal !== bNormal) return aNormal ? -1 : 1;
+          return (a.sku || "").localeCompare(b.sku || "");
+        }),
     [catalogBrowseBase]
   );
 
@@ -837,6 +856,15 @@ export default function OrderPage() {
       if (!sku) continue;
       const catalogItem = getCatalogItemBySku(sku) || item;
       if (!isOrderableItem(catalogItem)) continue;
+      adjustQtyForSku(sku, 1);
+    }
+  };
+
+  const addAllNewItemsOneCase = () => {
+    for (const item of newItemCatalogItems) {
+      const sku = item.sku?.toUpperCase();
+      if (!sku) continue;
+      if (!isOrderableItem(item)) continue;
       adjustQtyForSku(sku, 1);
     }
   };
@@ -1283,6 +1311,17 @@ export default function OrderPage() {
               <button
                 type="button"
                 role="tab"
+                aria-selected={mode === "newItems"}
+                onClick={() => changeMode("newItems")}
+                className="order-mode-tab"
+                style={newItemsModeButtonStyle(mode === "newItems")}
+              >
+                {t.newItemsMode}
+                {newItemCount > 0 ? ` (${newItemCount})` : ""}
+              </button>
+              <button
+                type="button"
+                role="tab"
                 aria-selected={mode === "clearance"}
                 onClick={() => changeMode("clearance")}
                 className="order-mode-tab"
@@ -1346,10 +1385,15 @@ export default function OrderPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setCatalogShowNewOnly((prev) => !prev);
                       setCatalogShowRecommendedOnly(false);
+                      if (mode === "catalog") {
+                        setCatalogShowNewOnly((prev) => !prev);
+                      } else {
+                        setCatalogShowNewOnly(false);
+                        changeMode("newItems");
+                      }
                     }}
-                    style={newItemsButtonStyle(catalogShowNewOnly)}
+                    style={newItemsButtonStyle(mode === "newItems" || catalogShowNewOnly)}
                   >
                     {t.newItems} ({newItemCount})
                   </button>
@@ -1599,6 +1643,53 @@ export default function OrderPage() {
                 ))}
               </div>
             </div>
+          </section>
+        ) : mode === "newItems" ? (
+          <section
+            className="order-shop-card"
+            style={{ ...cardStyle, border: "1px solid #fdba74", background: "linear-gradient(180deg, #fff7ed 0%, #ffffff 40%)" }}
+          >
+            <div style={sectionTitleStyle}>{t.newItemsMode}</div>
+            <p style={{ fontSize: 13, color: "#9a3412", margin: "4px 0 10px", lineHeight: 1.45 }}>{t.newItemsHero}</p>
+            {newItemCatalogItems.length > 0 ? (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+                <button
+                  type="button"
+                  onClick={addAllNewItemsOneCase}
+                  style={{
+                    border: "1px solid #ea580c",
+                    background: "#ea580c",
+                    color: "#fff",
+                    borderRadius: 999,
+                    padding: "8px 14px",
+                    fontSize: 12,
+                    fontWeight: 900,
+                    cursor: "pointer",
+                  }}
+                >
+                  {t.addAllNewItemsOneCase}
+                </button>
+              </div>
+            ) : null}
+
+            {newItemCatalogItems.length === 0 ? (
+              <div style={{ ...emptyStyle, border: "1px solid #fdba74", background: "#fff7ed", color: "#c2410c" }}>{t.noNewItems}</div>
+            ) : (
+              <CatalogVirtualGrid
+                items={newItemCatalogItems}
+                catalogQtyMap={catalogQtyMap}
+                inCartLabel={t.inCart}
+                palletLabel={t.pallet}
+                promoBadgeLabel={t.newItems}
+                newBadgeLabel={t.newItems}
+                editLabel={t.editProduct}
+                showAdminEdit={showAdminEditLinks}
+                canOrderItem={isOrderableItem}
+                orderBlockedMessage={(item) => formatOrderNotAvailableMessage(item.sku || "", item.status, t)}
+                onAdjust={adjustCatalogQty}
+                onUpdateQty={updateCatalogQty}
+              />
+            )}
           </section>
         ) : mode === "promotion" ? (
           <section
@@ -2019,8 +2110,8 @@ export default function OrderPage() {
                   count: newItemCount,
                   onView: () => {
                     setShowReview(false);
-                    setCatalogShowNewOnly(true);
-                    changeMode("catalog");
+                    setCatalogShowNewOnly(false);
+                    changeMode("newItems");
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   },
                 }
