@@ -47,10 +47,10 @@ type StatusUploadResult = {
   sheetName?: string;
   totalRows?: number;
   updatedCount?: number;
-  unknownCount?: number;
+  createdCount?: number;
   skippedCount?: number;
-  updatedPreview?: { sku: string; status: string }[];
-  unknownPreview?: string[];
+  updatedPreviewLabels?: string[];
+  createdPreviewLabels?: string[];
   skippedPreview?: string[];
 };
 
@@ -500,7 +500,7 @@ export default function AdminProductsPage() {
 
       setStatusUploadResult(data);
       notify(
-        `Status upload complete: ${data.updatedCount || 0} updated, ${data.unknownCount || 0} unknown, ${data.skippedCount || 0} skipped.`
+        `Status upload complete: ${data.updatedCount || 0} updated, ${data.createdCount || 0} created, ${data.skippedCount || 0} skipped.`
       );
       await loadProducts();
     } catch (err: any) {
@@ -572,24 +572,25 @@ export default function AdminProductsPage() {
               disabled={uploadingStatusXlsx}
             />
             <p style={{ margin: 0, fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>
-              Reads <strong>PID/SKU</strong> and <strong>Status</strong>. Status <strong>NEW</strong> is not customer “New items”.
+              Reads <strong>PID/SKU</strong>, <strong>Status</strong>, <strong>UPC</strong>, <strong>PL</strong>, and other Export columns.
+              Unknown SKUs are created in Redis. Status <strong>NEW</strong> is not customer “New items”.
             </p>
             {uploadingStatusXlsx ? <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: "#2563eb" }}>Uploading and updating status...</p> : null}
             {statusUploadResult ? (
               <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 10, background: "#f9fafb", fontSize: 12, color: "#374151", lineHeight: 1.5 }}>
                 <div style={{ fontWeight: 900, color: "#111827" }}>
-                  Sheet {statusUploadResult.sheetName || "-"}: {statusUploadResult.updatedCount || 0} updated / {statusUploadResult.totalRows || 0} rows
+                  Sheet {statusUploadResult.sheetName || "-"}: {statusUploadResult.updatedCount || 0} updated, {statusUploadResult.createdCount || 0} created / {statusUploadResult.totalRows || 0} rows
                 </div>
-                {statusUploadResult.updatedPreview?.length ? (
+                {statusUploadResult.updatedPreviewLabels?.length ? (
                   <div style={{ marginTop: 6 }}>
-                    <strong>Updated:</strong> {statusUploadResult.updatedPreview.map((item) => `${item.sku} → ${item.status}`).join(", ")}
-                    {(statusUploadResult.updatedCount || 0) > statusUploadResult.updatedPreview.length ? " ..." : ""}
+                    <strong>Updated:</strong> {statusUploadResult.updatedPreviewLabels.join(", ")}
+                    {(statusUploadResult.updatedCount || 0) > statusUploadResult.updatedPreviewLabels.length ? " ..." : ""}
                   </div>
                 ) : null}
-                {statusUploadResult.unknownPreview?.length ? (
-                  <div style={{ marginTop: 6, color: "#b45309" }}>
-                    <strong>Unknown SKU:</strong> {statusUploadResult.unknownPreview.join(", ")}
-                    {(statusUploadResult.unknownCount || 0) > statusUploadResult.unknownPreview.length ? " ..." : ""}
+                {statusUploadResult.createdPreviewLabels?.length ? (
+                  <div style={{ marginTop: 6, color: "#047857" }}>
+                    <strong>Created:</strong> {statusUploadResult.createdPreviewLabels.join(", ")}
+                    {(statusUploadResult.createdCount || 0) > statusUploadResult.createdPreviewLabels.length ? " ..." : ""}
                   </div>
                 ) : null}
                 {statusUploadResult.skippedPreview?.length ? (

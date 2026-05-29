@@ -74,3 +74,100 @@ export function parsePalletSizeFromXlsxRow(row: Record<string, unknown>) {
 
   return "";
 }
+
+function safeXlsxNumber(value: unknown) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : undefined;
+}
+
+export type XlsxProductFields = {
+  sku: string;
+  name?: string;
+  name_k?: string;
+  brand?: string;
+  brand_k?: string;
+  status?: string;
+  size?: string;
+  um?: string;
+  upc?: string;
+  palletSize?: string;
+  inventory?: number;
+  bp?: number;
+  up?: number;
+  cbm?: number;
+  shelf_life_days?: number;
+  storage_type?: string;
+  country?: string;
+};
+
+const SKU_KEYS = ["PID", "SKU", "Item No.", "Item No", "No.", "No", "Item", "Item Number"];
+
+export function parseSkuFromXlsxRow(row: Record<string, unknown>) {
+  return getXlsxCell(row, SKU_KEYS).toUpperCase();
+}
+
+/** Full product fields from an Export sheet row (same columns as catalog rebuild). */
+export function parseProductFieldsFromXlsxRow(
+  row: Record<string, unknown>,
+  sku: string
+): XlsxProductFields {
+  const product: XlsxProductFields = { sku };
+
+  const name = getXlsxCell(row, ["Description", "DESCRIPTION", "Name", "NAME"]);
+  if (name) product.name = name;
+
+  const nameK = getXlsxCell(row, ["Description K", "Description_K", "DESCRIPTION K"]);
+  if (nameK) product.name_k = nameK;
+
+  const brand = getXlsxCell(row, ["Brand", "BRAND"]);
+  if (brand) product.brand = brand;
+
+  const brandK = getXlsxCell(row, ["Brand_K", "Brand K", "BRAND_K"]);
+  if (brandK) product.brand_k = brandK;
+
+  const status = getXlsxCell(row, ["Status", "STATUS", "Item Status"]).toUpperCase();
+  if (status) product.status = status;
+
+  const size = getXlsxCell(row, ["Size", "SIZE"]);
+  if (size) product.size = size;
+
+  const um = getXlsxCell(row, ["UM"]);
+  if (um) product.um = um;
+
+  const upc = parseUpcFromXlsxRow(row);
+  if (upc) product.upc = upc;
+
+  const palletSize = parsePalletSizeFromXlsxRow(row);
+  if (palletSize) product.palletSize = palletSize;
+
+  const inventory = safeXlsxNumber(getXlsxCell(row, ["INV (10)", "INV(10)", "INV"]));
+  if (inventory !== undefined) product.inventory = inventory;
+
+  const bp = safeXlsxNumber(getXlsxCell(row, ["BP"]));
+  if (bp !== undefined) product.bp = bp;
+
+  const up = safeXlsxNumber(getXlsxCell(row, ["UP"]));
+  if (up !== undefined) product.up = up;
+
+  const cbm = safeXlsxNumber(getXlsxCell(row, ["CBM"]));
+  if (cbm !== undefined) product.cbm = cbm;
+
+  const shelfLife = safeXlsxNumber(getXlsxCell(row, ["S Life (D)", "S Life(D)", "S LIFE (D)"]));
+  if (shelfLife !== undefined) product.shelf_life_days = shelfLife;
+
+  const storageType = getXlsxCell(row, ["S Type", "S TYPE", "Storage Type"]);
+  if (storageType) product.storage_type = storageType;
+
+  const country = getXlsxCell(row, ["CO", "Country", "COUNTRY"]);
+  if (country) product.country = country;
+
+  return product;
+}
+
+export function hasXlsxProductUpdate(row: Record<string, unknown>) {
+  const status = getXlsxCell(row, ["Status", "STATUS", "Item Status"]);
+  const upc = parseUpcFromXlsxRow(row);
+  const palletSize = parsePalletSizeFromXlsxRow(row);
+  return Boolean(status || upc || palletSize);
+}

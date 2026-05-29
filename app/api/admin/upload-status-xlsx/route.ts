@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
-import { parsePalletSizeFromXlsxRow, parseUpcFromXlsxRow } from "@/lib/catalogXlsxFields";
+import {
+  hasXlsxProductUpdate,
+  parseProductFieldsFromXlsxRow,
+  parseSkuFromXlsxRow,
+} from "@/lib/catalogXlsxFields";
 import { listRedisProductSkus, productRedisKey, saveRedisProduct } from "@/lib/productRedisStore";
 import { redis } from "@/lib/redis";
 import { bustServerDataCache, SERVER_CACHE } from "@/lib/serverDataCache";
@@ -12,38 +16,57 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "536678";
 
 type Product = {
   sku: string;
+  name?: string;
+  name_k?: string;
+  brand?: string;
+  brand_k?: string;
+  status?: string;
+  size?: string;
+  um?: string;
+  upc?: string;
+  palletSize?: string;
+  inventory?: number;
+  bp?: number;
+  up?: number;
+  cbm?: number;
+  shelf_life_days?: number;
+  storage_type?: string;
+  country?: string;
+  importedAt?: string;
+  source?: string;
+  updatedAt?: string;
+};
+
+type UploadPreview = {
+  sku: string;
   status?: string;
   upc?: string;
   palletSize?: string;
-  source?: string;
-  updatedAt?: string;
+  name?: string;
 };
 
 function checkAdmin(req: Request) {
   return (req.headers.get("x-admin-password") || "") === ADMIN_PASSWORD;
 }
 
-function safeString(value: unknown) {
-  if (value === undefined || value === null) return "";
-  return String(value).trim();
+function previewFromProduct(product: Product): UploadPreview {
+  return {
+    sku: product.sku,
+    ...(product.status ? { status: product.status } : {}),
+    ...(product.upc ? { upc: product.upc } : {}),
+    ...(product.palletSize ? { palletSize: product.palletSize } : {}),
+    ...(product.name ? { name: product.name } : {}),
+  };
 }
 
-function getAny(row: Record<string, unknown>, keys: string[]) {
-  for (const key of keys) {
-    const value = row[key];
-    if (safeString(value)) return safeString(value);
-  }
-
-  const normalized = new Map(
-    Object.keys(row).map((key) => [key.trim().toUpperCase(), key])
-  );
-
-  for (const key of keys) {
-    const actual = normalized.get(key.trim().toUpperCase());
-    if (actual && safeString(row[actual])) return safeString(row[actual]);
-  }
-
-  return "";
+function formatPreviewLabel(item: UploadPreview) {
+  const parts = [
+    item.status,
+    item.upc ? `UPC ${item.upc}` : "",
+    item.palletSize ? `PL ${item.palletSize}` : "",
+    item.name ? item.name : "",
+  ].filter(Boolean);
+  return `${item.sku} → ${parts.join(" · ") || "—"}`;
 }
 
 export async function POST(req: Request) {
@@ -75,36 +98,51 @@ export async function POST(req: Request) {
 
     const knownSkus = new Set(
       (catalogData as { sku?: string }[])
-        .map((item) => safeString(item.sku).toUpperCase())
+        .map((item) => String(item.sku || "").trim().toUpperCase())
         .filter(Boolean)
     );
     for (const sku of await listRedisProductSkus()) {
       knownSkus.add(sku);
     }
 
-    const updated: { sku: string; status?: string; upc?: string; palletSize?: string }[] = [];
-    const unknown: string[] = [];
+    const updated: UploadPreview[] = [];
+    const created: UploadPreview[] = [];
     const skipped: string[] = [];
     const seen = new Set<string>();
 
     for (const row of rows) {
-      const sku = getAny(row, ["PID", "SKU", "Item No.", "Item No", "No.", "No", "Item", "Item Number"]).toUpperCase();
-      const status = getAny(row, ["Status", "STATUS", "Item Status"]).toUpperCase();
-      const upc = parseUpcFromXlsxRow(row);
-      const palletSize = parsePalletSizeFromXlsxRow(row);
+      const sku = parseSkuFromXlsxRow(row);
 
       if (!sku) continue;
 
-      if (!status && !upc && !palletSize) {
-        skipped.push("(missing SKU/status/UPC/pallet)");
+      if (sku.includes(" ")) {
+        skipped.push(`${sku} (invalid SKU)`);
+        continue;
+      }
+
+      if (!hasXlsxProductUpdate(row)) {
+        skipped.push(`${sku} (missing status/UPC/pallet)`);
         continue;
       }
 
       if (seen.has(sku)) continue;
       seen.add(sku);
 
+      const fields = parseProductFieldsFromXlsxRow(row, sku);
+      const now = new Date().toISOString();
+
       if (!knownSkus.has(sku)) {
-        unknown.push(sku);
+        const product: Product = {
+          ...fields,
+          sku,
+          importedAt: now,
+          source: "Redis",
+          updatedAt: now,
+        };
+
+        await saveRedisProduct(product);
+        knownSkus.add(sku);
+        created.push(previewFromProduct(product));
         continue;
       }
 
@@ -113,20 +151,14 @@ export async function POST(req: Request) {
         ...existing,
         sku,
         source: "Redis",
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
       };
-      if (status) patch.status = status;
-      if (upc) patch.upc = upc;
-      if (palletSize) patch.palletSize = palletSize;
+      if (fields.status) patch.status = fields.status;
+      if (fields.upc) patch.upc = fields.upc;
+      if (fields.palletSize) patch.palletSize = fields.palletSize;
 
       await saveRedisProduct(patch);
-
-      updated.push({
-        sku,
-        ...(status ? { status } : {}),
-        ...(upc ? { upc } : {}),
-        ...(palletSize ? { palletSize } : {}),
-      });
+      updated.push(previewFromProduct(patch));
     }
 
     bustServerDataCache(SERVER_CACHE.catalog);
@@ -137,11 +169,13 @@ export async function POST(req: Request) {
       sheetName,
       totalRows: rows.length,
       updatedCount: updated.length,
-      unknownCount: unknown.length,
+      createdCount: created.length,
       skippedCount: skipped.length,
       updatedPreview: updated.slice(0, 20),
-      unknownPreview: unknown.slice(0, 20),
+      createdPreview: created.slice(0, 20),
       skippedPreview: skipped.slice(0, 20),
+      updatedPreviewLabels: updated.slice(0, 20).map(formatPreviewLabel),
+      createdPreviewLabels: created.slice(0, 20).map(formatPreviewLabel),
     });
   } catch (error: any) {
     return NextResponse.json(

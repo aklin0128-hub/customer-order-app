@@ -28,4 +28,4 @@ Or full rebuild from Excel (status, inventory, UPC, pallet, etc.):
 npm run catalog:rebuild
 ```
 
-Admin **Products → Upload today_update.xlsx** also applies **Status**, **UPC**, and **pallet size** to Redis overrides.
+Admin **Products → Upload today_update.xlsx** applies **Status**, **UPC**, and **pallet size** to Redis overrides, and **creates new Redis products** for SKUs not already in the catalog.
