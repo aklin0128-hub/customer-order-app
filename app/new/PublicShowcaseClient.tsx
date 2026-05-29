@@ -25,6 +25,8 @@ const copy = {
     emptyPromo: "No weekly picks right now. Check back soon.",
     emptyNew: "No new items right now.",
     updated: "Updated when you open this page",
+    newHint: "JUST ADDED items appear first. Tap Details for descriptions and PDFs.",
+    promoHint: "Weekly ad specials — sign in to add cases to your cart.",
   },
   zh: {
     brand: "门店订货",
@@ -36,6 +38,8 @@ const copy = {
     emptyPromo: "暂无本周主推，请稍后再看。",
     emptyNew: "暂无新品。",
     updated: "打开页面时更新",
+    newHint: "「刚刚上架」排在最前；有介绍或 PDF 的可点「查看说明」。",
+    promoHint: "本周主推促销 — 登录后可加入购物车下单。",
   },
   ko: {
     brand: "매장 주문",
@@ -47,6 +51,8 @@ const copy = {
     emptyPromo: "이번 주 추천이 없습니다.",
     emptyNew: "신상품이 없습니다.",
     updated: "페이지를 열 때 갱신됩니다",
+    newHint: "방금 등록 상품이 맨 위에 표시됩니다. 상세보기에서 PDF를 볼 수 있습니다.",
+    promoHint: "이번 주 추천 — 로그인 후 장바구니에 담아 주문하세요.",
   },
   vi: {
     brand: "Cửa hàng",
@@ -58,6 +64,8 @@ const copy = {
     emptyPromo: "Chưa có nổi bật tuần.",
     emptyNew: "Chưa có hàng mới.",
     updated: "Cập nhật khi mở trang",
+    newHint: "MỚI THÊM hiển thị trước. Nhấn Chi tiết để xem mô tả và PDF.",
+    promoHint: "Nổi bật tuần — đăng nhập để thêm vào giỏ.",
   },
 };
 
@@ -163,6 +171,12 @@ export default function PublicShowcaseClient({ data }: { data: ShowcaseData }) {
                 {data.newItemTotal > 0 ? ` (${data.newItemTotal})` : ""}
               </button>
             </div>
+
+            {items.length > 0 ? (
+              <p className="new-tab-hint" role="note">
+                {tab === "new" ? t.newHint : t.promoHint}
+              </p>
+            ) : null}
 
             {items.length === 0 ? (
               <div className="new-empty">{emptyText}</div>

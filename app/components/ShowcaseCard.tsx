@@ -49,43 +49,58 @@ export function ShowcaseCard({
           {justAddedBadge ? <div style={justAddedBadgeStyle}>{justAddedBadge}</div> : null}
           {storageLabel ? (
             <div
-              className={`showcase-card-badge showcase-card-storage showcase-card-storage--${storageLabel.toLowerCase()}`}
+              className={`showcase-card-storage showcase-card-storage--${storageLabel.toLowerCase()}`}
             >
               {storageLabel}
             </div>
           ) : null}
         </div>
       ) : null}
-      <div className="showcase-card-img-wrap">
-        {imgError ? (
-          <div className="showcase-card-img-fallback">SKU</div>
-        ) : (
-          <img
-            src={item.imageUrl || `/product/${item.sku}.jpg`}
-            alt={item.name || item.sku}
-            loading="lazy"
-            decoding="async"
-            onError={() => setImgError(true)}
-          />
-        )}
-      </div>
-      <div className="showcase-card-sku">{item.sku}</div>
-      {item.brand ? <div className="showcase-card-brand">{item.brand}</div> : null}
-      <div className="showcase-card-name">{item.name || "—"}</div>
-      {item.size ? <div className="showcase-card-size">{item.size}</div> : null}
-      {promoDisplay?.priceLine ? (
-        <div className="showcase-card-price">{promoDisplay.priceLine}</div>
-      ) : null}
-      {promoDisplay?.details.map((line, index) => (
-        <div key={`${index}-${line}`} className="showcase-card-detail">
-          {line}
+
+      <div className="showcase-card-body">
+        <div className="showcase-card-img-wrap">
+          {imgError ? (
+            <div className="showcase-card-img-fallback">SKU</div>
+          ) : (
+            <img
+              src={item.imageUrl || `/product/${item.sku}.jpg`}
+              alt={item.name || item.sku}
+              loading="lazy"
+              decoding="async"
+              onError={() => setImgError(true)}
+            />
+          )}
         </div>
-      ))}
-      {hasNewDetails ? (
-        <button type="button" className="showcase-card-details-btn" onClick={() => setDetailsOpen(true)}>
-          {detailsLabel[lang]}
-        </button>
-      ) : null}
+
+        <div className="showcase-card-meta">
+          <div className="showcase-card-sku">{item.sku}</div>
+          {item.brand ? <div className="showcase-card-brand">{item.brand}</div> : null}
+          <div className="showcase-card-name" title={item.name || undefined}>
+            {item.name || "—"}
+          </div>
+          {item.size ? <div className="showcase-card-size">{item.size}</div> : null}
+          {promoDisplay?.priceLine ? (
+            <div className="showcase-card-price">{promoDisplay.priceLine}</div>
+          ) : null}
+          {promoDisplay?.details.map((line, index) => (
+            <div key={`${index}-${line}`} className="showcase-card-detail">
+              {line}
+            </div>
+          ))}
+        </div>
+
+        {hasNewDetails ? (
+          <button
+            type="button"
+            className="showcase-card-details-btn"
+            onClick={() => setDetailsOpen(true)}
+            aria-haspopup="dialog"
+          >
+            {detailsLabel[lang]}
+          </button>
+        ) : null}
+      </div>
+
       {detailsOpen ? (
         <ShowcaseDescriptionModal item={item} lang={lang} onClose={() => setDetailsOpen(false)} />
       ) : null}

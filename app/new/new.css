@@ -69,6 +69,7 @@
   font-size: 11px;
   font-weight: 800;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .new-lang-btn.is-active {
@@ -111,7 +112,12 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
+  position: sticky;
+  top: max(8px, env(safe-area-inset-top));
+  z-index: 10;
+  padding: 6px 0;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.98) 70%, rgba(248, 250, 252, 0));
 }
 
 .new-tab {
@@ -123,6 +129,7 @@
   border: 1px solid #d1d5db;
   background: #fff;
   color: #374151;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 
 .new-tab.is-promo.is-active {
@@ -137,13 +144,27 @@
   color: #1d4ed8;
 }
 
+.new-tab-hint {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: #1e40af;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+}
+
 .new-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+  align-items: stretch;
 }
 
 .new-card {
+  height: 100%;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   padding: 8px;
@@ -153,18 +174,26 @@
   gap: 4px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   min-width: 0;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.new-card .showcase-card-body {
+  flex: 1;
 }
 
 .new-card .showcase-card-badge-row {
   margin-bottom: 4px;
+  min-height: 0;
 }
 
 .new-card .showcase-card-img-wrap {
-  min-height: 96px;
-  margin-bottom: 0;
+  min-height: 100px;
+  width: 100%;
+  margin-bottom: 2px;
 }
 
-.new-card .showcase-card-img-wrap img {
+.new-card .showcase-card-img-wrap img,
+.new-card .showcase-card-img-fallback {
   width: 96px;
   height: 96px;
 }
@@ -186,16 +215,31 @@
   font-size: 12px;
   color: #4b5563;
   line-height: 1.3;
-  max-height: 40px;
+  max-height: 48px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.new-card .showcase-card-size {
+  font-size: 11px;
+  color: #6b7280;
 }
 
 .new-card .showcase-card-price {
   font-size: 12px;
   line-height: 1.35;
+  margin-top: 2px;
 }
 
 .new-card .showcase-card-detail {
   font-size: 11px;
+}
+
+.new-card .showcase-card-details-btn {
+  margin-top: auto;
+  padding-top: 10px;
 }
 
 .new-empty,
@@ -241,6 +285,22 @@
   font-weight: 900;
   text-decoration: none;
   box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.new-sign-in-btn:active {
+  transform: scale(0.99);
+}
+
+@media (hover: hover) {
+  .new-card:hover {
+    border-color: #bfdbfe;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.1);
+  }
+
+  .new-sign-in-btn:hover {
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.4);
+  }
 }
 
 @media (min-width: 640px) {
