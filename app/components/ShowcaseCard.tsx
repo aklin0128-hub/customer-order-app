@@ -43,11 +43,23 @@ export function ShowcaseCard({
   const hasNewDetails =
     showNewDetails &&
     Boolean(String(item.newItemDescription || "").trim() || String(item.newItemDescriptionPdfUrl || "").trim());
+  const storageLabel = showNewDetails ? item.newItemStorageLabel : undefined;
 
   return (
     <article className={className}>
-      {justAddedBadge ? (
-        <div className="showcase-card-badge showcase-card-badge--just-added">{justAddedBadge}</div>
+      {justAddedBadge || storageLabel ? (
+        <div className="showcase-card-badge-row">
+          {justAddedBadge ? (
+            <div className="showcase-card-badge showcase-card-badge--just-added">{justAddedBadge}</div>
+          ) : null}
+          {storageLabel ? (
+            <div
+              className={`showcase-card-badge showcase-card-storage showcase-card-storage--${storageLabel.toLowerCase()}`}
+            >
+              {storageLabel}
+            </div>
+          ) : null}
+        </div>
       ) : null}
       <div className="showcase-card-img-wrap">
         {imgError ? (

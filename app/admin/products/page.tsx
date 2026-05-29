@@ -19,6 +19,7 @@ import {
 import { AdminPublicShowcaseHint } from "../_components/AdminPublicShowcaseHint";
 import { useAdminAuth } from "../_components/useAdminAuth";
 import { isJustAddedItem, parseImportedAtMs } from "@/lib/catalogNewItems";
+import { NEW_ITEM_STORAGE_LABELS, type NewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import { CATEGORY_OPTIONS } from "@/lib/inferCategory";
 
 type Product = {
@@ -38,6 +39,7 @@ type Product = {
   importedAt?: string;
   newItemDescription?: string;
   newItemDescriptionPdfUrl?: string;
+  newItemStorageLabel?: NewItemStorageLabel;
   source?: string;
 };
 
@@ -114,6 +116,7 @@ export default function AdminProductsPage() {
   const [justAdded, setJustAdded] = useState(false);
   const [newItemDescription, setNewItemDescription] = useState("");
   const [newItemDescriptionPdfUrl, setNewItemDescriptionPdfUrl] = useState("");
+  const [newItemStorageLabel, setNewItemStorageLabel] = useState<"" | NewItemStorageLabel>("");
 
   const [busy, setBusy] = useState(false);
   const [productsLoaded, setProductsLoaded] = useState(false);
@@ -236,6 +239,7 @@ export default function AdminProductsPage() {
     setJustAdded(Boolean(p.justAdded));
     setNewItemDescription(p.newItemDescription || "");
     setNewItemDescriptionPdfUrl(p.newItemDescriptionPdfUrl || "");
+    setNewItemStorageLabel(p.newItemStorageLabel || "");
     setFormDirty(false);
     setAutoSaveStatus("");
     notify(`Editing ${p.sku}`);
@@ -331,6 +335,7 @@ export default function AdminProductsPage() {
     setJustAdded(false);
     setNewItemDescription("");
     setNewItemDescriptionPdfUrl("");
+    setNewItemStorageLabel("");
     setFormDirty(false);
     setAutoSaveStatus("");
     setMsg("");
@@ -370,6 +375,7 @@ export default function AdminProductsPage() {
           justAdded,
           newItemDescription,
           newItemDescriptionPdfUrl,
+          newItemStorageLabel: newItemStorageLabel || undefined,
         }),
       });
       const data = await res.json();
@@ -413,7 +419,7 @@ export default function AdminProductsPage() {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, formDirty, sku, name, brand, status, category, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, newItemDescription, newItemDescriptionPdfUrl]);
+  }, [authed, formDirty, sku, name, brand, status, category, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, newItemDescription, newItemDescriptionPdfUrl, newItemStorageLabel]);
 
   const uploadNewItemPdf = async (file: File | null) => {
     const finalSku = sku.trim().toUpperCase();
@@ -820,7 +826,20 @@ export default function AdminProductsPage() {
                   cursor: "pointer",
                 }}
               >
-                <input type="checkbox" checked={isNew} onChange={(e) => { setIsNew(e.target.checked); markDirty(); }} />
+                <input
+                  type="checkbox"
+                  checked={isNew}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    setIsNew(next);
+                    markDirty();
+                    if (next) {
+                      requestAnimationFrame(() => {
+                        document.getElementById("admin-new-item-showcase")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                      });
+                    }
+                  }}
+                />
                 Show in customer “New items” (you set this — not read from name or Excel)
                 <span style={{ fontWeight: 600, color: "#c2410c" }}>
                   {" "}
@@ -831,6 +850,93 @@ export default function AdminProductsPage() {
                   )
                 </span>
               </label>
+              <div
+                id="admin-new-item-showcase"
+                style={{
+                  gridColumn: "1 / -1",
+                  border: isNew ? "2px solid #2563eb" : "1px solid #d1d5db",
+                  borderRadius: 12,
+                  padding: 14,
+                  background: isNew ? "#eff6ff" : "#f9fafb",
+                  scrollMarginTop: 88,
+                }}
+              >
+                <div style={{ fontSize: 15, fontWeight: 950, color: isNew ? "#1e40af" : "#374151", marginBottom: 4 }}>
+                  新品介绍 · /new/ 页面
+                </div>
+                <div style={{ fontSize: 12, color: isNew ? "#1d4ed8" : "#6b7280", marginBottom: 12, lineHeight: 1.5 }}>
+                  {isNew
+                    ? "顾客在 /new/ 新品页可点「查看说明」弹出介绍；可填文字、上传 PDF，并选 DRY / FROZEN / FRESH 标签。"
+                    : "请先勾选上方的「Show in customer New items」，再填写介绍与上传 PDF。"}
+                </div>
+                <fieldset disabled={!isNew} style={{ border: "none", margin: 0, padding: 0, opacity: isNew ? 1 : 0.55 }}>
+                  <label style={labelStyle}>仓储标签 Storage label</label>
+                  <select
+                    value={newItemStorageLabel}
+                    onChange={(e) => {
+                      setNewItemStorageLabel(e.target.value as "" | NewItemStorageLabel);
+                      markDirty();
+                    }}
+                    style={inputStyle}
+                  >
+                    <option value="">无 / None</option>
+                    {NEW_ITEM_STORAGE_LABELS.map((label) => (
+                      <option key={label} value={label}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                  <label style={{ ...labelStyle, marginTop: 10 }}>文字介绍 Short description</label>
+                  <textarea
+                    value={newItemDescription}
+                    onChange={(e) => updateText(setNewItemDescription, e.target.value)}
+                    style={{ ...inputStyle, minHeight: 96, resize: "vertical", width: "100%", boxSizing: "border-box" }}
+                    placeholder="例如：卖点、规格、到货说明…"
+                  />
+                  <label style={{ ...labelStyle, marginTop: 10 }}>上传产品介绍 PDF</label>
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    onChange={(e) => uploadNewItemPdf(e.target.files?.[0] || null)}
+                    style={inputStyle}
+                    disabled={uploadingNewPdf || !isNew}
+                  />
+                  <p style={{ fontSize: 11, color: "#6b7280", margin: "6px 0 0" }}>
+                    {uploadingNewPdf ? "正在上传…" : "仅 PDF，最大 12 MB。选择文件后会立即保存到当前 SKU。"}
+                  </p>
+                  {newItemDescriptionPdfUrl ? (
+                    <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                      <a
+                        href={newItemDescriptionPdfUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ fontSize: 12, fontWeight: 800, color: "#2563eb" }}
+                      >
+                        预览 PDF
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewItemDescriptionPdfUrl("");
+                          markDirty();
+                        }}
+                        style={{
+                          border: "1px solid #fecaca",
+                          background: "#fff",
+                          borderRadius: 8,
+                          padding: "4px 10px",
+                          fontSize: 11,
+                          fontWeight: 800,
+                          color: "#b91c1c",
+                          cursor: "pointer",
+                        }}
+                      >
+                        删除 PDF
+                      </button>
+                    </div>
+                  ) : null}
+                </fieldset>
+              </div>
               <label
                 style={{
                   gridColumn: "1 / -1",
@@ -860,72 +966,6 @@ export default function AdminProductsPage() {
               <div style={{ gridColumn: "1 / -1", fontSize: 11, color: "#6b7280", marginTop: -4 }}>
                 Catalog import time (reference only):{" "}
                 {formatImportedAtLabel(products.find((p) => p.sku?.toUpperCase() === sku.toUpperCase())?.importedAt)}
-              </div>
-              <div
-                style={{
-                  gridColumn: "1 / -1",
-                  border: "1px solid #bfdbfe",
-                  borderRadius: 12,
-                  padding: 12,
-                  background: "#eff6ff",
-                }}
-              >
-                <div style={{ fontSize: 13, fontWeight: 900, color: "#1e40af", marginBottom: 8 }}>
-                  /new/ showcase — description popup
-                </div>
-                <div style={{ fontSize: 11, color: "#1d4ed8", marginBottom: 10, lineHeight: 1.45 }}>
-                  Shown on the public New items tab when this SKU is marked as new. Customers tap Details to open a
-                  popup with your text and PDF.
-                </div>
-                <label style={labelStyle}>Short description (optional)</label>
-                <textarea
-                  value={newItemDescription}
-                  onChange={(e) => updateText(setNewItemDescription, e.target.value)}
-                  style={{ ...inputStyle, minHeight: 88, resize: "vertical" }}
-                  placeholder="e.g. launch notes, case pack, selling points…"
-                />
-                <label style={{ ...labelStyle, marginTop: 10 }}>Description PDF</label>
-                <input
-                  type="file"
-                  accept="application/pdf,.pdf"
-                  onChange={(e) => uploadNewItemPdf(e.target.files?.[0] || null)}
-                  style={inputStyle}
-                  disabled={uploadingNewPdf}
-                />
-                <p style={{ fontSize: 11, color: "#6b7280", margin: "4px 0 0" }}>
-                  {uploadingNewPdf ? "Uploading PDF…" : "PDF up to 12 MB. Upload saves to this SKU immediately."}
-                </p>
-                {newItemDescriptionPdfUrl ? (
-                  <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                    <a
-                      href={newItemDescriptionPdfUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ fontSize: 12, fontWeight: 800, color: "#2563eb" }}
-                    >
-                      Preview PDF
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNewItemDescriptionPdfUrl("");
-                        markDirty();
-                      }}
-                      style={{
-                        border: "1px solid #fecaca",
-                        background: "#fff",
-                        borderRadius: 8,
-                        padding: "4px 10px",
-                        fontSize: 11,
-                        fontWeight: 800,
-                        color: "#b91c1c",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Remove PDF
-                    </button>
-                  </div>
-                ) : null}
               </div>
               <div>
                 <label style={labelStyle}>Size</label>

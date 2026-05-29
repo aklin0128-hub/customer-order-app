@@ -70,15 +70,53 @@
   margin-top: 2px;
 }
 
+.showcase-card-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+  align-items: center;
+}
+
 .showcase-card-badge--just-added {
   margin-top: 0;
-  margin-bottom: 6px;
+  margin-bottom: 0;
   font-size: 10px;
   font-weight: 950;
   letter-spacing: 0.06em;
   color: #fff;
   background: #dc2626;
   border: 1px solid #b91c1c;
+  border-radius: 999px;
+  padding: 4px 8px;
+  width: fit-content;
+}
+
+.showcase-card-storage {
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.05em;
+  border-radius: 999px;
+  padding: 4px 8px;
+  width: fit-content;
+}
+
+.showcase-card-storage--dry {
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+}
+
+.showcase-card-storage--frozen {
+  color: #0c4a6e;
+  background: #e0f2fe;
+  border: 1px solid #7dd3fc;
+}
+
+.showcase-card-storage--fresh {
+  color: #14532d;
+  background: #dcfce7;
+  border: 1px solid #86efac;
 }
 
 .showcase-card-badge {

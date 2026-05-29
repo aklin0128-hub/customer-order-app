@@ -1,5 +1,6 @@
 import { isNewItem } from "@/app/order/catalogUtils";
 import { compareCatalogForDisplay } from "@/lib/catalogNewItems";
+import { parseNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import { getMergedCatalogProducts } from "@/lib/catalogMerge";
 import { getPromotionProducts, type PromotionProduct } from "@/lib/promotions";
 import { cachedServerData, SERVER_CACHE } from "@/lib/serverDataCache";
@@ -26,6 +27,7 @@ export type LoginPreviewCard = {
   justAdded?: boolean;
   newItemDescription?: string;
   newItemDescriptionPdfUrl?: string;
+  newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
 };
 
 export type ShowcaseData = {
@@ -77,6 +79,7 @@ function catalogToCard(item: Record<string, unknown>): LoginPreviewCard {
     justAdded: Boolean(item.justAdded),
     newItemDescription: String(item.newItemDescription || "").trim() || undefined,
     newItemDescriptionPdfUrl: String(item.newItemDescriptionPdfUrl || "").trim() || undefined,
+    newItemStorageLabel: parseNewItemStorageLabel(item.newItemStorageLabel),
   };
 }
 

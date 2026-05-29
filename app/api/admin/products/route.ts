@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadRedisProducts, saveRedisProduct } from "@/lib/productRedisStore";
+import { parseNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import { bustServerDataCache, SERVER_CACHE } from "@/lib/serverDataCache";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
 
@@ -23,6 +24,7 @@ type Product = {
   justAdded?: boolean;
   newItemDescription?: string;
   newItemDescriptionPdfUrl?: string;
+  newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
   source?: string;
   updatedAt?: string;
 };
@@ -103,6 +105,7 @@ export async function POST(req: Request) {
     const justAdded = Boolean(body?.justAdded);
     const newItemDescription = String(body?.newItemDescription || "").trim();
     const newItemDescriptionPdfUrl = String(body?.newItemDescriptionPdfUrl || "").trim();
+    const newItemStorageLabel = parseNewItemStorageLabel(body?.newItemStorageLabel);
 
     if (!sku) {
       return NextResponse.json({ error: "Missing SKU." }, { status: 400 });
@@ -124,6 +127,7 @@ export async function POST(req: Request) {
       justAdded,
       newItemDescription: newItemDescription || undefined,
       newItemDescriptionPdfUrl: newItemDescriptionPdfUrl || undefined,
+      newItemStorageLabel,
       source: "Redis",
       updatedAt: new Date().toISOString(),
     };

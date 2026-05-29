@@ -22,6 +22,8 @@ export type CatalogItem = {
   newItemDescription?: string;
   /** PDF served via /api/blob (Admin upload) */
   newItemDescriptionPdfUrl?: string;
+  /** /new/ showcase: DRY, FROZEN, or FRESH */
+  newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
 };
 
 export type PromoPriceTier = {
