@@ -349,12 +349,6 @@
 }
 
 @media (min-width: 1100px) {
-  .new-grid {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 1200px) {
   .new-page {
     padding-left: 24px;
     padding-right: 24px;
@@ -419,13 +413,5 @@
   .new-card .showcase-card-details-btn {
     padding: 8px 10px;
     font-size: 11px;
-  }
-}
-
-@media (min-width: 1500px) {
-  .new-grid {
-    grid-template-columns: repeat(10, minmax(0, 1fr));
-    column-gap: 16px;
-    row-gap: 24px;
   }
 }
