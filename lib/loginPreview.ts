@@ -24,6 +24,8 @@ export type LoginPreviewCard = {
   soldQty?: number;
   remainingQty?: number | null;
   justAdded?: boolean;
+  newItemDescription?: string;
+  newItemDescriptionPdfUrl?: string;
 };
 
 export type ShowcaseData = {
@@ -73,6 +75,8 @@ function catalogToCard(item: Record<string, unknown>): LoginPreviewCard {
     size: String(item.size || "").trim() || undefined,
     imageUrl: productImageUrl(sku, String(item.imageUrl || "").trim() || undefined),
     justAdded: Boolean(item.justAdded),
+    newItemDescription: String(item.newItemDescription || "").trim() || undefined,
+    newItemDescriptionPdfUrl: String(item.newItemDescriptionPdfUrl || "").trim() || undefined,
   };
 }
 

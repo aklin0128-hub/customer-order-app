@@ -36,6 +36,8 @@ type Product = {
   isNew?: boolean;
   justAdded?: boolean;
   importedAt?: string;
+  newItemDescription?: string;
+  newItemDescriptionPdfUrl?: string;
   source?: string;
 };
 
@@ -110,10 +112,13 @@ export default function AdminProductsPage() {
   const [imageUrl, setImageUrl] = useState("");
   const [isNew, setIsNew] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
+  const [newItemDescription, setNewItemDescription] = useState("");
+  const [newItemDescriptionPdfUrl, setNewItemDescriptionPdfUrl] = useState("");
 
   const [busy, setBusy] = useState(false);
   const [productsLoaded, setProductsLoaded] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingNewPdf, setUploadingNewPdf] = useState(false);
   const [uploadingStatusXlsx, setUploadingStatusXlsx] = useState(false);
   const [statusUploadResult, setStatusUploadResult] = useState<StatusUploadResult | null>(null);
   const [msg, setMsg] = useState("");
@@ -229,6 +234,8 @@ export default function AdminProductsPage() {
     setImageUrl(p.imageUrl || "");
     setIsNew(typeof p.isNew === "boolean" ? p.isNew : false);
     setJustAdded(Boolean(p.justAdded));
+    setNewItemDescription(p.newItemDescription || "");
+    setNewItemDescriptionPdfUrl(p.newItemDescriptionPdfUrl || "");
     setFormDirty(false);
     setAutoSaveStatus("");
     notify(`Editing ${p.sku}`);
@@ -322,6 +329,8 @@ export default function AdminProductsPage() {
     setImageUrl("");
     setIsNew(false);
     setJustAdded(false);
+    setNewItemDescription("");
+    setNewItemDescriptionPdfUrl("");
     setFormDirty(false);
     setAutoSaveStatus("");
     setMsg("");
@@ -359,6 +368,8 @@ export default function AdminProductsPage() {
           imageUrl,
           isNew,
           justAdded,
+          newItemDescription,
+          newItemDescriptionPdfUrl,
         }),
       });
       const data = await res.json();
@@ -402,7 +413,36 @@ export default function AdminProductsPage() {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, formDirty, sku, name, brand, status, category, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded]);
+  }, [authed, formDirty, sku, name, brand, status, category, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, newItemDescription, newItemDescriptionPdfUrl]);
+
+  const uploadNewItemPdf = async (file: File | null) => {
+    const finalSku = sku.trim().toUpperCase();
+    if (!finalSku) return notify("Enter SKU first, then upload a PDF.", "error");
+    if (!file) return;
+
+    setUploadingNewPdf(true);
+    try {
+      const formData = new FormData();
+      formData.append("sku", finalSku);
+      formData.append("file", file);
+
+      const res = await fetch("/api/admin/upload-new-item-pdf", {
+        method: "POST",
+        headers: adminHeaders(),
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to upload PDF.");
+      setNewItemDescriptionPdfUrl(data.newItemDescriptionPdfUrl || "");
+      markDirty();
+      notify(`PDF uploaded for ${finalSku}`);
+      await loadProducts();
+    } catch (err: any) {
+      notify(err?.message || "Failed to upload PDF.", "error");
+    } finally {
+      setUploadingNewPdf(false);
+    }
+  };
 
   const uploadProductImage = async (file: File | null) => {
     const finalSku = sku.trim().toUpperCase();
@@ -820,6 +860,72 @@ export default function AdminProductsPage() {
               <div style={{ gridColumn: "1 / -1", fontSize: 11, color: "#6b7280", marginTop: -4 }}>
                 Catalog import time (reference only):{" "}
                 {formatImportedAtLabel(products.find((p) => p.sku?.toUpperCase() === sku.toUpperCase())?.importedAt)}
+              </div>
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  border: "1px solid #bfdbfe",
+                  borderRadius: 12,
+                  padding: 12,
+                  background: "#eff6ff",
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 900, color: "#1e40af", marginBottom: 8 }}>
+                  /new/ showcase — description popup
+                </div>
+                <div style={{ fontSize: 11, color: "#1d4ed8", marginBottom: 10, lineHeight: 1.45 }}>
+                  Shown on the public New items tab when this SKU is marked as new. Customers tap Details to open a
+                  popup with your text and PDF.
+                </div>
+                <label style={labelStyle}>Short description (optional)</label>
+                <textarea
+                  value={newItemDescription}
+                  onChange={(e) => updateText(setNewItemDescription, e.target.value)}
+                  style={{ ...inputStyle, minHeight: 88, resize: "vertical" }}
+                  placeholder="e.g. launch notes, case pack, selling points…"
+                />
+                <label style={{ ...labelStyle, marginTop: 10 }}>Description PDF</label>
+                <input
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  onChange={(e) => uploadNewItemPdf(e.target.files?.[0] || null)}
+                  style={inputStyle}
+                  disabled={uploadingNewPdf}
+                />
+                <p style={{ fontSize: 11, color: "#6b7280", margin: "4px 0 0" }}>
+                  {uploadingNewPdf ? "Uploading PDF…" : "PDF up to 12 MB. Upload saves to this SKU immediately."}
+                </p>
+                {newItemDescriptionPdfUrl ? (
+                  <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <a
+                      href={newItemDescriptionPdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: 12, fontWeight: 800, color: "#2563eb" }}
+                    >
+                      Preview PDF
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewItemDescriptionPdfUrl("");
+                        markDirty();
+                      }}
+                      style={{
+                        border: "1px solid #fecaca",
+                        background: "#fff",
+                        borderRadius: 8,
+                        padding: "4px 10px",
+                        fontSize: 11,
+                        fontWeight: 800,
+                        color: "#b91c1c",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Remove PDF
+                    </button>
+                  </div>
+                ) : null}
               </div>
               <div>
                 <label style={labelStyle}>Size</label>

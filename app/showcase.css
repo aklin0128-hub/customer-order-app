@@ -91,3 +91,124 @@
   border-radius: 8px;
   background: #f3f4f6;
 }
+
+.showcase-card-details-btn {
+  margin-top: 8px;
+  width: 100%;
+  border: 1px solid #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.showcase-card-details-btn:hover {
+  background: #dbeafe;
+}
+
+.showcase-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.showcase-modal {
+  width: min(640px, 100%);
+  max-height: min(90vh, 820px);
+  overflow: auto;
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+  padding: 16px;
+}
+
+.showcase-modal-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.showcase-modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+  color: #111827;
+}
+
+.showcase-modal-sku {
+  font-size: 13px;
+  font-weight: 900;
+  color: #374151;
+  margin-top: 4px;
+}
+
+.showcase-modal-name {
+  font-size: 13px;
+  color: #4b5563;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.showcase-modal-close {
+  border: none;
+  background: #f3f4f6;
+  color: #374151;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.showcase-modal-text {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  margin-bottom: 12px;
+}
+
+.showcase-modal-pdf {
+  margin-bottom: 12px;
+}
+
+.showcase-modal-pdf-frame {
+  width: 100%;
+  height: min(52vh, 420px);
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f9fafb;
+}
+
+.showcase-modal-pdf-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #2563eb;
+}
+
+.showcase-modal-done {
+  width: 100%;
+  border: none;
+  background: #111827;
+  color: #fff;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}

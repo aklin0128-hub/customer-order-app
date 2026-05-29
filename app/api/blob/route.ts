@@ -1,5 +1,6 @@
 import { get } from "@vercel/blob";
 import { NextResponse } from "next/server";
+import { isAllowedCatalogBlobPathname } from "@/lib/catalogBlob";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +9,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const pathname = String(searchParams.get("pathname") || "").trim();
 
-    if (!pathname || !pathname.startsWith("product-images/")) {
+    if (!isAllowedCatalogBlobPathname(pathname)) {
       return NextResponse.json({ error: "Not found." }, { status: 404 });
     }
 
@@ -18,7 +19,11 @@ export async function GET(req: Request) {
     }
 
     const headers = new Headers();
-    headers.set("Content-Type", result.blob.contentType || "application/octet-stream");
+    const contentType = result.blob.contentType || "application/octet-stream";
+    headers.set("Content-Type", contentType);
+    if (contentType === "application/pdf") {
+      headers.set("Content-Disposition", "inline");
+    }
     headers.set("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400");
     headers.set("ETag", result.blob.etag);
 

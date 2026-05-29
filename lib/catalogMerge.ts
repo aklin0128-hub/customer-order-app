@@ -14,6 +14,8 @@ export type MergedCatalogProduct = {
   isNew?: boolean;
   justAdded?: boolean;
   importedAt?: string;
+  newItemDescription?: string;
+  newItemDescriptionPdfUrl?: string;
   name_k?: string;
   [key: string]: unknown;
 };

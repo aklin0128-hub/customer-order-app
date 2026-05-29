@@ -18,6 +18,10 @@ export type CatalogItem = {
   justAdded?: boolean;
   /** ISO time when SKU first appeared in catalog (import) */
   importedAt?: string;
+  /** Short blurb for /new/ showcase modal */
+  newItemDescription?: string;
+  /** PDF served via /api/blob (Admin upload) */
+  newItemDescriptionPdfUrl?: string;
 };
 
 export type PromoPriceTier = {

@@ -176,6 +176,7 @@ export default function PublicShowcaseClient({ data }: { data: ShowcaseData }) {
                     item={item}
                     lang={lang}
                     showPromo={tab === "promo"}
+                    showNewDetails={tab === "new"}
                     className="new-card"
                     badge={tab === "new" ? justAddedBadgeText : null}
                   />

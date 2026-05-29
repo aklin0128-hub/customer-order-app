@@ -21,6 +21,8 @@ type Product = {
   category?: string;
   isNew?: boolean;
   justAdded?: boolean;
+  newItemDescription?: string;
+  newItemDescriptionPdfUrl?: string;
   source?: string;
   updatedAt?: string;
 };
@@ -99,6 +101,8 @@ export async function POST(req: Request) {
     const category = String(body?.category || "").trim().toUpperCase();
     const isNew = Boolean(body?.isNew);
     const justAdded = Boolean(body?.justAdded);
+    const newItemDescription = String(body?.newItemDescription || "").trim();
+    const newItemDescriptionPdfUrl = String(body?.newItemDescriptionPdfUrl || "").trim();
 
     if (!sku) {
       return NextResponse.json({ error: "Missing SKU." }, { status: 400 });
@@ -118,6 +122,8 @@ export async function POST(req: Request) {
       category,
       isNew,
       justAdded,
+      newItemDescription: newItemDescription || undefined,
+      newItemDescriptionPdfUrl: newItemDescriptionPdfUrl || undefined,
       source: "Redis",
       updatedAt: new Date().toISOString(),
     };
