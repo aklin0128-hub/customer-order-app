@@ -75,6 +75,11 @@ const MAX_NEW_ITEM_PDF_BYTES = 12 * 1024 * 1024;
 
 async function readApiJson(res: Response) {
   const text = await res.text();
+  if (!text.trim()) {
+    throw new Error(
+      res.ok ? "Empty server response." : `Request failed (${res.status || "unknown"}).`
+    );
+  }
   try {
     return JSON.parse(text) as Record<string, unknown>;
   } catch {
@@ -168,9 +173,9 @@ export default function AdminProductsPage() {
         cache: "no-store",
         headers: adminHeaders(),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to load products.");
-      setProducts(Array.isArray(data.products) ? data.products : []);
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(String(data?.error || "Failed to load products."));
+      setProducts(Array.isArray(data.products) ? (data.products as Product[]) : []);
     } catch (err: any) {
       notify(err?.message || "Failed to load products.", "error");
     } finally {
@@ -304,14 +309,15 @@ export default function AdminProductsPage() {
           headers: adminHeaders({ "Content-Type": "application/json" }),
           body: JSON.stringify(nextProduct),
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || `Failed to save ${product.sku}.`);
+        const data = await readApiJson(res);
+        if (!res.ok) throw new Error(String(data?.error || `Failed to save ${product.sku}.`));
 
-        if (data.product?.sku) {
+        const saved = data.product as Product | undefined;
+        if (saved?.sku) {
           updated += 1;
           setProducts((prev) => prev.map((item) =>
-            item.sku?.toUpperCase() === data.product.sku.toUpperCase()
-              ? { ...item, ...data.product }
+            item.sku?.toUpperCase() === saved.sku.toUpperCase()
+              ? { ...item, ...saved }
               : item
           ));
         }
@@ -394,15 +400,16 @@ export default function AdminProductsPage() {
           newItemStorageLabel: newItemStorageLabel || undefined,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to save product.");
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(String(data?.error || "Failed to save product."));
 
-      if (data.product?.sku) {
+      const saved = data.product as Product | undefined;
+      if (saved?.sku) {
         setProducts((prev) => {
           const next = [...prev];
-          const idx = next.findIndex((p) => p.sku?.toUpperCase() === data.product.sku.toUpperCase());
-          if (idx >= 0) next[idx] = { ...next[idx], ...data.product };
-          else next.unshift(data.product);
+          const idx = next.findIndex((p) => p.sku?.toUpperCase() === saved.sku.toUpperCase());
+          if (idx >= 0) next[idx] = { ...next[idx], ...saved };
+          else next.unshift(saved);
           return next;
         });
       }
@@ -421,7 +428,7 @@ export default function AdminProductsPage() {
   };
 
   useEffect(() => {
-    if (!authed || !formDirty) return;
+    if (!authed || !formDirty || uploadingNewPdf) return;
 
     const finalSku = sku.trim().toUpperCase();
     if (!finalSku || !name.trim()) return;
@@ -435,7 +442,7 @@ export default function AdminProductsPage() {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, formDirty, sku, name, brand, status, category, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, newItemDescription, newItemDescriptionPdfUrl, newItemStorageLabel]);
+  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, category, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, newItemDescription, newItemDescriptionPdfUrl, newItemStorageLabel]);
 
   const uploadNewItemPdf = async (file: File | null) => {
     const finalSku = sku.trim().toUpperCase();
@@ -470,10 +477,18 @@ export default function AdminProductsPage() {
       const data = await readApiJson(res);
       if (!res.ok) throw new Error(String(data?.error || "Failed to register PDF."));
 
-      setNewItemDescriptionPdfUrl(String(data.newItemDescriptionPdfUrl || ""));
-      markDirty();
+      const pdfUrl = String(data.newItemDescriptionPdfUrl || "");
+      setNewItemDescriptionPdfUrl(pdfUrl);
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.sku?.toUpperCase() === finalSku
+            ? { ...p, newItemDescriptionPdfUrl: pdfUrl, source: "Redis" as const }
+            : p
+        )
+      );
+      setFormDirty(false);
+      setAutoSaveStatus("");
       notify(`PDF uploaded for ${finalSku}`);
-      await loadProducts();
     } catch (err: any) {
       notify(err?.message || "Failed to upload PDF.", "error");
     } finally {
@@ -497,9 +512,9 @@ export default function AdminProductsPage() {
         headers: adminHeaders(),
         body: formData,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to upload image.");
-      setImageUrl(data.imageUrl || "");
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(String(data?.error || "Failed to upload image."));
+      setImageUrl(String(data.imageUrl || ""));
       markDirty();
       notify(`Image uploaded for ${finalSku}`);
       await loadProducts();
@@ -524,12 +539,12 @@ export default function AdminProductsPage() {
         headers: adminHeaders(),
         body: formData,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to upload status XLSX.");
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(String(data?.error || "Failed to upload status XLSX."));
 
-      setStatusUploadResult(data);
+      setStatusUploadResult(data as StatusUploadResult);
       notify(
-        `Status upload complete: ${data.updatedCount || 0} updated, ${data.createdCount || 0} created, ${data.skippedCount || 0} skipped.`
+        `Status upload complete: ${Number(data.updatedCount) || 0} updated, ${Number(data.createdCount) || 0} created, ${Number(data.skippedCount) || 0} skipped.`
       );
       await loadProducts();
     } catch (err: any) {

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { loadRedisProducts, saveRedisProduct } from "@/lib/productRedisStore";
+import { loadRedisProducts, productRedisKey, saveRedisProduct } from "@/lib/productRedisStore";
 import { parseNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import { bustServerDataCache, SERVER_CACHE } from "@/lib/serverDataCache";
+import { redis } from "@/lib/redis";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
 
 export const dynamic = "force-dynamic";
@@ -111,7 +112,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing SKU." }, { status: 400 });
     }
 
+    const existing =
+      (await redis.get<Product>(productRedisKey(sku))) ||
+      ((catalogData as Product[]).find((item) => String(item.sku || "").toUpperCase() === sku) ?? {});
+
     const product: Product = {
+      ...existing,
       sku,
       name,
       brand,
