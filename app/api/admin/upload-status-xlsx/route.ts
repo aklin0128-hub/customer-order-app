@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
 import {
+  hasXlsxProductIdentity,
   hasXlsxProductUpdate,
   parseProductFieldsFromXlsxRow,
   parseSkuFromXlsxRow,
@@ -120,7 +121,12 @@ export async function POST(req: Request) {
         continue;
       }
 
-      if (!hasXlsxProductUpdate(row)) {
+      const isKnown = knownSkus.has(sku);
+      if (!isKnown && !hasXlsxProductIdentity(row)) {
+        skipped.push(`${sku} (missing product data)`);
+        continue;
+      }
+      if (isKnown && !hasXlsxProductUpdate(row)) {
         skipped.push(`${sku} (missing status/UPC/pallet)`);
         continue;
       }
@@ -131,7 +137,7 @@ export async function POST(req: Request) {
       const fields = parseProductFieldsFromXlsxRow(row, sku);
       const now = new Date().toISOString();
 
-      if (!knownSkus.has(sku)) {
+      if (!isKnown) {
         const product: Product = {
           ...fields,
           sku,

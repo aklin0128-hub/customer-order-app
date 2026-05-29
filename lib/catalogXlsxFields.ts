@@ -171,3 +171,12 @@ export function hasXlsxProductUpdate(row: Record<string, unknown>) {
   const palletSize = parsePalletSizeFromXlsxRow(row);
   return Boolean(status || upc || palletSize);
 }
+
+/** Enough row data to create a brand-new SKU (looser than update-only rows). */
+export function hasXlsxProductIdentity(row: Record<string, unknown>) {
+  if (hasXlsxProductUpdate(row)) return true;
+  return Boolean(
+    getXlsxCell(row, ["Description", "DESCRIPTION", "Name", "NAME"]) ||
+      getXlsxCell(row, ["Brand", "BRAND"])
+  );
+}
