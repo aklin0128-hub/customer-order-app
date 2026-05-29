@@ -191,6 +191,16 @@ async function buildCatalogMap(skus?: string[]) {
   return map;
 }
 
+/** Resolve one SKU from catalog JSON + Redis overrides (for admin forms). */
+export async function lookupClearanceCatalogProduct(
+  sku: string
+): Promise<ClearanceProduct | null> {
+  const clean = String(sku || "").trim().toUpperCase();
+  if (!clean) return null;
+  const map = await buildCatalogMap([clean]);
+  return map.get(clean) ?? null;
+}
+
 function recordToProduct(record: ClearanceRecord, product: ClearanceProduct): ClearanceProduct {
   const remainingQty = getClearanceRemainingQty(record);
 

@@ -1,6 +1,7 @@
 import catalogData from "@/data/catalog_sku_master_extracted.json";
 import { cleanSku } from "@/lib/analyticsCommon";
 import { loadInventoryLots } from "@/lib/inventoryExpiry";
+import { loadRedisProducts } from "@/lib/productRedisStore";
 
 export type SkuSuggestRow = { sku: string; name: string };
 
@@ -45,6 +46,19 @@ export async function adminSkuSuggest(
 
   for (const row of adminSkuSuggestFromCatalog(query, limit)) {
     bySku.set(row.sku.toUpperCase(), row);
+  }
+
+  const exactSku = cleanSku(query);
+  if (exactSku.length >= 2) {
+    const redisHits = await loadRedisProducts<{ sku?: string; name?: string; brand?: string }>([
+      exactSku,
+    ]);
+    for (const item of redisHits) {
+      const sku = cleanSku(item.sku);
+      if (!sku) continue;
+      const name = String(item.name || item.brand || "").trim();
+      bySku.set(sku.toUpperCase(), { sku, name: name || sku });
+    }
   }
 
   if (options?.includeInventory) {

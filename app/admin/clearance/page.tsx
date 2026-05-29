@@ -84,6 +84,7 @@ export default function AdminClearancePage() {
   const [loaded, setLoaded] = useState(false);
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
+  const [catalogLookup, setCatalogLookup] = useState<ClearanceProduct | null>(null);
 
   const notify = (text: string, tone: "success" | "error" = "success") => {
     setMsg(text);
@@ -96,7 +97,41 @@ export default function AdminClearancePage() {
     return map;
   }, [products]);
 
-  const selectedProduct = productMap.get(form.sku.trim().toUpperCase()) ?? null;
+  const selectedProduct =
+    productMap.get(form.sku.trim().toUpperCase()) ?? catalogLookup;
+
+  useEffect(() => {
+    const clean = form.sku.trim().toUpperCase();
+    if (!clean) {
+      setCatalogLookup(null);
+      return;
+    }
+    if (productMap.has(clean)) {
+      setCatalogLookup(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/admin/clearance?lookupSku=${encodeURIComponent(clean)}`,
+          { cache: "no-store", headers: adminHeaders() }
+        );
+        const data = await res.json();
+        if (!cancelled) {
+          setCatalogLookup(res.ok && data.product ? (data.product as ClearanceProduct) : null);
+        }
+      } catch {
+        if (!cancelled) setCatalogLookup(null);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [form.sku, productMap, adminHeaders]);
 
   const filteredClearances = useMemo(() => {
     const q = search.trim().toUpperCase();

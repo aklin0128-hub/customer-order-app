@@ -3,6 +3,7 @@ import {
   getClearanceProducts,
   getClearanceRecords,
   getClearanceStatus,
+  lookupClearanceCatalogProduct,
   saveClearanceRecords,
   validateClearanceInput,
   type ClearanceRecord,
@@ -23,6 +24,16 @@ export async function GET(req: Request) {
   }
 
   try {
+    const url = new URL(req.url);
+    const lookupSku = String(url.searchParams.get("lookupSku") || "")
+      .trim()
+      .toUpperCase();
+
+    if (lookupSku) {
+      const product = await lookupClearanceCatalogProduct(lookupSku);
+      return NextResponse.json({ success: true, product });
+    }
+
     const clearances = await getClearanceRecords();
     const products = await getClearanceProducts({ records: clearances });
 
