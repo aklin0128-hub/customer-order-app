@@ -1,5 +1,6 @@
 "use client";
 
+import { upload } from "@vercel/blob/client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AdminLogin } from "../_components/AdminLogin";
 import { AdminShell } from "../_components/AdminShell";
@@ -70,6 +71,19 @@ const statusOptions = [
 
 const categoryOptions = ["", ...CATEGORY_OPTIONS.filter((c) => c !== "ALL")];
 const AUTO_SAVE_DELAY_MS = 1200;
+const MAX_NEW_ITEM_PDF_BYTES = 12 * 1024 * 1024;
+
+async function readApiJson(res: Response) {
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    if (res.status === 413 || text.includes("Request Entity Too Large")) {
+      throw new Error("PDF is too large. Maximum size is 12 MB.");
+    }
+    throw new Error(text.slice(0, 160) || `Request failed (${res.status}).`);
+  }
+}
 /** Bump when admin new-item showcase UI changes — visible in Products editor to confirm deploy. */
 const ADMIN_PRODUCTS_BUILD_TAG = "new-desc-v2";
 
@@ -428,20 +442,35 @@ export default function AdminProductsPage() {
     if (!finalSku) return notify("Enter SKU first, then upload a PDF.", "error");
     if (!file) return;
 
+    const type = String(file.type || "").toLowerCase();
+    const name = String(file.name || "").toLowerCase();
+    if (type !== "application/pdf" && !name.endsWith(".pdf")) {
+      return notify("Only PDF files are allowed.", "error");
+    }
+    if (file.size > MAX_NEW_ITEM_PDF_BYTES) {
+      return notify("PDF must be 12 MB or smaller.", "error");
+    }
+
     setUploadingNewPdf(true);
     try {
-      const formData = new FormData();
-      formData.append("sku", finalSku);
-      formData.append("file", file);
-
-      const res = await fetch("/api/admin/upload-new-item-pdf", {
-        method: "POST",
+      const blob = await upload(`new-item-pdfs/${finalSku}.pdf`, file, {
+        access: "private",
+        handleUploadUrl: "/api/admin/upload-new-item-pdf",
+        clientPayload: JSON.stringify({ sku: finalSku }),
         headers: adminHeaders(),
-        body: formData,
+        contentType: "application/pdf",
+        multipart: file.size > 5 * 1024 * 1024,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to upload PDF.");
-      setNewItemDescriptionPdfUrl(data.newItemDescriptionPdfUrl || "");
+
+      const res = await fetch("/api/admin/register-new-item-pdf", {
+        method: "POST",
+        headers: adminHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ sku: finalSku, pathname: blob.pathname }),
+      });
+      const data = await readApiJson(res);
+      if (!res.ok) throw new Error(String(data?.error || "Failed to register PDF."));
+
+      setNewItemDescriptionPdfUrl(String(data.newItemDescriptionPdfUrl || ""));
       markDirty();
       notify(`PDF uploaded for ${finalSku}`);
       await loadProducts();
@@ -981,7 +1010,7 @@ export default function AdminProductsPage() {
                     disabled={uploadingNewPdf || !isNew}
                   />
                   <p style={{ fontSize: 12, color: "#64748b", margin: "8px 0 0" }}>
-                    {uploadingNewPdf ? "正在上传…" : "仅 PDF，最大 12 MB。选择文件后立即保存。"}
+                    {uploadingNewPdf ? "正在上传…" : "仅 PDF，最大 12 MB。大文件直传存储，选择后立即保存。"}
                   </p>
                   {newItemDescriptionPdfUrl ? (
                     <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>

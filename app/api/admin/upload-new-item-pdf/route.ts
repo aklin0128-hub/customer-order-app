@@ -1,8 +1,7 @@
+import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
-import { put } from "@vercel/blob";
-import { productRedisKey, saveRedisProduct } from "@/lib/productRedisStore";
-import { redis } from "@/lib/redis";
-import { bustServerDataCache, SERVER_CACHE } from "@/lib/serverDataCache";
+
+import { attachNewItemPdfToProduct } from "@/lib/attachNewItemPdf";
 
 export const dynamic = "force-dynamic";
 
@@ -13,62 +12,59 @@ function checkAdmin(req: Request) {
   return (req.headers.get("x-admin-password") || "") === ADMIN_PASSWORD;
 }
 
-export async function POST(req: Request) {
-  if (!checkAdmin(req)) {
+function parseClientPayload(raw: string | null | undefined) {
+  if (!raw) return { sku: "" };
+  try {
+    const parsed = JSON.parse(raw) as { sku?: string };
+    return { sku: String(parsed?.sku || "").trim().toUpperCase() };
+  } catch {
+    return { sku: "" };
+  }
+}
+
+export async function POST(request: Request): Promise<NextResponse> {
+  if (!checkAdmin(request)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
+  const body = (await request.json()) as HandleUploadBody;
+
   try {
-    const formData = await req.formData();
-    const sku = String(formData.get("sku") || "").trim().toUpperCase();
-    const file = formData.get("file") as File | null;
+    const jsonResponse = await handleUpload({
+      body,
+      request,
+      onBeforeGenerateToken: async (pathname, clientPayload) => {
+        if (!checkAdmin(request)) {
+          throw new Error("Unauthorized.");
+        }
 
-    if (!sku) {
-      return NextResponse.json({ error: "Missing SKU." }, { status: 400 });
-    }
+        const { sku } = parseClientPayload(clientPayload);
+        if (!sku) {
+          throw new Error("Missing SKU.");
+        }
 
-    if (!file) {
-      return NextResponse.json({ error: "Missing PDF file." }, { status: 400 });
-    }
+        const expectedPrefix = `new-item-pdfs/${sku}`;
+        if (!pathname.startsWith(expectedPrefix)) {
+          throw new Error("Invalid upload path.");
+        }
 
-    const type = String(file.type || "").toLowerCase();
-    const name = String(file.name || "").toLowerCase();
-    const isPdf = type === "application/pdf" || name.endsWith(".pdf");
-    if (!isPdf) {
-      return NextResponse.json({ error: "Only PDF files are allowed." }, { status: 400 });
-    }
-
-    if (file.size > MAX_PDF_BYTES) {
-      return NextResponse.json({ error: "PDF must be 12 MB or smaller." }, { status: 400 });
-    }
-
-    const blob = await put(`new-item-pdfs/${sku}.pdf`, file, {
-      access: "private",
-      addRandomSuffix: true,
-      contentType: "application/pdf",
+        return {
+          allowedContentTypes: ["application/pdf", "application/x-pdf"],
+          maximumSizeInBytes: MAX_PDF_BYTES,
+          addRandomSuffix: true,
+          tokenPayload: JSON.stringify({ sku }),
+        };
+      },
+      onUploadCompleted: async ({ blob, tokenPayload }) => {
+        const { sku } = parseClientPayload(tokenPayload);
+        if (!sku) throw new Error("Missing SKU in upload token.");
+        await attachNewItemPdfToProduct(sku, blob.pathname);
+      },
     });
 
-    const pdfUrl = `/api/blob?pathname=${encodeURIComponent(blob.pathname)}`;
-    const existing = (await redis.get<Record<string, unknown>>(productRedisKey(sku))) || {};
-
-    await saveRedisProduct({
-      ...existing,
-      sku,
-      newItemDescriptionPdfUrl: pdfUrl,
-      newItemDescriptionPdfPathname: blob.pathname,
-      source: "Redis",
-      updatedAt: new Date().toISOString(),
-    } as { sku: string });
-
-    bustServerDataCache(SERVER_CACHE.catalog);
-    bustServerDataCache(SERVER_CACHE.showcase);
-
-    return NextResponse.json({
-      success: true,
-      newItemDescriptionPdfUrl: pdfUrl,
-    });
+    return NextResponse.json(jsonResponse);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to upload PDF.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }
