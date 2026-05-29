@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { ShowcaseDescriptionModal } from "@/app/components/ShowcaseDescriptionModal";
+import { getJustAddedLabel, justAddedBadgeStyle } from "@/lib/justAddedBadge";
 import { formatShowcasePromoDisplay, type Lang } from "@/lib/showcasePromoFormat";
 import type { LoginPreviewCard } from "@/lib/loginPreview";
 
@@ -35,9 +36,7 @@ export function ShowcaseCard({
     [showPromo, item, lang]
   );
 
-  const justAddedText =
-    lang === "zh" ? "刚刚上架" : lang === "ko" ? "방금 등록" : lang === "vi" ? "MỚI THÊM" : "JUST ADDED";
-  const justAddedBadge = item.justAdded ? justAddedText : null;
+  const justAddedBadge = item.justAdded ? getJustAddedLabel(lang) : null;
   const hasNewDetails =
     showNewDetails &&
     Boolean(String(item.newItemDescription || "").trim() || String(item.newItemDescriptionPdfUrl || "").trim());
@@ -47,9 +46,7 @@ export function ShowcaseCard({
     <article className={className}>
       {justAddedBadge || storageLabel ? (
         <div className="showcase-card-badge-row">
-          {justAddedBadge ? (
-            <div className="showcase-card-badge showcase-card-badge--just-added">{justAddedBadge}</div>
-          ) : null}
+          {justAddedBadge ? <div style={justAddedBadgeStyle}>{justAddedBadge}</div> : null}
           {storageLabel ? (
             <div
               className={`showcase-card-badge showcase-card-storage showcase-card-storage--${storageLabel.toLowerCase()}`}

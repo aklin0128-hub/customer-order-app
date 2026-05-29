@@ -392,15 +392,7 @@ export const categoryButtonStyle = (active: boolean): CSSProperties => ({
   whiteSpace: "nowrap",
 });
 
-export const justAddedTagStyle: CSSProperties = {
-  ...promoTagStyle,
-  background: "#dc2626",
-  color: "#ffffff",
-  border: "1px solid #b91c1c",
-  letterSpacing: "0.06em",
-  fontSize: 10,
-  fontWeight: 950,
-};
+export { justAddedBadgeStyle as justAddedTagStyle } from "@/lib/justAddedBadge";
 
 export const newItemsButtonStyle = (active: boolean): CSSProperties => ({
   padding: "9px 14px",
