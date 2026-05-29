@@ -97,8 +97,6 @@ export default function PublicShowcaseClient({ data }: { data: ShowcaseData }) {
   const items = tab === "promo" ? data.promotions : data.newItems;
   const total = tab === "promo" ? data.promotionTotal : data.newItemTotal;
   const emptyText = tab === "promo" ? t.emptyPromo : t.emptyNew;
-  const justAddedBadgeText =
-    lang === "zh" ? "刚刚上架" : lang === "ko" ? "방금 등록" : lang === "vi" ? "MỚI THÊM" : "JUST ADDED";
   const isEmpty = data.promotionTotal === 0 && data.newItemTotal === 0;
 
   const langButtons = useMemo(
@@ -178,7 +176,6 @@ export default function PublicShowcaseClient({ data }: { data: ShowcaseData }) {
                     showPromo={tab === "promo"}
                     showNewDetails={tab === "new"}
                     className="new-card"
-                    badge={tab === "new" ? justAddedBadgeText : null}
                   />
                 ))}
               </div>

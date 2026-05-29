@@ -1677,7 +1677,8 @@ export default function OrderPage() {
                 inCartLabel={t.inCart}
                 palletLabel={t.pallet}
                 justAddedLabel={t.justAdded}
-                uniformNewPill
+                newBadgeLabel={t.newItems}
+                newItemChecker={() => true}
                 promoBadgeLabel={t.newItems}
                 editLabel={t.editProduct}
                 showAdminEdit={showAdminEditLinks}

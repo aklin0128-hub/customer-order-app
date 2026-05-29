@@ -18,14 +18,12 @@ export function ShowcaseCard({
   lang,
   showPromo,
   className = "showcase-card",
-  badge,
   showNewDetails,
 }: {
   item: LoginPreviewCard;
   lang: Lang;
   showPromo: boolean;
   className?: string;
-  badge?: string | null;
   /** New-items tab: show Details when description or PDF exists */
   showNewDetails?: boolean;
 }) {
@@ -39,7 +37,7 @@ export function ShowcaseCard({
 
   const justAddedText =
     lang === "zh" ? "刚刚上架" : lang === "ko" ? "방금 등록" : lang === "vi" ? "MỚI THÊM" : "JUST ADDED";
-  const justAddedBadge = badge ?? (item.justAdded ? justAddedText : null);
+  const justAddedBadge = item.justAdded ? justAddedText : null;
   const hasNewDetails =
     showNewDetails &&
     Boolean(String(item.newItemDescription || "").trim() || String(item.newItemDescriptionPdfUrl || "").trim());
@@ -86,7 +84,6 @@ export function ShowcaseCard({
           {line}
         </div>
       ))}
-      {badge && !item.justAdded ? <div className="showcase-card-badge">{badge}</div> : null}
       {hasNewDetails ? (
         <button type="button" className="showcase-card-details-btn" onClick={() => setDetailsOpen(true)}>
           {detailsLabel[lang]}
