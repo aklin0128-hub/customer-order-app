@@ -47,15 +47,15 @@ export function ShowcaseCard({
     <article className={className}>
       {justAddedBadge || storageLabel ? (
         <div className="showcase-card-badge-row">
+          {justAddedBadge ? (
+            <div className="showcase-card-badge showcase-card-badge--just-added">{justAddedBadge}</div>
+          ) : null}
           {storageLabel ? (
             <div
               className={`showcase-card-badge showcase-card-storage showcase-card-storage--${storageLabel.toLowerCase()}`}
             >
               {storageLabel}
             </div>
-          ) : null}
-          {justAddedBadge ? (
-            <div className="showcase-card-badge showcase-card-badge--just-added">{justAddedBadge}</div>
           ) : null}
         </div>
       ) : null}
