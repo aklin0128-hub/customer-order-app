@@ -145,33 +145,33 @@
 }
 
 .new-tab-hint {
-  margin: 0 0 12px;
-  padding: 10px 12px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
   font-size: 12px;
   font-weight: 700;
-  line-height: 1.45;
+  line-height: 1.5;
   color: #1e40af;
   background: #eff6ff;
   border: 1px solid #bfdbfe;
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
 .new-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 14px;
   align-items: stretch;
 }
 
 .new-card {
   height: 100%;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 8px;
+  border-radius: 14px;
+  padding: 12px 12px 14px;
   background: #fff;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 10px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   min-width: 0;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -179,67 +179,90 @@
 
 .new-card .showcase-card-body {
   flex: 1;
+  gap: 10px;
 }
 
 .new-card .showcase-card-badge-row {
-  margin-bottom: 4px;
-  min-height: 0;
+  margin-bottom: 0;
+  gap: 6px;
+  min-height: 22px;
 }
 
 .new-card .showcase-card-img-wrap {
-  min-height: 100px;
+  min-height: 108px;
   width: 100%;
-  margin-bottom: 2px;
+  margin-bottom: 0;
+  padding: 12px 8px;
+  box-sizing: border-box;
 }
 
 .new-card .showcase-card-img-wrap img,
 .new-card .showcase-card-img-fallback {
-  width: 96px;
-  height: 96px;
+  width: 88px;
+  height: 88px;
+}
+
+.new-card .showcase-card-meta {
+  gap: 5px;
+  padding-top: 2px;
 }
 
 .new-card .showcase-card-sku {
   font-size: 13px;
   font-weight: 900;
   color: #111827;
-  line-height: 1.2;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
 }
 
 .new-card .showcase-card-brand {
   font-size: 12px;
   font-weight: 800;
   color: #374151;
+  line-height: 1.3;
+  margin-top: 1px;
 }
 
 .new-card .showcase-card-name {
   font-size: 12px;
   color: #4b5563;
-  line-height: 1.3;
-  max-height: 48px;
+  line-height: 1.45;
+  max-height: 52px;
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
+  margin-top: 2px;
 }
 
 .new-card .showcase-card-size {
   font-size: 11px;
   color: #6b7280;
+  line-height: 1.35;
+  margin-top: 4px;
 }
 
 .new-card .showcase-card-price {
   font-size: 12px;
-  line-height: 1.35;
-  margin-top: 2px;
+  line-height: 1.4;
+  margin-top: 6px;
 }
 
 .new-card .showcase-card-detail {
   font-size: 11px;
+  line-height: 1.4;
+  margin-top: 4px;
 }
 
 .new-card .showcase-card-details-btn {
   margin-top: auto;
-  padding-top: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+}
+
+/* Cards without Details still get comfortable bottom space */
+.new-card .showcase-card-body:not(:has(.showcase-card-details-btn)) .showcase-card-meta {
+  padding-bottom: 4px;
 }
 
 .new-empty,
@@ -306,7 +329,11 @@
 @media (min-width: 640px) {
   .new-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
+    gap: 16px;
+  }
+
+  .new-card {
+    padding: 12px 14px 16px;
   }
 }
 
@@ -329,6 +356,7 @@
 
 @media (min-width: 1280px) {
   .new-grid {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 18px;
   }
 }

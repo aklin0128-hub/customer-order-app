@@ -55,7 +55,6 @@ import {
   filterLabelStyle,
   limitedBadgeStyle,
   modeButtonStyle,
-  newItemsButtonStyle,
   newItemsModeButtonStyle,
   primarySmallButtonStyle,
   productSmallButtonStyle,
@@ -130,7 +129,6 @@ export default function OrderPage() {
   const [expandedHistoryKey, setExpandedHistoryKey] = useState("");
   const [showCart, setShowCart] = useState(false);
   const [catalogShowSelectedOnly, setCatalogShowSelectedOnly] = useState(false);
-  const [catalogShowNewOnly, setCatalogShowNewOnly] = useState(false);
   const [catalogShowRecommendedOnly, setCatalogShowRecommendedOnly] = useState(false);
   const [catalogFiltersOpen, setCatalogFiltersOpen] = useState(false);
   const [recentItems, setRecentItems] = useState<CartItem[]>([]);
@@ -556,11 +554,10 @@ export default function OrderPage() {
     if (showAvailableOnly) count += 1;
     if (categoryFilter !== "ALL") count += 1;
     if (brandFilter !== "ALL") count += 1;
-    if (catalogShowNewOnly) count += 1;
     if (catalogShowRecommendedOnly) count += 1;
     if (catalogShowSelectedOnly) count += 1;
     return count;
-  }, [brandFilter, catalogShowNewOnly, catalogShowRecommendedOnly, catalogShowSelectedOnly, categoryFilter, showAvailableOnly]);
+  }, [brandFilter, catalogShowRecommendedOnly, catalogShowSelectedOnly, categoryFilter, showAvailableOnly]);
 
   const orderableCatalogItems = useMemo(() => {
     const q = catalogSearch.trim().toUpperCase();
@@ -573,7 +570,6 @@ export default function OrderPage() {
         }
         if (categoryFilter !== "ALL" && inferCategory(item) !== categoryFilter) return false;
         if (brandFilter !== "ALL" && !brandMatchesFilter(item.brand, brandFilter)) return false;
-        if (catalogShowNewOnly && !isNewItem(item)) return false;
         if (catalogShowRecommendedOnly && !recommendedSkuSet.has(item.sku?.toUpperCase() || "")) return false;
         return true;
       })
@@ -593,7 +589,7 @@ export default function OrderPage() {
         if (aNormal !== bNormal) return aNormal ? -1 : 1;
         return compareCatalogForDisplay(a, b);
       });
-  }, [catalogSearch, categoryFilter, brandFilter, catalogQtyMap, catalogBrowseBase, catalogShowSelectedOnly, catalogShowNewOnly, catalogShowRecommendedOnly, recommendedSkuSet]);
+  }, [catalogSearch, categoryFilter, brandFilter, catalogQtyMap, catalogBrowseBase, catalogShowSelectedOnly, catalogShowRecommendedOnly, recommendedSkuSet]);
 
   useEffect(() => {
     if (brandFilter !== "ALL" && !isKnownBrandFilter(brandSplit, brandFilter)) {
@@ -1375,23 +1371,10 @@ export default function OrderPage() {
                 <div className="order-sticky-catalog-chips">
                   <button
                     type="button"
-                    onClick={() => {
-                      setCatalogShowRecommendedOnly((prev) => !prev);
-                      setCatalogShowNewOnly(false);
-                    }}
+                    onClick={() => setCatalogShowRecommendedOnly((prev) => !prev)}
                     style={categoryButtonStyle(catalogShowRecommendedOnly)}
                   >
                     {t.recommended} ({recommendedItemCount})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCatalogShowRecommendedOnly(false);
-                      setCatalogShowNewOnly((prev) => !prev);
-                    }}
-                    style={newItemsButtonStyle(catalogShowNewOnly)}
-                  >
-                    {t.newItems} ({newItemCount})
                   </button>
                   <label style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 800, color: "#374151", cursor: "pointer", whiteSpace: "nowrap" }}>
                     <input
@@ -2111,7 +2094,6 @@ export default function OrderPage() {
                   count: newItemCount,
                   onView: () => {
                     setShowReview(false);
-                    setCatalogShowNewOnly(false);
                     changeMode("newItems");
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   },
