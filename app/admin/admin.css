@@ -618,6 +618,10 @@
   top: 72px;
 }
 
+.admin-new-showcase-panel {
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.12);
+}
+
 .admin-form-section {
   border: 1px solid #e5e7eb;
   border-radius: 12px;

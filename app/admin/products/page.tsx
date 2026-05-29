@@ -70,6 +70,8 @@ const statusOptions = [
 
 const categoryOptions = ["", ...CATEGORY_OPTIONS.filter((c) => c !== "ALL")];
 const AUTO_SAVE_DELAY_MS = 1200;
+/** Bump when admin new-item showcase UI changes — visible in Products editor to confirm deploy. */
+const ADMIN_PRODUCTS_BUILD_TAG = "new-desc-v2";
 
 function productImageSrc(sku: string, imageUrl?: string) {
   if (imageUrl) return imageUrl;
@@ -741,6 +743,10 @@ export default function AdminProductsPage() {
 
         <div style={splitForm} className="admin-catalog-form-sticky">
           <Panel title={sku ? `Edit ${sku}` : "SKU details"}>
+            <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 8, fontWeight: 700 }}>
+              Build {ADMIN_PRODUCTS_BUILD_TAG}
+              {!sku.trim() ? " · 选择左侧 SKU 后可编辑新品介绍" : null}
+            </div>
             {autoSaveStatus ? (
               <div
                 style={{
@@ -850,93 +856,6 @@ export default function AdminProductsPage() {
                   )
                 </span>
               </label>
-              <div
-                id="admin-new-item-showcase"
-                style={{
-                  gridColumn: "1 / -1",
-                  border: isNew ? "2px solid #2563eb" : "1px solid #d1d5db",
-                  borderRadius: 12,
-                  padding: 14,
-                  background: isNew ? "#eff6ff" : "#f9fafb",
-                  scrollMarginTop: 88,
-                }}
-              >
-                <div style={{ fontSize: 15, fontWeight: 950, color: isNew ? "#1e40af" : "#374151", marginBottom: 4 }}>
-                  新品介绍 · /new/ 页面
-                </div>
-                <div style={{ fontSize: 12, color: isNew ? "#1d4ed8" : "#6b7280", marginBottom: 12, lineHeight: 1.5 }}>
-                  {isNew
-                    ? "顾客在 /new/ 新品页可点「查看说明」弹出介绍；可填文字、上传 PDF，并选 DRY / FROZEN / FRESH 标签。"
-                    : "请先勾选上方的「Show in customer New items」，再填写介绍与上传 PDF。"}
-                </div>
-                <fieldset disabled={!isNew} style={{ border: "none", margin: 0, padding: 0, opacity: isNew ? 1 : 0.55 }}>
-                  <label style={labelStyle}>仓储标签 Storage label</label>
-                  <select
-                    value={newItemStorageLabel}
-                    onChange={(e) => {
-                      setNewItemStorageLabel(e.target.value as "" | NewItemStorageLabel);
-                      markDirty();
-                    }}
-                    style={inputStyle}
-                  >
-                    <option value="">无 / None</option>
-                    {NEW_ITEM_STORAGE_LABELS.map((label) => (
-                      <option key={label} value={label}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                  <label style={{ ...labelStyle, marginTop: 10 }}>文字介绍 Short description</label>
-                  <textarea
-                    value={newItemDescription}
-                    onChange={(e) => updateText(setNewItemDescription, e.target.value)}
-                    style={{ ...inputStyle, minHeight: 96, resize: "vertical", width: "100%", boxSizing: "border-box" }}
-                    placeholder="例如：卖点、规格、到货说明…"
-                  />
-                  <label style={{ ...labelStyle, marginTop: 10 }}>上传产品介绍 PDF</label>
-                  <input
-                    type="file"
-                    accept="application/pdf,.pdf"
-                    onChange={(e) => uploadNewItemPdf(e.target.files?.[0] || null)}
-                    style={inputStyle}
-                    disabled={uploadingNewPdf || !isNew}
-                  />
-                  <p style={{ fontSize: 11, color: "#6b7280", margin: "6px 0 0" }}>
-                    {uploadingNewPdf ? "正在上传…" : "仅 PDF，最大 12 MB。选择文件后会立即保存到当前 SKU。"}
-                  </p>
-                  {newItemDescriptionPdfUrl ? (
-                    <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                      <a
-                        href={newItemDescriptionPdfUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ fontSize: 12, fontWeight: 800, color: "#2563eb" }}
-                      >
-                        预览 PDF
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewItemDescriptionPdfUrl("");
-                          markDirty();
-                        }}
-                        style={{
-                          border: "1px solid #fecaca",
-                          background: "#fff",
-                          borderRadius: 8,
-                          padding: "4px 10px",
-                          fontSize: 11,
-                          fontWeight: 800,
-                          color: "#b91c1c",
-                          cursor: "pointer",
-                        }}
-                      >
-                        删除 PDF
-                      </button>
-                    </div>
-                  ) : null}
-                </fieldset>
-              </div>
               <label
                 style={{
                   gridColumn: "1 / -1",
@@ -1005,6 +924,98 @@ export default function AdminProductsPage() {
                 </p>
               </div>
             </div>
+
+            {sku.trim() ? (
+              <div
+                id="admin-new-item-showcase"
+                className="admin-new-showcase-panel"
+                style={{
+                  marginTop: 16,
+                  marginBottom: 16,
+                  border: isNew ? "2px solid #2563eb" : "2px dashed #94a3b8",
+                  borderRadius: 14,
+                  padding: 16,
+                  background: isNew ? "#eff6ff" : "#f8fafc",
+                  scrollMarginTop: 88,
+                }}
+              >
+                <div style={{ fontSize: 17, fontWeight: 950, color: isNew ? "#1e40af" : "#334155", marginBottom: 6 }}>
+                  新品介绍 · /new/ 页面
+                </div>
+                <div style={{ fontSize: 13, color: isNew ? "#1d4ed8" : "#64748b", marginBottom: 14, lineHeight: 1.55 }}>
+                  {isNew
+                    ? "顾客在 /new/ 新品页可点「查看说明」弹出介绍。可填文字、上传 PDF，并选 DRY / FROZEN / FRESH 标签。"
+                    : "请先在上方勾选「Show in customer New items」，再填写下方内容。"}
+                </div>
+                <fieldset disabled={!isNew} style={{ border: "none", margin: 0, padding: 0, opacity: isNew ? 1 : 0.5 }}>
+                  <label style={labelStyle}>仓储标签 (DRY / FROZEN / FRESH)</label>
+                  <select
+                    value={newItemStorageLabel}
+                    onChange={(e) => {
+                      setNewItemStorageLabel(e.target.value as "" | NewItemStorageLabel);
+                      markDirty();
+                    }}
+                    style={inputStyle}
+                  >
+                    <option value="">无</option>
+                    {NEW_ITEM_STORAGE_LABELS.map((label) => (
+                      <option key={label} value={label}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                  <label style={{ ...labelStyle, marginTop: 12 }}>文字介绍</label>
+                  <textarea
+                    value={newItemDescription}
+                    onChange={(e) => updateText(setNewItemDescription, e.target.value)}
+                    style={{ ...inputStyle, minHeight: 100, resize: "vertical", width: "100%", boxSizing: "border-box" }}
+                    placeholder="例如：卖点、规格、到货说明…"
+                  />
+                  <label style={{ ...labelStyle, marginTop: 12 }}>上传产品介绍 PDF</label>
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    onChange={(e) => uploadNewItemPdf(e.target.files?.[0] || null)}
+                    style={{ ...inputStyle, width: "100%", boxSizing: "border-box" }}
+                    disabled={uploadingNewPdf || !isNew}
+                  />
+                  <p style={{ fontSize: 12, color: "#64748b", margin: "8px 0 0" }}>
+                    {uploadingNewPdf ? "正在上传…" : "仅 PDF，最大 12 MB。选择文件后立即保存。"}
+                  </p>
+                  {newItemDescriptionPdfUrl ? (
+                    <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                      <a
+                        href={newItemDescriptionPdfUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ fontSize: 13, fontWeight: 800, color: "#2563eb" }}
+                      >
+                        预览 PDF
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewItemDescriptionPdfUrl("");
+                          markDirty();
+                        }}
+                        style={{
+                          border: "1px solid #fecaca",
+                          background: "#fff",
+                          borderRadius: 8,
+                          padding: "6px 12px",
+                          fontSize: 12,
+                          fontWeight: 800,
+                          color: "#b91c1c",
+                          cursor: "pointer",
+                        }}
+                      >
+                        删除 PDF
+                      </button>
+                    </div>
+                  ) : null}
+                </fieldset>
+              </div>
+            ) : null}
 
             <BtnRow>
               <BtnPrimary onClick={() => void saveProduct()} disabled={busy || !formDirty}>
