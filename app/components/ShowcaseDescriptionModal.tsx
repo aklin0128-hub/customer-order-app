@@ -27,6 +27,8 @@ export function ShowcaseDescriptionModal({
   const t = copy[lang];
   const text = String(item.newItemDescription || "").trim();
   const pdfUrl = String(item.newItemDescriptionPdfUrl || "").trim();
+  const pdfFrameSrc = pdfUrl && !pdfUrl.includes("#") ? `${pdfUrl}#view=FitH` : pdfUrl;
+  const hasPdf = Boolean(pdfUrl);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -44,14 +46,14 @@ export function ShowcaseDescriptionModal({
   return (
     <div className="showcase-modal-backdrop" role="presentation" onClick={onClose}>
       <div
-        className="showcase-modal"
+        className={`showcase-modal${hasPdf ? " showcase-modal--pdf" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="showcase-modal-title"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="showcase-modal-header">
-          <div>
+          <div className="showcase-modal-header-text">
             <h2 id="showcase-modal-title" className="showcase-modal-title">
               {t.title}
             </h2>
@@ -65,18 +67,24 @@ export function ShowcaseDescriptionModal({
 
         {text ? <div className="showcase-modal-text">{text}</div> : null}
 
-        {pdfUrl ? (
+        {hasPdf ? (
           <div className="showcase-modal-pdf">
-            <iframe title={`${item.sku} PDF`} src={pdfUrl} className="showcase-modal-pdf-frame" />
-            <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="showcase-modal-pdf-link">
-              {t.openPdf}
-            </a>
+            <iframe title={`${item.sku} PDF`} src={pdfFrameSrc} className="showcase-modal-pdf-frame" />
           </div>
         ) : null}
 
-        <button type="button" className="showcase-modal-done" onClick={onClose}>
-          {t.close}
-        </button>
+        <div className="showcase-modal-footer">
+          {hasPdf ? (
+            <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="showcase-modal-pdf-link">
+              {t.openPdf}
+            </a>
+          ) : (
+            <span />
+          )}
+          <button type="button" className="showcase-modal-done" onClick={onClose}>
+            {t.close}
+          </button>
+        </div>
       </div>
     </div>
   );
