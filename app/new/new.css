@@ -237,6 +237,19 @@
   margin-top: 6px;
 }
 
+.new-card .showcase-card-promo-deal {
+  margin-top: 8px;
+  padding: 8px 6px;
+}
+
+.new-card .showcase-card-promo-deal-label {
+  font-size: 10px;
+}
+
+.new-card .showcase-card-promo-deal-tier {
+  font-size: 13px;
+}
+
 .new-card .showcase-card-detail {
   font-size: 11px;
   line-height: 1.4;

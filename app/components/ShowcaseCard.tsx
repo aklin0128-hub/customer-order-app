@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ShowcaseDescriptionModal } from "@/app/components/ShowcaseDescriptionModal";
+import { ProductImage } from "@/app/order/components/ProductImage";
 import { getJustAddedLabel, justAddedBadgeStyle } from "@/lib/justAddedBadge";
 import { formatShowcasePromoDisplay, type Lang } from "@/lib/showcasePromoFormat";
 import type { LoginPreviewCard } from "@/lib/loginPreview";
@@ -20,6 +21,7 @@ export function ShowcaseCard({
   showPromo,
   className = "showcase-card",
   showNewDetails,
+  imageSize,
 }: {
   item: LoginPreviewCard;
   lang: Lang;
@@ -27,9 +29,22 @@ export function ShowcaseCard({
   className?: string;
   /** New-items tab: show Details when description or PDF exists */
   showNewDetails?: boolean;
+  imageSize?: number;
 }) {
-  const [imgError, setImgError] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [desktopGrid, setDesktopGrid] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1100px)");
+    const sync = () => setDesktopGrid(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
+  const isNewCard = className.includes("new-card");
+  const resolvedImageSize =
+    imageSize ?? (isNewCard ? (desktopGrid ? 72 : 88) : 80);
 
   const promoDisplay = useMemo(
     () => (showPromo ? formatShowcasePromoDisplay(item, lang) : null),
@@ -59,17 +74,12 @@ export function ShowcaseCard({
 
       <div className="showcase-card-body">
         <div className="showcase-card-img-wrap">
-          {imgError ? (
-            <div className="showcase-card-img-fallback">SKU</div>
-          ) : (
-            <img
-              src={item.imageUrl || `/product/${item.sku}.jpg`}
-              alt={item.name || item.sku}
-              loading="lazy"
-              decoding="async"
-              onError={() => setImgError(true)}
-            />
-          )}
+          <ProductImage
+            sku={item.sku}
+            alt={item.name || item.sku}
+            size={resolvedImageSize}
+            imageUrl={item.imageUrl}
+          />
         </div>
 
         <div className="showcase-card-meta">
@@ -79,7 +89,20 @@ export function ShowcaseCard({
             {item.name || "—"}
           </div>
           {item.size ? <div className="showcase-card-size">{item.size}</div> : null}
-          {promoDisplay?.priceLine ? (
+          {promoDisplay?.tierPricesLine ? (
+            <div className="showcase-card-promo-deal">
+              {promoDisplay.priceLine ? (
+                <div className="showcase-card-promo-deal-label">{promoDisplay.priceLine}</div>
+              ) : null}
+              <div className="showcase-card-promo-deal-tiers">
+                {promoDisplay.tierPricesLine.split(" · ").map((tier) => (
+                  <div key={tier} className="showcase-card-promo-deal-tier">
+                    {tier}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : promoDisplay?.priceLine ? (
             <div className="showcase-card-price">{promoDisplay.priceLine}</div>
           ) : null}
           {promoDisplay?.details.map((line, index) => (

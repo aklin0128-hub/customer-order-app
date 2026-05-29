@@ -12,16 +12,17 @@ export type Lang = "en" | "zh" | "ko" | "vi";
 export function formatShowcasePromoDisplay(
   item: LoginPreviewCard,
   lang: Lang
-): { priceLine: string; details: string[] } {
+): { priceLine: string; tierPricesLine?: string; details: string[] } {
   const t = copy[lang];
   const details: string[] = [];
   const highlight = getPromotionDealHighlight(item, t);
 
   let priceLine = "";
+  let tierPricesLine: string | undefined;
 
   if (highlight.headline && highlight.detail) {
     priceLine = highlight.headline;
-    details.push(highlight.detail);
+    tierPricesLine = highlight.detail;
   } else if (highlight.headline) {
     priceLine = highlight.headline;
   } else if (highlight.simplePrice) {
@@ -40,5 +41,5 @@ export function formatShowcasePromoDisplay(
   const note = String(item.promoNote || "").trim();
   if (note) details.push(note);
 
-  return { priceLine, details };
+  return { priceLine, tierPricesLine, details };
 }

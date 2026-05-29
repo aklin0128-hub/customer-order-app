@@ -74,6 +74,38 @@
   color: #0f766e;
 }
 
+.showcase-card-promo-deal {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  text-align: center;
+  line-height: 1.35;
+}
+
+.showcase-card-promo-deal-label {
+  font-size: 10px;
+  font-weight: 900;
+  color: #b45309;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.showcase-card-promo-deal-tiers {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.showcase-card-promo-deal-tier {
+  font-size: 12px;
+  font-weight: 900;
+  color: #92400e;
+  letter-spacing: -0.01em;
+}
+
 .showcase-card-note,
 .showcase-card-detail {
   font-size: 10px;
