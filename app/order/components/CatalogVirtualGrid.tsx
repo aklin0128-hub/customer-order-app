@@ -3,29 +3,15 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { catalogColumnCountForWidth, CATALOG_GRID_GAP_PX } from "../catalogGridLayout";
 import { catalogVirtualScrollStyle } from "../orderStyles";
 import { isJustAddedItem } from "../catalogUtils";
 import type { CatalogItem } from "../types";
 import { CatalogQtyCard } from "./CatalogQtyCard";
 
-const GAP = 8;
-const MAX_CATALOG_WIDTH = 1280;
-const DESKTOP_COLUMNS = 6;
+const GAP = CATALOG_GRID_GAP_PX;
 /** Initial row height before measure; kept close to real card height to avoid huge gaps */
 const ROW_HEIGHT = 330;
-
-function columnCountForWidth(rawWidth: number) {
-  const width =
-    rawWidth > 0
-      ? rawWidth
-      : typeof window !== "undefined"
-        ? Math.min(MAX_CATALOG_WIDTH, window.innerWidth - 40)
-        : MAX_CATALOG_WIDTH;
-  if (width >= 1024) return DESKTOP_COLUMNS;
-  if (width >= 768) return 4;
-  if (width >= 520) return 3;
-  return 2;
-}
 
 export function CatalogVirtualGrid({
   items,
@@ -94,7 +80,7 @@ export function CatalogVirtualGrid({
     };
   }, [items.length]);
 
-  const columnCount = useMemo(() => columnCountForWidth(width), [width]);
+  const columnCount = useMemo(() => catalogColumnCountForWidth(width), [width]);
 
   const rowCount = Math.max(1, Math.ceil(items.length / columnCount));
 
