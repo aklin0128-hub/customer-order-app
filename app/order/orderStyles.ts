@@ -236,7 +236,6 @@ export const catalogCardStyle: CSSProperties = {
   overflow: "visible",
   position: "relative",
   minWidth: 0,
-  height: "100%",
   boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
 };
 export const catalogNameStyle: CSSProperties = {

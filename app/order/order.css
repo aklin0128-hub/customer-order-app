@@ -323,8 +323,7 @@
 }
 
 .catalog-qty-card {
-  height: 100%;
-  min-height: 0;
+  align-self: stretch;
 }
 
 .catalog-qty-card-stepper {

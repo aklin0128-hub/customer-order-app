@@ -12,7 +12,7 @@ const GAP = 8;
 const MAX_CATALOG_WIDTH = 1280;
 const DESKTOP_COLUMNS = 6;
 /** Initial row height before measure; kept close to real card height to avoid huge gaps */
-const ROW_HEIGHT = 290;
+const ROW_HEIGHT = 330;
 
 function columnCountForWidth(rawWidth: number) {
   const width =
@@ -107,7 +107,11 @@ export function CatalogVirtualGrid({
 
   useEffect(() => {
     rowVirtualizer.measure();
-  }, [columnCount, rowCount]);
+    const timer = window.setTimeout(() => rowVirtualizer.measure(), 150);
+    return () => window.clearTimeout(timer);
+    // rowVirtualizer is stable enough; remeasure when layout inputs change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [columnCount, rowCount, items.length]);
 
   if (items.length === 0) return null;
 
@@ -130,8 +134,10 @@ export function CatalogVirtualGrid({
                 transform: `translateY(${vr.start}px)`,
                 display: "grid",
                 gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
+                alignItems: "stretch",
                 columnGap: GAP,
-                rowGap: GAP,
+                paddingBottom: GAP,
+                boxSizing: "border-box",
               }}
             >
               {rowItems.map((item) => {
