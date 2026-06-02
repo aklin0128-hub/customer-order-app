@@ -883,26 +883,6 @@ export default function OrderPage() {
     setQtyForSku(sku, "");
   };
 
-  const addAllWeeklyPicksOneCase = () => {
-    for (const item of promotionItems) {
-      if (item.remainingQty === 0) continue;
-      const sku = item.sku?.toUpperCase();
-      if (!sku) continue;
-      const catalogItem = getCatalogItemBySku(sku) || item;
-      if (!isOrderableItem(catalogItem)) continue;
-      adjustQtyForSku(sku, 1);
-    }
-  };
-
-  const addAllNewItemsOneCase = () => {
-    for (const item of newItemCatalogItems) {
-      const sku = item.sku?.toUpperCase();
-      if (!sku) continue;
-      if (!isOrderableItem(item)) continue;
-      adjustQtyForSku(sku, 1);
-    }
-  };
-
   const addAllClearanceOneCase = () => {
     for (const item of clearanceItems) {
       if (item.remainingQty === 0) continue;
@@ -1684,27 +1664,6 @@ export default function OrderPage() {
             style={{ ...cardStyle, border: "1px solid #fdba74", background: "linear-gradient(180deg, #fff7ed 0%, #ffffff 40%)" }}
           >
             <div style={sectionTitleStyle}>{t.newItemsMode}</div>
-            <p style={{ fontSize: 13, color: "#9a3412", margin: "4px 0 10px", lineHeight: 1.45 }}>{t.newItemsHero}</p>
-            {newItemCatalogItems.length > 0 ? (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-                <button
-                  type="button"
-                  onClick={addAllNewItemsOneCase}
-                  style={{
-                    border: "1px solid #ea580c",
-                    background: "#ea580c",
-                    color: "#fff",
-                    borderRadius: 999,
-                    padding: "8px 14px",
-                    fontSize: 12,
-                    fontWeight: 900,
-                    cursor: "pointer",
-                  }}
-                >
-                  {t.addAllNewItemsOneCase}
-                </button>
-              </div>
-            ) : null}
 
             {newItemCatalogItems.length === 0 ? (
               <div style={{ ...emptyStyle, border: "1px solid #fdba74", background: "#fff7ed", color: "#c2410c" }}>{t.noNewItems}</div>
@@ -1733,27 +1692,6 @@ export default function OrderPage() {
             style={{ ...cardStyle, border: "1px solid #5eead4", background: "linear-gradient(180deg, #f0fdfa 0%, #ffffff 40%)" }}
           >
             <div style={sectionTitleStyle}>{t.promotionMode}</div>
-            <p style={{ fontSize: 13, color: "#115e59", margin: "4px 0 10px", lineHeight: 1.45 }}>{t.weeklyPicksHero}</p>
-            {promotionItems.length > 0 ? (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
-                <button
-                  type="button"
-                  onClick={addAllWeeklyPicksOneCase}
-                  style={{
-                    border: "1px solid #0f766e",
-                    background: "#0f766e",
-                    color: "#fff",
-                    borderRadius: 999,
-                    padding: "8px 14px",
-                    fontSize: 12,
-                    fontWeight: 900,
-                    cursor: "pointer",
-                  }}
-                >
-                  {t.addAllWeeklyPicksOneCase}
-                </button>
-              </div>
-            ) : null}
 
             {promotionsLoading ? (
               <div style={{ ...emptyStyle, border: "1px solid #5eead4", background: "#f0fdfa", color: "#0f766e" }}>{t.loadingPromotions}</div>
