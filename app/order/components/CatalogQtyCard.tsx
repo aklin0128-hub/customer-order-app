@@ -1,7 +1,8 @@
 "use client";
 
+import { formatCatalogAddedDate } from "@/lib/catalogNewItems";
 import { getDisplayStatus, getStatusBadgeStyle, isJustAddedItem, isOrderableItem } from "../catalogUtils";
-import type { CatalogItem } from "../types";
+import type { CatalogItem, Lang } from "../types";
 import {
   catalogCardStyle,
   catalogNameStyle,
@@ -42,6 +43,10 @@ export function CatalogQtyCard({
   editLabel = "Edit",
   palletLabel,
   justAddedLabel,
+  /** Show catalog import date (New items tab). */
+  showAddedDate,
+  addedDateLabel,
+  lang = "en",
   /** New-items tab: every card uses the red JUST ADDED pill (pin order still uses justAdded flag). */
   uniformNewPill,
 }: {
@@ -70,9 +75,14 @@ export function CatalogQtyCard({
   palletLabel?: string;
   /** e.g. "JUST ADDED" — shown when admin sets justAdded on the SKU */
   justAddedLabel?: string;
+  showAddedDate?: boolean;
+  addedDateLabel?: string;
+  lang?: Lang;
   uniformNewPill?: boolean;
 }) {
   const showJustAdded = Boolean(justAddedLabel && (uniformNewPill || isJustAddedItem(item)));
+  const addedDateText =
+    showAddedDate && addedDateLabel ? formatCatalogAddedDate(item.importedAt, lang) : null;
   const hasQty = Number(qty) > 0;
   const qtyNum = Number(qty) || 0;
   const showBogoRoundUp =
@@ -143,6 +153,11 @@ export function CatalogQtyCard({
       {item.palletSize && palletLabel ? (
         <div style={{ fontSize: 11, color: "#6b7280", marginTop: item.size ? 2 : 0 }}>
           {palletLabel}: {item.palletSize}
+        </div>
+      ) : null}
+      {addedDateText ? (
+        <div className="catalog-added-date">
+          {addedDateLabel}: {addedDateText}
         </div>
       ) : null}
       {!isOrderableItem(item) && getDisplayStatus(item.status) ? (

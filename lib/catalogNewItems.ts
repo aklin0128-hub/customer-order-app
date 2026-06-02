@@ -3,6 +3,27 @@ export function parseImportedAtMs(value?: string | null) {
   return Number.isFinite(ms) ? ms : null;
 }
 
+const DATE_LOCALE_BY_LANG: Record<string, string> = {
+  en: "en-US",
+  zh: "zh-CN",
+  ko: "ko-KR",
+  vi: "vi-VN",
+};
+
+export function catalogDateLocale(lang?: string) {
+  return DATE_LOCALE_BY_LANG[String(lang || "en")] || "en-US";
+}
+
+export function formatCatalogAddedDate(value: string | undefined, lang?: string) {
+  const ms = parseImportedAtMs(value);
+  if (ms == null) return null;
+  return new Date(ms).toLocaleDateString(catalogDateLocale(lang), {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export type CatalogNewFields = {
   sku?: string;
   /** Admin only: show in customer “New items” tab/list */
@@ -40,5 +61,11 @@ export function compareCatalogByNewestImport(
   a: CatalogNewFields & { sku?: string },
   b: CatalogNewFields & { sku?: string }
 ) {
-  return compareCatalogForDisplay(a, b);
+  const aPin = isJustAddedItem(a) ? 1 : 0;
+  const bPin = isJustAddedItem(b) ? 1 : 0;
+  if (bPin !== aPin) return bPin - aPin;
+  const aMs = parseImportedAtMs(a.importedAt) ?? 0;
+  const bMs = parseImportedAtMs(b.importedAt) ?? 0;
+  if (bMs !== aMs) return bMs - aMs;
+  return String(a.sku || "").localeCompare(String(b.sku || ""));
 }

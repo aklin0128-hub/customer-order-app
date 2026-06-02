@@ -17,7 +17,7 @@ import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
 import { buildClearanceUpsellLines } from "./salesFlow";
 import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog } from "./catalogState";
-import { compareCatalogForDisplay } from "@/lib/catalogNewItems";
+import { compareCatalogForDisplay, compareCatalogByNewestImport } from "@/lib/catalogNewItems";
 import {
   formatBrandLabel,
   formatClearanceDetails,
@@ -529,7 +529,7 @@ export default function OrderPage() {
           const aNormal = isOrderableItem(a);
           const bNormal = isOrderableItem(b);
           if (aNormal !== bNormal) return aNormal ? -1 : 1;
-          return compareCatalogForDisplay(a, b);
+          return compareCatalogByNewestImport(a, b);
         }),
     [catalogBrowseBase]
   );
@@ -1679,6 +1679,9 @@ export default function OrderPage() {
                 promoBadgeLabel={t.newItems}
                 editLabel={t.editProduct}
                 showAdminEdit={showAdminEditLinks}
+                showAddedDate
+                addedDateLabel={t.addedDate}
+                lang={lang}
                 canOrderItem={isOrderableItem}
                 orderBlockedMessage={(item) => formatOrderNotAvailableMessage(item.sku || "", item.status, t)}
                 onAdjust={adjustCatalogQty}

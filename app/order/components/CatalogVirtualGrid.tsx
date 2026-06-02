@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { catalogColumnCountForWidth, CATALOG_GRID_GAP_PX } from "../catalogGridLayout";
 import { catalogVirtualScrollStyle } from "../orderStyles";
 import { isJustAddedItem } from "../catalogUtils";
-import type { CatalogItem } from "../types";
+import type { CatalogItem, Lang } from "../types";
 import { CatalogQtyCard } from "./CatalogQtyCard";
 
 const GAP = CATALOG_GRID_GAP_PX;
@@ -27,6 +27,9 @@ export function CatalogVirtualGrid({
   palletLabel,
   justAddedLabel,
   uniformNewPill,
+  showAddedDate,
+  addedDateLabel,
+  lang,
   showAdminEdit,
   canOrderItem,
   orderBlockedMessage,
@@ -46,6 +49,9 @@ export function CatalogVirtualGrid({
   palletLabel?: string;
   justAddedLabel?: string;
   uniformNewPill?: boolean;
+  showAddedDate?: boolean;
+  addedDateLabel?: string;
+  lang?: Lang;
   showAdminEdit?: boolean;
   canOrderItem?: (item: CatalogItem) => boolean;
   orderBlockedMessage?: (item: CatalogItem) => string;
@@ -154,6 +160,9 @@ export function CatalogVirtualGrid({
                     palletLabel={palletLabel}
                     justAddedLabel={justAddedLabel}
                     uniformNewPill={uniformNewPill}
+                    showAddedDate={showAddedDate}
+                    addedDateLabel={addedDateLabel}
+                    lang={lang}
                     showAdminEdit={showAdminEdit}
                     disabled={!canOrder}
                     unavailableNote={!canOrder ? orderBlockedMessage?.(item) : undefined}
