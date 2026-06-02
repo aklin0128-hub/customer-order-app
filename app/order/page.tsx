@@ -8,7 +8,7 @@ import { CATEGORY_OPTIONS, inferCategory } from "@/lib/inferCategory";
 
 import { CatalogVirtualGrid } from "./components/CatalogVirtualGrid";
 import { CatalogQtyCard } from "./components/CatalogQtyCard";
-import { OrderCartSection } from "./components/OrderCartSection";
+import { OrderCartModal } from "./components/OrderCartModal";
 import { OrderShopNudge } from "./components/OrderShopNudge";
 import { RecommendedStrip } from "./components/RecommendedStrip";
 import { OrderInput } from "./components/OrderInput";
@@ -2016,70 +2016,60 @@ export default function OrderPage() {
         ) : null}
       </div>
 
-      {showCart ? (
-        <button
-          type="button"
-          className="order-cart-scrim"
-          aria-label={t.hideCart}
-          onClick={toggleCartPanel}
-        />
-      ) : null}
-
-      {showCart ? (
-        <div className="order-cart-sheet" aria-label={t.orderCart}>
-          <div className="order-cart-sheet-inner">
-            <OrderCartSection
-              lang={lang}
-              items={catalogItemsForSubmit}
-              clearanceSkus={clearanceSkuSet}
-              expanded
-              onToggleExpanded={toggleCartPanel}
-              lineCount={cartItemCount}
-              totalCases={totalCases}
-              onAdjustQty={adjustQtyForSku}
-              onQtyInput={updateCatalogQty}
-              onRemove={removeSkuFromOrder}
-              nudge={
-                clearanceUpsellLines.length > 0 ? (
-                  <details className="order-cart-nudge-fold" open={cartItemCount > 0}>
-                    <summary>
-                      {t.clearanceMode} ({clearanceItems.length})
-                    </summary>
-                    <OrderShopNudge
-                      lang={lang}
-                      clearanceMissing={clearanceUpsellLines.length}
-                      clearanceDealCount={clearanceItems.length}
-                      onAddClearanceMissing={addAllMissingClearanceUpsell}
-                      onViewClearance={() => changeMode("clearance")}
-                    />
-                  </details>
-                ) : null
-              }
-              tools={
-                <div className="order-cart-tools">
-                  <div className="order-cart-tools-row">
-                    <button type="button" onClick={downloadCsv} className="order-cart-tool-btn" style={secondaryButtonStyle}>
-                      {t.downloadCsv}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="order-cart-tool-btn"
-                      style={secondaryButtonStyle}
-                    >
-                      {t.uploadCsv}
-                    </button>
-                    <button type="button" onClick={clearOrder} className="order-cart-clear-btn">
-                      {t.clearOrder}
-                    </button>
-                    <input ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleUploadCsv} />
-                  </div>
-                </div>
-              }
-            />
+      <OrderCartModal
+        open={showCart}
+        onClose={toggleCartPanel}
+        onReview={() => {
+          setShowCart(false);
+          openReview();
+        }}
+        lang={lang}
+        items={catalogItemsForSubmit}
+        clearanceSkus={clearanceSkuSet}
+        lineCount={cartItemCount}
+        totalCases={totalCases}
+        submitting={submitting}
+        onAdjustQty={adjustQtyForSku}
+        onQtyInput={updateCatalogQty}
+        onRemove={removeSkuFromOrder}
+        nudge={
+          clearanceUpsellLines.length > 0 ? (
+            <details className="order-cart-nudge-fold" open={cartItemCount > 0}>
+              <summary>
+                {t.clearanceMode} ({clearanceItems.length})
+              </summary>
+              <OrderShopNudge
+                lang={lang}
+                clearanceMissing={clearanceUpsellLines.length}
+                clearanceDealCount={clearanceItems.length}
+                onAddClearanceMissing={addAllMissingClearanceUpsell}
+                onViewClearance={() => changeMode("clearance")}
+              />
+            </details>
+          ) : null
+        }
+        tools={
+          <div className="order-cart-tools">
+            <div className="order-cart-tools-row">
+              <button type="button" onClick={downloadCsv} className="order-cart-tool-btn" style={secondaryButtonStyle}>
+                {t.downloadCsv}
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="order-cart-tool-btn"
+                style={secondaryButtonStyle}
+              >
+                {t.uploadCsv}
+              </button>
+              <button type="button" onClick={clearOrder} className="order-cart-clear-btn">
+                {t.clearOrder}
+              </button>
+              <input ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleUploadCsv} />
+            </div>
           </div>
-        </div>
-      ) : null}
+        }
+      />
 
       <div className="order-fixed-bar">
         <div className="order-fixed-bar-inner">
