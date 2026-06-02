@@ -157,6 +157,8 @@ export const copy = {
     viewDetails: "View",
     hideDetails: "Hide",
     moreBrandsPick: "More brands…",
+    enterFullscreen: "Full screen",
+    exitFullscreen: "Exit full screen",
   },
   zh: {
     title: "门店订货",
@@ -316,6 +318,8 @@ export const copy = {
     viewDetails: "查看",
     hideDetails: "收起",
     moreBrandsPick: "更多品牌…",
+    enterFullscreen: "全屏",
+    exitFullscreen: "退出全屏",
   },
   ko: {
     title: "매장 주문",
@@ -475,6 +479,8 @@ export const copy = {
     viewDetails: "보기",
     hideDetails: "숨기기",
     moreBrandsPick: "다른 브랜드…",
+    enterFullscreen: "전체 화면",
+    exitFullscreen: "전체 화면 종료",
   },
   vi: {
     title: "Đặt hàng cửa hàng",
@@ -634,6 +640,8 @@ export const copy = {
     viewDetails: "Xem",
     hideDetails: "Ẩn",
     moreBrandsPick: "Thương hiệu khác…",
+    enterFullscreen: "Toàn màn hình",
+    exitFullscreen: "Thoát toàn màn hình",
   },
 } as const;
 

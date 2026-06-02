@@ -12,7 +12,7 @@ const GAP = 8;
 const MAX_CATALOG_WIDTH = 1280;
 const DESKTOP_COLUMNS = 6;
 /** Initial row height before measure; kept close to real card height to avoid huge gaps */
-const ROW_HEIGHT = 268;
+const ROW_HEIGHT = 290;
 
 function columnCountForWidth(rawWidth: number) {
   const width =
@@ -112,7 +112,7 @@ export function CatalogVirtualGrid({
   if (items.length === 0) return null;
 
   return (
-    <div ref={scrollRef} style={catalogVirtualScrollStyle}>
+    <div ref={scrollRef} className="order-catalog-virtual-scroll" style={catalogVirtualScrollStyle}>
       <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative", width: "100%" }}>
         {rowVirtualizer.getVirtualItems().map((vr) => {
           const rowStart = vr.index * columnCount;

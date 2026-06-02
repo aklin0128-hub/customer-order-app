@@ -83,8 +83,13 @@ export function CatalogQtyCard({
     qtyNum % bogoPackSize !== 0 &&
     onRoundUpBogo;
 
+  const tierPrices = promoDealDetail?.includes(" · ")
+    ? promoDealDetail.split(" · ").filter(Boolean)
+    : null;
+
   return (
     <div
+      className="catalog-qty-card"
       style={{
         ...catalogCardStyle,
         background: disabled ? "#f3f4f6" : hasQty ? "#ecfdf5" : highlight ? "#f0fdfa" : "#ffffff",
@@ -171,8 +176,16 @@ export function CatalogQtyCard({
       {promoDealLabel ? (
         <div style={promoDealStyle}>
           <div>{promoDealLabel}</div>
-          {promoDealDetail ? (
-            <div style={{ fontSize: 11, fontWeight: 800, marginTop: 4, lineHeight: 1.35 }}>{promoDealDetail}</div>
+          {tierPrices ? (
+            <div className="catalog-promo-deal-tiers">
+              {tierPrices.map((tier) => (
+                <div key={tier} className="catalog-promo-deal-tier">
+                  {tier}
+                </div>
+              ))}
+            </div>
+          ) : promoDealDetail ? (
+            <div style={{ fontSize: 12, fontWeight: 800, marginTop: 4, lineHeight: 1.35 }}>{promoDealDetail}</div>
           ) : null}
         </div>
       ) : null}
@@ -181,42 +194,45 @@ export function CatalogQtyCard({
       {policyNote ? <div style={clearancePolicyStyle}>{policyNote}</div> : null}
       {hasQty ? <div style={inCartTagStyle}>{inCartLabel}: {qty}</div> : null}
 
-      <div style={catalogStepperStyle}>
-        <button type="button" onClick={() => onAdjust(item.sku, -1)} disabled={disabled} style={catalogStepBtnStyle}>
-          −
-        </button>
-        <input
-          value={qty}
-          onChange={(e) => onUpdateQty(item.sku, e.target.value)}
-          placeholder="0"
-          inputMode="numeric"
-          disabled={disabled}
-          style={{ ...catalogStepInputStyle, opacity: disabled ? 0.5 : 1 }}
-        />
-        <button type="button" onClick={() => onAdjust(item.sku, 1)} disabled={disabled} style={catalogStepBtnStyle}>
-          +
-        </button>
+      <div className="catalog-qty-card-stepper">
+        <div style={catalogStepperStyle}>
+          <button type="button" onClick={() => onAdjust(item.sku, -1)} disabled={disabled} style={catalogStepBtnStyle}>
+            −
+          </button>
+          <input
+            value={qty}
+            onChange={(e) => onUpdateQty(item.sku, e.target.value)}
+            placeholder="0"
+            inputMode="numeric"
+            disabled={disabled}
+            style={{ ...catalogStepInputStyle, opacity: disabled ? 0.5 : 1 }}
+          />
+          <button type="button" onClick={() => onAdjust(item.sku, 1)} disabled={disabled} style={catalogStepBtnStyle}>
+            +
+          </button>
+        </div>
+        {showBogoRoundUp ? (
+          <button
+            type="button"
+            onClick={onRoundUpBogo}
+            style={{
+              marginTop: 6,
+              width: "100%",
+              border: "1px solid #fbbf24",
+              background: "#fffbeb",
+              color: "#92400e",
+              borderRadius: 999,
+              padding: "8px 10px",
+              fontSize: 11,
+              fontWeight: 800,
+              cursor: "pointer",
+              minHeight: 36,
+            }}
+          >
+            {roundUpBogoLabel}
+          </button>
+        ) : null}
       </div>
-      {showBogoRoundUp ? (
-        <button
-          type="button"
-          onClick={onRoundUpBogo}
-          style={{
-            marginTop: 6,
-            width: "100%",
-            border: "1px solid #fbbf24",
-            background: "#fffbeb",
-            color: "#92400e",
-            borderRadius: 999,
-            padding: "6px 8px",
-            fontSize: 10,
-            fontWeight: 800,
-            cursor: "pointer",
-          }}
-        >
-          {roundUpBogoLabel}
-        </button>
-      ) : null}
     </div>
   );
 }

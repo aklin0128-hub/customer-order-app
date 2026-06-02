@@ -229,13 +229,14 @@ export const promoGridStyle: CSSProperties = {
 };
 export const catalogCardStyle: CSSProperties = {
   borderRadius: 12,
-  padding: 8,
+  padding: 10,
   display: "flex",
   flexDirection: "column",
-  gap: 4,
+  gap: 5,
   overflow: "visible",
   position: "relative",
   minWidth: 0,
+  height: "100%",
   boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
 };
 export const catalogNameStyle: CSSProperties = {
@@ -297,16 +298,16 @@ export const inCartTagStyle: CSSProperties = {
 };
 export const catalogStepperStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "38px 1fr 38px",
-  gap: 6,
+  gridTemplateColumns: "44px 1fr 44px",
+  gap: 8,
   alignItems: "center",
-  marginTop: 4,
+  marginTop: 0,
   paddingTop: 0,
 };
 export const catalogStepBtnStyle: CSSProperties = {
-  width: 38,
-  height: 38,
-  borderRadius: 10,
+  width: 44,
+  height: 44,
+  borderRadius: 12,
   border: "1px solid #d1d5db",
   background: "#f9fafb",
   fontSize: 22,
@@ -316,7 +317,7 @@ export const catalogStepBtnStyle: CSSProperties = {
 };
 export const catalogStepInputStyle: CSSProperties = {
   width: "100%",
-  height: 38,
+  height: 44,
   borderRadius: 10,
   border: "1px solid #d1d5db",
   textAlign: "center",

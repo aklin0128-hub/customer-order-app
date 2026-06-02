@@ -87,6 +87,7 @@ export default function OrderPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const skuInputRef = useRef<HTMLInputElement | null>(null);
+  const mainRef = useRef<HTMLElement | null>(null);
   const submitLockRef = useRef(false);
   const autoLoadedRef = useRef(false);
   const clearanceFetchedRef = useRef(false);
@@ -124,6 +125,7 @@ export default function OrderPage() {
   const [autoLoaded, setAutoLoaded] = useState(false);
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
   const [showCustomerInfo, setShowCustomerInfo] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const [showRecent, setShowRecent] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [expandedHistoryKey, setExpandedHistoryKey] = useState("");
@@ -227,6 +229,41 @@ export default function OrderPage() {
     localStorage.setItem("order_mode", next);
     setSubmitMsg("");
   };
+
+  const setFullscreenMode = async (next: boolean) => {
+    setFullscreen(next);
+    try {
+      if (next) {
+        await mainRef.current?.requestFullscreen?.();
+      } else if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      }
+    } catch {
+      /* CSS-only fullscreen still works */
+    }
+  };
+
+  const toggleFullscreen = () => {
+    void setFullscreenMode(!fullscreen);
+  };
+
+  useEffect(() => {
+    const syncFullscreen = () => {
+      setFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && fullscreen && !document.fullscreenElement) {
+        setFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [fullscreen]);
 
   useEffect(() => {
     autoLoadedRef.current = autoLoaded;
@@ -1248,7 +1285,7 @@ export default function OrderPage() {
   if (!ready) return null;
 
   return (
-    <main className="order-page">
+    <main ref={mainRef} className={`order-page${fullscreen ? " is-fullscreen" : ""}`}>
       <div className="order-container">
         <section style={cardStyle} className="order-top-card order-compact-card">
           <div className="order-header-bar">
@@ -1274,6 +1311,14 @@ export default function OrderPage() {
             </div>
             <button
               type="button"
+              className={`order-header-link order-fullscreen-toggle${fullscreen ? " is-open" : ""}`}
+              onClick={toggleFullscreen}
+              aria-pressed={fullscreen}
+            >
+              {fullscreen ? t.exitFullscreen : t.enterFullscreen}
+            </button>
+            <button
+              type="button"
               className={`order-header-link${showCustomerInfo ? " is-open" : ""}`}
               onClick={() => setShowCustomerInfo((prev) => !prev)}
             >
@@ -1293,6 +1338,16 @@ export default function OrderPage() {
 
         <div className="order-sticky-bar">
           <div className="order-sticky-bar-inner">
+            {fullscreen ? (
+              <div className="order-fullscreen-toolbar">
+                <span className="order-fullscreen-meta">
+                  {accountNo} · {storeName}
+                </span>
+                <button type="button" className="order-fullscreen-exit" onClick={toggleFullscreen}>
+                  {t.exitFullscreen}
+                </button>
+              </div>
+            ) : null}
             <div className="order-mode-tabs" role="tablist" aria-label="Order mode">
               <button
                 type="button"
@@ -1481,7 +1536,7 @@ export default function OrderPage() {
         </div>
 
         {mode === "search" && recentItems.length > 0 ? (
-          <section style={cardStyle} className="order-compact-fold">
+          <section style={cardStyle} className="order-compact-fold order-aux-section">
             <button type="button" onClick={() => setShowRecent((prev) => !prev)} className="order-compact-fold-btn">
               <span className="order-compact-fold-title">{t.recent}</span>
               <span className="order-compact-fold-action">{showRecent ? t.hide : t.show}</span>
@@ -1867,7 +1922,7 @@ export default function OrderPage() {
         )}
 
         {orderHistory.length > 0 ? (
-          <section style={cardStyle} className="order-secondary-section order-compact-fold">
+          <section style={cardStyle} className="order-secondary-section order-compact-fold order-aux-section">
             <button type="button" onClick={() => setShowHistory((prev) => !prev)} className="order-compact-fold-btn">
               <span className="order-compact-fold-title">{t.history}</span>
               <span className="order-compact-fold-action">{showHistory ? t.hide : t.show}</span>
@@ -2040,7 +2095,13 @@ export default function OrderPage() {
               className="order-fixed-summary-btn"
             >
               <span>
-                {t.cartSummary}: {cartItemCount} {t.lines} / {totalCases} {t.cases}
+                {t.cartSummary}
+                {cartItemCount > 0 ? (
+                  <span className="order-fixed-cart-badge">{cartItemCount}</span>
+                ) : null}
+                <span style={{ display: "block", fontSize: 11, color: "#6b7280", marginTop: 2, fontWeight: 700 }}>
+                  {totalCases} {t.cases}
+                </span>
                 {!showCart ? (
                   <span className="order-fixed-inline-link">· {t.showCart}</span>
                 ) : cartItemCount > 0 ? (
