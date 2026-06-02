@@ -2091,7 +2091,7 @@ export default function OrderPage() {
           <div className="order-fixed-bar-layout">
             <button
               type="button"
-              onClick={() => (showCart ? scrollToCart() : setShowCart(true))}
+              onClick={() => (showCart ? toggleCartPanel() : setShowCart(true))}
               className="order-fixed-summary-btn"
             >
               <span>
@@ -2104,8 +2104,6 @@ export default function OrderPage() {
                 </span>
                 {!showCart ? (
                   <span className="order-fixed-inline-link">· {t.showCart}</span>
-                ) : cartItemCount > 0 ? (
-                  <span className="order-fixed-inline-link">· {t.jumpToCart}</span>
                 ) : null}
               </span>
               {weeklyInCartCount > 0 || clearanceInCartCount > 0 ? (
