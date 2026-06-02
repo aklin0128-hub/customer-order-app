@@ -18,6 +18,8 @@ export type CatalogItem = {
   justAdded?: boolean;
   /** ISO time when SKU first appeared in catalog (import) */
   importedAt?: string;
+  /** ISO time when admin first marked SKU as new */
+  newSince?: string;
   /** Short blurb for /new/ showcase modal */
   newItemDescription?: string;
   /** PDF served via /api/blob (Admin upload) */

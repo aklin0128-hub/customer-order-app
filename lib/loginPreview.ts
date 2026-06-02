@@ -1,5 +1,5 @@
 import { isNewItem } from "@/app/order/catalogUtils";
-import { compareCatalogForDisplay } from "@/lib/catalogNewItems";
+import { compareCatalogByNewestImport } from "@/lib/catalogNewItems";
 import { parseNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import { getMergedCatalogProducts } from "@/lib/catalogMerge";
 import { getPromotionProducts, type PromotionProduct } from "@/lib/promotions";
@@ -92,7 +92,7 @@ async function listNewItemCards(cardLimit?: number) {
     cards.push(catalogToCard(item));
   }
 
-  cards.sort(compareCatalogForDisplay);
+  cards.sort(compareCatalogByNewestImport);
 
   return {
     cards: cardLimit != null ? cards.slice(0, cardLimit) : cards,

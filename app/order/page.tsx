@@ -525,12 +525,7 @@ export default function OrderPage() {
     () =>
       catalogBrowseBase
         .filter((item) => isNewItem(item))
-        .sort((a, b) => {
-          const aNormal = isOrderableItem(a);
-          const bNormal = isOrderableItem(b);
-          if (aNormal !== bNormal) return aNormal ? -1 : 1;
-          return compareCatalogByNewestImport(a, b);
-        }),
+        .sort(compareCatalogByNewestImport),
     [catalogBrowseBase]
   );
 

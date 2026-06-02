@@ -1,6 +1,6 @@
 "use client";
 
-import { formatCatalogAddedDate } from "@/lib/catalogNewItems";
+import { formatCatalogAddedDateForItem } from "@/lib/catalogNewItems";
 import { getDisplayStatus, getStatusBadgeStyle, isJustAddedItem, isOrderableItem } from "../catalogUtils";
 import type { CatalogItem, Lang } from "../types";
 import {
@@ -82,7 +82,7 @@ export function CatalogQtyCard({
 }) {
   const showJustAdded = Boolean(justAddedLabel && (uniformNewPill || isJustAddedItem(item)));
   const addedDateText =
-    showAddedDate && addedDateLabel ? formatCatalogAddedDate(item.importedAt, lang) : null;
+    showAddedDate && addedDateLabel ? formatCatalogAddedDateForItem(item, lang) : null;
   const hasQty = Number(qty) > 0;
   const qtyNum = Number(qty) || 0;
   const showBogoRoundUp =

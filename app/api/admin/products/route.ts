@@ -23,6 +23,8 @@ type Product = {
   category?: string;
   isNew?: boolean;
   justAdded?: boolean;
+  importedAt?: string;
+  newSince?: string;
   newItemDescription?: string;
   newItemDescriptionPdfUrl?: string;
   newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
@@ -112,9 +114,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing SKU." }, { status: 400 });
     }
 
-    const existing =
+    const existing: Product =
       (await redis.get<Product>(productRedisKey(sku))) ||
-      ((catalogData as Product[]).find((item) => String(item.sku || "").toUpperCase() === sku) ?? {});
+      ((catalogData as Product[]).find((item) => String(item.sku || "").toUpperCase() === sku) ?? { sku });
+
+    const now = new Date().toISOString();
+    const newSince = isNew ? existing.newSince || now : existing.newSince;
 
     const product: Product = {
       ...existing,
@@ -131,11 +136,12 @@ export async function POST(req: Request) {
       category,
       isNew,
       justAdded,
+      newSince,
       newItemDescription: newItemDescription || undefined,
       newItemDescriptionPdfUrl: newItemDescriptionPdfUrl || undefined,
       newItemStorageLabel,
       source: "Redis",
-      updatedAt: new Date().toISOString(),
+      updatedAt: now,
     };
 
     await saveRedisProduct(product);
