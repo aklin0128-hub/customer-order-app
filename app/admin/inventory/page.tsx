@@ -33,6 +33,9 @@ type InventoryLot = {
   receivedDate?: string;
   expireDate?: string;
   onHandQty?: number;
+  location?: string;
+  licensePlate?: string;
+  sourceLine?: number;
 };
 
 type SkuLookupResult = {
@@ -244,8 +247,9 @@ export default function AdminInventoryPage() {
             <code>Loc Item</code>, <code>Loc Item Desc</code>, <code>Loc Qty UM</code>,{" "}
             <code>Loc Inventory Status</code>, <code>Loc Received Date</code>,{" "}
             <code>Loc Expire Date</code>, <code>Loc On Hand Qty</code>. Replaces the previous upload. Rows with a
-            blank <code>Loc Item</code> (merged cells in Excel) inherit the SKU from the row above. If you uploaded
-            before this fix, <strong>re-upload</strong> your file.
+            blank <code>Loc Item</code> (merged cells in Excel) inherit the SKU from the row above. Rows with the same
+            received and expire dates are merged and <strong>on hand</strong> quantities are summed. Re-upload after
+            parser updates.
           </p>
           <label style={labelStyle}>CSV or Excel file</label>
           <input
@@ -323,18 +327,22 @@ export default function AdminInventoryPage() {
                   <th>Received</th>
                   <th>Expires</th>
                   <th>On hand</th>
+                  <th>Location</th>
+                  <th>LPN</th>
                   <th>UM</th>
                   <th>Description</th>
                 </tr>
               </thead>
               <tbody>
                 {lookup.lots.map((lot, i) => (
-                  <tr key={`${lot.sku}-${i}`}>
+                  <tr key={`${lot.sku}-${lot.sourceLine ?? i}`}>
                     <td style={{ fontWeight: 800 }}>{lot.sku}</td>
                     <td>{lot.status || "—"}</td>
                     <td>{formatInventoryDate(lot.receivedDate)}</td>
                     <td style={{ fontWeight: 700 }}>{formatInventoryDate(lot.expireDate)}</td>
                     <td>{lot.onHandQty ?? "—"}</td>
+                    <td>{lot.location || "—"}</td>
+                    <td>{lot.licensePlate || "—"}</td>
                     <td>{lot.qtyUm || "—"}</td>
                     <td style={{ color: "#4b5563" }}>{lot.description || "—"}</td>
                   </tr>

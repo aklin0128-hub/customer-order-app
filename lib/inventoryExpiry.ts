@@ -6,6 +6,10 @@ export type InventoryLot = {
   receivedDate?: string;
   expireDate?: string;
   onHandQty?: number;
+  /** Distinguishes rows (location/LPN) when dates/qty match; 1-based CSV line. */
+  sourceLine?: number;
+  location?: string;
+  licensePlate?: string;
 };
 
 export type SkuExpirationResult = {
@@ -48,7 +52,18 @@ const HEADER_ALIASES: Record<keyof Omit<InventoryLot, "sku"> | "sku", string[]> 
     "EXPIRY DATE",
     "EXP DATE",
   ],
-  onHandQty: ["LOC ON HAND QTY", "ON HAND QTY", "QTY", "ON HAND"],
+  onHandQty: ["LOC ON HAND QTY", "ON HAND QTY", "ON HAND"],
+  location: ["LOC LOCATION", "LOC LOC", "LOCATION", "BIN", "LOC BIN", "WAREHOUSE LOCATION"],
+  licensePlate: [
+    "LOC LICENSE PLATE",
+    "LICENSE PLATE",
+    "LPN",
+    "LOC LPN",
+    "LP",
+    "LOC LP",
+    "PALLET",
+    "LOC PALLET",
+  ],
 };
 
 const HEADER_FUZZY: Partial<
@@ -307,6 +322,9 @@ function resolveHeaderIndex(headers: string[]) {
       const norm = compact[i]!;
       if (norm.length < 2) continue;
       if (field === "sku" && norm.includes("DESC")) continue;
+      if (field === "location" && (norm.includes("ITEM") || norm.includes("EXPIR") || norm.includes("RECEIV"))) {
+        continue;
+      }
       for (const alias of HEADER_ALIASES[field]) {
         const a = compactHeaderKey(alias);
         if (norm.length >= 4 && a.length >= 4 && (norm.includes(a) || a.includes(norm))) return i;
@@ -324,6 +342,8 @@ function resolveHeaderIndex(headers: string[]) {
     receivedDate: pick("receivedDate"),
     expireDate: pick("expireDate"),
     onHandQty: pick("onHandQty"),
+    location: pick("location"),
+    licensePlate: pick("licensePlate"),
   };
 }
 
@@ -342,7 +362,8 @@ export function parseInventoryRecords(records: Record<string, unknown>[]): Inven
   const rows: InventoryLot[] = [];
   let lastSku = "";
 
-  for (const record of records) {
+  for (let i = 0; i < records.length; i++) {
+    const record = records[i]!;
     const rawSku = safeString(getFieldFromRecord(record, "sku"));
     const sku = normalizeInventorySku(rawSku || lastSku);
     if (!sku) continue;
@@ -359,6 +380,9 @@ export function parseInventoryRecords(records: Record<string, unknown>[]): Inven
       receivedDate: parseInventoryDate(receivedRaw) || undefined,
       expireDate: parseInventoryDate(expireRaw) || undefined,
       onHandQty: parseQty(safeString(getFieldFromRecord(record, "onHandQty"))) || undefined,
+      location: safeString(getFieldFromRecord(record, "location")) || undefined,
+      licensePlate: safeString(getFieldFromRecord(record, "licensePlate")) || undefined,
+      sourceLine: i + 1,
     });
   }
 
@@ -399,15 +423,9 @@ export function serializeInventoryLotsToCsv(rows: InventoryLot[]): string {
   return lines.join("\n");
 }
 
-function lotDedupeKey(lot: InventoryLot) {
-  return [
-    lot.sku,
-    lot.description || "",
-    lot.status || "",
-    lot.receivedDate || "",
-    lot.expireDate || "",
-    lot.onHandQty ?? "",
-  ].join("|");
+export function inventorySkuMatchesQuery(storedSku: string, querySku: string) {
+  const queryKeys = new Set(skuLookupKeys(querySku));
+  return skuLookupKeys(storedSku).some((key) => queryKeys.has(key));
 }
 
 export function buildInventoryIndex(rows: InventoryLot[]) {
@@ -463,6 +481,9 @@ export function parseInventoryCsvText(raw: string): InventoryLot[] {
       expireDate:
         cols.expireDate >= 0 ? parseInventoryDate(cells[cols.expireDate] || "") || undefined : undefined,
       onHandQty: cols.onHandQty >= 0 ? parseQty(cells[cols.onHandQty] || "") : undefined,
+      location: cols.location >= 0 ? safeString(cells[cols.location]) : undefined,
+      licensePlate: cols.licensePlate >= 0 ? safeString(cells[cols.licensePlate]) : undefined,
+      sourceLine: i + 1,
     });
   }
 
@@ -527,6 +548,41 @@ export type GetSkuExpirationOptions = {
   onlyFutureExpiry?: boolean;
 };
 
+function mergeLotGroupKey(lot: InventoryLot) {
+  return [lot.sku, lot.receivedDate || "", lot.expireDate || ""].join("|");
+}
+
+function appendUniqueField(prev: string | undefined, next: string | undefined) {
+  const clean = safeString(next);
+  if (!clean) return prev;
+  if (!prev) return clean;
+  if (prev.split("; ").includes(clean)) return prev;
+  return `${prev}; ${clean}`;
+}
+
+/** Same SKU + received + expire → one lot with summed on-hand (different bins/LPNs). */
+export function mergeInventoryLotsByReceivedAndExpire(lots: InventoryLot[]): InventoryLot[] {
+  const map = new Map<string, InventoryLot>();
+
+  for (const lot of lots) {
+    const key = mergeLotGroupKey(lot);
+    const prev = map.get(key);
+    if (!prev) {
+      map.set(key, { ...lot });
+      continue;
+    }
+
+    prev.onHandQty = (prev.onHandQty || 0) + (lot.onHandQty || 0);
+    prev.description = prev.description || lot.description;
+    prev.qtyUm = prev.qtyUm || lot.qtyUm;
+    prev.status = prev.status || lot.status;
+    prev.location = appendUniqueField(prev.location, lot.location);
+    prev.licensePlate = appendUniqueField(prev.licensePlate, lot.licensePlate);
+  }
+
+  return [...map.values()];
+}
+
 /** Earliest expire first; rows without expire date last. */
 export function sortInventoryLotsByExpireDate(lots: InventoryLot[]): InventoryLot[] {
   return [...lots].sort((a, b) => {
@@ -539,13 +595,16 @@ export function sortInventoryLotsByExpireDate(lots: InventoryLot[]): InventoryLo
     const ra = a.receivedDate || "";
     const rb = b.receivedDate || "";
     if (ra !== rb) return ra.localeCompare(rb);
-    return (b.onHandQty || 0) - (a.onHandQty || 0);
+    const la = a.location || "";
+    const lb = b.location || "";
+    if (la !== lb) return la.localeCompare(lb);
+    return (a.sourceLine || 0) - (b.sourceLine || 0);
   });
 }
 
 function querySkuExpiration(
   sku: string,
-  index: Map<string, InventoryLot[]>,
+  allRows: InventoryLot[],
   options: GetSkuExpirationOptions = {}
 ): SkuExpirationResult {
   const querySku = normalizeInventorySku(sku);
@@ -561,31 +620,26 @@ function querySkuExpiration(
 
   if (!querySku) return empty;
 
-  const seen = new Set<string>();
   const lots: InventoryLot[] = [];
 
-  for (const key of skuLookupKeys(querySku)) {
-    for (const lot of index.get(key) || []) {
-      const id = lotDedupeKey(lot);
-      if (seen.has(id)) continue;
-      seen.add(id);
+  for (const lot of allRows) {
+    if (!inventorySkuMatchesQuery(lot.sku, querySku)) continue;
 
-      if (options.status && safeString(lot.status).toLowerCase() !== options.status.toLowerCase()) {
-        continue;
-      }
-
-      if (options.onlyFutureExpiry && lot.expireDate) {
-        const today = new Date().toISOString().slice(0, 10);
-        if (lot.expireDate < today) continue;
-      }
-
-      lots.push(lot);
+    if (options.status && safeString(lot.status).toLowerCase() !== options.status.toLowerCase()) {
+      continue;
     }
+
+    if (options.onlyFutureExpiry && lot.expireDate) {
+      const today = new Date().toISOString().slice(0, 10);
+      if (lot.expireDate < today) continue;
+    }
+
+    lots.push(lot);
   }
 
   if (lots.length === 0) return empty;
 
-  const sortedLots = sortInventoryLotsByExpireDate(lots);
+  const sortedLots = sortInventoryLotsByExpireDate(mergeInventoryLotsByReceivedAndExpire(lots));
 
   const expireDates = [
     ...new Set(sortedLots.map((l) => l.expireDate).filter((d): d is string => Boolean(d))),
@@ -604,12 +658,29 @@ function querySkuExpiration(
   };
 }
 
+/** Test helper and direct row scan without Redis/Blob reload. */
+export function getSkuExpirationFromRows(
+  sku: string,
+  rows: InventoryLot[],
+  options: GetSkuExpirationOptions = {}
+) {
+  return querySkuExpiration(sku, rows, options);
+}
+
 export async function getSkuExpiration(
   sku: string,
   options: GetSkuExpirationOptions = {}
 ): Promise<SkuExpirationResult> {
-  const index = await getIndex(options.filePath);
-  return querySkuExpiration(sku, index, options);
+  if (options.filePath) {
+    const { loadInventoryLotsFromFile } = await import(
+      /* webpackIgnore: true */ "@/lib/inventoryExpiry.local"
+    );
+    await loadInventoryLotsFromFile(options.filePath);
+  } else {
+    await loadInventoryLots();
+  }
+  const rows = cached?.rows || [];
+  return querySkuExpiration(sku, rows, options);
 }
 
 export async function getSkuExpirationDates(sku: string, options?: GetSkuExpirationOptions) {

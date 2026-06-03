@@ -8,6 +8,8 @@ import * as XLSX from "xlsx";
 
 import {
   getSkuExpiration,
+  getSkuExpirationFromRows,
+  mergeInventoryLotsByReceivedAndExpire,
   normalizeInventorySku,
   parseInventoryCsvText,
   parseInventoryDate,
@@ -154,6 +156,75 @@ test("parseInventoryXlsxBuffer skips title rows before headers", () => {
   assert.equal(rows[0]?.sku, "29931V");
   assert.equal(rows[0]?.receivedDate, "2026-02-11");
   assert.equal(rows[0]?.expireDate, "2028-02-10");
+});
+
+test("mergeInventoryLotsByReceivedAndExpire sums on hand when received and expire match", () => {
+  const merged = mergeInventoryLotsByReceivedAndExpire([
+    {
+      sku: "10480K",
+      receivedDate: "2026-03-19",
+      expireDate: "2028-09-14",
+      onHandQty: 50,
+      location: "BIN-A",
+    },
+    {
+      sku: "10480K",
+      receivedDate: "2026-03-19",
+      expireDate: "2028-09-14",
+      onHandQty: 40,
+      location: "BIN-B",
+    },
+    {
+      sku: "10480K",
+      receivedDate: "2026-03-02",
+      expireDate: "2028-09-14",
+      onHandQty: 40,
+    },
+  ]);
+  assert.equal(merged.length, 2);
+  const mar19 = merged.find((l) => l.receivedDate === "2026-03-19");
+  assert.equal(mar19?.onHandQty, 90);
+  assert.equal(mar19?.location, "BIN-A; BIN-B");
+});
+
+test("getSkuExpiration merges lots with same received and expire dates", () => {
+  const rows: InventoryLot[] = [
+    {
+      sku: "10480K",
+      status: "Available",
+      receivedDate: "2026-03-19",
+      expireDate: "2028-09-14",
+      onHandQty: 50,
+    },
+    {
+      sku: "10480K",
+      status: "Available",
+      receivedDate: "2026-03-19",
+      expireDate: "2028-09-14",
+      onHandQty: 40,
+    },
+    {
+      sku: "10480K",
+      status: "Available",
+      receivedDate: "2026-03-19",
+      expireDate: "2028-09-14",
+      onHandQty: 0,
+    },
+    {
+      sku: "10480K",
+      status: "Available",
+      receivedDate: "2026-03-02",
+      expireDate: "2028-09-14",
+      onHandQty: 40,
+    },
+  ];
+  const result = getSkuExpirationFromRows("10480K", rows);
+  assert.equal(result.lots.length, 2);
+  assert.equal(
+    result.lots.find((l) => l.receivedDate === "2026-03-19")?.onHandQty,
+    90
+  );
+  assert.equal(result.totalOnHandQty, 130);
 });
 
 test("parseInventoryXlsxBuffer reads Loca/Local column headers", () => {
