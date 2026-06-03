@@ -1,19 +1,30 @@
 "use client";
 
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { catalogColumnCountForWidth, CATALOG_GRID_GAP_PX } from "../catalogGridLayout";
+import {
+  catalogColumnCountForWidth,
+  CATALOG_GRID_GAP_PX,
+  CATALOG_ROW_HEIGHT_PX,
+  catalogRowStridePx,
+} from "../catalogGridLayout";
 import { catalogVirtualScrollStyle } from "../orderStyles";
-import { isJustAddedItem } from "../catalogUtils";
 import type { CatalogItem, Lang } from "../types";
 import { CatalogQtyCard } from "./CatalogQtyCard";
 
 const GAP = CATALOG_GRID_GAP_PX;
-/** Initial row height before measure; kept close to real card height to avoid huge gaps */
-const ROW_HEIGHT = 330;
+const ROW_HEIGHT = CATALOG_ROW_HEIGHT_PX;
+const ROW_STRIDE = catalogRowStridePx();
+
+function readScrollContainerWidth(el: HTMLElement | null) {
+  if (!el) return 0;
+  const w = el.clientWidth || el.offsetWidth;
+  return w > 0 ? w : 0;
+}
 
 export function CatalogVirtualGrid({
+  gridKey,
   items,
   catalogQtyMap,
   inCartLabel,
@@ -36,6 +47,8 @@ export function CatalogVirtualGrid({
   onAdjust,
   onUpdateQty,
 }: {
+  /** Remount virtualizer when switching catalog modes (catalog vs new items, etc.). */
+  gridKey?: string;
   items: CatalogItem[];
   catalogQtyMap: Record<string, string>;
   inCartLabel: string;
@@ -59,56 +72,58 @@ export function CatalogVirtualGrid({
   onUpdateQty: (sku: string, value: string) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(0);
+  const [width, setWidth] = useState(() =>
+    typeof window !== "undefined" ? Math.max(0, window.innerWidth - 32) : 0
+  );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
     const measure = () => {
-      const next = el.offsetWidth;
+      const next = readScrollContainerWidth(el);
       if (next > 0) setWidth(next);
     };
 
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
-
-    const raf = requestAnimationFrame(measure);
-    const timer = window.setTimeout(measure, 100);
     window.addEventListener("resize", measure);
 
     return () => {
       ro.disconnect();
-      cancelAnimationFrame(raf);
-      window.clearTimeout(timer);
       window.removeEventListener("resize", measure);
     };
-  }, [items.length]);
+  }, [gridKey, items.length]);
 
-  const columnCount = useMemo(() => catalogColumnCountForWidth(width), [width]);
+  const columnCount = useMemo(() => {
+    if (width > 0) return catalogColumnCountForWidth(width);
+    if (typeof window !== "undefined") return catalogColumnCountForWidth(window.innerWidth - 32);
+    return 4;
+  }, [width]);
 
   const rowCount = Math.max(1, Math.ceil(items.length / columnCount));
 
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_HEIGHT + GAP,
-    overscan: 2,
+    estimateSize: () => ROW_STRIDE,
+    overscan: 3,
   });
 
   useEffect(() => {
-    rowVirtualizer.measure();
-    const timer = window.setTimeout(() => rowVirtualizer.measure(), 150);
-    return () => window.clearTimeout(timer);
-    // rowVirtualizer is stable enough; remeasure when layout inputs change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [columnCount, rowCount, items.length]);
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [gridKey, columnCount]);
 
   if (items.length === 0) return null;
 
   return (
-    <div ref={scrollRef} className="order-catalog-virtual-scroll" style={catalogVirtualScrollStyle}>
+    <div
+      key={gridKey}
+      ref={scrollRef}
+      className="order-catalog-virtual-scroll"
+      style={catalogVirtualScrollStyle}
+    >
       <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative", width: "100%" }}>
         {rowVirtualizer.getVirtualItems().map((vr) => {
           const rowStart = vr.index * columnCount;
@@ -116,20 +131,21 @@ export function CatalogVirtualGrid({
           return (
             <div
               key={vr.key}
-              ref={rowVirtualizer.measureElement}
               data-index={vr.index}
+              className="order-catalog-virtual-row"
               style={{
                 position: "absolute",
                 top: 0,
                 left: 0,
                 width: "100%",
+                height: ROW_HEIGHT,
+                paddingBottom: GAP,
+                boxSizing: "content-box",
                 transform: `translateY(${vr.start}px)`,
                 display: "grid",
                 gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
                 alignItems: "stretch",
                 columnGap: GAP,
-                paddingBottom: GAP,
-                boxSizing: "border-box",
               }}
             >
               {rowItems.map((item) => {

@@ -1678,6 +1678,7 @@ export default function OrderPage() {
               <div style={{ ...emptyStyle, border: "1px solid #fdba74", background: "#fff7ed", color: "#c2410c" }}>{t.noNewItems}</div>
             ) : (
               <CatalogVirtualGrid
+                gridKey="newItems"
                 items={newItemCatalogItems}
                 catalogQtyMap={catalogQtyMap}
                 inCartLabel={t.inCart}
@@ -1846,6 +1847,7 @@ export default function OrderPage() {
             ) : null}
 
             <CatalogVirtualGrid
+              gridKey="catalog"
               items={orderableCatalogItems}
               catalogQtyMap={catalogQtyMap}
               inCartLabel={t.inCart}

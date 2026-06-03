@@ -267,6 +267,37 @@ export default function AdminInvoicesPage() {
     }
   };
 
+  const exportLatestPricesCsv = async () => {
+    setBusy(true);
+    setMsg("");
+    try {
+      const res = await fetch("/api/admin/invoice-latest-prices?format=csv", {
+        cache: "no-store",
+        headers: adminHeaders(),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string })?.error || "Failed to export latest prices.");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `invoice-latest-prices-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setMsg("Downloaded latest invoice prices (account, sku, price).");
+      setMsgTone("success");
+    } catch (err: unknown) {
+      setMsg(err instanceof Error ? err.message : "Failed to export latest prices.");
+      setMsgTone("error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const bulkDownloadImports = () => {
     if (selectedImports.length === 0) return;
 
@@ -315,16 +346,11 @@ export default function AdminInvoicesPage() {
           {invoiceQuality.missingAccount} missing account · {invoiceQuality.zeroLines} empty parses ·{" "}
           {invoiceQuality.unknownSkus.length} unknown SKUs
         </p>
-        {invoiceQuality.unknownSkus.length > 0 ? (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: invoiceQuality.unknownSkus.length > 0 ? 8 : 0 }}>
           <button
             type="button"
-            onClick={() =>
-              downloadCsv(
-                "invoice-unknown-skus.csv",
-                ["SKU"],
-                invoiceQuality.unknownSkus.map((s) => [s])
-              )
-            }
+            onClick={() => void exportLatestPricesCsv()}
+            disabled={busy}
             style={{
               border: "1px solid #d1d5db",
               borderRadius: 10,
@@ -332,13 +358,38 @@ export default function AdminInvoicesPage() {
               background: "#fff",
               fontWeight: 800,
               fontSize: 12,
-              cursor: "pointer",
-              marginBottom: 8,
+              cursor: busy ? "not-allowed" : "pointer",
             }}
           >
-            Export unknown SKU list
+            Export latest prices (CSV)
           </button>
-        ) : null}
+          {invoiceQuality.unknownSkus.length > 0 ? (
+            <button
+              type="button"
+              onClick={() =>
+                downloadCsv(
+                  "invoice-unknown-skus.csv",
+                  ["SKU"],
+                  invoiceQuality.unknownSkus.map((s) => [s])
+                )
+              }
+              style={{
+                border: "1px solid #d1d5db",
+                borderRadius: 10,
+                padding: "8px 12px",
+                background: "#fff",
+                fontWeight: 800,
+                fontSize: 12,
+                cursor: "pointer",
+              }}
+            >
+              Export unknown SKU list
+            </button>
+          ) : null}
+        </div>
+        <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
+          Latest price CSV uses all uploaded invoices: one row per account + SKU with the most recent invoice unit price.
+        </p>
       </section>
 
       <section style={{ ...panel, marginBottom: 16 }}>

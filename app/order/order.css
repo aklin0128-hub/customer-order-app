@@ -357,6 +357,13 @@
 
 .catalog-qty-card {
   align-self: stretch;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.order-catalog-virtual-row {
+  overflow: hidden;
 }
 
 .catalog-qty-card-stepper {
