@@ -21,6 +21,7 @@ import { AdminPublicShowcaseHint } from "../_components/AdminPublicShowcaseHint"
 import { useAdminAuth } from "../_components/useAdminAuth";
 import { isJustAddedItem, parseImportedAtMs } from "@/lib/catalogNewItems";
 import { NEW_ITEM_STORAGE_LABELS, type NewItemStorageLabel } from "@/lib/newItemStorageLabel";
+import { readProductCategories } from "@/lib/productCategories";
 import { CATEGORY_OPTIONS } from "@/lib/inferCategory";
 
 type Product = {
@@ -35,6 +36,7 @@ type Product = {
   palletSize?: string;
   imageUrl?: string;
   category?: string;
+  categories?: string[];
   isNew?: boolean;
   justAdded?: boolean;
   importedAt?: string;
@@ -69,7 +71,7 @@ const statusOptions = [
   "INV",
 ];
 
-const categoryOptions = ["", ...CATEGORY_OPTIONS.filter((c) => c !== "ALL")];
+const categoryOptions = CATEGORY_OPTIONS.filter((c) => c !== "ALL");
 const AUTO_SAVE_DELAY_MS = 1200;
 const MAX_NEW_ITEM_PDF_BYTES = 12 * 1024 * 1024;
 
@@ -126,7 +128,7 @@ export default function AdminProductsPage() {
   const [name, setName] = useState("");
   const [brand, setBrand] = useState("");
   const [status, setStatus] = useState("NORMAL");
-  const [category, setCategory] = useState("");
+  const [categories, setCategories] = useState<string[]>([]);
   const [size, setSize] = useState("");
   const [barcode, setBarcode] = useState("");
   const [upc, setUpc] = useState("");
@@ -159,6 +161,13 @@ export default function AdminProductsPage() {
   const markDirty = () => {
     setFormDirty(true);
     setAutoSaveStatus("Saving...");
+  };
+
+  const toggleProductCategory = (cat: string) => {
+    setCategories((prev) =>
+      prev.includes(cat) ? prev.filter((value) => value !== cat) : [...prev, cat]
+    );
+    markDirty();
   };
 
   const updateText = (setter: (value: string) => void, value: string) => {
@@ -210,6 +219,7 @@ export default function AdminProductsPage() {
         (p) =>
           p.source === "Redis" ||
           p.category ||
+          readProductCategories(p).join(" ") ||
           p.imageUrl ||
           p.limitedQty ||
           p.palletSize ||
@@ -249,7 +259,7 @@ export default function AdminProductsPage() {
     setName(p.name || "");
     setBrand(p.brand || "");
     setStatus((p.status || "NORMAL").toUpperCase());
-    setCategory((p.category || "").toUpperCase());
+    setCategories(readProductCategories(p));
     setSize(p.size || "");
     setBarcode(p.barcode || "");
     setUpc(p.upc || "");
@@ -298,7 +308,7 @@ export default function AdminProductsPage() {
         const nextProduct = {
           ...product,
           status: bulkStatus || product.status || "NORMAL",
-          category: bulkCategory || product.category || "",
+          categories: bulkCategory ? [bulkCategory] : readProductCategories(product),
           isNew: bulkNewFlag === "keep" ? Boolean(product.isNew) : bulkNewFlag === "yes",
           justAdded:
             bulkJustAddedFlag === "keep" ? Boolean(product.justAdded) : bulkJustAddedFlag === "yes",
@@ -346,7 +356,7 @@ export default function AdminProductsPage() {
     setName("");
     setBrand("");
     setStatus("NORMAL");
-    setCategory("");
+    setCategories([]);
     setSize("");
     setBarcode("");
     setUpc("");
@@ -386,7 +396,7 @@ export default function AdminProductsPage() {
           name,
           brand,
           status,
-          category,
+          categories,
           size,
           barcode,
           upc,
@@ -442,7 +452,7 @@ export default function AdminProductsPage() {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, category, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, newItemDescription, newItemDescriptionPdfUrl, newItemStorageLabel]);
+  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, newItemDescription, newItemDescriptionPdfUrl, newItemStorageLabel]);
 
   const uploadNewItemPdf = async (file: File | null) => {
     const finalSku = sku.trim().toUpperCase();
@@ -588,7 +598,7 @@ export default function AdminProductsPage() {
         items={[
           { label: "Catalog SKUs", value: products.length },
           { label: "Redis overrides", value: products.filter((p) => p.source === "Redis").length },
-          { label: "With category", value: products.filter((p) => p.category).length },
+          { label: "With category", value: products.filter((p) => readProductCategories(p).length > 0).length },
           { label: "New items", value: products.filter((p) => isNewProduct(p)).length },
           { label: "JUST ADDED pin", value: products.filter((p) => isJustAddedItem(p)).length },
         ]}
@@ -848,17 +858,45 @@ export default function AdminProductsPage() {
                   ))}
                 </select>
               </div>
-              <div>
+              <div style={{ gridColumn: "1 / -1" }}>
                 <label style={labelStyle}>Category</label>
-                <select value={category} onChange={(e) => updateText(setCategory, e.target.value)} style={inputStyle}>
-                  {categoryOptions.map((c) => (
-                    <option key={c || "AUTO"} value={c}>
-                      {c || "AUTO (from catalog)"}
-                    </option>
-                  ))}
-                </select>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    marginTop: 6,
+                    paddingBottom: 4,
+                  }}
+                >
+                  {categoryOptions.map((cat) => {
+                    const active = categories.includes(cat);
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => toggleProductCategory(cat)}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 999,
+                          border: active ? "1px solid #2563eb" : "1px solid #d1d5db",
+                          background: active ? "#eff6ff" : "#ffffff",
+                          color: active ? "#2563eb" : "#374151",
+                          fontSize: 12,
+                          fontWeight: 900,
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {cat}
+                      </button>
+                    );
+                  })}
+                </div>
                 <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>
-                  Saved in Redis overrides the spreadsheet category for this SKU on the customer order page.
+                  {categories.length > 0
+                    ? `Selected: ${categories.join(", ")}. Saved in Redis overrides catalog categories on the order page.`
+                    : "No selection = AUTO (use catalog-inferred category). Tap to select one or more."}
                 </div>
               </div>
               <label

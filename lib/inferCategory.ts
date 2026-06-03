@@ -27,6 +27,8 @@ export type CategoryItem = {
   name?: string;
   brand?: string;
   category?: string;
+  /** Admin: one or more catalog categories (overrides inferred category on order page). */
+  categories?: string[];
   storage_type?: string;
 };
 

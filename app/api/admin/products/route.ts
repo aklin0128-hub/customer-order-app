@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadRedisProducts, productRedisKey, saveRedisProduct } from "@/lib/productRedisStore";
+import { parseCategoriesFromBody } from "@/lib/productCategories";
 import { parseNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import { bustServerDataCache, SERVER_CACHE } from "@/lib/serverDataCache";
 import { redis } from "@/lib/redis";
@@ -21,6 +22,7 @@ type Product = {
   palletSize?: string;
   imageUrl?: string;
   category?: string;
+  categories?: string[];
   isNew?: boolean;
   justAdded?: boolean;
   importedAt?: string;
@@ -103,7 +105,7 @@ export async function POST(req: Request) {
     const limitedQty = String(body?.limitedQty || "").trim();
     const palletSize = String(body?.palletSize || "").trim();
     const imageUrl = String(body?.imageUrl || "").trim();
-    const category = String(body?.category || "").trim().toUpperCase();
+    const categories = parseCategoriesFromBody(body);
     const isNew = Boolean(body?.isNew);
     const justAdded = Boolean(body?.justAdded);
     const newItemDescription = String(body?.newItemDescription || "").trim();
@@ -133,7 +135,8 @@ export async function POST(req: Request) {
       limitedQty,
       palletSize,
       imageUrl,
-      category,
+      categories: categories.length > 0 ? categories : undefined,
+      category: categories.length > 0 ? categories[0] : undefined,
       isNew,
       justAdded,
       newSince,

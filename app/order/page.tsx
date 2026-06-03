@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { brandMatchesFilter, isKnownBrandFilter, splitBrandFilters } from "@/lib/catalogBrands";
-import { CATEGORY_OPTIONS, inferCategory } from "@/lib/inferCategory";
+import { productMatchesCategoryFilters } from "@/lib/productCategories";
+import { CATEGORY_OPTIONS } from "@/lib/inferCategory";
 
 import { CatalogVirtualGrid } from "./components/CatalogVirtualGrid";
 import { CatalogQtyCard } from "./components/CatalogQtyCard";
@@ -612,7 +613,7 @@ export default function OrderPage() {
           const sku = (item.sku || "").toUpperCase();
           if (Number(catalogQtyMap[sku] || 0) <= 0) return false;
         }
-        if (categoryFilters.length > 0 && !categoryFilters.includes(inferCategory(item))) return false;
+        if (!productMatchesCategoryFilters(item, categoryFilters)) return false;
         if (brandFilter !== "ALL" && !brandMatchesFilter(item.brand, brandFilter)) return false;
         if (catalogShowRecommendedOnly && !recommendedSkuSet.has(item.sku?.toUpperCase() || "")) return false;
         return true;

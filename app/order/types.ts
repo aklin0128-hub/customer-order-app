@@ -13,6 +13,7 @@ export type CatalogItem = {
   palletSize?: string;
   imageUrl?: string;
   category?: string;
+  categories?: string[];
   isNew?: boolean;
   /** Admin: show JUST ADDED badge and pin to top of lists */
   justAdded?: boolean;
