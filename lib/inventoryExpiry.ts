@@ -23,7 +23,10 @@ export type SkuExpirationResult = {
   totalOnHandQty: number;
 };
 
-const HEADER_ALIASES: Record<keyof Omit<InventoryLot, "sku"> | "sku", string[]> = {
+const HEADER_ALIASES: Record<
+  keyof Omit<InventoryLot, "sku" | "sourceLine"> | "sku",
+  string[]
+> = {
   sku: ["LOC ITEM", "SKU", "ITEM", "LOC_ITEM", "LOCAL ITEM"],
   description: ["LOC ITEM DESC", "ITEM DESC", "DESCRIPTION", "DESC"],
   qtyUm: ["LOC QTY UM", "QTY UM", "UM"],
