@@ -288,7 +288,7 @@ export default function AdminInvoicesPage() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      setMsg("Downloaded latest invoice prices (account, sku, price).");
+      setMsg("Downloaded latest invoice prices (by invoice date on each account's invoice).");
       setMsgTone("success");
     } catch (err: unknown) {
       setMsg(err instanceof Error ? err.message : "Failed to export latest prices.");
@@ -388,7 +388,7 @@ export default function AdminInvoicesPage() {
           ) : null}
         </div>
         <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
-          Latest price CSV uses all uploaded invoices: one row per account + SKU with the most recent invoice unit price.
+          Latest price CSV uses the invoice date on each account invoice (not upload time). Columns: account, sku, price, invoice_date. Skips imports with no parsed invoice date.
         </p>
       </section>
 

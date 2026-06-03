@@ -1,16 +1,20 @@
-import { cleanSku, loadInvoiceImports, parseDate } from "@/lib/analyticsCommon";
+import { cleanSku, formatDate, loadInvoiceImports, parseDate } from "@/lib/analyticsCommon";
 import type { InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
 
 export type InvoiceLatestPriceRow = {
   account: string;
   sku: string;
   price: number;
+  /** Invoice date from the customer's invoice (as printed/parsed), ISO YYYY-MM-DD when parseable. */
+  invoiceDate: string;
 };
 
 type LatestEntry = {
   price: number;
-  effectiveMs: number;
+  invoiceDateMs: number;
+  invoiceDateLabel: string;
   uploadedMs: number;
+  invoiceNo: string;
 };
 
 function priceForLine(line: InvoiceImportRecord["lines"][number]) {
@@ -20,7 +24,31 @@ function priceForLine(line: InvoiceImportRecord["lines"][number]) {
   return null;
 }
 
-/** Latest unit price per account + SKU from uploaded invoice imports. */
+function invoiceDateFromRecord(record: InvoiceImportRecord): { ms: number; label: string } | null {
+  const parsed = parseDate(record.invoiceDate);
+  if (!parsed) return null;
+  const raw = String(record.invoiceDate || "").trim();
+  return {
+    ms: parsed.getTime(),
+    label: raw || formatDate(parsed),
+  };
+}
+
+function isNewerInvoice(
+  next: { invoiceDateMs: number; uploadedMs: number; invoiceNo: string },
+  prev: LatestEntry
+) {
+  if (next.invoiceDateMs > prev.invoiceDateMs) return true;
+  if (next.invoiceDateMs < prev.invoiceDateMs) return false;
+  if (next.uploadedMs > prev.uploadedMs) return true;
+  if (next.uploadedMs < prev.uploadedMs) return false;
+  return next.invoiceNo.localeCompare(prev.invoiceNo) > 0;
+}
+
+/**
+ * Latest unit price per account + SKU using each import's **invoice date** (not upload time).
+ * Imports without a parsed invoice date are skipped.
+ */
 export function buildLatestInvoicePricesFromImports(
   imports: InvoiceImportRecord[],
   options?: { since?: Date | null; accountNo?: string }
@@ -34,12 +62,14 @@ export function buildLatestInvoicePricesFromImports(
     if (!account) continue;
     if (accountFilter && account !== accountFilter) continue;
 
-    const effectiveDate = parseDate(record.invoiceDate) || parseDate(record.uploadedAt);
-    if (!effectiveDate) continue;
-    const effectiveMs = effectiveDate.getTime();
-    if (sinceMs != null && effectiveMs < sinceMs) continue;
+    const invoiceDate = invoiceDateFromRecord(record);
+    if (!invoiceDate) continue;
 
-    const uploadedMs = parseDate(record.uploadedAt)?.getTime() ?? effectiveMs;
+    const { ms: invoiceDateMs, label: invoiceDateLabel } = invoiceDate;
+    if (sinceMs != null && invoiceDateMs < sinceMs) continue;
+
+    const uploadedMs = parseDate(record.uploadedAt)?.getTime() ?? 0;
+    const invoiceNo = String(record.invoiceNo || record.id || "").trim().toUpperCase();
 
     for (const line of record.lines || []) {
       const sku = cleanSku(line.sku);
@@ -48,13 +78,16 @@ export function buildLatestInvoicePricesFromImports(
 
       const key = `${account}|${sku}`;
       const prev = latest.get(key);
-      const isNewer =
-        !prev ||
-        effectiveMs > prev.effectiveMs ||
-        (effectiveMs === prev.effectiveMs && uploadedMs >= prev.uploadedMs);
+      const candidate = { invoiceDateMs, uploadedMs, invoiceNo };
 
-      if (isNewer) {
-        latest.set(key, { price, effectiveMs, uploadedMs });
+      if (!prev || isNewerInvoice(candidate, prev)) {
+        latest.set(key, {
+          price,
+          invoiceDateMs,
+          invoiceDateLabel,
+          uploadedMs,
+          invoiceNo,
+        });
       }
     }
   }
@@ -62,13 +95,20 @@ export function buildLatestInvoicePricesFromImports(
   return Array.from(latest.entries())
     .map(([key, row]) => {
       const [account, sku] = key.split("|");
+      const parsed = parseDate(row.invoiceDateLabel);
       return {
         account,
         sku,
         price: Math.round(row.price * 100) / 100,
+        invoiceDate: parsed ? formatDate(parsed) : row.invoiceDateLabel,
       };
     })
-    .sort((a, b) => a.account.localeCompare(b.account) || a.sku.localeCompare(b.sku));
+    .sort(
+      (a, b) =>
+        a.account.localeCompare(b.account) ||
+        a.sku.localeCompare(b.sku) ||
+        a.invoiceDate.localeCompare(b.invoiceDate)
+    );
 }
 
 export async function getInvoiceLatestPrices(options?: {
@@ -80,8 +120,8 @@ export async function getInvoiceLatestPrices(options?: {
 }
 
 export function invoiceLatestPricesToCsv(rows: InvoiceLatestPriceRow[]): string {
-  const header = ["account", "sku", "price"];
-  const body = rows.map((row) => [row.account, row.sku, row.price]);
+  const header = ["account", "sku", "price", "invoice_date"];
+  const body = rows.map((row) => [row.account, row.sku, row.price, row.invoiceDate]);
   return [header, ...body]
     .map((line) => line.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
     .join("\n");

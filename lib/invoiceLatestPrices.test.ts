@@ -23,38 +23,58 @@ function record(partial: Partial<InvoiceImportRecord> & Pick<InvoiceImportRecord
   };
 }
 
-test("buildLatestInvoicePricesFromImports keeps newest invoice price per account and sku", () => {
+test("buildLatestInvoicePricesFromImports uses invoice date not upload time", () => {
   const imports: InvoiceImportRecord[] = [
     record({
-      id: "a",
+      id: "newer-upload",
       accountNo: "FL100",
-      invoiceDate: "1/1/2026",
-      uploadedAt: "2026-01-02T12:00:00.000Z",
-      lines: [{ sku: "00100", qty: 1, unitPrice: 10, inCatalog: true }],
+      invoiceDate: "1/15/2026",
+      uploadedAt: "2026-03-15T12:00:00.000Z",
+      lines: [{ sku: "00100", qty: 1, unitPrice: 99, inCatalog: true }],
     }),
     record({
-      id: "b",
+      id: "older-upload",
       accountNo: "FL100",
-      invoiceDate: "2/1/2026",
-      uploadedAt: "2026-02-02T12:00:00.000Z",
+      invoiceDate: "2/20/2026",
+      uploadedAt: "2026-01-05T12:00:00.000Z",
       lines: [{ sku: "00100", qty: 2, unitPrice: 12.5, inCatalog: true }],
-    }),
-    record({
-      id: "c",
-      accountNo: "FL200",
-      invoiceDate: "2/1/2026",
-      uploadedAt: "2026-02-02T12:00:00.000Z",
-      lines: [{ sku: "00200", qty: 1, unitPrice: 8, inCatalog: true }],
     }),
   ];
 
   assert.deepEqual(buildLatestInvoicePricesFromImports(imports), [
-    { account: "FL100", sku: "00100", price: 12.5 },
-    { account: "FL200", sku: "00200", price: 8 },
+    { account: "FL100", sku: "00100", price: 12.5, invoiceDate: "2026-02-20" },
   ]);
 });
 
-test("invoiceLatestPricesToCsv uses account, sku, price columns", () => {
-  const csv = invoiceLatestPricesToCsv([{ account: "FL1", sku: "ABC", price: 9.99 }]);
-  assert.equal(csv, '"account","sku","price"\n"FL1","ABC","9.99"');
+test("buildLatestInvoicePricesFromImports skips imports without invoice date", () => {
+  const imports: InvoiceImportRecord[] = [
+    record({
+      id: "no-date",
+      accountNo: "FL100",
+      invoiceDate: null,
+      uploadedAt: "2026-05-01T12:00:00.000Z",
+      lines: [{ sku: "00100", qty: 1, unitPrice: 50, inCatalog: true }],
+    }),
+    record({
+      id: "with-date",
+      accountNo: "FL100",
+      invoiceDate: "3/1/2026",
+      uploadedAt: "2026-01-01T12:00:00.000Z",
+      lines: [{ sku: "00100", qty: 1, unitPrice: 11, inCatalog: true }],
+    }),
+  ];
+
+  assert.deepEqual(buildLatestInvoicePricesFromImports(imports), [
+    { account: "FL100", sku: "00100", price: 11, invoiceDate: "2026-03-01" },
+  ]);
+});
+
+test("invoiceLatestPricesToCsv includes invoice_date column", () => {
+  const csv = invoiceLatestPricesToCsv([
+    { account: "FL1", sku: "ABC", price: 9.99, invoiceDate: "2026-04-01" },
+  ]);
+  assert.equal(
+    csv,
+    '"account","sku","price","invoice_date"\n"FL1","ABC","9.99","2026-04-01"'
+  );
 });
