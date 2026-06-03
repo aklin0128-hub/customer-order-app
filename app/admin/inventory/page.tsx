@@ -243,9 +243,9 @@ export default function AdminInventoryPage() {
             Column titles should match your export:
             <code>Loc Item</code>, <code>Loc Item Desc</code>, <code>Loc Qty UM</code>,{" "}
             <code>Loc Inventory Status</code>, <code>Loc Received Date</code>,{" "}
-            <code>Loc Expire Date</code>, <code>Loc On Hand Qty</code>. Replaces the previous upload. If
-            Received/Expires show as blank, <strong>re-upload</strong> the file after updating the app so dates are
-            parsed correctly.
+            <code>Loc Expire Date</code>, <code>Loc On Hand Qty</code>. Replaces the previous upload. Rows with a
+            blank <code>Loc Item</code> (merged cells in Excel) inherit the SKU from the row above. If you uploaded
+            before this fix, <strong>re-upload</strong> your file.
           </p>
           <label style={labelStyle}>CSV or Excel file</label>
           <input

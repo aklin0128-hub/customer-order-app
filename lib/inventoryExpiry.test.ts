@@ -67,6 +67,39 @@ test("parseInventoryCsvText rejects missing columns", () => {
   assert.throws(() => parseInventoryCsvText("a,b\n1,2"), /Loc Item/);
 });
 
+test("parseInventoryCsvText skips title rows and carries forward blank Loc Item", () => {
+  const csv = `Inventory Exp Report,,,,,,
+Loc Item,Loc Item Desc,Loc Qty UM,Loc Inventory Status,Loc Received Date,Loc Expire Date,Loc On Hand Qty
+00002D,RICE,BG,Available,2/11/2026,2/10/2028,473
+,RICE,BG,Available,2/19/2026,2/18/2028,319
+000030,RICE 2,CS,Available,2/1/2026,6/1/2027,50
+`;
+  const rows = parseInventoryCsvText(csv);
+  assert.equal(rows.length, 3);
+  assert.equal(rows[0]?.sku, "00002D");
+  assert.equal(rows[0]?.expireDate, "2028-02-10");
+  assert.equal(rows[1]?.sku, "00002D");
+  assert.equal(rows[1]?.expireDate, "2028-02-18");
+  assert.equal(rows[1]?.onHandQty, 319);
+});
+
+test("parseInventoryXlsxBuffer carries forward blank Loc Item cells", () => {
+  const workbook = XLSX.utils.book_new();
+  const sheet = XLSX.utils.aoa_to_sheet([
+    ["Loc Item", "Loc Expire Date", "Loc On Hand Qty", "Loc Inventory Status"],
+    ["00033D", "2/10/2028", 10, "Available"],
+    ["", "2/18/2028", 20, "Available"],
+  ]);
+  XLSX.utils.book_append_sheet(workbook, sheet, "By Item");
+  const buffer = Buffer.from(XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }));
+
+  const { rows } = parseInventoryXlsxBuffer(buffer);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0]?.sku, "00033D");
+  assert.equal(rows[1]?.sku, "00033D");
+  assert.equal(rows[1]?.expireDate, "2028-02-18");
+});
+
 test("parseInventoryDate handles Excel serial numbers", () => {
   assert.equal(parseInventoryDate("2/10/2028"), "2028-02-10");
   assert.equal(parseInventoryDate(45323)?.startsWith("2024"), true);

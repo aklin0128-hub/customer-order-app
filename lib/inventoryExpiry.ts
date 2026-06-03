@@ -229,7 +229,7 @@ function parseQty(value: string) {
   return Number.isFinite(num) ? num : 0;
 }
 
-function parseCsvLine(line: string): string[] {
+function parseCsvLine(line: string, delimiter = ","): string[] {
   const cells: string[] = [];
   let current = "";
   let inQuotes = false;
@@ -245,7 +245,7 @@ function parseCsvLine(line: string): string[] {
       }
       continue;
     }
-    if (ch === "," && !inQuotes) {
+    if (ch === delimiter && !inQuotes) {
       cells.push(current.trim());
       current = "";
       continue;
@@ -257,15 +257,58 @@ function parseCsvLine(line: string): string[] {
   return cells;
 }
 
+function detectCsvDelimiter(headerLine: string): string {
+  let commas = 0;
+  let semicolons = 0;
+  let tabs = 0;
+  for (const ch of headerLine) {
+    if (ch === ",") commas += 1;
+    else if (ch === ";") semicolons += 1;
+    else if (ch === "\t") tabs += 1;
+  }
+  if (semicolons > commas) return ";";
+  if (tabs > commas) return "\t";
+  return ",";
+}
+
+/** Find row that contains Loc Item (or similar) — exports often have title rows above headers. */
+export function findInventoryHeaderRowIndex(aoa: unknown[][]): number {
+  const max = Math.min(45, aoa.length);
+  for (let i = 0; i < max; i++) {
+    const row = aoa[i];
+    if (!Array.isArray(row)) continue;
+    for (const cell of row) {
+      const compact = compactHeaderKey(String(cell ?? ""));
+      if (
+        compact === "LOCITEM" ||
+        compact === "SKU" ||
+        (compact.includes("LOC") && compact.includes("ITEM") && !compact.includes("DESC") && compact.length <= 14)
+      ) {
+        return i;
+      }
+    }
+  }
+  return 0;
+}
+
 function resolveHeaderIndex(headers: string[]) {
   const compact = headers.map(compactHeaderKey);
   const pick = (field: keyof typeof HEADER_ALIASES) => {
     for (let i = 0; i < compact.length; i++) {
       const norm = compact[i]!;
       if (norm.length < 2) continue;
+      if (field === "sku" && norm.includes("DESC")) continue;
       for (const alias of HEADER_ALIASES[field]) {
         const a = compactHeaderKey(alias);
         if (norm === a) return i;
+      }
+    }
+    for (let i = 0; i < compact.length; i++) {
+      const norm = compact[i]!;
+      if (norm.length < 2) continue;
+      if (field === "sku" && norm.includes("DESC")) continue;
+      for (const alias of HEADER_ALIASES[field]) {
+        const a = compactHeaderKey(alias);
         if (norm.length >= 4 && a.length >= 4 && (norm.includes(a) || a.includes(norm))) return i;
       }
       if (norm.length >= 6 && HEADER_FUZZY[field]?.(norm)) return i;
@@ -284,6 +327,10 @@ function resolveHeaderIndex(headers: string[]) {
   };
 }
 
+export function resolveHeaderIndexFromHeaders(headers: string[]) {
+  return resolveHeaderIndex(headers);
+}
+
 /** Parse rows from Excel sheet_to_json or similar. */
 export function parseInventoryRecords(records: Record<string, unknown>[]): InventoryLot[] {
   if (!recordsHaveRequiredColumns(records)) {
@@ -293,10 +340,13 @@ export function parseInventoryRecords(records: Record<string, unknown>[]): Inven
   }
 
   const rows: InventoryLot[] = [];
+  let lastSku = "";
 
   for (const record of records) {
-    const sku = normalizeInventorySku(safeString(getFieldFromRecord(record, "sku")));
+    const rawSku = safeString(getFieldFromRecord(record, "sku"));
+    const sku = normalizeInventorySku(rawSku || lastSku);
     if (!sku) continue;
+    if (rawSku) lastSku = sku;
 
     const receivedRaw = getFieldFromRecord(record, "receivedDate");
     const expireRaw = getFieldFromRecord(record, "expireDate");
@@ -376,10 +426,14 @@ export function buildInventoryIndex(rows: InventoryLot[]) {
 
 /** Parse inventory CSV text (By Item export). */
 export function parseInventoryCsvText(raw: string): InventoryLot[] {
-  const lines = raw.split(/\r?\n/).filter((line) => line.trim());
+  const text = raw.replace(/^\uFEFF/, "");
+  const lines = text.split(/\r?\n/).filter((line) => line.trim());
   if (lines.length < 2) return [];
 
-  const headers = parseCsvLine(lines[0]);
+  const delimiter = detectCsvDelimiter(lines[0]);
+  const aoa = lines.map((line) => parseCsvLine(line, delimiter));
+  const headerRowIndex = findInventoryHeaderRowIndex(aoa);
+  const headers = (aoa[headerRowIndex] || []).map((h) => String(h ?? "").trim());
   const cols = resolveHeaderIndex(headers);
   if (cols.sku < 0 || cols.expireDate < 0) {
     throw new Error(
@@ -388,11 +442,14 @@ export function parseInventoryCsvText(raw: string): InventoryLot[] {
   }
 
   const rows: InventoryLot[] = [];
+  let lastSku = "";
 
-  for (let i = 1; i < lines.length; i++) {
-    const cells = parseCsvLine(lines[i]);
-    const sku = normalizeInventorySku(cells[cols.sku] || "");
+  for (let i = headerRowIndex + 1; i < aoa.length; i++) {
+    const cells = aoa[i] || [];
+    const rawSku = cols.sku >= 0 ? safeString(cells[cols.sku]) : "";
+    const sku = normalizeInventorySku(rawSku || lastSku);
     if (!sku) continue;
+    if (rawSku) lastSku = sku;
 
     rows.push({
       sku,

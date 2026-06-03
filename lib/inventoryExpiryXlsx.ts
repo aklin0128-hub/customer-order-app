@@ -2,8 +2,10 @@ import * as XLSX from "xlsx";
 
 import {
   compactHeaderKey,
+  findInventoryHeaderRowIndex,
   parseInventoryDate,
   parseInventoryRecords,
+  resolveHeaderIndexFromHeaders,
   serializeInventoryLotsToCsv,
   type InventoryLot,
 } from "@/lib/inventoryExpiry";
@@ -28,26 +30,6 @@ function pickByItemSheet(workbook: XLSX.WorkBook): XLSX.WorkSheet | null {
 
   const first = workbook.SheetNames[0];
   return first ? workbook.Sheets[first] : null;
-}
-
-/** Find row that contains Loc Item (or similar) — exports often have title rows above headers. */
-export function findInventoryHeaderRowIndex(aoa: unknown[][]): number {
-  const max = Math.min(45, aoa.length);
-  for (let i = 0; i < max; i++) {
-    const row = aoa[i];
-    if (!Array.isArray(row)) continue;
-    for (const cell of row) {
-      const compact = compactHeaderKey(String(cell ?? ""));
-      if (
-        compact === "LOCITEM" ||
-        compact === "SKU" ||
-        (compact.includes("LOC") && compact.includes("ITEM") && compact.length <= 12)
-      ) {
-        return i;
-      }
-    }
-  }
-  return 0;
 }
 
 function cellFieldValue(cell: XLSX.CellObject | undefined): unknown {
@@ -113,6 +95,9 @@ export function sheetToInventoryRecords(sheet: XLSX.WorkSheet): Record<string, u
     const text = String(h ?? "").trim();
     return text || `__COL_${i}`;
   });
+  const cols = resolveHeaderIndexFromHeaders(headers);
+  const skuHeader = cols.sku >= 0 ? headers[cols.sku] : "";
+  let lastSkuRaw = "";
 
   const records: Record<string, unknown>[] = [];
 
@@ -130,6 +115,16 @@ export function sheetToInventoryRecords(sheet: XLSX.WorkSheet): Record<string, u
       if (!empty) hasValue = true;
       record[header] = empty ? "" : val;
     });
+
+    if (skuHeader) {
+      const rawSku = String(record[skuHeader] ?? "").trim();
+      const skuRaw = rawSku || lastSkuRaw;
+      if (skuRaw) {
+        if (rawSku) lastSkuRaw = rawSku;
+        record[skuHeader] = skuRaw;
+        hasValue = true;
+      }
+    }
 
     if (hasValue) records.push(record);
   }
