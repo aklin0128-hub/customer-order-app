@@ -1,17 +1,14 @@
+import { mapLegacyCategoryToMain } from "@/lib/catalogMainCategories";
 import { CATEGORY_OPTIONS, inferCategory, type CategoryItem } from "@/lib/inferCategory";
 
 const VALID_CATEGORIES = new Set(
   CATEGORY_OPTIONS.filter((value) => value !== "ALL") as readonly string[]
 );
 
-/** Primary category → extra tags applied automatically (e.g. RICE also counts as DRY GOODS). */
-const CATEGORY_IMPLIED_TAGS: Record<string, string[]> = {
-  RICE: ["DRY GOODS"],
-};
-
 export function normalizeProductCategory(value: string) {
   const clean = String(value || "").trim().toUpperCase();
-  return VALID_CATEGORIES.has(clean) ? clean : "";
+  if (VALID_CATEGORIES.has(clean)) return clean;
+  return mapLegacyCategoryToMain(clean);
 }
 
 function dedupeCategories(categories: string[]) {
@@ -26,23 +23,14 @@ function dedupeCategories(categories: string[]) {
   return out;
 }
 
-/** Extra tags implied by a primary category. */
-export function getImpliedCategories(category: string): string[] {
-  const primary = normalizeProductCategory(category);
-  if (!primary) return [];
-  return dedupeCategories(CATEGORY_IMPLIED_TAGS[primary] || []);
+/** @deprecated Implied sub-tags removed; returns []. */
+export function getImpliedCategories(_category: string): string[] {
+  return [];
 }
 
-/** Add implied tags (RICE → DRY GOODS, etc.). */
+/** Normalize to main categories (legacy values map to DRY / FROZEN / FRESH / HOUSEWARE). */
 export function expandCategoryTags(categories: string[]): string[] {
-  const out: string[] = [];
-  for (const cat of dedupeCategories(categories)) {
-    out.push(cat);
-    for (const implied of getImpliedCategories(cat)) {
-      if (!out.includes(implied)) out.push(implied);
-    }
-  }
-  return out;
+  return dedupeCategories(categories);
 }
 
 export type ProductCategoryFields = {
@@ -74,12 +62,12 @@ export function parseCategoriesFromBody(body: {
 /** Tags used for customer catalog category filters. */
 export function getProductCategoryTags(item: CategoryItem): string[] {
   const explicit = readProductCategories(item);
-  if (explicit.length > 0) return expandCategoryTags(explicit);
-  return expandCategoryTags([inferCategory(item)]);
+  if (explicit.length > 0) return explicit;
+  return [inferCategory(item)];
 }
 
 export function productMatchesCategoryFilters(item: CategoryItem, filters: string[]) {
   if (filters.length === 0) return true;
   const tags = new Set(getProductCategoryTags(item));
-  return filters.some((filter) => tags.has(filter));
+  return filters.some((filter) => tags.has(normalizeProductCategory(filter)));
 }

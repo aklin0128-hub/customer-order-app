@@ -23,7 +23,6 @@ import { isJustAddedItem, parseImportedAtMs } from "@/lib/catalogNewItems";
 import { NEW_ITEM_STORAGE_LABELS, type NewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import {
   expandCategoryTags,
-  getImpliedCategories,
   readProductCategories,
 } from "@/lib/productCategories";
 import { CATEGORY_OPTIONS } from "@/lib/inferCategory";
@@ -168,17 +167,9 @@ export default function AdminProductsPage() {
   };
 
   const toggleProductCategory = (cat: string) => {
-    setCategories((prev) => {
-      if (prev.includes(cat)) {
-        let next = prev.filter((value) => value !== cat);
-        for (const implied of getImpliedCategories(cat)) {
-          const stillImplied = next.some((value) => getImpliedCategories(value).includes(implied));
-          if (!stillImplied) next = next.filter((value) => value !== implied);
-        }
-        return next;
-      }
-      return expandCategoryTags([...prev, cat]);
-    });
+    setCategories((prev) =>
+      prev.includes(cat) ? prev.filter((value) => value !== cat) : expandCategoryTags([...prev, cat])
+    );
     markDirty();
   };
 
@@ -907,7 +898,7 @@ export default function AdminProductsPage() {
                 </div>
                 <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>
                   {categories.length > 0
-                    ? `Selected: ${categories.join(", ")}. RICE auto-includes DRY GOODS. Saved overrides apply on the order page.`
+                    ? `Selected: ${categories.join(", ")}. Categories: DRY, FROZEN, FRESH, HOUSEWARE. Saved overrides apply on the order page.`
                     : "No selection = AUTO (use catalog-inferred category). Tap to select one or more."}
                 </div>
               </div>

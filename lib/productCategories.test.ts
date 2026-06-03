@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   expandCategoryTags,
+  normalizeProductCategory,
   parseCategoriesFromBody,
   productMatchesCategoryFilters,
   readProductCategories,
@@ -10,27 +11,31 @@ import {
 
 test("readProductCategories prefers categories array over legacy category", () => {
   assert.deepEqual(
-    readProductCategories({ categories: ["SNACK", "DRINK"], category: "RICE" }),
-    ["SNACK", "DRINK"]
+    readProductCategories({ categories: ["FRESH", "DRY"], category: "RICE" }),
+    ["FRESH", "DRY"]
   );
 });
 
-test("parseCategoriesFromBody accepts categories array", () => {
-  assert.deepEqual(parseCategoriesFromBody({ categories: ["NOODLE", "FROZEN"] }), ["NOODLE", "FROZEN"]);
+test("parseCategoriesFromBody normalizes legacy categories to mains", () => {
+  assert.deepEqual(parseCategoriesFromBody({ categories: ["NOODLE", "FROZEN"] }), ["DRY", "FROZEN"]);
 });
 
-test("expandCategoryTags adds DRY GOODS when RICE is selected", () => {
-  assert.deepEqual(expandCategoryTags(["RICE"]), ["RICE", "DRY GOODS"]);
+test("expandCategoryTags maps RICE to DRY", () => {
+  assert.deepEqual(expandCategoryTags(["RICE"]), ["DRY"]);
 });
 
-test("productMatchesCategoryFilters treats RICE as DRY GOODS for filters", () => {
+test("normalizeProductCategory maps NON-FOOD to HOUSEWARE", () => {
+  assert.equal(normalizeProductCategory("NON-FOOD"), "HOUSEWARE");
+});
+
+test("productMatchesCategoryFilters uses main categories", () => {
   const item = { sku: "00001", categories: ["RICE"] };
-  assert.equal(productMatchesCategoryFilters(item, ["DRY GOODS"]), true);
-  assert.equal(productMatchesCategoryFilters(item, ["RICE"]), true);
+  assert.equal(productMatchesCategoryFilters(item, ["DRY"]), true);
+  assert.equal(productMatchesCategoryFilters(item, ["FRESH"]), false);
 });
 
 test("productMatchesCategoryFilters matches any assigned category", () => {
   const item = { sku: "TEST01", categories: ["SNACK", "DRINK"] };
-  assert.equal(productMatchesCategoryFilters(item, ["DRINK"]), true);
-  assert.equal(productMatchesCategoryFilters(item, ["RICE"]), false);
+  assert.equal(productMatchesCategoryFilters(item, ["DRY"]), true);
+  assert.equal(productMatchesCategoryFilters(item, ["FRESH"]), false);
 });

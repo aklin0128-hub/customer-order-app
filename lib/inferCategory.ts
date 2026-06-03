@@ -1,26 +1,13 @@
-export const CATEGORY_OPTIONS = [
-  "ALL",
-  "RICE",
-  "NOODLE",
-  "FROZEN",
-  "SEAFOOD",
-  "ICE CREAM",
-  "SAUCE",
-  "SEASONING",
-  "REFRIGERATED",
-  "PRODUCE",
-  "SNACK",
-  "DRINK",
-  "DRY GOODS",
-  "NON-FOOD",
-  "OTHER",
-] as const;
+import {
+  CATEGORY_OPTIONS,
+  mapGranularToMain,
+  mapLegacyCategoryToMain,
+  type GranularCategory,
+  type MainCategory,
+} from "@/lib/catalogMainCategories";
 
-export type ProductCategory = (typeof CATEGORY_OPTIONS)[number] extends infer T
-  ? T extends "ALL" | "OTHER"
-    ? never
-    : T
-  : never;
+export { CATEGORY_OPTIONS };
+export type ProductCategory = MainCategory;
 
 export type CategoryItem = {
   sku?: string;
@@ -33,7 +20,7 @@ export type CategoryItem = {
 };
 
 /** SKU department prefixes used in this distributor catalog */
-const SKU_PREFIX_CATEGORY: Record<string, ProductCategory> = {
+const SKU_PREFIX_CATEGORY: Record<string, GranularCategory> = {
   "00": "RICE",
   "01": "RICE",
   "02": "DRY GOODS",
@@ -89,18 +76,37 @@ function matchAny(text: string, words: string[]) {
   return words.some((w) => text.includes(w));
 }
 
-function normalizeLegacyCategory(category: string): ProductCategory | "OTHER" | null {
+const GRANULAR_CATEGORIES = new Set<string>([
+  "RICE",
+  "NOODLE",
+  "FROZEN",
+  "SEAFOOD",
+  "ICE CREAM",
+  "SAUCE",
+  "SEASONING",
+  "REFRIGERATED",
+  "PRODUCE",
+  "SNACK",
+  "DRINK",
+  "DRY GOODS",
+  "NON-FOOD",
+  "OTHER",
+]);
+
+function normalizeLegacyCategory(category: string): GranularCategory | "OTHER" | null {
   const explicit = category.trim().toUpperCase();
   if (!explicit || explicit === "ALL") return null;
+  const main = mapLegacyCategoryToMain(explicit);
+  if (main) return null;
   if (explicit === "NOODLES") return "NOODLE";
   if (explicit === "PROCESSED") return "DRY GOODS";
-  if (CATEGORY_OPTIONS.includes(explicit as (typeof CATEGORY_OPTIONS)[number])) {
-    return explicit as ProductCategory | "OTHER";
+  if (GRANULAR_CATEGORIES.has(explicit)) {
+    return explicit as GranularCategory | "OTHER";
   }
   return null;
 }
 
-function inferFromKeywords(text: string, sku: string): ProductCategory | null {
+function inferFromKeywords(text: string, sku: string): GranularCategory | null {
   if (
     matchAny(text, [
       "CHOPSTICK",
@@ -466,7 +472,7 @@ function inferFromKeywords(text: string, sku: string): ProductCategory | null {
   return null;
 }
 
-function inferFromStorage(storage: string, text: string): ProductCategory | null {
+function inferFromStorage(storage: string, text: string): GranularCategory | null {
   const s = storage.trim().toLowerCase();
 
   if (s === "frz" || s === "frozen") {
@@ -491,7 +497,7 @@ function inferFromStorage(storage: string, text: string): ProductCategory | null
   return null;
 }
 
-function inferFromSkuPrefix(prefix: string, text: string): ProductCategory | null {
+function inferFromSkuPrefix(prefix: string, text: string): GranularCategory | null {
   const base = SKU_PREFIX_CATEGORY[prefix];
   if (!base) return null;
 
@@ -539,7 +545,7 @@ function inferFromSkuPrefix(prefix: string, text: string): ProductCategory | nul
  *
  * Batch JSON defaults: run `npm run assign-categories` after re-exporting the catalog spreadsheet.
  */
-export function inferCategory(item: CategoryItem): ProductCategory | "OTHER" {
+function inferGranularCategory(item: CategoryItem): GranularCategory | "OTHER" {
   const sku = String(item.sku || "").trim().toUpperCase();
   const text = normalizeText(item);
   const storage = String(item.storage_type || "").trim();
@@ -569,4 +575,16 @@ export function inferCategory(item: CategoryItem): ProductCategory | "OTHER" {
   if (storage.toLowerCase() === "dry") return "DRY GOODS";
 
   return "OTHER";
+}
+
+export function inferCategory(item: CategoryItem): ProductCategory {
+  const explicitMain = mapLegacyCategoryToMain(String(item.category || ""));
+  if (explicitMain) return explicitMain;
+
+  const fromAssigned = Array.isArray(item.categories)
+    ? item.categories.map((c) => mapLegacyCategoryToMain(String(c))).filter(Boolean)
+    : [];
+  if (fromAssigned.length > 0) return fromAssigned[0] as ProductCategory;
+
+  return mapGranularToMain(inferGranularCategory(item));
 }
