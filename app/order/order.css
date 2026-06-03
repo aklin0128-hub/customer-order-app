@@ -138,6 +138,11 @@
   overflow-y: auto;
 }
 
+.order-category-filters {
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+
 .order-header-bar {
   display: flex;
   align-items: center;

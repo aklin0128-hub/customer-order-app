@@ -114,7 +114,7 @@ export default function OrderPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [catalogQtyMap, setCatalogQtyMap] = useState<Record<string, string>>({});
   const [catalogSearch, setCatalogSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("ALL");
+  const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
   const [brandFilter, setBrandFilter] = useState("ALL");
   const [submitting, setSubmitting] = useState(false);
   const [submitMsg, setSubmitMsg] = useState("");
@@ -141,6 +141,18 @@ export default function OrderPage() {
   const [clearanceItems, setClearanceItems] = useState<ClearanceItem[]>([]);
   const [clearanceLoading, setClearanceLoading] = useState(false);
   const [showAdminEditLinks, setShowAdminEditLinks] = useState(false);
+
+  const toggleCategoryFilter = (cat: string) => {
+    if (cat === "ALL") {
+      setCategoryFilters([]);
+      return;
+    }
+    setCategoryFilters((prev) =>
+      prev.includes(cat) ? prev.filter((value) => value !== cat) : [...prev, cat]
+    );
+  };
+
+  const categoryAllActive = categoryFilters.length === 0;
 
   const t = copy[lang];
 
@@ -584,12 +596,12 @@ export default function OrderPage() {
   const activeCatalogFilterCount = useMemo(() => {
     let count = 0;
     if (showAvailableOnly) count += 1;
-    if (categoryFilter !== "ALL") count += 1;
+    if (categoryFilters.length > 0) count += 1;
     if (brandFilter !== "ALL") count += 1;
     if (catalogShowRecommendedOnly) count += 1;
     if (catalogShowSelectedOnly) count += 1;
     return count;
-  }, [brandFilter, catalogShowRecommendedOnly, catalogShowSelectedOnly, categoryFilter, showAvailableOnly]);
+  }, [brandFilter, catalogShowRecommendedOnly, catalogShowSelectedOnly, categoryFilters, showAvailableOnly]);
 
   const orderableCatalogItems = useMemo(() => {
     const q = catalogSearch.trim().toUpperCase();
@@ -600,7 +612,7 @@ export default function OrderPage() {
           const sku = (item.sku || "").toUpperCase();
           if (Number(catalogQtyMap[sku] || 0) <= 0) return false;
         }
-        if (categoryFilter !== "ALL" && inferCategory(item) !== categoryFilter) return false;
+        if (categoryFilters.length > 0 && !categoryFilters.includes(inferCategory(item))) return false;
         if (brandFilter !== "ALL" && !brandMatchesFilter(item.brand, brandFilter)) return false;
         if (catalogShowRecommendedOnly && !recommendedSkuSet.has(item.sku?.toUpperCase() || "")) return false;
         return true;
@@ -621,7 +633,7 @@ export default function OrderPage() {
         if (aNormal !== bNormal) return aNormal ? -1 : 1;
         return compareCatalogForDisplay(a, b);
       });
-  }, [catalogSearch, categoryFilter, brandFilter, catalogQtyMap, catalogBrowseBase, catalogShowSelectedOnly, catalogShowRecommendedOnly, recommendedSkuSet]);
+  }, [catalogSearch, categoryFilters, brandFilter, catalogQtyMap, catalogBrowseBase, catalogShowSelectedOnly, catalogShowRecommendedOnly, recommendedSkuSet]);
 
   useEffect(() => {
     if (brandFilter !== "ALL" && !isKnownBrandFilter(brandSplit, brandFilter)) {
@@ -1426,13 +1438,14 @@ export default function OrderPage() {
                   <div className="order-sticky-filters">
                     <div style={filterBlockStyle}>
                       <div style={filterLabelStyle}>{t.category}</div>
-                      <div style={categoryBarStyle}>
+                      <div style={categoryBarStyle} className="order-category-filters">
                         {categoryOptions.map((cat) => (
                           <button
                             key={cat}
                             type="button"
-                            onClick={() => setCategoryFilter(cat)}
-                            style={categoryButtonStyle(categoryFilter === cat)}
+                            onClick={() => toggleCategoryFilter(cat)}
+                            style={categoryButtonStyle(cat === "ALL" ? categoryAllActive : categoryFilters.includes(cat))}
+                            aria-pressed={cat === "ALL" ? categoryAllActive : categoryFilters.includes(cat)}
                           >
                             {cat}
                           </button>
