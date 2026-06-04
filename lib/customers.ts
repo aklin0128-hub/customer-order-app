@@ -15,6 +15,8 @@ export type CustomerRecord = {
   note?: string;
   /** Miami, Orlando, Melbourne, or Jacksonville — for market reporting. */
   region?: MarketRegionId;
+  /** When true, order UI shows SKU prices from this account's latest invoice imports. */
+  invoicePricing?: boolean;
   updatedAt?: string;
   /** local = from data/customers.csv only; redis = stored or overridden in Redis */
   source: "local" | "redis";
@@ -43,6 +45,7 @@ export async function getCustomerByAccount(accountNo: string): Promise<CustomerR
       phone: String(redisCustomer.phone || "").trim() || undefined,
       note: String(redisCustomer.note || "").trim() || undefined,
       region: normalizeMarketRegion(redisCustomer.region),
+      invoicePricing: redisCustomer.invoicePricing === true,
       updatedAt: String(redisCustomer.updatedAt || "").trim() || undefined,
       source: "redis",
     };
@@ -84,6 +87,7 @@ export async function upsertCustomerContact(
     phone: nextPhone,
     note: existing.note,
     region: existing.region,
+    invoicePricing: existing.invoicePricing === true,
     updatedAt: new Date().toISOString(),
     source: "redis",
   });
@@ -130,6 +134,7 @@ export async function getAllCustomers(): Promise<CustomerRecord[]> {
       phone: String(item.phone || "").trim() || undefined,
       note: String(item.note || "").trim() || undefined,
       region: normalizeMarketRegion(item.region),
+      invoicePricing: item.invoicePricing === true,
       updatedAt: String(item.updatedAt || "").trim() || undefined,
       source: "redis",
       csvBacked: Boolean(local),
@@ -160,6 +165,7 @@ export async function removeCustomerAccess(accountNo: string) {
       email: String(existingRedis?.email || "").trim() || undefined,
       phone: String(existingRedis?.phone || "").trim() || undefined,
       note: String(existingRedis?.note || "").trim() || "Disabled in admin (CSV account)",
+      invoicePricing: existingRedis?.invoicePricing === true,
       updatedAt: new Date().toISOString(),
       source: "redis",
     });

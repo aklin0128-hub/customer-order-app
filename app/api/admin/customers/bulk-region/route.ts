@@ -52,6 +52,7 @@ export async function POST(req: Request) {
         phone: existing.phone,
         note: existing.note,
         region,
+        invoicePricing: existing.invoicePricing === true,
         updatedAt: new Date().toISOString(),
         source: "redis",
       });

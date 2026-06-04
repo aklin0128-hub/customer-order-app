@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { brandMatchesFilter, isKnownBrandFilter, splitBrandFilters } from "@/lib/catalogBrands";
@@ -37,6 +37,10 @@ import {
   isOrderableItem,
 } from "./catalogUtils";
 import { DEFAULT_ORDER_EMAIL, isValidOrderEmail, resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
+import {
+  formatCustomerInvoicePriceLabel,
+  type CustomerInvoicePriceEntry,
+} from "@/lib/customerInvoicePricing";
 import {
   buildCatalogQtyMapFromDraft,
   cartItemsFromQtyMap,
@@ -126,6 +130,10 @@ export default function OrderPage() {
   const [autoLoaded, setAutoLoaded] = useState(false);
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
   const [showCustomerInfo, setShowCustomerInfo] = useState(false);
+  const [invoicePricingEnabled, setInvoicePricingEnabled] = useState(false);
+  const [invoicePriceEntries, setInvoicePriceEntries] = useState<
+    Record<string, CustomerInvoicePriceEntry>
+  >({});
   const [fullscreen, setFullscreen] = useState(false);
   const [showRecent, setShowRecent] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -156,6 +164,14 @@ export default function OrderPage() {
   const categoryAllActive = categoryFilters.length === 0;
 
   const t = copy[lang];
+
+  const invoicePriceLabelForSku = useCallback(
+    (sku: string) =>
+      invoicePricingEnabled
+        ? formatCustomerInvoicePriceLabel(sku, invoicePriceEntries, t.invoicePrice)
+        : undefined,
+    [invoicePricingEnabled, invoicePriceEntries, t.invoicePrice]
+  );
 
   useEffect(() => {
     setShowAdminEditLinks(Boolean(sessionStorage.getItem("admin_password")));
@@ -296,6 +312,8 @@ export default function OrderPage() {
 
   useEffect(() => {
     setAutoLoaded(false);
+    setInvoicePricingEnabled(false);
+    setInvoicePriceEntries({});
   }, [accountNo]);
 
   useEffect(() => {
@@ -374,10 +392,32 @@ export default function OrderPage() {
           { cache: "no-store" }
         );
         const profileData = await profileRes.json();
-        if (profileRes.ok && profileData?.orderEmail) {
-          const resolved = resolveCustomerOrderEmail(profileData.orderEmail);
-          setOrderEmail(resolved);
-          sessionStorage.setItem("customer_order_email", resolved);
+        if (profileRes.ok) {
+          if (profileData?.orderEmail) {
+            const resolved = resolveCustomerOrderEmail(profileData.orderEmail);
+            setOrderEmail(resolved);
+            sessionStorage.setItem("customer_order_email", resolved);
+          }
+          if (profileData?.invoicePricing) {
+            setInvoicePricingEnabled(true);
+            try {
+              const priceRes = await fetch(
+                `/api/customer-invoice-prices?accountNo=${encodeURIComponent(accountNo)}`,
+                { cache: "no-store" }
+              );
+              const priceData = await priceRes.json();
+              if (priceRes.ok && priceData?.enabled && priceData?.prices) {
+                setInvoicePriceEntries(priceData.prices);
+              } else {
+                setInvoicePriceEntries({});
+              }
+            } catch {
+              setInvoicePriceEntries({});
+            }
+          } else {
+            setInvoicePricingEnabled(false);
+            setInvoicePriceEntries({});
+          }
         }
       } catch {}
 
@@ -1620,6 +1660,11 @@ export default function OrderPage() {
                             </div>
                             <div style={{ fontSize: 12, color: "#374151", marginTop: 3, lineHeight: 1.4 }}>{item.name || "-"}</div>
                             {renderProductMeta(item)}
+                            {invoicePriceLabelForSku(item.sku) ? (
+                              <div style={{ marginTop: 6, fontSize: 12, fontWeight: 800, color: "#0f766e" }}>
+                                {invoicePriceLabelForSku(item.sku)}
+                              </div>
+                            ) : null}
                             {!canOrder ? (
                               <div style={{ marginTop: 6, fontSize: 11, fontWeight: 800, color: "#b91c1c", lineHeight: 1.35 }}>
                                 {formatOrderNotAvailableMessage(item.sku || "", item.status, t)}
@@ -1681,6 +1726,7 @@ export default function OrderPage() {
                 gridKey="newItems"
                 items={newItemCatalogItems}
                 catalogQtyMap={catalogQtyMap}
+                invoicePriceLabelForSku={invoicePriceLabelForSku}
                 inCartLabel={t.inCart}
                 palletLabel={t.pallet}
                 justAddedLabel={t.justAdded}
@@ -1850,6 +1896,7 @@ export default function OrderPage() {
               gridKey="catalog"
               items={orderableCatalogItems}
               catalogQtyMap={catalogQtyMap}
+              invoicePriceLabelForSku={invoicePriceLabelForSku}
               inCartLabel={t.inCart}
               palletLabel={t.pallet}
               justAddedLabel={t.justAdded}

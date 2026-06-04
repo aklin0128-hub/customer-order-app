@@ -111,6 +111,7 @@ export async function POST(req: Request) {
     const phone = String(body?.phone || "").trim();
     const note = String(body?.note || "").trim();
     const regionRaw = body?.region;
+    const invoicePricing = body?.invoicePricing === true;
     const region =
       regionRaw === "" || regionRaw === null || regionRaw === undefined
         ? undefined
@@ -144,6 +145,7 @@ export async function POST(req: Request) {
       phone: phone || undefined,
       note: note || undefined,
       region,
+      invoicePricing,
       updatedAt: new Date().toISOString(),
       source: "redis",
     };

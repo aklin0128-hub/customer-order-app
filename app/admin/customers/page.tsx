@@ -37,6 +37,7 @@ type Customer = {
   phone?: string;
   note?: string;
   region?: string;
+  invoicePricing?: boolean;
   updatedAt?: string;
   source?: "local" | "redis";
   csvBacked?: boolean;
@@ -63,6 +64,7 @@ export default function AdminCustomersPage() {
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
   const [region, setRegion] = useState("");
+  const [invoicePricing, setInvoicePricing] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkRegion, setBulkRegion] = useState("");
@@ -198,6 +200,7 @@ export default function AdminCustomersPage() {
     setPhone(c.phone || "");
     setNote(c.note || "");
     setRegion(c.region || "");
+    setInvoicePricing(c.invoicePricing === true);
     notify(`Editing ${c.accountNo}`);
   };
 
@@ -210,6 +213,7 @@ export default function AdminCustomersPage() {
     setPhone("");
     setNote("");
     setRegion("");
+    setInvoicePricing(false);
     setMsg("");
   };
 
@@ -233,6 +237,7 @@ export default function AdminCustomersPage() {
           phone,
           note,
           region: region || "",
+          invoicePricing,
         }),
       });
       const data = await res.json();
@@ -531,6 +536,33 @@ export default function AdminCustomersPage() {
                   <option value="active">Active — can log in</option>
                   <option value="inactive">Inactive — blocked</option>
                 </select>
+              </Field>
+              <Field
+                label="Invoice prices on order site"
+                hint="When ON, this customer sees SKU unit prices from their latest uploaded invoices (by invoice date). Default OFF."
+              >
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    border: `2px solid ${invoicePricing ? "#5eead4" : "#e5e7eb"}`,
+                    background: invoicePricing ? "#f0fdfa" : "#f9fafb",
+                    cursor: "pointer",
+                    fontWeight: 800,
+                    fontSize: 13,
+                    color: invoicePricing ? "#0f766e" : "#374151",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={invoicePricing}
+                    onChange={(e) => setInvoicePricing(e.target.checked)}
+                  />
+                  {invoicePricing ? "ON — show latest invoice prices" : "OFF — hide prices (default)"}
+                </label>
               </Field>
               <Field
                 label="Order recipient email"

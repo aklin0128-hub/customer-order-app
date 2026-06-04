@@ -24,6 +24,7 @@ export async function GET(req: Request) {
       storeName: customer.storeName,
       orderEmail: resolveCustomerOrderEmail(customer.email),
       phone: customer.phone || "",
+      invoicePricing: customer.invoicePricing === true,
     });
   } catch (error: any) {
     return NextResponse.json(

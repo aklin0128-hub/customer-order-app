@@ -43,6 +43,7 @@ export async function POST(req: Request) {
         storeName: customer.storeName || "",
         orderEmail: resolveCustomerOrderEmail(customer.email),
         phone: customer.phone || "",
+        invoicePricing: customer.invoicePricing === true,
       },
     });
   } catch (error: any) {

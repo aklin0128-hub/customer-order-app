@@ -24,6 +24,7 @@ export function CatalogQtyCard({
   qty,
   promoNote,
   promoPrice,
+  invoicePrice,
   promoDetails,
   promoDealLabel,
   promoDealDetail,
@@ -54,6 +55,8 @@ export function CatalogQtyCard({
   qty: string;
   promoNote?: string;
   promoPrice?: string;
+  /** Per-customer latest invoice unit price (when admin enables invoice pricing). */
+  invoicePrice?: string;
   promoDetails?: string;
   promoDealLabel?: string;
   promoDealDetail?: string;
@@ -205,6 +208,10 @@ export function CatalogQtyCard({
         </div>
       ) : null}
       {promoPrice ? <div style={promoPriceStyle}>{promoPrice}</div> : null}
+      {!promoPrice && invoicePrice ? <div style={promoPriceStyle}>{invoicePrice}</div> : null}
+      {promoPrice && invoicePrice ? (
+        <div style={{ ...promoPriceStyle, color: "#1d4ed8", marginTop: promoPrice ? 2 : 0 }}>{invoicePrice}</div>
+      ) : null}
       {promoDetails ? <div style={promoDetailsStyle}>{promoDetails}</div> : null}
       {policyNote ? <div style={clearancePolicyStyle}>{policyNote}</div> : null}
       {hasQty ? <div style={inCartTagStyle}>{inCartLabel}: {qty}</div> : null}
