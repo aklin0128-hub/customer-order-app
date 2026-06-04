@@ -40,7 +40,7 @@ import { DEFAULT_ORDER_EMAIL, isValidOrderEmail, resolveCustomerOrderEmail } fro
 import {
   formatCustomerInvoicePriceLabel,
   type CustomerInvoicePriceEntry,
-} from "@/lib/customerInvoicePricing";
+} from "@/lib/customerInvoicePriceDisplay";
 import {
   buildCatalogQtyMapFromDraft,
   cartItemsFromQtyMap,

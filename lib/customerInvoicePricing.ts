@@ -2,27 +2,9 @@ import { cleanSku } from "@/lib/analyticsCommon";
 import { getCustomerByAccount, normalizeAccountNo } from "@/lib/customers";
 import { getInvoiceLatestPrices } from "@/lib/invoiceLatestPrices";
 
-export type CustomerInvoicePriceEntry = {
-  price: number;
-  invoiceDate: string;
-};
+import type { CustomerInvoicePriceEntry } from "@/lib/customerInvoicePriceDisplay";
 
-export function formatInvoiceUnitPrice(price: number) {
-  if (!Number.isFinite(price)) return "";
-  return `$${price.toFixed(2)}`;
-}
-
-export function formatCustomerInvoicePriceLabel(
-  sku: string,
-  prices: Record<string, CustomerInvoicePriceEntry>,
-  prefix: string
-) {
-  const key = cleanSku(sku) || String(sku || "").trim().toUpperCase();
-  const entry = prices[key];
-  if (!entry || !Number.isFinite(entry.price)) return undefined;
-  const money = formatInvoiceUnitPrice(entry.price);
-  return prefix ? `${prefix}: ${money}` : money;
-}
+export type { CustomerInvoicePriceEntry } from "@/lib/customerInvoicePriceDisplay";
 
 /** Latest invoice unit prices for one account when admin enabled invoice pricing. */
 export async function getCustomerInvoicePricesForOrder(accountNo: string): Promise<{

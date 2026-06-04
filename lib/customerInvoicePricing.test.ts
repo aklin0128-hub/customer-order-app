@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { formatCustomerInvoicePriceLabel, formatInvoiceUnitPrice } from "./customerInvoicePricing";
+import {
+  formatCustomerInvoicePriceLabel,
+  formatInvoiceUnitPrice,
+} from "./customerInvoicePriceDisplay";
 
 test("formatInvoiceUnitPrice", () => {
   assert.equal(formatInvoiceUnitPrice(12.5), "$12.50");
