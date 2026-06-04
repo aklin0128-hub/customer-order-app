@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AdminLogin } from "../_components/AdminLogin";
-import { AdminShell } from "../_components/AdminShell";
+import { AdminPage } from "../_components/AdminPage";
 import { inputStyle, panel, panelTitle } from "../_components/admin-styles";
 import {
   BtnSecondary,
@@ -14,6 +13,7 @@ import {
 } from "../_components/admin-utils";
 import { AdminListPager } from "../_components/AdminListPager";
 import { useAdminAuth } from "../_components/useAdminAuth";
+import { useAdminList } from "../_components/useAdminList";
 
 type OrderItem = { sku: string; qty: string };
 
@@ -31,60 +31,54 @@ type OrderSortField = "date" | "account" | "ref";
 type SortDir = "asc" | "desc";
 
 export default function AdminOrdersPage() {
-  const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
-  const [passwordInput, setPasswordInput] = useState("");
-
-  const [orders, setOrders] = useState<OrderRecord[]>([]);
+  const { adminHeaders } = useAdminAuth();
   const [search, setSearch] = useState("");
-  const [listPage, setListPage] = useState(1);
-  const [listTotal, setListTotal] = useState(0);
-  const [listTotalPages, setListTotalPages] = useState(1);
   const [sortField, setSortField] = useState<OrderSortField>("date");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [selectedOrderKeys, setSelectedOrderKeys] = useState<string[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
 
-  const loadOrders = async (page = listPage) => {
-    setBusy(true);
-    setMsg("");
-    try {
+  const {
+    items: orders,
+    setItems: setOrders,
+    page: listPage,
+    setPage: setListPage,
+    total: listTotal,
+    totalPages: listTotalPages,
+    busy: listBusy,
+    load: loadOrders,
+  } = useAdminList<OrderRecord>({
+    buildParams: (page) => {
       const params = new URLSearchParams({ page: String(page), limit: "40" });
       if (search.trim()) params.set("q", search.trim());
-      const res = await fetch(`/api/admin/orders?${params}`, {
-        cache: "no-store",
-        headers: adminHeaders(),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to load orders.");
-      setOrders(Array.isArray(data.orders) ? data.orders : []);
-      setListTotal(data.total ?? 0);
-      setListTotalPages(data.totalPages ?? 1);
-      setListPage(data.page ?? page);
-      setSelectedOrderKeys([]);
-    } catch (err: any) {
-      setMsg(err?.message || "Failed to load orders.");
+      return params;
+    },
+    fetchPath: "/api/admin/orders",
+    pickItems: (data) => (Array.isArray(data.orders) ? (data.orders as OrderRecord[]) : []),
+    pickMeta: (data) => ({
+      total: Number(data.total) || 0,
+      totalPages: Number(data.totalPages) || 1,
+      page: Number(data.page) || 1,
+    }),
+    debounceMs: search ? 300 : 0,
+    deps: [search],
+    onError: (message) => {
+      setMsg(message);
       setMsgTone("error");
-    } finally {
-      setBusy(false);
-    }
-  };
+    },
+  });
 
   useEffect(() => {
-    if (!authed) return;
     const q = new URLSearchParams(window.location.search).get("q");
     if (q) setSearch(q);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed]);
+  }, []);
 
   useEffect(() => {
-    if (!authed) return;
-    const t = setTimeout(() => void loadOrders(listPage), search ? 300 : 0);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, search, listPage]);
+    setSelectedOrderKeys([]);
+  }, [orders, listPage, search]);
 
   const filteredOrders = useMemo(() => {
     return [...orders].sort((a, b) => {
@@ -137,7 +131,7 @@ export default function AdminOrdersPage() {
     if (targets.length === 0) return;
     if (!options.skipConfirm && !confirm(`Delete ${targets.length} selected order(s)? This cannot be undone.`)) return;
 
-    setBusy(true);
+    setActionBusy(true);
     setMsg("");
     try {
       const res = await fetch("/api/admin/orders", {
@@ -164,35 +158,18 @@ export default function AdminOrdersPage() {
       setMsg(err?.message || "Failed to delete orders.");
       setMsgTone("error");
     } finally {
-      setBusy(false);
+      setActionBusy(false);
     }
   };
 
-  if (!ready) return null;
-
-  if (!authed) {
-    return (
-      <AdminLogin
-        title="Orders"
-        subtitle="Sign in to view customer order history from Redis."
-        password={passwordInput}
-        onPasswordChange={setPasswordInput}
-        error={error}
-        loading={loading}
-        onSubmit={() => login(passwordInput)}
-      />
-    );
-  }
-
   return (
-    <AdminShell
+    <AdminPage
       active="orders"
       title="Orders"
       subtitle="Recent orders saved when customers submit (up to 20 per account)."
-      onLogout={logout}
       actions={
-        <BtnSecondary onClick={loadOrders} disabled={busy}>
-          {busy ? "Loading..." : "Refresh"}
+        <BtnSecondary onClick={() => void loadOrders(listPage)} disabled={listBusy}>
+          {listBusy ? "Loading..." : "Refresh"}
         </BtnSecondary>
       }
     >
@@ -258,7 +235,7 @@ export default function AdminOrdersPage() {
                 onClick={() =>
                   setSelectedOrderKeys(allVisibleSelected ? [] : filteredOrders.map(stableOrderKey))
                 }
-                disabled={busy}
+                disabled={listBusy || actionBusy}
                 style={{
                   border: "1px solid #d1d5db",
                   background: "#fff",
@@ -266,7 +243,7 @@ export default function AdminOrdersPage() {
                   padding: "7px 10px",
                   fontSize: 12,
                   fontWeight: 900,
-                  cursor: busy ? "not-allowed" : "pointer",
+                  cursor: listBusy || actionBusy ? "not-allowed" : "pointer",
                 }}
               >
                 {allVisibleSelected ? "Clear selection" : "Select all shown"}
@@ -274,7 +251,7 @@ export default function AdminOrdersPage() {
               <button
                 type="button"
                 onClick={bulkDownloadOrders}
-                disabled={busy || selectedOrders.length === 0}
+                disabled={listBusy || actionBusy || selectedOrders.length === 0}
                 style={{
                   border: "1px solid #bfdbfe",
                   background: "#eff6ff",
@@ -283,7 +260,7 @@ export default function AdminOrdersPage() {
                   padding: "7px 10px",
                   fontSize: 12,
                   fontWeight: 900,
-                  cursor: busy || selectedOrders.length === 0 ? "not-allowed" : "pointer",
+                  cursor: listBusy || actionBusy || selectedOrders.length === 0 ? "not-allowed" : "pointer",
                 }}
               >
                 Download selected ({selectedOrders.length})
@@ -291,7 +268,7 @@ export default function AdminOrdersPage() {
               <button
                 type="button"
                 onClick={() => void deleteOrders(selectedOrders)}
-                disabled={busy || selectedOrders.length === 0}
+                disabled={listBusy || actionBusy || selectedOrders.length === 0}
                 style={{
                   border: "1px solid #fecaca",
                   background: "#fef2f2",
@@ -300,7 +277,7 @@ export default function AdminOrdersPage() {
                   padding: "7px 10px",
                   fontSize: 12,
                   fontWeight: 900,
-                  cursor: busy || selectedOrders.length === 0 ? "not-allowed" : "pointer",
+                  cursor: listBusy || actionBusy || selectedOrders.length === 0 ? "not-allowed" : "pointer",
                 }}
               >
                 Delete selected ({selectedOrders.length})
@@ -336,7 +313,7 @@ export default function AdminOrdersPage() {
                         type="checkbox"
                         checked={selected}
                         onChange={() => toggleOrderSelection(order)}
-                        disabled={busy}
+                        disabled={listBusy || actionBusy}
                         style={{ marginTop: 3 }}
                         aria-label={`Select order ${order.orderRef || key}`}
                       />
@@ -392,7 +369,7 @@ export default function AdminOrdersPage() {
                       <button
                         type="button"
                         onClick={() => void deleteOrders([order])}
-                        disabled={busy}
+                        disabled={listBusy || actionBusy}
                         title="Delete order"
                         aria-label={`Delete order ${order.orderRef || key}`}
                         style={{
@@ -404,7 +381,7 @@ export default function AdminOrdersPage() {
                           height: 34,
                           fontSize: 16,
                           fontWeight: 900,
-                          cursor: busy ? "not-allowed" : "pointer",
+                          cursor: listBusy || actionBusy ? "not-allowed" : "pointer",
                           flexShrink: 0,
                         }}
                       >
@@ -461,9 +438,9 @@ export default function AdminOrdersPage() {
           totalPages={listTotalPages}
           total={listTotal}
           onPageChange={setListPage}
-          disabled={busy}
+          disabled={listBusy || actionBusy}
         />
       </section>
-    </AdminShell>
+    </AdminPage>
   );
 }

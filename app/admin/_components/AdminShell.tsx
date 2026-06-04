@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { AdminGlobalSearchHandle } from "./AdminGlobalSearch";
 import {
   brandSub,
   brandTitle,
@@ -85,10 +86,22 @@ export function AdminShell({
 }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
+  const searchRef = useRef<AdminGlobalSearchHandle>(null);
 
   useEffect(() => {
     setNavOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   useEffect(() => {
     if (!navOpen) return;
@@ -160,7 +173,7 @@ export function AdminShell({
             </div>
           </div>
           <div className="admin-topbar-actions" style={topActions}>
-            <AdminGlobalSearch />
+            <AdminGlobalSearch ref={searchRef} />
             {actions}
           </div>
         </header>

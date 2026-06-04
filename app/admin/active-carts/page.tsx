@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AdminLogin } from "../_components/AdminLogin";
-import { AdminShell } from "../_components/AdminShell";
+import { AdminPage } from "../_components/AdminPage";
 import { inputStyle, panel, panelTitle } from "../_components/admin-styles";
 import { downloadCsv } from "../_components/admin-analytics-ui";
 import { BtnSecondary, EmptyState, FilterChips, StatGrid, Toast, downloadOrderCsv, formatDate } from "../_components/admin-utils";
@@ -30,8 +29,7 @@ function isStaleCart(cart: ActiveCart) {
 
 function AdminActiveCartsContent() {
   const searchParams = useSearchParams();
-  const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
-  const [passwordInput, setPasswordInput] = useState("");
+  const { authed, adminHeaders } = useAdminAuth();
   const [carts, setCarts] = useState<ActiveCart[]>([]);
   const [search, setSearch] = useState("");
   const [staleFilter, setStaleFilter] = useState<StaleFilter>(
@@ -77,28 +75,13 @@ function AdminActiveCartsContent() {
     });
   }, [carts, search, staleFilter]);
 
-  if (!ready) return null;
-
-  if (!authed) {
-    return (
-      <AdminLogin
-        title="Active Carts"
-        subtitle="Sign in to see customer carts that have unsent items."
-        password={passwordInput}
-        onPasswordChange={setPasswordInput}
-        error={error}
-        loading={loading}
-        onSubmit={() => login(passwordInput)}
-      />
-    );
-  }
+  if (!authed) return null;
 
   return (
-    <AdminShell
+    <AdminPage
       active="activeCarts"
       title="Active Carts"
       subtitle="Follow up on stale carts (3+ days) — call or email the store."
-      onLogout={logout}
       actions={
         <>
           <BtnSecondary
@@ -249,7 +232,7 @@ function AdminActiveCartsContent() {
           </div>
         )}
       </section>
-    </AdminShell>
+    </AdminPage>
   );
 }
 

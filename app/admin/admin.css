@@ -55,6 +55,18 @@
   max-width: 360px;
 }
 
+.admin-global-search-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.admin-global-search-field .admin-global-search-input {
+  flex: 1;
+  min-width: 0;
+}
+
 .admin-global-search-input {
   box-sizing: border-box;
 }
@@ -1132,4 +1144,31 @@
   .admin-data-table th {
     position: static;
   }
+}
+
+.admin-products-virtual-list {
+  max-height: min(70vh, 640px);
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  padding: 6px;
+}
+
+.admin-badge-pricing {
+  font-size: 10px;
+  font-weight: 900;
+  padding: 3px 8px;
+  border-radius: 999;
+  background: #ecfdf5;
+  color: #0f766e;
+  border: 1px solid #99f6e4;
+}
+
+.admin-global-search-kbd {
+  font-size: 10px;
+  font-weight: 800;
+  color: #9ca3af;
+  margin-left: 6px;
+  white-space: nowrap;
 }

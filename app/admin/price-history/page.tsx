@@ -1,8 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useState, type CSSProperties } from "react";
-import { AdminLogin } from "../_components/AdminLogin";
-import { AdminShell } from "../_components/AdminShell";
+import { AdminPage } from "../_components/AdminPage";
 import { AdminSkuAutocomplete } from "../_components/AdminSkuAutocomplete";
 import { inputStyle, labelStyle, panel, panelTitle } from "../_components/admin-styles";
 import { Toast } from "../_components/admin-utils";
@@ -65,8 +64,7 @@ function changeFromPrevious(history: PriceHistoryPoint[], index: number) {
 }
 
 export default function AdminPriceHistoryPage() {
-  const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
-  const [passwordInput, setPasswordInput] = useState("");
+  const { authed, adminHeaders } = useAdminAuth();
   const [accountNo, setAccountNo] = useState("");
   const [sku, setSku] = useState("");
   const [days, setDays] = useState("");
@@ -97,32 +95,13 @@ export default function AdminPriceHistoryPage() {
     }
   };
 
-  useEffect(() => {
-    if (ready && authed) setPasswordInput("");
-  }, [ready, authed]);
-
-  if (!ready) return null;
-
-  if (!authed) {
-    return (
-      <AdminLogin
-        title="Price History"
-        subtitle="Sign in to check account item unit price history."
-        password={passwordInput}
-        onPasswordChange={setPasswordInput}
-        error={error}
-        loading={loading}
-        onSubmit={() => login(passwordInput)}
-      />
-    );
-  }
+  if (!authed) return null;
 
   return (
-    <AdminShell
-      active="priceCompare"
+    <AdminPage
+      active="priceHistory"
       title="Price History"
       subtitle="Legacy view — use Price Compare in the sidebar for account + SKU tools."
-      onLogout={logout}
     >
       {msg ? <Toast tone="error" message={msg} /> : null}
 
@@ -242,6 +221,6 @@ export default function AdminPriceHistoryPage() {
           <p style={{ margin: 0, color: "#6b7280", fontSize: 14 }}>No unit price history found for this account + SKU.</p>
         </section>
       ) : null}
-    </AdminShell>
+    </AdminPage>
   );
 }

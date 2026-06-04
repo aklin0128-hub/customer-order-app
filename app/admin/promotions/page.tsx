@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import { AdminLogin } from "../_components/AdminLogin";
-import { AdminShell } from "../_components/AdminShell";
+import { AdminPage } from "../_components/AdminPage";
 import { AdminSkuAutocomplete } from "../_components/AdminSkuAutocomplete";
 import {
   FieldLabel,
@@ -118,8 +117,7 @@ function emptyForm() {
 }
 
 export default function AdminPromotionsPage() {
-  const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
-  const [passwordInput, setPasswordInput] = useState("");
+  const { authed, adminHeaders } = useAdminAuth();
 
   const [promotions, setPromotions] = useState<PromotionRecord[]>([]);
   const [products, setProducts] = useState<PromotionProduct[]>([]);
@@ -300,28 +298,13 @@ export default function AdminPromotionsPage() {
   const activeCount = promotions.filter((p) => p.promoStatus === "active").length;
   const editingSku = form.sku.trim().toUpperCase();
 
-  if (!ready) return null;
-
-  if (!authed) {
-    return (
-      <AdminLogin
-        title="Promotions"
-        subtitle="Sign in to manage featured sales SKUs on the order page."
-        password={passwordInput}
-        onPasswordChange={setPasswordInput}
-        error={error}
-        loading={loading}
-        onSubmit={() => login(passwordInput)}
-      />
-    );
-  }
+  if (!authed) return null;
 
   return (
-    <AdminShell
+    <AdminPage
       active="promotions"
       title="Promotions"
       subtitle="Click a row to edit · Active promos sync to /new/ and customer Weekly picks."
-      onLogout={logout}
       actions={
         <BtnSecondary onClick={() => setForm(emptyForm())} disabled={busy}>
           + New promo
@@ -662,6 +645,6 @@ export default function AdminPromotionsPage() {
         </Panel>
         </section>
       ) : null}
-    </AdminShell>
+    </AdminPage>
   );
 }

@@ -1,8 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useState, type CSSProperties } from "react";
-import { AdminLogin } from "../_components/AdminLogin";
-import { AdminShell } from "../_components/AdminShell";
+import { AdminPage } from "../_components/AdminPage";
 import { AdminSkuAutocomplete } from "../_components/AdminSkuAutocomplete";
 import { inputStyle, labelStyle, panel, panelTitle } from "../_components/admin-styles";
 import { Toast } from "../_components/admin-utils";
@@ -77,8 +76,7 @@ function invoiceHref(importId: string) {
 }
 
 export default function AdminPriceComparePage() {
-  const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
-  const [passwordInput, setPasswordInput] = useState("");
+  const { authed, adminHeaders } = useAdminAuth();
   const [priceAccountNo, setPriceAccountNo] = useState("");
   const [priceSku, setPriceSku] = useState("");
   const [priceDays, setPriceDays] = useState("");
@@ -148,31 +146,18 @@ export default function AdminPriceComparePage() {
   };
 
   useEffect(() => {
-    if (ready && authed) setPasswordInput("");
-  }, [ready, authed]);
+    if (!authed) return;
+    const acct = new URLSearchParams(window.location.search).get("accountNo");
+    if (acct) setPriceAccountNo(acct.trim().toUpperCase());
+  }, [authed]);
 
-  if (!ready) return null;
-
-  if (!authed) {
-    return (
-      <AdminLogin
-        title="Price compare"
-        subtitle="Sign in to compare invoice prices by account and SKU."
-        password={passwordInput}
-        onPasswordChange={setPasswordInput}
-        error={error}
-        loading={loading}
-        onSubmit={() => login(passwordInput)}
-      />
-    );
-  }
+  if (!authed) return null;
 
   return (
-    <AdminShell
+    <AdminPage
       active="priceCompare"
       title="Price Compare"
       subtitle="Two tools: account item price history, and SKU top buyers."
-      onLogout={logout}
     >
       {msg ? <Toast tone="error" message={msg} /> : null}
 
@@ -387,6 +372,6 @@ export default function AdminPriceComparePage() {
           )}
         </section>
       ) : null}
-    </AdminShell>
+    </AdminPage>
   );
 }

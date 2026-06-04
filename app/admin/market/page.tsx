@@ -12,8 +12,7 @@ import {
   downloadCsv,
   formatMoney,
 } from "../_components/admin-analytics-ui";
-import { AdminLogin } from "../_components/AdminLogin";
-import { AdminShell } from "../_components/AdminShell";
+import { AdminPage } from "../_components/AdminPage";
 import { inputStyle, panel, panelTitle, splitLayout } from "../_components/admin-styles";
 import {
   BtnPrimary,
@@ -70,8 +69,7 @@ const PERIOD_OPTIONS: { id: MarketPeriod; label: string; hint: string }[] = [
 type AccountSort = "growth" | "qty" | "account";
 
 export default function AdminMarketPage() {
-  const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
-  const [passwordInput, setPasswordInput] = useState("");
+  const { authed, adminHeaders } = useAdminAuth();
   const [period, setPeriod] = useState<MarketPeriod>("monthly");
   const [regionFilter, setRegionFilter] = useState("all");
   const [accountSearch, setAccountSearch] = useState("");
@@ -192,28 +190,13 @@ export default function AdminMarketPage() {
 
   const periodHint = PERIOD_OPTIONS.find((p) => p.id === period)?.hint || "";
 
-  if (!ready) return null;
-
-  if (!authed) {
-    return (
-      <AdminLogin
-        title="Market"
-        subtitle="Sign in to compare sales growth by city and by account."
-        password={passwordInput}
-        onPasswordChange={setPasswordInput}
-        error={error}
-        loading={loading}
-        onSubmit={() => login(passwordInput)}
-      />
-    );
-  }
+  if (!authed) return null;
 
   return (
-    <AdminShell
+    <AdminPage
       active="market"
       title="Market by city"
       subtitle="Click a city to filter accounts · export CSV for reports."
-      onLogout={logout}
     >
       {msg ? <Toast tone="error" message={msg} /> : null}
 
@@ -446,6 +429,6 @@ export default function AdminMarketPage() {
           </section>
         ) : null}
       </div>
-    </AdminShell>
+    </AdminPage>
   );
 }

@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { AdminLogin } from "../_components/AdminLogin";
-import { AdminShell } from "../_components/AdminShell";
+import { AdminPage } from "../_components/AdminPage";
 import { formGrid, inputStyle, labelStyle, splitForm, splitLayout, splitList } from "../_components/admin-styles";
 import {
   BtnDanger,
@@ -46,8 +45,7 @@ type Customer = {
 type StatusFilter = "all" | "active" | "inactive";
 
 export default function AdminCustomersPage() {
-  const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
-  const [passwordInput, setPasswordInput] = useState("");
+  const { authed, adminHeaders } = useAdminAuth();
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [search, setSearch] = useState("");
@@ -69,6 +67,7 @@ export default function AdminCustomersPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkRegion, setBulkRegion] = useState("");
   const [regionFilter, setRegionFilter] = useState("all");
+  const [invoicePricingFilter, setInvoicePricingFilter] = useState("all");
   const [urlAccountHandled, setUrlAccountHandled] = useState(false);
   const orderEmailOptions = useMemo(() => getOrderEmailSelectOptions(), []);
   const resolvedOrderEmail = resolveCustomerOrderEmail(email);
@@ -90,6 +89,7 @@ export default function AdminCustomersPage() {
       if (search.trim()) params.set("q", search.trim());
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (regionFilter !== "all") params.set("region", regionFilter);
+      if (invoicePricingFilter === "on") params.set("invoicePricing", "on");
 
       const res = await fetch(`/api/admin/customers?${params}`, {
         cache: "no-store",
@@ -113,7 +113,7 @@ export default function AdminCustomersPage() {
     const t = setTimeout(() => void loadCustomers(listPage), search ? 300 : 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, search, statusFilter, regionFilter, listPage]);
+  }, [authed, search, statusFilter, regionFilter, invoicePricingFilter, listPage]);
 
   useEffect(() => {
     if (urlAccountHandled) return;
@@ -121,6 +121,7 @@ export default function AdminCustomersPage() {
     const acct = params.get("accountNo")?.trim().toUpperCase();
     const region = params.get("region");
     if (region === "unassigned") setRegionFilter("unassigned");
+    if (params.get("invoicePricing") === "on") setInvoicePricingFilter("on");
     if (!acct) {
       setUrlAccountHandled(true);
       return;
@@ -242,8 +243,20 @@ export default function AdminCustomersPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to save customer.");
+      const saved = data.customer as Customer;
+      if (saved?.accountNo) {
+        setCustomers((prev) => {
+          const acct = saved.accountNo.toUpperCase();
+          const idx = prev.findIndex((c) => c.accountNo.toUpperCase() === acct);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = { ...next[idx], ...saved };
+            return next;
+          }
+          return [...prev, saved].sort((a, b) => a.accountNo.localeCompare(b.accountNo));
+        });
+      }
       notify(`Saved ${finalAccount}`);
-      await loadCustomers();
     } catch (err: any) {
       notify(err?.message || "Failed to save customer.", "error");
     } finally {
@@ -288,28 +301,14 @@ export default function AdminCustomersPage() {
     }
   };
 
-  if (!ready) return null;
-
-  if (!authed) {
-    return (
-      <AdminLogin
-        title="Customers"
-        subtitle="Sign in to manage customer login accounts."
-        password={passwordInput}
-        onPasswordChange={setPasswordInput}
-        error={error}
-        loading={loading}
-        onSubmit={() => login(passwordInput)}
-      />
-    );
-  }
+  if (!authed) return null;
 
   return (
-    <AdminShell
+    <AdminPage
       active="customers"
       title="Customers"
       subtitle="CSV accounts cannot be removed from the file here — Delete disables login via Redis. Redis-only accounts are removed entirely."
-      onLogout={logout}
+      loginSubtitle="Sign in to manage customer login accounts."
       actions={
         <BtnSecondary onClick={() => { clearForm(); notify("New customer form ready."); }}>
           + New customer
@@ -362,6 +361,17 @@ export default function AdminCustomersPage() {
               { id: "all", label: "All regions" },
               ...MARKET_REGIONS.map((r) => ({ id: r.id, label: r.label })),
               { id: "unassigned", label: "Unassigned" },
+            ]}
+          />
+          <FilterChips
+            value={invoicePricingFilter}
+            onChange={(v) => {
+              setInvoicePricingFilter(v);
+              setListPage(1);
+            }}
+            options={[
+              { id: "all", label: "All pricing" },
+              { id: "on", label: "Invoice prices ON" },
             ]}
           />
           {selected.size > 0 ? (
@@ -470,6 +480,7 @@ export default function AdminCustomersPage() {
                     >
                       {c.active !== false ? "ACTIVE" : "OFF"}
                     </span>
+                    {c.invoicePricing ? <span className="admin-badge-pricing">PRICING</span> : null}
                   </div>
                 </div>
               </ListItemButton>
@@ -605,9 +616,17 @@ export default function AdminCustomersPage() {
                 {busy ? "Saving..." : "Save customer"}
               </BtnPrimary>
               {accountNo ? (
-                <Link href={`/admin/account?accountNo=${encodeURIComponent(accountNo)}`}>
-                  <BtnSecondary>Account 360</BtnSecondary>
-                </Link>
+                <>
+                  <Link href={`/admin/account?accountNo=${encodeURIComponent(accountNo)}`}>
+                    <BtnSecondary>Account 360</BtnSecondary>
+                  </Link>
+                  <Link href={`/admin/invoices?accountNo=${encodeURIComponent(accountNo.trim().toUpperCase())}`}>
+                    <BtnSecondary>Invoices</BtnSecondary>
+                  </Link>
+                  <Link href={`/admin/orders?q=${encodeURIComponent(accountNo.trim().toUpperCase())}`}>
+                    <BtnSecondary>Orders</BtnSecondary>
+                  </Link>
+                </>
               ) : null}
               <BtnSecondary onClick={clearForm}>Clear form</BtnSecondary>
               <BtnSecondary onClick={loadCustomers} disabled={busy}>
@@ -624,7 +643,7 @@ export default function AdminCustomersPage() {
           </Panel>
         </div>
       </div>
-    </AdminShell>
+    </AdminPage>
   );
 }
 

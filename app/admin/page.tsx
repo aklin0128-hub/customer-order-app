@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { AdminLogin } from "./_components/AdminLogin";
-import { AdminShell } from "./_components/AdminShell";
+import { AdminPage } from "./_components/AdminPage";
 import { GrowthCell } from "./_components/admin-analytics-ui";
 import { panel, panelTitle } from "./_components/admin-styles";
 import { BtnPrimary, BtnSecondary, StatGrid, Toast } from "./_components/admin-utils";
@@ -21,6 +20,7 @@ type DashboardData = {
     activeClearance: number;
     activeCarts: number;
     staleCarts: number;
+    invoicePricingCustomers: number;
   };
   alerts: { id: string; label: string; count: number; href: string; tone: string }[];
   invoiceQuality: {
@@ -67,8 +67,7 @@ function alertToneClass(tone: string): string {
 }
 
 export default function AdminDashboardPage() {
-  const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
-  const [passwordInput, setPasswordInput] = useState("");
+  const { authed, adminHeaders } = useAdminAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [busy, setBusy] = useState(false);
   const [sectionsLoading, setSectionsLoading] = useState(false);
@@ -134,28 +133,15 @@ export default function AdminDashboardPage() {
     if (authed) void load();
   }, [authed, load]);
 
-  if (!ready) return null;
-
-  if (!authed) {
-    return (
-      <AdminLogin
-        title="Admin sign in"
-        subtitle="Operations dashboard for customers, catalog, orders, and reports."
-        password={passwordInput}
-        onPasswordChange={setPasswordInput}
-        error={error}
-        loading={loading}
-        onSubmit={() => login(passwordInput)}
-      />
-    );
-  }
+  if (!authed) return null;
 
   return (
-    <AdminShell
+    <AdminPage
       active="home"
       title="Dashboard"
       subtitle="What needs attention today — then jump into the right tool."
-      onLogout={logout}
+      loginTitle="Admin sign in"
+      loginSubtitle="Operations dashboard for customers, catalog, orders, and reports."
       actions={
         <BtnPrimary onClick={() => void load()} disabled={busy}>
           {busy ? "Refreshing…" : "Refresh"}
@@ -176,6 +162,7 @@ export default function AdminDashboardPage() {
               { label: "Unknown SKUs", value: data.kpis.unknownSkuCount },
               { label: "Active carts", value: data.kpis.activeCarts },
               { label: "Stale carts (3d+)", value: data.kpis.staleCarts },
+              { label: "Invoice prices ON", value: data.kpis.invoicePricingCustomers },
             ]}
           />
 
@@ -344,6 +331,6 @@ export default function AdminDashboardPage() {
           <p style={{ margin: 0, color: "#2563eb", fontWeight: 800 }}>Loading dashboard…</p>
         </section>
       ) : null}
-    </AdminShell>
+    </AdminPage>
   );
 }

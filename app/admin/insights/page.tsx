@@ -13,8 +13,7 @@ import {
   downloadCsv,
   formatMoney,
 } from "../_components/admin-analytics-ui";
-import { AdminLogin } from "../_components/AdminLogin";
-import { AdminShell } from "../_components/AdminShell";
+import { AdminPage } from "../_components/AdminPage";
 import { AdminSkuAutocomplete } from "../_components/AdminSkuAutocomplete";
 import { inputStyle, panel, panelTitle } from "../_components/admin-styles";
 import {
@@ -184,8 +183,7 @@ function MoverTable({ rows }: { rows: SkuMover[] }) {
 
 function AdminInsightsPageInner() {
   const searchParams = useSearchParams();
-  const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
-  const [passwordInput, setPasswordInput] = useState("");
+  const { authed, adminHeaders } = useAdminAuth();
   const [tab, setTab] = useState<Tab>("health");
   const [msg, setMsg] = useState("");
 
@@ -333,28 +331,13 @@ function AdminInsightsPageInner() {
     );
   };
 
-  if (!ready) return null;
-
-  if (!authed) {
-    return (
-      <AdminLogin
-        title="Insights"
-        subtitle="Customer health, brand share, and price distribution."
-        password={passwordInput}
-        onPasswordChange={setPasswordInput}
-        error={error}
-        loading={loading}
-        onSubmit={() => login(passwordInput)}
-      />
-    );
-  }
+  if (!authed) return null;
 
   return (
-    <AdminShell
+    <AdminPage
       active="insights"
       title="Insights"
       subtitle="Health · brand share · SKU pricing. Sale data is cached ~30 min on the server — use Refresh to reload."
-      onLogout={logout}
     >
       <section style={panel}>
         <FilterChips value={tab} onChange={(v) => setTab(v as Tab)} options={TABS} />
@@ -680,7 +663,7 @@ function AdminInsightsPageInner() {
           ) : null}
         </>
       ) : null}
-    </AdminShell>
+    </AdminPage>
   );
 }
 

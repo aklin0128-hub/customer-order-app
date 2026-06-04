@@ -35,6 +35,7 @@ export async function GET(req: Request) {
     const accountNo = (url.searchParams.get("accountNo") || "").trim().toUpperCase();
     const status = url.searchParams.get("status") || "all";
     const region = url.searchParams.get("region") || "all";
+    const invoicePricing = url.searchParams.get("invoicePricing") || "all";
 
     let customers = await getAllCustomers();
 
@@ -54,6 +55,7 @@ export async function GET(req: Request) {
       if (status === "inactive" && c.active !== false) return false;
       if (region === "unassigned" && c.region) return false;
       if (region !== "all" && region !== "unassigned" && c.region !== region) return false;
+      if (invoicePricing === "on" && c.invoicePricing !== true) return false;
       if (!query.q) return true;
       const hay = `${c.accountNo} ${c.storeName} ${c.email || ""} ${c.phone || ""}`;
       return matchesQuery(hay, query.q);

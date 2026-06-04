@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AdminLogin } from "../_components/AdminLogin";
+import { AdminPage } from "../_components/AdminPage";
 import { AdminDataTable } from "../_components/AdminDataTable";
-import { AdminShell } from "../_components/AdminShell";
 import { AdminSkuAutocomplete } from "../_components/AdminSkuAutocomplete";
 import { inputStyle, labelStyle, panel, panelTitle } from "../_components/admin-styles";
 import {
@@ -69,8 +68,7 @@ function formatUploadedAt(iso?: string) {
 }
 
 export default function AdminInventoryPage() {
-  const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
-  const [passwordInput, setPasswordInput] = useState("");
+  const { authed, adminHeaders } = useAdminAuth();
 
   const [meta, setMeta] = useState<InventoryMeta | null>(null);
   const [loadedRows, setLoadedRows] = useState(0);
@@ -207,28 +205,13 @@ export default function AdminInventoryPage() {
     }
   };
 
-  if (!ready) return null;
-
-  if (!authed) {
-    return (
-      <AdminLogin
-        title="Inventory expiry"
-        subtitle="Upload weekly By Item CSV or Excel and look up SKU expiration dates."
-        password={passwordInput}
-        onPasswordChange={setPasswordInput}
-        error={error}
-        loading={loading}
-        onSubmit={() => login(passwordInput)}
-      />
-    );
-  }
+  if (!authed) return null;
 
   return (
-    <AdminShell
+    <AdminPage
       active="inventory"
       title="Inventory expiry"
       subtitle="Internal only — upload Friday By Item CSV or Excel. Stores do not see this."
-      onLogout={logout}
     >
       <StatGrid
         items={[
@@ -356,6 +339,6 @@ export default function AdminInventoryPage() {
       ) : null}
 
       <Toast message={msg} tone={msgTone} />
-    </AdminShell>
+    </AdminPage>
   );
 }

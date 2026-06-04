@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { AdminAccountAutocomplete } from "../_components/AdminAccountAutocomplete";
-import { AdminLogin } from "../_components/AdminLogin";
-import { AdminShell } from "../_components/AdminShell";
+import { AdminPage } from "../_components/AdminPage";
 import { GrowthCell } from "../_components/admin-analytics-ui";
 import { inputStyle, panel, panelTitle } from "../_components/admin-styles";
 import { BtnPrimary, BtnSecondary, Panel, StatGrid, Toast } from "../_components/admin-utils";
@@ -101,6 +100,20 @@ function Account360Content() {
 
       {data ? (
         <>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+            <Link href={`/admin/customers?accountNo=${encodeURIComponent(data.accountNo)}`}>
+              <BtnSecondary>Edit customer</BtnSecondary>
+            </Link>
+            <Link href={`/admin/invoices?accountNo=${encodeURIComponent(data.accountNo)}`}>
+              <BtnSecondary>Invoices</BtnSecondary>
+            </Link>
+            <Link href={`/admin/orders?q=${encodeURIComponent(data.accountNo)}`}>
+              <BtnSecondary>Orders</BtnSecondary>
+            </Link>
+            <Link href={`/admin/price-compare?accountNo=${encodeURIComponent(data.accountNo)}`}>
+              <BtnSecondary>Price compare</BtnSecondary>
+            </Link>
+          </div>
           <StatGrid
             items={[
               { label: "Store", value: data.customer?.storeName || "—" },
@@ -168,6 +181,9 @@ function Account360Content() {
               ) : (
                 <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>No orders.</p>
               )}
+              <Link href={`/admin/orders?q=${encodeURIComponent(data.accountNo)}`} style={{ fontSize: 13, fontWeight: 800 }}>
+                All orders →
+              </Link>
             </Panel>
             <Panel title="Recent invoices">
               {data.recentInvoices.length ? (
@@ -181,6 +197,9 @@ function Account360Content() {
               ) : (
                 <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>No imports.</p>
               )}
+              <Link href={`/admin/invoices?accountNo=${encodeURIComponent(data.accountNo)}`} style={{ fontSize: 13, fontWeight: 800 }}>
+                All invoices →
+              </Link>
             </Panel>
           </div>
         </>
@@ -190,30 +209,20 @@ function Account360Content() {
 }
 
 export default function AdminAccountPage() {
-  const { ready, authed, error, loading, login, logout } = useAdminAuth();
-  const [passwordInput, setPasswordInput] = useState("");
+  const { authed } = useAdminAuth();
 
-  if (!ready) return null;
-
-  if (!authed) {
-    return (
-      <AdminLogin
-        title="Account 360"
-        subtitle="One-page view of a customer account."
-        password={passwordInput}
-        onPasswordChange={setPasswordInput}
-        error={error}
-        loading={loading}
-        onSubmit={() => login(passwordInput)}
-      />
-    );
-  }
+  if (!authed) return null;
 
   return (
-    <AdminShell active="account" title="Account 360" subtitle="Orders, invoices, health, and top SKUs." onLogout={logout}>
+    <AdminPage
+      active="account"
+      title="Account 360"
+      subtitle="Orders, invoices, health, and top SKUs."
+      loginSubtitle="One-page view of a customer account."
+    >
       <Suspense fallback={<p style={{ fontSize: 13, color: "#6b7280" }}>Loading…</p>}>
         <Account360Content />
       </Suspense>
-    </AdminShell>
+    </AdminPage>
   );
 }

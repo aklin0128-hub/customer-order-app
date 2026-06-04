@@ -34,6 +34,7 @@ export type AdminDashboardData = {
     activeClearance: number;
     activeCarts: number;
     staleCarts: number;
+    invoicePricingCustomers: number;
   };
   alerts: DashboardAlert[];
   invoiceQuality: Awaited<ReturnType<typeof getInvoiceQualityStats>>;
@@ -81,6 +82,7 @@ export async function getAdminDashboardKpis(): Promise<AdminDashboardKpis> {
   const activePromotions = promos.filter((p) => getPromotionStatus(p) === "active").length;
   const activeClearance = clearance.filter((c) => getClearanceStatus(c) === "active").length;
   const unassignedRegions = customers.filter((c) => !c.region).length;
+  const invoicePricingCustomers = customers.filter((c) => c.invoicePricing === true).length;
 
   const kpis = {
     ordersLast7Days,
@@ -93,6 +95,7 @@ export async function getAdminDashboardKpis(): Promise<AdminDashboardKpis> {
     activeClearance,
     activeCarts: cartStats.activeCarts,
     staleCarts: cartStats.staleCarts,
+    invoicePricingCustomers,
   };
 
   const alerts: DashboardAlert[] = [];
@@ -139,6 +142,15 @@ export async function getAdminDashboardKpis(): Promise<AdminDashboardKpis> {
       count: clearanceUrgent.length,
       href: "/admin/clearance",
       tone: "warn",
+    });
+  }
+  if (invoicePricingCustomers > 0) {
+    alerts.push({
+      id: "invoice_pricing",
+      label: "Invoice prices on order site",
+      count: invoicePricingCustomers,
+      href: "/admin/customers?invoicePricing=on",
+      tone: "default",
     });
   }
 

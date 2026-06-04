@@ -2,8 +2,8 @@
 
 import { upload } from "@vercel/blob/client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AdminLogin } from "../_components/AdminLogin";
-import { AdminShell } from "../_components/AdminShell";
+import { AdminPage } from "../_components/AdminPage";
+import { AdminProductsVirtualList } from "../_components/AdminProductsVirtualList";
 import { AdminSkuAutocomplete } from "../_components/AdminSkuAutocomplete";
 import { formGrid, inputStyle, labelStyle, splitForm, splitLayout, splitList } from "../_components/admin-styles";
 import {
@@ -12,7 +12,6 @@ import {
   BtnSecondary,
   EmptyState,
   FilterChips,
-  ListItemButton,
   Panel,
   StatGrid,
   Toast,
@@ -114,8 +113,7 @@ function formatImportedAtLabel(value?: string) {
 }
 
 export default function AdminProductsPage() {
-  const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
-  const [passwordInput, setPasswordInput] = useState("");
+  const { authed, adminHeaders } = useAdminAuth();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
@@ -567,30 +565,16 @@ export default function AdminProductsPage() {
     }
   };
 
-  if (!ready) return null;
-
-  if (!authed) {
-    return (
-      <AdminLogin
-        title="Products"
-        subtitle="Sign in to manage SKU settings and photos."
-        password={passwordInput}
-        onPasswordChange={setPasswordInput}
-        error={error}
-        loading={loading}
-        onSubmit={() => login(passwordInput)}
-      />
-    );
-  }
+  if (!authed) return null;
 
   const previewSrc = productImageSrc(sku.trim().toUpperCase(), imageUrl);
 
   return (
-    <AdminShell
+    <AdminPage
       active="products"
       title="Products"
       subtitle="Search a SKU, edit details · New flag syncs to /new/ and customer catalog."
-      onLogout={logout}
+      loginSubtitle="Sign in to manage SKU settings and photos."
       actions={
         <BtnSecondary onClick={() => { clearForm(); notify("Enter a SKU to add or edit."); }}>
           + Find / edit SKU
@@ -736,67 +720,17 @@ export default function AdminProductsPage() {
               </button>
             </div>
           </div>
-          <div className="admin-split-list">
-            {filteredProducts.map((p) => (
-              <div key={p.sku} style={{ position: "relative" }}>
-                <input
-                  type="checkbox"
-                  checked={selectedProductSkus.includes(p.sku?.toUpperCase())}
-                  onChange={() => toggleProductSelection(p.sku)}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ position: "absolute", top: 10, left: 10, zIndex: 2 }}
-                  aria-label={`Select ${p.sku}`}
-                />
-                <ListItemButton
-                  selected={sku.toUpperCase() === p.sku?.toUpperCase()}
-                  onClick={() => selectProduct(p)}
-                >
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  {productImageSrc(p.sku, p.imageUrl) ? (
-                    <img
-                      src={productImageSrc(p.sku, p.imageUrl)}
-                      alt=""
-                      loading="lazy"
-                      style={{ width: 34, height: 34, objectFit: "contain", borderRadius: 8, border: "1px solid #e5e7eb", flexShrink: 0 }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: 8,
-                        background: "#f3f4f6",
-                        fontSize: 8,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "#9ca3af",
-                        flexShrink: 0,
-                      }}
-                    >
-                      IMG
-                    </div>
-                  )}
-                  <div style={{ flex: 1, minWidth: 0, paddingLeft: 18 }}>
-                    <strong style={{ fontSize: 13 }}>{p.sku}</strong>
-                    <div title={p.name || ""} style={{ fontSize: 12, color: "#374151", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name || "—"}</div>
-                    <div style={{ fontSize: 11, color: "#9ca3af" }}>
-                      {p.brand || "—"} · {p.source || "Catalog"}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                    {isJustAddedItem(p) ? <JustAddedBadge /> : isNewProduct(p) ? <NewBadge /> : null}
-                    <StatusBadge status={p.status} />
-                  </div>
-                </div>
-                </ListItemButton>
-              </div>
-            ))}
-            {filteredProducts.length === 0 ? (
-              <EmptyState title="No SKUs found" detail="Try another search term or filter." />
-            ) : null}
-          </div>
+          {filteredProducts.length === 0 ? (
+            <EmptyState title="No SKUs found" detail="Try another search term or filter." />
+          ) : (
+            <AdminProductsVirtualList
+              items={filteredProducts}
+              selectedSku={sku}
+              selectedSkus={selectedProductSkus}
+              onToggleSelect={toggleProductSelection}
+              onSelectProduct={selectProduct}
+            />
+          )}
         </Panel>
 
         <div style={splitForm} className="admin-catalog-form-sticky">
@@ -1117,7 +1051,7 @@ export default function AdminProductsPage() {
           </Panel>
         </div>
       </div>
-    </AdminShell>
+    </AdminPage>
   );
 }
 

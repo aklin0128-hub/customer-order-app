@@ -1,4 +1,5 @@
 import { matchesQuery, paginateList, parseAdminListQuery } from "@/lib/adminListQuery";
+import { listOrderHistoryAccounts } from "@/lib/redisIndexes";
 import { NextResponse } from "next/server";
 import { redis } from "@/lib/redis";
 
@@ -30,12 +31,11 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const query = parseAdminListQuery(url, 40);
-    const keys = await redis.keys("orderHistory:*");
+    const accounts = await listOrderHistoryAccounts();
     const orders: OrderRecord[] = [];
 
-    for (const key of keys) {
-      const accountNo = key.replace(/^orderHistory:/, "").toUpperCase();
-      const history = (await redis.get<OrderRecord[]>(key)) || [];
+    for (const accountNo of accounts) {
+      const history = (await redis.get<OrderRecord[]>(`orderHistory:${accountNo}`)) || [];
 
       for (const entry of history) {
         const items = Array.isArray(entry?.items) ? entry.items : [];

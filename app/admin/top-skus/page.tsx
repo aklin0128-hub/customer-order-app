@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { AdminLogin } from "../_components/AdminLogin";
-import { AdminShell } from "../_components/AdminShell";
+import { AdminPage } from "../_components/AdminPage";
 import { FieldLabel, inputStyle } from "../_components/admin-sales-ui";
 import { panel, panelTitle, splitForm, splitLayout } from "../_components/admin-styles";
 import { BtnPrimary, BtnSecondary, Panel, StatGrid, Toast } from "../_components/admin-utils";
@@ -73,8 +72,7 @@ const tdStyle: CSSProperties = { padding: 8 };
 
 export default function AdminTopSkusPage() {
   const router = useRouter();
-  const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
-  const [passwordInput, setPasswordInput] = useState("");
+  const { authed, adminHeaders } = useAdminAuth();
 
   const [days, setDays] = useState("");
   const [limit, setLimit] = useState("100");
@@ -171,10 +169,6 @@ export default function AdminTopSkusPage() {
   );
 
   useEffect(() => {
-    if (ready && authed) setPasswordInput("");
-  }, [ready, authed]);
-
-  useEffect(() => {
     if (authed) void loadRanking();
   }, [authed, loadRanking]);
 
@@ -232,28 +226,13 @@ export default function AdminTopSkusPage() {
 
   const selectedRow = data?.rows.find((r) => r.sku === selectedSku);
 
-  if (!ready) return null;
-
-  if (!authed) {
-    return (
-      <AdminLogin
-        title="Top SKUs"
-        subtitle="Sign in to see best sellers and drill into who buys each SKU."
-        password={passwordInput}
-        onPasswordChange={setPasswordInput}
-        error={error}
-        loading={loading}
-        onSubmit={() => login(passwordInput)}
-      />
-    );
-  }
+  if (!authed) return null;
 
   return (
-    <AdminShell
+    <AdminPage
       active="topSkus"
       title="Top SKUs"
       subtitle="Start with the ranking, then click a row to see which accounts buy that SKU."
-      onLogout={logout}
     >
       {msg ? <Toast tone="error" message={msg} /> : null}
 
@@ -469,6 +448,6 @@ export default function AdminTopSkusPage() {
           </Panel>
         </div>
       </div>
-    </AdminShell>
+    </AdminPage>
   );
 }

@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { downloadCsv } from "../_components/admin-analytics-ui";
 
-import { AdminLogin } from "../_components/AdminLogin";
-import { AdminShell } from "../_components/AdminShell";
+import { AdminPage } from "../_components/AdminPage";
 import { inputStyle, panel, panelTitle } from "../_components/admin-styles";
 import { AdminListPager } from "../_components/AdminListPager";
 import { Toast } from "../_components/admin-utils";
@@ -56,8 +55,7 @@ function invoiceDownloadHref(row: Pick<ImportRecord, "id" | "blobUrl" | "blobPat
 }
 
 export default function AdminInvoicesPage() {
-  const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
-  const [passwordInput, setPasswordInput] = useState("");
+  const { authed, adminHeaders } = useAdminAuth();
 
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -111,8 +109,11 @@ export default function AdminInvoicesPage() {
 
   useEffect(() => {
     if (!authed) return;
-    const q = new URLSearchParams(window.location.search).get("q");
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q");
+    const acct = params.get("accountNo");
     if (q && q !== "unknown") setSearch(q);
+    if (acct) setAccountNo(acct.trim().toUpperCase());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
 
@@ -314,28 +315,13 @@ export default function AdminInvoicesPage() {
     });
   };
 
-  if (!ready) return null;
-
-  if (!authed) {
-    return (
-      <AdminLogin
-        title="Admin sign in"
-        subtitle="Upload invoices from the Customers / Orders admin."
-        password={passwordInput}
-        onPasswordChange={setPasswordInput}
-        error={error}
-        loading={loading}
-        onSubmit={() => login(passwordInput)}
-      />
-    );
-  }
+  if (!authed) return null;
 
   return (
-    <AdminShell
+    <AdminPage
       active="invoices"
       title="Invoice import"
       subtitle="PDF extracts text locally; scanned PNG/JPEG uses OCR (eng + kor + vie). Lines must match Vendor table: SKU … Qty Case Type Unit Each Total."
-      onLogout={logout}
     >
       {msg ? <Toast tone={msgTone} message={msg} /> : null}
 
@@ -707,6 +693,6 @@ export default function AdminInvoicesPage() {
           disabled={busy}
         />
       </section>
-    </AdminShell>
+    </AdminPage>
   );
 }

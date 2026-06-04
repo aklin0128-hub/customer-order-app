@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { formatClearancePriceDisplay } from "@/lib/clearanceFormat";
-import { AdminLogin } from "../_components/AdminLogin";
-import { AdminShell } from "../_components/AdminShell";
+import { AdminPage } from "../_components/AdminPage";
 import { AdminSkuAutocomplete } from "../_components/AdminSkuAutocomplete";
 import {
   FieldLabel,
@@ -72,8 +71,7 @@ function emptyForm() {
 }
 
 export default function AdminClearancePage() {
-  const { ready, authed, error, loading, login, logout, adminHeaders } = useAdminAuth();
-  const [passwordInput, setPasswordInput] = useState("");
+  const { authed, adminHeaders } = useAdminAuth();
 
   const [clearances, setClearances] = useState<ClearanceRecord[]>([]);
   const [products, setProducts] = useState<ClearanceProduct[]>([]);
@@ -245,28 +243,13 @@ export default function AdminClearancePage() {
   const activeCount = clearances.filter((p) => p.clearanceStatus === "active").length;
   const editingSku = form.sku.trim().toUpperCase();
 
-  if (!ready) return null;
-
-  if (!authed) {
-    return (
-      <AdminLogin
-        title="Clearance (Sell as is)"
-        subtitle="Sign in to manage near-expiry items on the customer order page."
-        password={passwordInput}
-        onPasswordChange={setPasswordInput}
-        error={error}
-        loading={loading}
-        onSubmit={() => login(passwordInput)}
-      />
-    );
-  }
+  if (!authed) return null;
 
   return (
-    <AdminShell
+    <AdminPage
       active="clearance"
       title="Clearance — Sell as is"
       subtitle="Click a row to edit · form on the right. Same fields as before."
-      onLogout={logout}
       actions={
         <BtnSecondary onClick={() => setForm(emptyForm())} disabled={busy}>
           + New clearance
@@ -492,6 +475,6 @@ export default function AdminClearancePage() {
           </Panel>
         </div>
       </div>
-    </AdminShell>
+    </AdminPage>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { inputStyle } from "./admin-styles";
 import { useAdminAuth } from "./useAdminAuth";
 
@@ -18,13 +18,25 @@ function resultKey(r: SearchResult) {
   return `i-${r.id}`;
 }
 
-export function AdminGlobalSearch() {
+export type AdminGlobalSearchHandle = {
+  focus: () => void;
+};
+
+export const AdminGlobalSearch = forwardRef<AdminGlobalSearchHandle>(function AdminGlobalSearch(_, ref) {
   const { authed, adminHeaders } = useAdminAuth();
   const [q, setQ] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      inputRef.current?.focus();
+      setOpen(true);
+    },
+  }));
 
   const search = useCallback(
     async (query: string) => {
@@ -72,41 +84,47 @@ export function AdminGlobalSearch() {
 
   return (
     <div ref={wrapRef} className="admin-global-search">
-      <input
-        type="search"
-        placeholder="Account, SKU, order, invoice…"
-        value={q}
-        onChange={(e) => {
-          setQ(e.target.value);
-          setOpen(true);
-        }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            setOpen(false);
-            return;
-          }
-          if (e.key === "Enter" && activeIdx >= 0 && results[activeIdx]) {
-            e.preventDefault();
-            window.location.href = results[activeIdx].href;
-            close();
-            return;
-          }
-          if (!showPanel || !results.length) return;
-          if (e.key === "ArrowDown") {
-            e.preventDefault();
-            setActiveIdx((i) => (i + 1) % results.length);
-          } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            setActiveIdx((i) => (i <= 0 ? results.length - 1 : i - 1));
-          }
-        }}
-        className="admin-global-search-input"
-        style={{ ...inputStyle, width: "100%", fontSize: 13 }}
-        aria-label="Admin search"
-        aria-expanded={showPanel}
-        autoComplete="off"
-      />
+      <div className="admin-global-search-field">
+        <input
+          ref={inputRef}
+          type="search"
+          placeholder="Account, SKU, order, invoice…"
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setOpen(false);
+              return;
+            }
+            if (e.key === "Enter" && activeIdx >= 0 && results[activeIdx]) {
+              e.preventDefault();
+              window.location.href = results[activeIdx].href;
+              close();
+              return;
+            }
+            if (!showPanel || !results.length) return;
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setActiveIdx((i) => (i + 1) % results.length);
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setActiveIdx((i) => (i <= 0 ? results.length - 1 : i - 1));
+            }
+          }}
+          className="admin-global-search-input"
+          style={{ ...inputStyle, width: "100%", fontSize: 13 }}
+          aria-label="Admin search"
+          aria-expanded={showPanel}
+          autoComplete="off"
+        />
+        <span className="admin-global-search-kbd" aria-hidden>
+          Ctrl+K
+        </span>
+      </div>
       {showPanel ? (
         results.length > 0 ? (
           <ul className="admin-search-results" role="listbox">
@@ -150,4 +168,4 @@ export function AdminGlobalSearch() {
       ) : null}
     </div>
   );
-}
+});
