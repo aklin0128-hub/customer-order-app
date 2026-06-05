@@ -34,7 +34,6 @@ import {
   getStatusBadgeStyle,
   formatOrderNotAvailableMessage,
   findCatalogItemByScanCode,
-  getCatalogItemBySku,
   isNewItem,
   isOrderableItem,
   scoreCatalogSearchQuery,
