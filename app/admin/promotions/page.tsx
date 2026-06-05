@@ -134,6 +134,7 @@ export default function AdminPromotionsPage() {
   >([]);
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
+  const [catalogLookup, setCatalogLookup] = useState<PromotionProduct | null>(null);
 
   const notify = (text: string, tone: "success" | "error" = "success") => {
     setMsg(text);
@@ -146,7 +147,43 @@ export default function AdminPromotionsPage() {
     return map;
   }, [products]);
 
-  const selectedProduct = productMap.get(form.sku.trim().toUpperCase()) ?? null;
+  const selectedProduct =
+    productMap.get(form.sku.trim().toUpperCase()) ?? catalogLookup;
+
+  useEffect(() => {
+    const clean = form.sku.trim().toUpperCase();
+    if (!clean) {
+      setCatalogLookup(null);
+      return;
+    }
+    if (productMap.has(clean)) {
+      setCatalogLookup(null);
+      return;
+    }
+
+    setCatalogLookup(null);
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/admin/promotions?lookupSku=${encodeURIComponent(clean)}`,
+          { cache: "no-store", headers: adminHeaders() }
+        );
+        const data = await res.json();
+        if (!cancelled) {
+          setCatalogLookup(res.ok && data.product ? (data.product as PromotionProduct) : null);
+        }
+      } catch {
+        if (!cancelled) setCatalogLookup(null);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [form.sku, productMap, adminHeaders]);
 
   const filteredPromotions = useMemo(() => {
     const q = search.trim().toUpperCase();

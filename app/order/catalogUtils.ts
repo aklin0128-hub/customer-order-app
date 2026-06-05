@@ -219,6 +219,84 @@ export function getCatalogItemBySku(sku: string) {
   return catalog.find((item) => item.sku?.toUpperCase() === sku.toUpperCase());
 }
 
+/** Digits only — for barcode / UPC scanner input. */
+export function normalizeScanDigits(value: unknown) {
+  return String(value ?? "").replace(/\D/g, "");
+}
+
+/** Pad to 12 digits for UPC-A style comparison (keeps GTIN-14 as last 12 when longer). */
+export function normalizeUpcScanCode(value: unknown) {
+  let digits = normalizeScanDigits(value);
+  if (!digits) return "";
+  if (digits.length > 12) digits = digits.slice(-12);
+  if (digits.length < 12) digits = digits.padStart(12, "0");
+  return digits;
+}
+
+function catalogScanCodes(item: Pick<CatalogItem, "upc" | "barcode">) {
+  const raw = [item.upc, item.barcode].map((v) => normalizeScanDigits(v)).filter(Boolean);
+  const normalized = raw.map((d) => normalizeUpcScanCode(d)).filter(Boolean);
+  return [...new Set([...raw, ...normalized])];
+}
+
+export function catalogItemMatchesScanCode(
+  item: Pick<CatalogItem, "upc" | "barcode">,
+  query: string
+) {
+  const qRaw = normalizeScanDigits(query);
+  if (!qRaw) return false;
+  const qNorm = normalizeUpcScanCode(qRaw);
+  return catalogScanCodes(item).some((code) => code === qRaw || code === qNorm);
+}
+
+export function catalogItemScanCodeStartsWith(
+  item: Pick<CatalogItem, "upc" | "barcode">,
+  query: string
+) {
+  const qRaw = normalizeScanDigits(query);
+  if (!qRaw) return false;
+  const qNorm = normalizeUpcScanCode(qRaw);
+  return catalogScanCodes(item).some(
+    (code) =>
+      code.startsWith(qRaw) ||
+      qRaw.startsWith(code) ||
+      code.startsWith(qNorm) ||
+      qNorm.startsWith(code)
+  );
+}
+
+export function findCatalogItemByScanCode(query: string) {
+  const q = query.trim();
+  if (!q) return null;
+  return catalog.find((item) => catalogItemMatchesScanCode(item, q)) || null;
+}
+
+export function scoreCatalogSearchQuery(item: CatalogItem, query: string) {
+  const q = query.trim().toUpperCase();
+  if (!q) return -1;
+
+  const sku = item.sku?.toUpperCase() || "";
+  const name = item.name?.toUpperCase() || "";
+  const brand = item.brand?.toUpperCase() || "";
+  const barcode = item.barcode?.toUpperCase() || "";
+  const upc = item.upc?.toUpperCase() || "";
+
+  if (sku === q) return 1000;
+  if (sku.startsWith(q)) return 900;
+  if (catalogItemMatchesScanCode(item, q) || barcode === q || upc === q) return 850;
+  if (catalogItemScanCodeStartsWith(item, q) || barcode.startsWith(q) || upc.startsWith(q)) return 800;
+  if (sku.includes(q)) return 700;
+  if (q.length >= 3 && brand.startsWith(q)) return 500;
+  if (q.length >= 3 && name.startsWith(q)) return 450;
+  if (
+    q.length >= 3 &&
+    (name.includes(q) || brand.includes(q) || barcode.includes(q) || upc.includes(q))
+  ) {
+    return 200;
+  }
+  return -1;
+}
+
 export function generateOrderRef(accountNo: string) {
   const now = new Date();
   const mm = String(now.getMonth() + 1).padStart(2, "0");

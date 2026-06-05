@@ -33,8 +33,11 @@ import {
   getDisplayStatus,
   getStatusBadgeStyle,
   formatOrderNotAvailableMessage,
+  findCatalogItemByScanCode,
+  getCatalogItemBySku,
   isNewItem,
   isOrderableItem,
+  scoreCatalogSearchQuery,
 } from "./catalogUtils";
 import { DEFAULT_ORDER_EMAIL, isValidOrderEmail, resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
 import {
@@ -526,26 +529,8 @@ export default function OrderPage() {
     if (!normalizedSkuInput) return [];
     const q = normalizedSkuInput;
 
-    const scoreItem = (item: CatalogItem) => {
-      const sku = item.sku?.toUpperCase() || "";
-      const name = item.name?.toUpperCase() || "";
-      const brand = item.brand?.toUpperCase() || "";
-      const barcode = item.barcode?.toUpperCase() || "";
-      const upc = item.upc?.toUpperCase() || "";
-
-      if (sku === q) return 1000;
-      if (sku.startsWith(q)) return 900;
-      if (barcode === q || upc === q) return 850;
-      if (barcode.startsWith(q) || upc.startsWith(q)) return 800;
-      if (sku.includes(q)) return 700;
-      if (q.length >= 3 && brand.startsWith(q)) return 500;
-      if (q.length >= 3 && name.startsWith(q)) return 450;
-      if (q.length >= 3 && (name.includes(q) || brand.includes(q) || barcode.includes(q) || upc.includes(q))) return 200;
-      return -1;
-    };
-
     return catalog
-      .map((item) => ({ item, score: scoreItem(item) }))
+      .map((item) => ({ item, score: scoreCatalogSearchQuery(item, q) }))
       .filter((x) => x.score >= 0)
       .filter((x) => (showAvailableOnly ? isOrderableItem(x.item) : true))
       .sort((a, b) => {
@@ -660,13 +645,7 @@ export default function OrderPage() {
       })
       .filter((item) => {
         if (!q) return true;
-        return (
-          item.sku?.toUpperCase().includes(q) ||
-          item.name?.toUpperCase().includes(q) ||
-          item.brand?.toUpperCase().includes(q) ||
-          item.barcode?.toUpperCase().includes(q) ||
-          item.upc?.toUpperCase().includes(q)
-        );
+        return scoreCatalogSearchQuery(item, q) >= 0;
       })
       .sort((a, b) => {
         const aNormal = isOrderableItem(a);
@@ -952,7 +931,9 @@ export default function OrderPage() {
       return;
     }
 
-    const exactMatch = catalog.find((item) => item.sku?.toUpperCase() === normalizedSkuInput) || null;
+    const exactMatch =
+      catalog.find((item) => item.sku?.toUpperCase() === normalizedSkuInput) ||
+      findCatalogItemByScanCode(normalizedSkuInput);
     if (exactMatch && (!showAvailableOnly || isOrderableItem(exactMatch))) {
       setSelectedItem(exactMatch);
       return;
@@ -992,7 +973,9 @@ export default function OrderPage() {
 
   const addItem = () => {
     const typedSku = skuInput.trim().toUpperCase();
-    const exactMatch = catalog.find((item) => item.sku?.toUpperCase() === typedSku) || null;
+    const exactMatch =
+      catalog.find((item) => item.sku?.toUpperCase() === typedSku) ||
+      findCatalogItemByScanCode(skuInput.trim());
     const finalItem = exactMatch || selectedItem || matchedItems[0] || null;
     const finalSku = finalItem?.sku || typedSku;
     const qty = qtyInput.trim().toUpperCase() || "1";

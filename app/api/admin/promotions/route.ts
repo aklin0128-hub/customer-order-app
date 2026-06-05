@@ -3,6 +3,7 @@ import {
   getPromotionProducts,
   getPromotionRecords,
   getPromotionStatus,
+  lookupPromotionCatalogProduct,
   savePromotionRecords,
   validatePromotionInput,
   type PromotionRecord,
@@ -23,6 +24,16 @@ export async function GET(req: Request) {
   }
 
   try {
+    const url = new URL(req.url);
+    const lookupSku = String(url.searchParams.get("lookupSku") || "")
+      .trim()
+      .toUpperCase();
+
+    if (lookupSku) {
+      const product = await lookupPromotionCatalogProduct(lookupSku);
+      return NextResponse.json({ success: true, product });
+    }
+
     const promotions = await getPromotionRecords();
     const products = await getPromotionProducts({ records: promotions });
 

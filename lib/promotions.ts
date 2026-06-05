@@ -234,6 +234,16 @@ async function buildCatalogMap(skus?: string[]) {
   return map;
 }
 
+/** Resolve one SKU from catalog JSON + Redis overrides (for admin forms). */
+export async function lookupPromotionCatalogProduct(
+  sku: string
+): Promise<PromotionProduct | null> {
+  const clean = String(sku || "").trim().toUpperCase();
+  if (!clean) return null;
+  const map = await buildCatalogMap([clean]);
+  return map.get(clean) ?? null;
+}
+
 function recordToProduct(record: PromotionRecord, product: PromotionProduct): PromotionProduct {
   const remainingQty = getPromotionRemainingQty(record);
   const clean = sanitizePromotionDealFields(record);
