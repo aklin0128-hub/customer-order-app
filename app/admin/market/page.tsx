@@ -190,8 +190,6 @@ export default function AdminMarketPage() {
 
   const periodHint = PERIOD_OPTIONS.find((p) => p.id === period)?.hint || "";
 
-  if (!authed) return null;
-
   return (
     <AdminPage
       active="market"

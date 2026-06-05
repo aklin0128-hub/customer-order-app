@@ -243,8 +243,6 @@ export default function AdminClearancePage() {
   const activeCount = clearances.filter((p) => p.clearanceStatus === "active").length;
   const editingSku = form.sku.trim().toUpperCase();
 
-  if (!authed) return null;
-
   return (
     <AdminPage
       active="clearance"

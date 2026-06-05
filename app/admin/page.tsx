@@ -133,8 +133,6 @@ export default function AdminDashboardPage() {
     if (authed) void load();
   }, [authed, load]);
 
-  if (!authed) return null;
-
   return (
     <AdminPage
       active="home"

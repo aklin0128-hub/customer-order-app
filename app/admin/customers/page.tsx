@@ -301,8 +301,6 @@ export default function AdminCustomersPage() {
     }
   };
 
-  if (!authed) return null;
-
   return (
     <AdminPage
       active="customers"

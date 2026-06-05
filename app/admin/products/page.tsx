@@ -565,8 +565,6 @@ export default function AdminProductsPage() {
     }
   };
 
-  if (!authed) return null;
-
   const previewSrc = productImageSrc(sku.trim().toUpperCase(), imageUrl);
 
   return (

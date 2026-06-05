@@ -315,8 +315,6 @@ export default function AdminInvoicesPage() {
     });
   };
 
-  if (!authed) return null;
-
   return (
     <AdminPage
       active="invoices"

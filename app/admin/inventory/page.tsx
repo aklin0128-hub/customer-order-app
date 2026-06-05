@@ -205,8 +205,6 @@ export default function AdminInventoryPage() {
     }
   };
 
-  if (!authed) return null;
-
   return (
     <AdminPage
       active="inventory"

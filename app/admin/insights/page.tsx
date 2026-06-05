@@ -331,8 +331,6 @@ function AdminInsightsPageInner() {
     );
   };
 
-  if (!authed) return null;
-
   return (
     <AdminPage
       active="insights"

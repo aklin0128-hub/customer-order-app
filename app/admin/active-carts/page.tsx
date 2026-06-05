@@ -75,8 +75,6 @@ function AdminActiveCartsContent() {
     });
   }, [carts, search, staleFilter]);
 
-  if (!authed) return null;
-
   return (
     <AdminPage
       active="activeCarts"

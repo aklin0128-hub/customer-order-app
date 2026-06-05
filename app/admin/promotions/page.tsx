@@ -298,8 +298,6 @@ export default function AdminPromotionsPage() {
   const activeCount = promotions.filter((p) => p.promoStatus === "active").length;
   const editingSku = form.sku.trim().toUpperCase();
 
-  if (!authed) return null;
-
   return (
     <AdminPage
       active="promotions"

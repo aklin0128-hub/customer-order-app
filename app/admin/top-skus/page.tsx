@@ -226,8 +226,6 @@ export default function AdminTopSkusPage() {
 
   const selectedRow = data?.rows.find((r) => r.sku === selectedSku);
 
-  if (!authed) return null;
-
   return (
     <AdminPage
       active="topSkus"

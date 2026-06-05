@@ -57,8 +57,8 @@ function Account360Content() {
         setData(json);
         setAccountInput(accountNo);
         window.history.replaceState(null, "", `/admin/account?accountNo=${encodeURIComponent(accountNo)}`);
-      } catch (err: any) {
-        setMsg(err?.message || "Failed to load account.");
+      } catch (err: unknown) {
+        setMsg(err instanceof Error ? err.message : "Failed to load account.");
         setData(null);
       } finally {
         setBusy(false);
@@ -85,12 +85,12 @@ function Account360Content() {
             <AdminAccountAutocomplete
               value={accountInput}
               onChange={setAccountInput}
-              placeholder="Account # or store…"
+              placeholder="Account # or store name"
               onEnter={() => void load()}
             />
           </div>
           <BtnPrimary onClick={() => void load()} disabled={busy}>
-            {busy ? "Loading…" : "Load"}
+            {busy ? "Loading..." : "Load"}
           </BtnPrimary>
           <Link href="/admin/customers">
             <BtnSecondary>Customers</BtnSecondary>
@@ -116,10 +116,10 @@ function Account360Content() {
           </div>
           <StatGrid
             items={[
-              { label: "Store", value: data.customer?.storeName || "—" },
-              { label: "Region", value: data.customer?.regionLabel || "—" },
-              { label: "Health", value: data.health?.statusLabel || "—" },
-              { label: "90d cases", value: data.health?.qty90 ?? "—" },
+              { label: "Store", value: data.customer?.storeName || "-" },
+              { label: "Region", value: data.customer?.regionLabel || "-" },
+              { label: "Health", value: data.health?.statusLabel || "-" },
+              { label: "90d cases", value: data.health?.qty90 ?? "-" },
             ]}
           />
 
@@ -127,7 +127,7 @@ function Account360Content() {
             <section style={panel}>
               <h2 style={panelTitle}>Health</h2>
               <p style={{ margin: 0, fontSize: 13, lineHeight: 1.55 }}>
-                Last invoice: {data.health.lastInvoiceDate || "—"} · YoY cases:{" "}
+                Last invoice: {data.health.lastInvoiceDate || "-"} | YoY cases:{" "}
                 <GrowthCell
                   pct={data.health.yoyQtyGrowthPct}
                   current={data.health.qty90}
@@ -135,7 +135,7 @@ function Account360Content() {
                 />
               </p>
               <Link href="/admin/insights" style={{ fontSize: 13, fontWeight: 800 }}>
-                Full insights →
+                Full insights
               </Link>
             </section>
           ) : null}
@@ -144,8 +144,8 @@ function Account360Content() {
             <section style={panel}>
               <h2 style={panelTitle}>Open cart</h2>
               <p style={{ margin: 0, fontSize: 13 }}>
-                {data.draft.lineCount} lines · {data.draft.totalCases} cases · updated{" "}
-                {data.draft.updatedAt ? new Date(data.draft.updatedAt).toLocaleString() : "—"}
+                {data.draft.lineCount} lines | {data.draft.totalCases} cases | updated{" "}
+                {data.draft.updatedAt ? new Date(data.draft.updatedAt).toLocaleString() : "-"}
               </p>
               <Link href="/admin/active-carts">
                 <BtnSecondary>View active carts</BtnSecondary>
@@ -159,7 +159,7 @@ function Account360Content() {
                 {data.topSkus.map((s) => (
                   <li key={s.sku}>
                     <strong>{s.sku}</strong>
-                    {s.brand || s.name ? ` · ${s.brand || ""} ${s.name || ""}` : ""} — {s.qty} cs
+                    {s.brand || s.name ? ` | ${s.brand || ""} ${s.name || ""}` : ""} - {s.qty} cs
                   </li>
                 ))}
               </ul>
@@ -174,7 +174,7 @@ function Account360Content() {
                 <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, lineHeight: 1.5 }}>
                   {data.recentOrders.map((o, i) => (
                     <li key={i}>
-                      {o.orderRef} · {o.totalCases} cs · {o.createdAt?.slice(0, 10) || "—"}
+                      {o.orderRef} | {o.totalCases} cs | {o.createdAt?.slice(0, 10) || "-"}
                     </li>
                   ))}
                 </ul>
@@ -182,7 +182,7 @@ function Account360Content() {
                 <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>No orders.</p>
               )}
               <Link href={`/admin/orders?q=${encodeURIComponent(data.accountNo)}`} style={{ fontSize: 13, fontWeight: 800 }}>
-                All orders →
+                All orders
               </Link>
             </Panel>
             <Panel title="Recent invoices">
@@ -190,7 +190,7 @@ function Account360Content() {
                 <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, lineHeight: 1.5 }}>
                   {data.recentInvoices.map((inv) => (
                     <li key={inv.id}>
-                      {inv.invoiceDate || inv.uploadedAt?.slice(0, 10)} · {inv.lineCount} lines
+                      {inv.invoiceDate || inv.uploadedAt?.slice(0, 10)} | {inv.lineCount} lines
                     </li>
                   ))}
                 </ul>
@@ -198,7 +198,7 @@ function Account360Content() {
                 <p style={{ margin: 0, fontSize: 13, color: "#6b7280" }}>No imports.</p>
               )}
               <Link href={`/admin/invoices?accountNo=${encodeURIComponent(data.accountNo)}`} style={{ fontSize: 13, fontWeight: 800 }}>
-                All invoices →
+                All invoices
               </Link>
             </Panel>
           </div>
@@ -209,10 +209,6 @@ function Account360Content() {
 }
 
 export default function AdminAccountPage() {
-  const { authed } = useAdminAuth();
-
-  if (!authed) return null;
-
   return (
     <AdminPage
       active="account"
@@ -220,7 +216,7 @@ export default function AdminAccountPage() {
       subtitle="Orders, invoices, health, and top SKUs."
       loginSubtitle="One-page view of a customer account."
     >
-      <Suspense fallback={<p style={{ fontSize: 13, color: "#6b7280" }}>Loading…</p>}>
+      <Suspense fallback={<p style={{ fontSize: 13, color: "#6b7280" }}>Loading...</p>}>
         <Account360Content />
       </Suspense>
     </AdminPage>

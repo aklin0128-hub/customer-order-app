@@ -151,8 +151,6 @@ export default function AdminPriceComparePage() {
     if (acct) setPriceAccountNo(acct.trim().toUpperCase());
   }, [authed]);
 
-  if (!authed) return null;
-
   return (
     <AdminPage
       active="priceCompare"

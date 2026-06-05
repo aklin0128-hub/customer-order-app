@@ -1735,8 +1735,6 @@ export default function OrderPage() {
                 promoBadgeLabel={t.newItems}
                 editLabel={t.editProduct}
                 showAdminEdit={showAdminEditLinks}
-                showAddedDate
-                addedDateLabel={t.addedDate}
                 lang={lang}
                 canOrderItem={isOrderableItem}
                 orderBlockedMessage={(item) => formatOrderNotAvailableMessage(item.sku || "", item.status, t)}

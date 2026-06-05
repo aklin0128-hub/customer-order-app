@@ -95,8 +95,6 @@ export default function AdminPriceHistoryPage() {
     }
   };
 
-  if (!authed) return null;
-
   return (
     <AdminPage
       active="priceHistory"
