@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { loadRedisProducts, productRedisKey, saveRedisProduct } from "@/lib/productRedisStore";
 import { parseCategoriesFromBody, expandCategoryTags } from "@/lib/productCategories";
-import { parseNewItemStorageLabel } from "@/lib/newItemStorageLabel";
+import {
+  mainCategoryToNewItemStorageLabel,
+  parseNewItemStorageLabel,
+  resolveNewItemStorageLabel,
+} from "@/lib/newItemStorageLabel";
+import { mapLegacyCategoryToMain } from "@/lib/catalogMainCategories";
 import { bustServerDataCache, SERVER_CACHE } from "@/lib/serverDataCache";
 import { redis } from "@/lib/redis";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
@@ -110,7 +115,14 @@ export async function POST(req: Request) {
     const justAdded = Boolean(body?.justAdded);
     const newItemDescription = String(body?.newItemDescription || "").trim();
     const newItemDescriptionPdfUrl = String(body?.newItemDescriptionPdfUrl || "").trim();
-    const newItemStorageLabel = parseNewItemStorageLabel(body?.newItemStorageLabel);
+    const newItemStorageLabel =
+      resolveNewItemStorageLabel({
+        category: categories[0],
+        categories,
+        newItemStorageLabel: body?.newItemStorageLabel,
+      }) ??
+      mainCategoryToNewItemStorageLabel(mapLegacyCategoryToMain(existing.category || "")) ??
+      parseNewItemStorageLabel(existing.newItemStorageLabel);
 
     if (!sku) {
       return NextResponse.json({ error: "Missing SKU." }, { status: 400 });

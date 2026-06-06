@@ -19,7 +19,7 @@ import {
 import { AdminPublicShowcaseHint } from "../_components/AdminPublicShowcaseHint";
 import { useAdminAuth } from "../_components/useAdminAuth";
 import { isJustAddedItem, parseImportedAtMs } from "@/lib/catalogNewItems";
-import { NEW_ITEM_STORAGE_LABELS, type NewItemStorageLabel } from "@/lib/newItemStorageLabel";
+import { resolveNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import {
   expandCategoryTags,
   readProductCategories,
@@ -44,7 +44,7 @@ type Product = {
   importedAt?: string;
   newItemDescription?: string;
   newItemDescriptionPdfUrl?: string;
-  newItemStorageLabel?: NewItemStorageLabel;
+  newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
   source?: string;
 };
 
@@ -140,7 +140,11 @@ export default function AdminProductsPage() {
   const [justAdded, setJustAdded] = useState(false);
   const [newItemDescription, setNewItemDescription] = useState("");
   const [newItemDescriptionPdfUrl, setNewItemDescriptionPdfUrl] = useState("");
-  const [newItemStorageLabel, setNewItemStorageLabel] = useState<"" | NewItemStorageLabel>("");
+
+  const showcaseStorageLabel = useMemo(
+    () => resolveNewItemStorageLabel({ categories, category: categories[0] }),
+    [categories]
+  );
 
   const [busy, setBusy] = useState(false);
   const [productsLoaded, setProductsLoaded] = useState(false);
@@ -271,7 +275,6 @@ export default function AdminProductsPage() {
     setJustAdded(Boolean(p.justAdded));
     setNewItemDescription(p.newItemDescription || "");
     setNewItemDescriptionPdfUrl(p.newItemDescriptionPdfUrl || "");
-    setNewItemStorageLabel(p.newItemStorageLabel || "");
     setFormDirty(false);
     setAutoSaveStatus("");
     notify(`Editing ${p.sku}`);
@@ -408,7 +411,6 @@ export default function AdminProductsPage() {
           justAdded,
           newItemDescription,
           newItemDescriptionPdfUrl,
-          newItemStorageLabel: newItemStorageLabel || undefined,
         }),
       });
       const data = await readApiJson(res);
@@ -453,7 +455,7 @@ export default function AdminProductsPage() {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, newItemDescription, newItemDescriptionPdfUrl, newItemStorageLabel]);
+  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, newItemDescription, newItemDescriptionPdfUrl]);
 
   const uploadNewItemPdf = async (file: File | null) => {
     const finalSku = sku.trim().toUpperCase();
@@ -962,26 +964,27 @@ export default function AdminProductsPage() {
                 </div>
                 <div style={{ fontSize: 13, color: isNew ? "#1d4ed8" : "#64748b", marginBottom: 14, lineHeight: 1.55 }}>
                   {isNew
-                    ? "顾客在 /new/ 新品页可点「查看说明」弹出介绍。可填文字、上传 PDF，并选 DRY / FROZEN / FRESH 标签。"
+                    ? "顾客在 /new/ 新品页可点「查看说明」弹出介绍。可填文字、上传 PDF。DRY / FROZEN / FRESH 标签来自上方 Category。"
                     : "请先在上方勾选「Show in customer New items」，再填写下方内容。"}
                 </div>
                 <fieldset disabled={!isNew} style={{ border: "none", margin: 0, padding: 0, opacity: isNew ? 1 : 0.5 }}>
-                  <label style={labelStyle}>仓储标签 (DRY / FROZEN / FRESH)</label>
-                  <select
-                    value={newItemStorageLabel}
-                    onChange={(e) => {
-                      setNewItemStorageLabel(e.target.value as "" | NewItemStorageLabel);
-                      markDirty();
+                  <label style={labelStyle}>仓储标签 (from Category)</label>
+                  <div
+                    style={{
+                      ...inputStyle,
+                      display: "flex",
+                      alignItems: "center",
+                      minHeight: 40,
+                      fontWeight: 800,
+                      color: showcaseStorageLabel ? "#111827" : "#9ca3af",
+                      background: "#f9fafb",
                     }}
-                    style={inputStyle}
                   >
-                    <option value="">无</option>
-                    {NEW_ITEM_STORAGE_LABELS.map((label) => (
-                      <option key={label} value={label}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
+                    {showcaseStorageLabel ||
+                      (categories.length > 0
+                        ? "—"
+                        : "Select Category above (DRY / FROZEN / FRESH / HOUSEWARE → DRY)")}
+                  </div>
                   <label style={{ ...labelStyle, marginTop: 12 }}>文字介绍</label>
                   <textarea
                     value={newItemDescription}

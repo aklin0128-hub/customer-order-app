@@ -1,6 +1,6 @@
 import { isNewItem } from "@/app/order/catalogUtils";
 import { compareCatalogByNewestImport } from "@/lib/catalogNewItems";
-import { parseNewItemStorageLabel } from "@/lib/newItemStorageLabel";
+import { resolveNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import { getMergedCatalogProducts } from "@/lib/catalogMerge";
 import { getPromotionProducts, type PromotionProduct } from "@/lib/promotions";
 import { cachedServerData, SERVER_CACHE } from "@/lib/serverDataCache";
@@ -79,7 +79,7 @@ function catalogToCard(item: Record<string, unknown>): LoginPreviewCard {
     justAdded: Boolean(item.justAdded),
     newItemDescription: String(item.newItemDescription || "").trim() || undefined,
     newItemDescriptionPdfUrl: String(item.newItemDescriptionPdfUrl || "").trim() || undefined,
-    newItemStorageLabel: parseNewItemStorageLabel(item.newItemStorageLabel),
+    newItemStorageLabel: resolveNewItemStorageLabel(item),
   };
 }
 
