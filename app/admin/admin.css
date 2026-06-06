@@ -562,6 +562,9 @@
 .admin-list-item {
   outline: none;
   box-shadow: none;
+  border: 1px solid #e5e7eb;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .admin-list-item:focus,
@@ -1153,6 +1156,76 @@
   border-radius: 12px;
   background: #fff;
   padding: 6px;
+}
+
+.admin-products-virtual-row {
+  padding-bottom: 8px;
+  box-sizing: border-box;
+}
+
+.admin-products-virtual-row-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.admin-products-virtual-row-inner input[type="checkbox"] {
+  flex-shrink: 0;
+  margin-top: 14px;
+}
+
+.admin-products-virtual-row-inner .admin-list-item {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.admin-products-virtual-row-content {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-products-virtual-row-img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.admin-products-virtual-row-img--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  font-size: 8px;
+  color: #9ca3af;
+}
+
+.admin-products-virtual-row-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-products-virtual-row-name {
+  font-size: 12px;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-products-virtual-row-badges {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
 }
 
 .admin-badge-pricing {

@@ -5,7 +5,8 @@ import { useRef } from "react";
 import { ListItemButton } from "./admin-utils";
 import { isJustAddedItem } from "@/lib/catalogNewItems";
 
-const ROW_HEIGHT = 72;
+const ROW_GAP = 8;
+const ROW_ESTIMATE = 92;
 
 export type AdminProductListItem = {
   sku: string;
@@ -84,7 +85,7 @@ export function AdminProductsVirtualList({
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: () => ROW_ESTIMATE + ROW_GAP,
     overscan: 8,
   });
 
@@ -104,91 +105,53 @@ export function AdminProductsVirtualList({
           return (
             <div
               key={p.sku}
+              data-index={vr.index}
+              ref={virtualizer.measureElement}
+              className="admin-products-virtual-row"
               style={{
                 position: "absolute",
                 top: 0,
                 left: 0,
                 width: "100%",
-                height: ROW_HEIGHT,
                 transform: `translateY(${vr.start}px)`,
-                paddingBottom: 6,
-                boxSizing: "border-box",
               }}
             >
-              <div style={{ position: "relative", height: ROW_HEIGHT - 6 }}>
+              <div className="admin-products-virtual-row-inner">
                 <input
                   type="checkbox"
                   checked={selectedSkus.includes(skuUpper)}
                   onChange={() => onToggleSelect(p.sku)}
                   onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
-                  style={{ position: "absolute", top: 10, left: 10, zIndex: 2 }}
                   aria-label={`Select ${p.sku}`}
                 />
                 <ListItemButton
                   selected={selectedSku.toUpperCase() === skuUpper}
                   onClick={() => onSelectProduct(p)}
                 >
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", height: "100%" }}>
+                  <div className="admin-products-virtual-row-content">
                     {productImageSrc(p.sku, p.imageUrl) ? (
                       <img
                         src={productImageSrc(p.sku, p.imageUrl)}
                         alt=""
                         loading="lazy"
-                        style={{
-                          width: 34,
-                          height: 34,
-                          objectFit: "contain",
-                          borderRadius: 8,
-                          border: "1px solid #e5e7eb",
-                          flexShrink: 0,
-                        }}
+                        className="admin-products-virtual-row-img"
                       />
                     ) : (
-                      <div
-                        style={{
-                          width: 34,
-                          height: 34,
-                          borderRadius: 8,
-                          background: "#f3f4f6",
-                          fontSize: 8,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "#9ca3af",
-                          flexShrink: 0,
-                        }}
-                      >
+                      <div className="admin-products-virtual-row-img admin-products-virtual-row-img--placeholder">
                         IMG
                       </div>
                     )}
-                    <div style={{ flex: 1, minWidth: 0, paddingLeft: 18 }}>
+                    <div className="admin-products-virtual-row-meta">
                       <strong style={{ fontSize: 13 }}>{p.sku}</strong>
-                      <div
-                        title={p.name || ""}
-                        style={{
-                          fontSize: 12,
-                          color: "#374151",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
+                      <div title={p.name || ""} className="admin-products-virtual-row-name">
                         {p.name || "—"}
                       </div>
                       <div style={{ fontSize: 11, color: "#9ca3af" }}>
                         {p.brand || "—"} · {p.source || "Catalog"}
                       </div>
                     </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: 6,
-                        alignItems: "center",
-                        flexWrap: "wrap",
-                        justifyContent: "flex-end",
-                      }}
-                    >
+                    <div className="admin-products-virtual-row-badges">
                       {isJustAddedItem(p) ? (
                         <JustAddedBadge />
                       ) : isNewProduct(p) ? (
