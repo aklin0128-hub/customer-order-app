@@ -115,14 +115,6 @@ export async function POST(req: Request) {
     const justAdded = Boolean(body?.justAdded);
     const newItemDescription = String(body?.newItemDescription || "").trim();
     const newItemDescriptionPdfUrl = String(body?.newItemDescriptionPdfUrl || "").trim();
-    const newItemStorageLabel =
-      resolveNewItemStorageLabel({
-        category: categories[0],
-        categories,
-        newItemStorageLabel: body?.newItemStorageLabel,
-      }) ??
-      mainCategoryToNewItemStorageLabel(mapLegacyCategoryToMain(existing.category || "")) ??
-      parseNewItemStorageLabel(existing.newItemStorageLabel);
 
     if (!sku) {
       return NextResponse.json({ error: "Missing SKU." }, { status: 400 });
@@ -131,6 +123,15 @@ export async function POST(req: Request) {
     const existing: Product =
       (await redis.get<Product>(productRedisKey(sku))) ||
       ((catalogData as Product[]).find((item) => String(item.sku || "").toUpperCase() === sku) ?? { sku });
+
+    const newItemStorageLabel =
+      resolveNewItemStorageLabel({
+        category: categories[0],
+        categories,
+        newItemStorageLabel: body?.newItemStorageLabel,
+      }) ??
+      mainCategoryToNewItemStorageLabel(mapLegacyCategoryToMain(existing.category || "")) ??
+      parseNewItemStorageLabel(existing.newItemStorageLabel);
 
     const now = new Date().toISOString();
     const newSince = isNew ? existing.newSince || now : existing.newSince;
