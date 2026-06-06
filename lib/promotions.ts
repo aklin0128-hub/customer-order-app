@@ -29,6 +29,8 @@ export type PromotionRecord = {
   priceTiers?: PromoPriceTier[];
   /** Admin manually ended — hides from store even before end date. */
   ended?: boolean;
+  /** Admin pin — show first in weekly picks / promotion tab */
+  pinned?: boolean;
   updatedAt?: string;
 };
 
@@ -53,6 +55,7 @@ export type PromotionProduct = {
   buyQty?: number;
   getQtyFree?: number;
   priceTiers?: PromoPriceTier[];
+  pinned?: boolean;
 };
 
 function parseDateOnly(value?: string) {
@@ -117,6 +120,12 @@ export function normalizePromotionRecord(entry: unknown): PromotionRecord | null
       .trim()
       .toLowerCase() === "true";
 
+  const pinned =
+    raw.pinned === true ||
+    String(raw.pinned || "")
+      .trim()
+      .toLowerCase() === "true";
+
   const record: PromotionRecord = {
     sku,
     note: String(raw.note || "").trim() || undefined,
@@ -129,6 +138,7 @@ export function normalizePromotionRecord(entry: unknown): PromotionRecord | null
     getQtyFree,
     priceTiers,
     ended: ended || undefined,
+    pinned: pinned || undefined,
     updatedAt: String(raw.updatedAt || "").trim() || undefined,
   };
 
@@ -187,6 +197,23 @@ export function isPromotionVisibleToCustomers(record: PromotionRecord, now = new
   return status === "active";
 }
 
+export function isPinnedPromotion(record?: Pick<PromotionRecord, "pinned"> | null) {
+  return Boolean(record?.pinned);
+}
+
+/** Pinned promos first; preserve saved order within each group. */
+export function sortPromotionRecords<T extends PromotionRecord>(records: T[]): T[] {
+  return records
+    .map((record, index) => ({ record, index }))
+    .sort((a, b) => {
+      const aPin = isPinnedPromotion(a.record) ? 1 : 0;
+      const bPin = isPinnedPromotion(b.record) ? 1 : 0;
+      if (bPin !== aPin) return bPin - aPin;
+      return a.index - b.index;
+    })
+    .map(({ record }) => record);
+}
+
 export async function getPromotionRecords(): Promise<PromotionRecord[]> {
   const raw = await redis.get<unknown[]>(PROMOTIONS_KEY);
   if (!Array.isArray(raw)) return [];
@@ -201,7 +228,7 @@ export async function getPromotionRecords(): Promise<PromotionRecord[]> {
     list.push(record);
   }
 
-  return list;
+  return sortPromotionRecords(list);
 }
 
 export async function savePromotionRecords(records: PromotionRecord[]) {
@@ -261,6 +288,7 @@ function recordToProduct(record: PromotionRecord, product: PromotionProduct): Pr
     getQtyFree: clean.getQtyFree,
     priceTiers: clean.priceTiers,
     promoStatus: getPromotionStatus(clean),
+    pinned: clean.pinned,
   };
 }
 

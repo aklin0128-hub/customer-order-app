@@ -94,6 +94,7 @@ export async function POST(req: Request) {
 
     const resetSoldQty = Boolean(body?.resetSoldQty);
     const ended = Boolean(body?.ended);
+    const pinned = Boolean(body?.pinned);
 
     const nextRecord: PromotionRecord = {
       sku,
@@ -106,6 +107,7 @@ export async function POST(req: Request) {
       getQtyFree,
       priceTiers,
       ended: ended || undefined,
+      pinned: pinned || undefined,
       soldQty: resetSoldQty ? 0 : existing?.soldQty || 0,
       updatedAt: new Date().toISOString(),
     };

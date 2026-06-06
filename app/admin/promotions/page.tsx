@@ -45,6 +45,7 @@ type PromotionRecord = {
   getQtyFree?: number;
   priceTiers?: PromoPriceTier[];
   ended?: boolean;
+  pinned?: boolean;
   promoStatus?: PromotionStatus;
 };
 
@@ -113,6 +114,7 @@ function emptyForm() {
     tiers: emptyTierRows(),
     resetSoldQty: false,
     promotionEnded: false,
+    pinned: false,
   };
 }
 
@@ -266,6 +268,7 @@ export default function AdminPromotionsPage() {
       tiers,
       resetSoldQty: false,
       promotionEnded: Boolean(record.ended),
+      pinned: Boolean(record.pinned),
     });
   };
 
@@ -296,6 +299,7 @@ export default function AdminPromotionsPage() {
               : undefined,
           resetSoldQty: form.resetSoldQty,
           ended: form.promotionEnded,
+          pinned: form.pinned,
         }),
       });
       const data = await res.json();
@@ -350,6 +354,7 @@ export default function AdminPromotionsPage() {
         items={[
           { label: "Total promos", value: promotions.length },
           { label: "Live now", value: activeCount },
+          { label: "Pinned", value: promotions.filter((p) => p.pinned).length },
           { label: "Valid SKUs", value: products.length },
           {
             label: "Missing SKU",
@@ -404,6 +409,12 @@ export default function AdminPromotionsPage() {
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <strong style={{ fontSize: 14 }}>{p.sku}</strong>
+                    {p.pinned ? (
+                      <StatusBadge
+                        label="PINNED"
+                        style={{ background: "#fef3c7", color: "#b45309", border: "1px solid #fcd34d" }}
+                      />
+                    ) : null}
                     <StatusBadge label={statusLabel[status]} style={statusStyle[status]} />
                   </div>
                   {p.note ? (
@@ -611,6 +622,29 @@ export default function AdminPromotionsPage() {
                 </div>
               ) : null}
             </FormSection>
+
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 13,
+                fontWeight: 700,
+                marginBottom: 8,
+                border: form.pinned ? "1px solid #fcd34d" : "1px solid #e5e7eb",
+                borderRadius: 12,
+                padding: 12,
+                background: form.pinned ? "#fffbeb" : "#fff",
+                color: "#92400e",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={form.pinned}
+                onChange={(e) => setForm((f) => ({ ...f, pinned: e.target.checked }))}
+              />
+              Pin to top — show first in customer Weekly picks and /order promotion tab
+            </label>
 
             <label
               style={{
