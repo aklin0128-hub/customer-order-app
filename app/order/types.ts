@@ -21,6 +21,8 @@ export type CatalogItem = {
   importedAt?: string;
   /** ISO time when admin first marked SKU as new */
   newSince?: string;
+  /** Admin-set publish date (YYYY-MM-DD) for /new/ display and sort */
+  newPublishedDate?: string;
   /** Short blurb for /new/ showcase modal */
   newItemDescription?: string;
   /** PDF served via /api/blob (Admin upload) */

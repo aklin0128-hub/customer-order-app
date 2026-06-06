@@ -42,6 +42,7 @@ type Product = {
   isNew?: boolean;
   justAdded?: boolean;
   importedAt?: string;
+  newPublishedDate?: string;
   newItemDescription?: string;
   newItemDescriptionPdfUrl?: string;
   newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
@@ -140,6 +141,7 @@ export default function AdminProductsPage() {
   const [justAdded, setJustAdded] = useState(false);
   const [newItemDescription, setNewItemDescription] = useState("");
   const [newItemDescriptionPdfUrl, setNewItemDescriptionPdfUrl] = useState("");
+  const [newPublishedDate, setNewPublishedDate] = useState("");
 
   const showcaseStorageLabel = useMemo(
     () => resolveNewItemStorageLabel({ categories, category: categories[0] }),
@@ -275,6 +277,7 @@ export default function AdminProductsPage() {
     setJustAdded(Boolean(p.justAdded));
     setNewItemDescription(p.newItemDescription || "");
     setNewItemDescriptionPdfUrl(p.newItemDescriptionPdfUrl || "");
+    setNewPublishedDate(p.newPublishedDate || "");
     setFormDirty(false);
     setAutoSaveStatus("");
     notify(`Editing ${p.sku}`);
@@ -371,6 +374,7 @@ export default function AdminProductsPage() {
     setJustAdded(false);
     setNewItemDescription("");
     setNewItemDescriptionPdfUrl("");
+    setNewPublishedDate("");
     setFormDirty(false);
     setAutoSaveStatus("");
     setMsg("");
@@ -410,6 +414,7 @@ export default function AdminProductsPage() {
           justAdded,
           newItemDescription,
           newItemDescriptionPdfUrl,
+          newPublishedDate: newPublishedDate || undefined,
         }),
       });
       const data = await readApiJson(res);
@@ -454,7 +459,7 @@ export default function AdminProductsPage() {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, newItemDescription, newItemDescriptionPdfUrl]);
+  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, newItemDescription, newItemDescriptionPdfUrl, newPublishedDate]);
 
   const uploadNewItemPdf = async (file: File | null) => {
     const finalSku = sku.trim().toUpperCase();
@@ -963,11 +968,21 @@ export default function AdminProductsPage() {
                 </div>
                 <div style={{ fontSize: 13, color: isNew ? "#1d4ed8" : "#64748b", marginBottom: 14, lineHeight: 1.55 }}>
                   {isNew
-                    ? "顾客在 /new/ 新品页可点「查看说明」弹出介绍。可填文字、上传 PDF。DRY / FROZEN / FRESH 标签来自上方 Category。"
+                    ? "顾客在 /new/ 新品页可点「查看说明」弹出介绍。可填文字、上传 PDF、设上架日期。DRY / FROZEN / FRESH 标签来自上方 Category。"
                     : "请先在上方勾选「Show in customer New items」，再填写下方内容。"}
                 </div>
                 <fieldset disabled={!isNew} style={{ border: "none", margin: 0, padding: 0, opacity: isNew ? 1 : 0.5 }}>
-                  <label style={labelStyle}>仓储标签 (from Category)</label>
+                  <label style={labelStyle}>Published date</label>
+                  <input
+                    type="date"
+                    value={newPublishedDate}
+                    onChange={(e) => updateText(setNewPublishedDate, e.target.value)}
+                    style={inputStyle}
+                  />
+                  <p style={{ fontSize: 11, color: "#64748b", margin: "6px 0 0" }}>
+                    Shown on /new/ and used to sort new items (newest first). Leave blank to use auto date when marked new.
+                  </p>
+                  <label style={{ ...labelStyle, marginTop: 12 }}>仓储标签 (from Category)</label>
                   <div
                     style={{
                       ...inputStyle,

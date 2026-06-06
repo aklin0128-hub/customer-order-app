@@ -7,6 +7,7 @@ import {
   resolveNewItemStorageLabel,
 } from "@/lib/newItemStorageLabel";
 import { mapLegacyCategoryToMain } from "@/lib/catalogMainCategories";
+import { parseNewPublishedDate } from "@/lib/catalogNewItems";
 import { bustServerDataCache, SERVER_CACHE } from "@/lib/serverDataCache";
 import { redis } from "@/lib/redis";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
@@ -32,6 +33,7 @@ type Product = {
   justAdded?: boolean;
   importedAt?: string;
   newSince?: string;
+  newPublishedDate?: string;
   newItemDescription?: string;
   newItemDescriptionPdfUrl?: string;
   newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
@@ -115,6 +117,10 @@ export async function POST(req: Request) {
     const justAdded = Boolean(body?.justAdded);
     const newItemDescription = String(body?.newItemDescription || "").trim();
     const newItemDescriptionPdfUrl = String(body?.newItemDescriptionPdfUrl || "").trim();
+    const publishedInput =
+      body?.newPublishedDate !== undefined
+        ? String(body.newPublishedDate || "").trim()
+        : "";
 
     if (!sku) {
       return NextResponse.json({ error: "Missing SKU." }, { status: 400 });
@@ -132,6 +138,20 @@ export async function POST(req: Request) {
       }) ??
       mainCategoryToNewItemStorageLabel(mapLegacyCategoryToMain(existing.category || "")) ??
       parseNewItemStorageLabel(existing.newItemStorageLabel);
+
+    const newPublishedDate =
+      body?.newPublishedDate !== undefined
+        ? publishedInput
+          ? parseNewPublishedDate(publishedInput)
+          : undefined
+        : existing.newPublishedDate;
+
+    if (publishedInput && !newPublishedDate) {
+      return NextResponse.json(
+        { error: "Invalid published date. Use YYYY-MM-DD." },
+        { status: 400 }
+      );
+    }
 
     const now = new Date().toISOString();
     const newSince = isNew ? existing.newSince || now : existing.newSince;
@@ -153,6 +173,7 @@ export async function POST(req: Request) {
       isNew,
       justAdded,
       newSince,
+      newPublishedDate,
       newItemDescription: newItemDescription || undefined,
       newItemDescriptionPdfUrl: newItemDescriptionPdfUrl || undefined,
       newItemStorageLabel,

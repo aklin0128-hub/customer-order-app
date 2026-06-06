@@ -24,6 +24,30 @@ export function formatCatalogAddedDate(value: string | undefined, lang?: string)
   });
 }
 
+/** Normalize admin YYYY-MM-DD publish date. */
+export function parseNewPublishedDate(value: unknown): string | undefined {
+  const text = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return undefined;
+  const date = new Date(`${text}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? undefined : text;
+}
+
+export function parseNewPublishedDateMs(value?: string | null) {
+  const clean = parseNewPublishedDate(value);
+  if (!clean) return null;
+  return Date.parse(`${clean}T12:00:00`);
+}
+
+export function formatNewItemPublishedDate(value: string | undefined, lang?: string) {
+  const ms = parseNewPublishedDateMs(value);
+  if (ms == null) return null;
+  return new Date(ms).toLocaleDateString(catalogDateLocale(lang), {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export type CatalogNewFields = {
   sku?: string;
   /** Admin only: show in customer “New items” tab/list */
@@ -34,6 +58,8 @@ export type CatalogNewFields = {
   importedAt?: string;
   /** ISO time when admin first marked SKU as new */
   newSince?: string;
+  /** Admin-set publish date (YYYY-MM-DD) for /new/ display and sort */
+  newPublishedDate?: string;
   name?: string;
   size?: string;
   name_k?: string;
@@ -44,6 +70,7 @@ export function getNewItemAddedAtMs(
   item?: (CatalogNewFields & { updatedAt?: string }) | null
 ): number | null {
   return (
+    parseNewPublishedDateMs(item?.newPublishedDate) ??
     parseImportedAtMs(item?.newSince) ??
     parseImportedAtMs(item?.importedAt) ??
     parseImportedAtMs(item?.updatedAt)

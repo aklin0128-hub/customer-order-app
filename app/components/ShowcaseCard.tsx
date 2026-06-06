@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ShowcaseDescriptionModal } from "@/app/components/ShowcaseDescriptionModal";
 import { ProductImage } from "@/app/order/components/ProductImage";
 import { getJustAddedLabel, justAddedBadgeStyle } from "@/lib/justAddedBadge";
+import { formatNewItemPublishedDate } from "@/lib/catalogNewItems";
 import { formatShowcasePromoDisplay, type Lang } from "@/lib/showcasePromoFormat";
 import type { LoginPreviewCard } from "@/lib/loginPreview";
 
@@ -13,6 +14,13 @@ const detailsLabel: Record<Lang, string> = {
   zh: "查看说明",
   ko: "상세보기",
   vi: "Chi tiết",
+};
+
+const publishedDateLabel: Record<Lang, string> = {
+  en: "Published",
+  zh: "上架",
+  ko: "게시",
+  vi: "Đăng",
 };
 
 export function ShowcaseCard({
@@ -56,6 +64,10 @@ export function ShowcaseCard({
     showNewDetails &&
     Boolean(String(item.newItemDescription || "").trim() || String(item.newItemDescriptionPdfUrl || "").trim());
   const storageLabel = showNewDetails ? item.newItemStorageLabel : undefined;
+  const publishedDateText =
+    showNewDetails && item.newPublishedDate
+      ? formatNewItemPublishedDate(item.newPublishedDate, lang)
+      : null;
 
   return (
     <article className={className}>
@@ -89,6 +101,11 @@ export function ShowcaseCard({
             {item.name || "—"}
           </div>
           {item.size ? <div className="showcase-card-size">{item.size}</div> : null}
+          {publishedDateText ? (
+            <div className="showcase-card-published">
+              {publishedDateLabel[lang]}: {publishedDateText}
+            </div>
+          ) : null}
           {promoDisplay?.tierPricesLine ? (
             <div className="showcase-card-promo-deal">
               {promoDisplay.priceLine ? (
