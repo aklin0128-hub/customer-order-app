@@ -171,9 +171,10 @@ export default function AdminProductsPage() {
   };
 
   const toggleProductCategory = (cat: string) => {
-    setCategories((prev) =>
-      prev.includes(cat) ? prev.filter((value) => value !== cat) : expandCategoryTags([...prev, cat])
-    );
+    setCategories((prev) => {
+      if (prev.includes(cat)) return [];
+      return [cat];
+    });
     markDirty();
   };
 
@@ -266,7 +267,10 @@ export default function AdminProductsPage() {
     setName(p.name || "");
     setBrand(p.brand || "");
     setStatus((p.status || "NORMAL").toUpperCase());
-    setCategories(expandCategoryTags(readProductCategories(p)));
+    setCategories(() => {
+      const tags = expandCategoryTags(readProductCategories(p));
+      return tags.length > 0 ? [tags[0]] : [];
+    });
     setSize(p.size || "");
     setBarcode(p.barcode || "");
     setUpc(p.upc || "");
@@ -836,8 +840,8 @@ export default function AdminProductsPage() {
                 </div>
                 <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>
                   {categories.length > 0
-                    ? `Selected: ${categories.join(", ")}. Categories: DRY, FROZEN, FRESH, HOUSEWARE. Saved overrides apply on the order page.`
-                    : "No selection = AUTO (use catalog-inferred category). Tap to select one or more."}
+                    ? `Selected: ${categories[0]}. Pick one of DRY, FROZEN, FRESH, HOUSEWARE. Tap again to clear (AUTO).`
+                    : "No selection = AUTO (use catalog-inferred category). Pick one category."}
                 </div>
               </div>
               <label

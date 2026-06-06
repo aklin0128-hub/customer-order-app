@@ -112,7 +112,7 @@ export async function POST(req: Request) {
     const limitedQty = String(body?.limitedQty || "").trim();
     const palletSize = String(body?.palletSize || "").trim();
     const imageUrl = String(body?.imageUrl || "").trim();
-    const categories = expandCategoryTags(parseCategoriesFromBody(body));
+    const categories = expandCategoryTags(parseCategoriesFromBody(body)).slice(0, 1);
     const isNew = Boolean(body?.isNew);
     const justAdded = Boolean(body?.justAdded);
     const newItemDescription = String(body?.newItemDescription || "").trim();
