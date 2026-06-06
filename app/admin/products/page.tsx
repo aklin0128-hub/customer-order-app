@@ -371,7 +371,6 @@ export default function AdminProductsPage() {
     setJustAdded(false);
     setNewItemDescription("");
     setNewItemDescriptionPdfUrl("");
-    setNewItemStorageLabel("");
     setFormDirty(false);
     setAutoSaveStatus("");
     setMsg("");
