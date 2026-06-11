@@ -11,6 +11,7 @@ import { CatalogVirtualGrid } from "./components/CatalogVirtualGrid";
 import { CatalogQtyCard } from "./components/CatalogQtyCard";
 import { OrderCartModal } from "./components/OrderCartModal";
 import { OrderFloatingCartFab } from "./components/OrderFloatingCartFab";
+import { OrderPastOrdersModal } from "./components/OrderPastOrdersModal";
 import { OrderShopNudge } from "./components/OrderShopNudge";
 import { RecommendedStrip } from "./components/RecommendedStrip";
 import { OrderInput } from "./components/OrderInput";
@@ -88,7 +89,6 @@ import {
   stepButtonStyle,
   stepInputStyle,
   submitButtonStyle,
-  toggleTextStyle,
 } from "./orderStyles";
 import type { CartItem, CatalogItem, ClearanceItem, Lang, OrderHistoryItem, OrderMode, PromotionItem } from "./types";
 
@@ -153,8 +153,7 @@ export default function OrderPage() {
   >({});
   const [fullscreen, setFullscreen] = useState(false);
   const [showRecent, setShowRecent] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const [expandedHistoryKey, setExpandedHistoryKey] = useState("");
+  const [showPastOrders, setShowPastOrders] = useState(false);
   const [showCart, setShowCart] = useState(false);
   const [catalogShowSelectedOnly, setCatalogShowSelectedOnly] = useState(false);
   const [catalogShowRecommendedOnly, setCatalogShowRecommendedOnly] = useState(false);
@@ -1473,6 +1472,24 @@ export default function OrderPage() {
               </button>
             </div>
 
+            {orderHistory.length > 0 ? (
+              <button
+                type="button"
+                className="order-past-orders-chip"
+                onClick={() => setShowPastOrders(true)}
+                aria-label={`${t.history} (${orderHistory.length})`}
+              >
+                <span className="order-past-orders-chip-icon" aria-hidden>
+                  📋
+                </span>
+                <span className="order-past-orders-chip-text">
+                  <strong>{t.history}</strong>
+                  <span>{t.historyChipHint}</span>
+                </span>
+                <span className="order-past-orders-chip-count">{orderHistory.length}</span>
+              </button>
+            ) : null}
+
             {mode === "catalog" ? (
               <>
                 <div className="order-sticky-search-row">
@@ -1959,99 +1976,6 @@ export default function OrderPage() {
           </section>
         )}
 
-        {orderHistory.length > 0 ? (
-          <section style={cardStyle} className="order-secondary-section order-compact-fold order-aux-section">
-            <button type="button" onClick={() => setShowHistory((prev) => !prev)} className="order-compact-fold-btn">
-              <span className="order-compact-fold-title">{t.history}</span>
-              <span className="order-compact-fold-action">{showHistory ? t.hide : t.show}</span>
-            </button>
-
-            {showHistory ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10, overflow: "visible" }}>
-                {orderHistory.slice(0, 8).map((order, index) => {
-                  const key = order.orderRef || order.createdAt || String(index);
-                  const items = order.items || [];
-                  const expanded = expandedHistoryKey === key;
-                  const totalHistoryCases = items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
-
-                  return (
-                    <div key={key} style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 10, background: "#f9fafb", overflow: "visible" }}>
-                      <button
-                        type="button"
-                        onClick={() => setExpandedHistoryKey((prev) => (prev === key ? "" : key))}
-                        style={{
-                          width: "100%",
-                          border: "none",
-                          background: "transparent",
-                          padding: 0,
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "flex-start",
-                          gap: 10,
-                          textAlign: "left",
-                          cursor: "pointer",
-                        }}
-                      >
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 900, color: "#111827" }}>{order.orderRef || "-"}</div>
-                          <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
-                            {order.createdAt ? new Date(order.createdAt).toLocaleString() : ""} · {items.length} {t.items} · {totalHistoryCases} {t.cases}
-                          </div>
-                          {!expanded ? (
-                            <div style={{ fontSize: 12, color: "#374151", marginTop: 6 }}>
-                              {items.slice(0, 5).map((item) => `${item.sku}(${item.qty})`).join(", ")}
-                              {items.length > 5 ? "..." : ""}
-                            </div>
-                          ) : null}
-                        </div>
-                        <div style={{ ...toggleTextStyle, flexShrink: 0 }}>{expanded ? t.hideDetails : t.viewDetails}</div>
-                      </button>
-
-                      {expanded ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
-                          {items.map((item, itemIndex) => {
-                            const catalogItem = getCatalogItemBySku(item.sku);
-                            return (
-                              <div
-                                key={`${item.sku}-${itemIndex}`}
-                                style={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "center",
-                                  gap: 10,
-                                  border: "1px solid #e5e7eb",
-                                  borderRadius: 10,
-                                  padding: 8,
-                                  background: "#ffffff",
-                                  overflow: "visible",
-                                }}
-                              >
-                                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                                  <ProductImage sku={item.sku} alt={item.sku} size={40} imageUrl={catalogItem?.imageUrl} />
-                                  <div style={{ minWidth: 0 }}>
-                                    <div style={{ fontSize: 13, fontWeight: 900, color: "#111827" }}>{item.sku}</div>
-                                    <div style={{ fontSize: 12, color: "#4b5563", lineHeight: 1.35, overflow: "hidden", textOverflow: "ellipsis" }}>
-                                      {catalogItem?.brand ? `${catalogItem.brand} | ` : ""}{catalogItem?.name || "-"}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div style={{ fontSize: 13, fontWeight: 900, color: "#16a34a", flexShrink: 0 }}>
-                                  {t.qty}: {item.qty}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : null}
-
-                      <button type="button" onClick={() => reorderItems(items)} style={{ ...secondaryButtonStyle, marginTop: 8, padding: "8px 10px" }}>{t.reorder}</button>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
-          </section>
-        ) : null}
       </div>
 
       <OrderCartModal
@@ -2114,10 +2038,18 @@ export default function OrderPage() {
         }
       />
 
+      <OrderPastOrdersModal
+        open={showPastOrders}
+        onClose={() => setShowPastOrders(false)}
+        lang={lang}
+        orders={orderHistory}
+        onReorder={reorderItems}
+      />
+
       <OrderFloatingCartFab
         count={cartItemCount}
         label={t.cartSummary}
-        hidden={showCart}
+        hidden={showCart || showPastOrders}
         onClick={() => (showCart ? toggleCartPanel() : setShowCart(true))}
       />
 
