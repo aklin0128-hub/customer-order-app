@@ -10,6 +10,7 @@ import { CATEGORY_OPTIONS } from "@/lib/inferCategory";
 import { CatalogVirtualGrid } from "./components/CatalogVirtualGrid";
 import { CatalogQtyCard } from "./components/CatalogQtyCard";
 import { OrderCartModal } from "./components/OrderCartModal";
+import { OrderFloatingCartFab } from "./components/OrderFloatingCartFab";
 import { OrderShopNudge } from "./components/OrderShopNudge";
 import { RecommendedStrip } from "./components/RecommendedStrip";
 import { OrderInput } from "./components/OrderInput";
@@ -820,16 +821,6 @@ export default function OrderPage() {
   const clearanceUpsellLines = useMemo(
     () => buildClearanceUpsellLines(lang, clearanceItems, cartSkuSet, t),
     [lang, clearanceItems, cartSkuSet, t]
-  );
-
-  const weeklyInCartCount = useMemo(
-    () => catalogItemsForSubmit.filter((item) => promoSkuSet.has(item.sku.toUpperCase())).length,
-    [catalogItemsForSubmit, promoSkuSet]
-  );
-
-  const clearanceInCartCount = useMemo(
-    () => catalogItemsForSubmit.filter((item) => clearanceSkuSet.has(item.sku.toUpperCase())).length,
-    [catalogItemsForSubmit, clearanceSkuSet]
   );
 
   const showNewItemsReviewReminder = useMemo(() => {
@@ -2050,6 +2041,13 @@ export default function OrderPage() {
         }
       />
 
+      <OrderFloatingCartFab
+        count={cartItemCount}
+        label={t.cartSummary}
+        hidden={showCart}
+        onClick={() => (showCart ? toggleCartPanel() : setShowCart(true))}
+      />
+
       <div className="order-fixed-bar">
         <div className="order-fixed-bar-inner">
           {submitMsg ? (
@@ -2057,32 +2055,11 @@ export default function OrderPage() {
               {submitMsg}
             </div>
           ) : null}
-          <div className="order-fixed-bar-layout">
-            <button
-              type="button"
-              onClick={() => (showCart ? toggleCartPanel() : setShowCart(true))}
-              className="order-fixed-summary-btn"
-            >
-              <span>
-                {t.cartSummary}
-                {cartItemCount > 0 ? (
-                  <span className="order-fixed-cart-badge">{cartItemCount}</span>
-                ) : null}
-                <span style={{ display: "block", fontSize: 11, color: "#6b7280", marginTop: 2, fontWeight: 700 }}>
-                  {totalCases} {t.cases}
-                </span>
-                {!showCart ? (
-                  <span className="order-fixed-inline-link">· {t.showCart}</span>
-                ) : null}
-              </span>
-              {weeklyInCartCount > 0 || clearanceInCartCount > 0 ? (
-                <span style={{ display: "block", fontSize: 10, color: "#6b7280", marginTop: 1, fontWeight: 700 }}>
-                  {t.cartSalesSummary
-                    .replace("{weekly}", String(weeklyInCartCount))
-                    .replace("{clearance}", String(clearanceInCartCount))}
-                </span>
-              ) : null}
-            </button>
+          <div className="order-fixed-bar-layout order-fixed-bar-layout--fab">
+            <div className="order-fixed-cases-stat" aria-live="polite">
+              <span className="order-fixed-cases-stat-value">{totalCases}</span>
+              <span className="order-fixed-cases-stat-label">{t.cases}</span>
+            </div>
             <button
               type="button"
               onClick={openReview}
