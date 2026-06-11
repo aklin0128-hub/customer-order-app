@@ -46,6 +46,7 @@ type Product = {
   newItemDescription?: string;
   newItemDescriptionPdfUrl?: string;
   newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
+  newItemListPrice?: string;
   source?: string;
 };
 
@@ -142,6 +143,7 @@ export default function AdminProductsPage() {
   const [newItemDescription, setNewItemDescription] = useState("");
   const [newItemDescriptionPdfUrl, setNewItemDescriptionPdfUrl] = useState("");
   const [newPublishedDate, setNewPublishedDate] = useState("");
+  const [newItemListPrice, setNewItemListPrice] = useState("");
 
   const showcaseStorageLabel = useMemo(
     () => resolveNewItemStorageLabel({ categories, category: categories[0] }),
@@ -282,6 +284,7 @@ export default function AdminProductsPage() {
     setNewItemDescription(p.newItemDescription || "");
     setNewItemDescriptionPdfUrl(p.newItemDescriptionPdfUrl || "");
     setNewPublishedDate(p.newPublishedDate || "");
+    setNewItemListPrice(p.newItemListPrice || "");
     setFormDirty(false);
     setAutoSaveStatus("");
     notify(`Editing ${p.sku}`);
@@ -379,6 +382,7 @@ export default function AdminProductsPage() {
     setNewItemDescription("");
     setNewItemDescriptionPdfUrl("");
     setNewPublishedDate("");
+    setNewItemListPrice("");
     setFormDirty(false);
     setAutoSaveStatus("");
     setMsg("");
@@ -419,6 +423,7 @@ export default function AdminProductsPage() {
           newItemDescription,
           newItemDescriptionPdfUrl,
           newPublishedDate: newPublishedDate || undefined,
+          newItemListPrice: newItemListPrice || undefined,
         }),
       });
       const data = await readApiJson(res);
@@ -463,7 +468,7 @@ export default function AdminProductsPage() {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, newItemDescription, newItemDescriptionPdfUrl, newPublishedDate]);
+  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, newItemDescription, newItemDescriptionPdfUrl, newPublishedDate, newItemListPrice]);
 
   const uploadNewItemPdf = async (file: File | null) => {
     const finalSku = sku.trim().toUpperCase();
@@ -972,11 +977,21 @@ export default function AdminProductsPage() {
                 </div>
                 <div style={{ fontSize: 13, color: isNew ? "#1d4ed8" : "#64748b", marginBottom: 14, lineHeight: 1.55 }}>
                   {isNew
-                    ? "顾客在 /new/ 新品页可点「查看说明」弹出介绍。可填文字、上传 PDF、设上架日期。DRY / FROZEN / FRESH 标签来自上方 Category。"
+                    ? "顾客在 /new/ 新品页可点「查看说明」弹出介绍。可填文字、上传 PDF、设上架日期与标价（仅 /new/ 显示，不影响订货页目录）。DRY / FROZEN / FRESH 标签来自上方 Category。"
                     : "请先在上方勾选「Show in customer New items」，再填写下方内容。"}
                 </div>
                 <fieldset disabled={!isNew} style={{ border: "none", margin: 0, padding: 0, opacity: isNew ? 1 : 0.5 }}>
-                  <label style={labelStyle}>Published date</label>
+                  <label style={labelStyle}>/new/ list price (optional)</label>
+                  <input
+                    value={newItemListPrice}
+                    onChange={(e) => updateText(setNewItemListPrice, e.target.value)}
+                    style={inputStyle}
+                    placeholder="e.g. 12.99 or $12.99/cs"
+                  />
+                  <p style={{ fontSize: 11, color: "#64748b", margin: "6px 0 0" }}>
+                    Shown on public /new/ only. Does not change order totals or catalog browse.
+                  </p>
+                  <label style={{ ...labelStyle, marginTop: 12 }}>Published date</label>
                   <input
                     type="date"
                     value={newPublishedDate}

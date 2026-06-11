@@ -12,12 +12,14 @@ export function OrderCartModal({
   open,
   onClose,
   onReview,
+  onConfirm,
   lang,
   items,
-  clearanceSkus,
+  nhItemsSkus,
   lineCount,
   totalCases,
   submitting,
+  statusMessage,
   onAdjustQty,
   onQtyInput,
   onRemove,
@@ -27,12 +29,14 @@ export function OrderCartModal({
   open: boolean;
   onClose: () => void;
   onReview: () => void;
+  onConfirm?: () => void;
   lang: Lang;
   items: CartItem[];
-  clearanceSkus?: Set<string>;
+  nhItemsSkus?: Set<string>;
   lineCount: number;
   totalCases: number;
   submitting: boolean;
+  statusMessage?: string;
   onAdjustQty: (sku: string, delta: number) => void;
   onQtyInput: (sku: string, value: string) => void;
   onRemove: (sku: string) => void;
@@ -79,7 +83,7 @@ export function OrderCartModal({
         <OrderCartSection
           lang={lang}
           items={items}
-          clearanceSkus={clearanceSkus}
+          nhItemsSkus={nhItemsSkus}
           expanded
           onToggleExpanded={onClose}
           onClose={onClose}
@@ -92,6 +96,14 @@ export function OrderCartModal({
           tools={tools}
         />
 
+        {statusMessage ? (
+          <div
+            className={`order-cart-modal-status${statusMessage.toLowerCase().includes("failed") ? " is-error" : " is-ok"}`}
+          >
+            {statusMessage}
+          </div>
+        ) : null}
+
         <footer className="order-cart-modal-footer">
           <button type="button" onClick={onClose} className="order-cart-modal-footer-btn" style={secondaryButtonStyle}>
             {t.close}
@@ -100,10 +112,19 @@ export function OrderCartModal({
             type="button"
             onClick={onReview}
             disabled={submitting || lineCount === 0}
-            className="order-cart-modal-footer-btn is-primary"
-            style={{ ...submitButtonStyle, background: submitting || lineCount === 0 ? "#93c5fd" : "#2563eb" }}
+            className="order-cart-modal-footer-btn"
+            style={secondaryButtonStyle}
           >
             {t.reviewCart}
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm ?? onReview}
+            disabled={submitting || lineCount === 0}
+            className="order-cart-modal-footer-btn is-submit"
+            style={{ ...submitButtonStyle, background: submitting || lineCount === 0 ? "#93c5fd" : "#16a34a" }}
+          >
+            {submitting ? t.submitting : t.submitOrder}
           </button>
         </footer>
       </div>

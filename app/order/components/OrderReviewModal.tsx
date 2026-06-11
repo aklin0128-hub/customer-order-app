@@ -36,7 +36,7 @@ export function OrderReviewModal({
   clearanceUpsellLines,
   onAddUpsellCase,
   onAddAllClearanceUpsell,
-  clearanceSkus,
+  nhItemsSkus,
   promoDealBySku,
   newItemsReminder,
   accountNo,
@@ -55,7 +55,7 @@ export function OrderReviewModal({
   clearanceUpsellLines?: UpsellLine[];
   onAddUpsellCase: (sku: string) => void;
   onAddAllClearanceUpsell: () => void;
-  clearanceSkus?: Set<string>;
+  nhItemsSkus?: Set<string>;
   promoDealBySku?: Record<string, string>;
   newItemsReminder?: {
     count: number;
@@ -98,7 +98,7 @@ export function OrderReviewModal({
       clearanceUpsellLines={clearanceUpsellLines}
       onAddUpsellCase={onAddUpsellCase}
       onAddAllClearanceUpsell={onAddAllClearanceUpsell}
-      clearanceSkus={clearanceSkus}
+      nhItemsSkus={nhItemsSkus}
       promoDealBySku={promoDealBySku}
       newItemsReminder={newItemsReminder}
       accountNo={accountNo}
@@ -121,7 +121,7 @@ function OrderReviewModalContent({
   clearanceUpsellLines,
   onAddUpsellCase,
   onAddAllClearanceUpsell,
-  clearanceSkus,
+  nhItemsSkus,
   promoDealBySku,
   newItemsReminder,
   accountNo,
@@ -136,8 +136,8 @@ function OrderReviewModalContent({
   const [hideWarnings, setHideWarnings] = useState(false);
   const [hideClearanceUpsell, setHideClearanceUpsell] = useState(false);
 
-  const hasClearanceInOrder = clearanceSkus
-    ? items.some((item) => clearanceSkus.has(item.sku.toUpperCase()))
+  const hasClearanceInOrder = nhItemsSkus
+    ? items.some((item) => nhItemsSkus.has(item.sku.toUpperCase()))
     : false;
 
   const showClearanceUpsell = !hideClearanceUpsell && clearanceUpsellLines && clearanceUpsellLines.length > 0;
@@ -259,7 +259,7 @@ function OrderReviewModalContent({
             {items.map((item, index) => {
               const catalogItem = getCatalogItemBySku(item.sku);
               const cleanSku = item.sku.toUpperCase();
-              const isClearance = clearanceSkus?.has(cleanSku) ?? false;
+              const isClearance = nhItemsSkus?.has(cleanSku) ?? false;
               const promoDeal = promoDealBySku?.[cleanSku];
               const hasMetaLine = !!(catalogItem?.limitedQty || catalogItem?.palletSize);
 

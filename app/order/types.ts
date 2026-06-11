@@ -29,6 +29,8 @@ export type CatalogItem = {
   newItemDescriptionPdfUrl?: string;
   /** /new/ showcase: DRY, FROZEN, or FRESH */
   newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
+  /** /new/ showcase only — optional list price (display) */
+  newItemListPrice?: string;
 };
 
 export type PromoPriceTier = {
@@ -64,6 +66,8 @@ export type ClearanceItem = CatalogItem & {
 export type CartItem = {
   sku: string;
   qty: string;
+  /** True when line was added from clearance tab (NH_ITEMS email tag). */
+  nhItems?: boolean;
 };
 
 export type OrderHistoryItem = {

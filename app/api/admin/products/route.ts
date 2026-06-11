@@ -8,6 +8,7 @@ import {
 } from "@/lib/newItemStorageLabel";
 import { mapLegacyCategoryToMain } from "@/lib/catalogMainCategories";
 import { parseNewPublishedDate } from "@/lib/catalogNewItems";
+import { normalizeNewItemListPrice } from "@/lib/newItemListPrice";
 import { bustServerDataCache, SERVER_CACHE } from "@/lib/serverDataCache";
 import { redis } from "@/lib/redis";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
@@ -37,6 +38,7 @@ type Product = {
   newItemDescription?: string;
   newItemDescriptionPdfUrl?: string;
   newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
+  newItemListPrice?: string;
   source?: string;
   updatedAt?: string;
 };
@@ -121,6 +123,8 @@ export async function POST(req: Request) {
       body?.newPublishedDate !== undefined
         ? String(body.newPublishedDate || "").trim()
         : "";
+    const listPriceInput =
+      body?.newItemListPrice !== undefined ? String(body.newItemListPrice || "").trim() : "";
 
     if (!sku) {
       return NextResponse.json({ error: "Missing SKU." }, { status: 400 });
@@ -145,6 +149,11 @@ export async function POST(req: Request) {
           ? parseNewPublishedDate(publishedInput)
           : undefined
         : existing.newPublishedDate;
+
+    const newItemListPrice =
+      body?.newItemListPrice !== undefined
+        ? normalizeNewItemListPrice(listPriceInput)
+        : existing.newItemListPrice;
 
     if (publishedInput && !newPublishedDate) {
       return NextResponse.json(
@@ -174,6 +183,7 @@ export async function POST(req: Request) {
       justAdded,
       newSince,
       newPublishedDate,
+      newItemListPrice,
       newItemDescription: newItemDescription || undefined,
       newItemDescriptionPdfUrl: newItemDescriptionPdfUrl || undefined,
       newItemStorageLabel,

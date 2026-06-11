@@ -19,13 +19,13 @@ export function OrderCartSection({
   onAdjustQty,
   onQtyInput,
   onRemove,
-  clearanceSkus,
+  nhItemsSkus,
   nudge,
   tools,
 }: {
   lang: Lang;
   items: CartItem[];
-  clearanceSkus?: Set<string>;
+  nhItemsSkus?: Set<string>;
   expanded: boolean;
   onToggleExpanded: () => void;
   onClose?: () => void;
@@ -110,7 +110,7 @@ export function OrderCartSection({
                           {t.limited}: {catalogItem.limitedQty}
                         </div>
                       ) : null}
-                      {clearanceSkus?.has(item.sku.toUpperCase()) ? (
+                      {nhItemsSkus?.has(item.sku.toUpperCase()) ? (
                         <div style={{ ...clearancePolicyStyle, marginTop: 4, fontSize: 10 }}>{t.clearanceNoReturn}</div>
                       ) : null}
                     </div>

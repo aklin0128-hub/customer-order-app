@@ -6,6 +6,7 @@ import { ShowcaseDescriptionModal } from "@/app/components/ShowcaseDescriptionMo
 import { ProductImage } from "@/app/order/components/ProductImage";
 import { getJustAddedLabel, justAddedBadgeStyle } from "@/lib/justAddedBadge";
 import { formatNewItemPublishedDate } from "@/lib/catalogNewItems";
+import { formatNewItemListPriceDisplay } from "@/lib/newItemListPrice";
 import { formatShowcasePromoDisplay, type Lang } from "@/lib/showcasePromoFormat";
 import type { LoginPreviewCard } from "@/lib/loginPreview";
 
@@ -68,6 +69,10 @@ export function ShowcaseCard({
     showNewDetails && item.newPublishedDate
       ? formatNewItemPublishedDate(item.newPublishedDate, lang)
       : null;
+  const listPriceText =
+    showNewDetails && item.newItemListPrice
+      ? formatNewItemListPriceDisplay(item.newItemListPrice)
+      : null;
 
   return (
     <article className={className}>
@@ -106,6 +111,7 @@ export function ShowcaseCard({
               {publishedDateLabel[lang]}: {publishedDateText}
             </div>
           ) : null}
+          {listPriceText ? <div className="showcase-card-price">{listPriceText}</div> : null}
           {promoDisplay?.tierPricesLine ? (
             <div className="showcase-card-promo-deal">
               {promoDisplay.priceLine ? (

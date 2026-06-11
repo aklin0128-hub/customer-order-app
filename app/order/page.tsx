@@ -52,6 +52,13 @@ import {
   normalizeOrderDraft,
   type OrderDraftPayload,
 } from "@/lib/orderDraft";
+import {
+  applyQtyDelta,
+  applyQtySet,
+  expandOrderSubmitLines,
+  getNhQty,
+  nhItemsSkuSet,
+} from "@/lib/orderNhItems";
 import { copy } from "./orderCopy";
 import {
   brandSelectStyle,
@@ -121,6 +128,8 @@ export default function OrderPage() {
   const [qtyInput, setQtyInput] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [catalogQtyMap, setCatalogQtyMap] = useState<Record<string, string>>({});
+  /** Session-only: qty added from clearance tab (NH_ITEMS). Not saved in drafts. */
+  const [nhItemsQtyMap, setNhItemsQtyMap] = useState<Record<string, string>>({});
   const [catalogSearch, setCatalogSearch] = useState("");
   const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
   const [brandFilter, setBrandFilter] = useState("ALL");
@@ -358,6 +367,7 @@ export default function OrderPage() {
       setNote(draft.note || "");
       const map = buildCatalogQtyMapFromDraft(draft);
       setCatalogQtyMap(map);
+      setNhItemsQtyMap({});
       setCart(cartItemsFromQtyMap(map));
     };
 
@@ -690,7 +700,13 @@ export default function OrderPage() {
     return false;
   };
 
-  const setQtyForSku = (sku: string, value: string) => {
+  const applyQtyMaps = (nextTotal: Record<string, string>, nextNh: Record<string, string>) => {
+    setCatalogQtyMap(nextTotal);
+    setNhItemsQtyMap(nextNh);
+    setCart(cartItemsFromQtyMap(nextTotal));
+  };
+
+  const setQtyForSku = (sku: string, value: string, source: "clearance" | "normal" = "normal") => {
     const cleanSku = sku.trim().toUpperCase();
     const cleanQty = String(value || "").replace(/[^0-9]/g, "");
 
@@ -698,18 +714,13 @@ export default function OrderPage() {
       return;
     }
 
-    setCatalogQtyMap((prev) => {
-      const next = { ...prev };
-      if (!cleanQty || Number(cleanQty) <= 0) delete next[cleanSku];
-      else next[cleanSku] = String(Number(cleanQty));
-      return next;
-    });
-
-    setCart((prev) => {
-      const withoutSku = prev.filter((item) => item.sku.toUpperCase() !== cleanSku);
-      if (!cleanQty || Number(cleanQty) <= 0) return withoutSku;
-      return [...withoutSku, { sku: cleanSku, qty: String(Number(cleanQty)) }];
-    });
+    const next = applyQtySet(
+      { total: catalogQtyMap, nh: nhItemsQtyMap },
+      cleanSku,
+      cleanQty,
+      source
+    );
+    applyQtyMaps(next.total, next.nh);
   };
 
   const getPromoRemainingForSku = (cleanSku: string) => {
@@ -754,7 +765,8 @@ export default function OrderPage() {
       }
       if (limitedQty > 0 && qty > limitedQty) warnings.push(t.limitedQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(limitedQty)));
       if (promoRemaining !== null && qty > promoRemaining) warnings.push(t.promoQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(promoRemaining)));
-      if (clearanceRemaining !== null && qty > clearanceRemaining) {
+      const nhQty = getNhQty({ total: catalogQtyMap, nh: nhItemsQtyMap }, cleanSku);
+      if (clearanceRemaining !== null && nhQty > clearanceRemaining) {
         warnings.push(t.clearanceQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(clearanceRemaining)));
       }
 
@@ -789,7 +801,7 @@ export default function OrderPage() {
 
     return warnings;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalogItemsForSubmit, promotionItems, clearanceItems, t]);
+  }, [catalogItemsForSubmit, catalogQtyMap, nhItemsQtyMap, promotionItems, clearanceItems, t]);
 
   const promoSkuSet = useMemo(
     () => new Set(promotionItems.map((item) => item.sku?.toUpperCase()).filter(Boolean) as Iterable<string>),
@@ -799,6 +811,11 @@ export default function OrderPage() {
   const clearanceSkuSet = useMemo(
     () => new Set(clearanceItems.map((item) => item.sku?.toUpperCase()).filter(Boolean)),
     [clearanceItems]
+  );
+
+  const nhItemsSkuSetForOrder = useMemo(
+    () => nhItemsSkuSet({ total: catalogQtyMap, nh: nhItemsQtyMap }),
+    [catalogQtyMap, nhItemsQtyMap]
   );
 
   const promoDealBySku = useMemo(() => {
@@ -865,10 +882,11 @@ export default function OrderPage() {
     setQtyForSku(target.sku, qty);
   };
 
-  const adjustQtyForSku = (sku: string, delta: number) => {
+  const adjustQtyForSku = (sku: string, delta: number, source: "clearance" | "normal" = "normal") => {
     const cleanSku = sku.trim().toUpperCase();
     const current = Number(catalogQtyMap[cleanSku] || 0);
     let next = Math.max(0, current + delta);
+    let appliedDelta = delta;
 
     if (delta > 0 && next > 0 && current <= 0 && blockAddForSku(cleanSku)) {
       return;
@@ -878,12 +896,18 @@ export default function OrderPage() {
     if (delta > 0 && promoRemaining !== null && next > promoRemaining) {
       alert(t.promoLimitAlert.replace("{sku}", cleanSku).replace("{qty}", String(promoRemaining)));
       next = promoRemaining;
+      appliedDelta = next - current;
     }
 
-    const clearanceRemaining = getClearanceRemainingForSku(cleanSku);
-    if (delta > 0 && clearanceRemaining !== null && next > clearanceRemaining) {
-      alert(t.clearanceLimitAlert.replace("{sku}", cleanSku).replace("{qty}", String(clearanceRemaining)));
-      next = clearanceRemaining;
+    if (source === "clearance" && delta > 0) {
+      const clearanceRemaining = getClearanceRemainingForSku(cleanSku);
+      const currentNh = getNhQty({ total: catalogQtyMap, nh: nhItemsQtyMap }, cleanSku);
+      if (clearanceRemaining !== null && currentNh + appliedDelta > clearanceRemaining) {
+        alert(t.clearanceLimitAlert.replace("{sku}", cleanSku).replace("{qty}", String(clearanceRemaining)));
+        appliedDelta = clearanceRemaining - currentNh;
+        if (appliedDelta <= 0) return;
+        next = current + appliedDelta;
+      }
     }
 
     const catalogItem = getCatalogItemBySku(cleanSku);
@@ -891,9 +915,18 @@ export default function OrderPage() {
     if (delta > 0 && limitedQty > 0 && next > limitedQty) {
       alert(`${cleanSku} limited qty is ${limitedQty}.`);
       next = limitedQty;
+      appliedDelta = next - current;
     }
 
-    setQtyForSku(cleanSku, next ? String(next) : "");
+    if (!appliedDelta) return;
+
+    const maps = applyQtyDelta(
+      { total: catalogQtyMap, nh: nhItemsQtyMap },
+      cleanSku,
+      appliedDelta,
+      source
+    );
+    applyQtyMaps(maps.total, maps.nh);
   };
 
   const removeSkuFromOrder = (sku: string) => {
@@ -907,12 +940,12 @@ export default function OrderPage() {
       if (!sku) continue;
       const catalogItem = getCatalogItemBySku(sku) || item;
       if (!isOrderableItem(catalogItem)) continue;
-      adjustQtyForSku(sku, 1);
+      adjustQtyForSku(sku, 1, "clearance");
     }
   };
 
   const addAllMissingClearanceUpsell = () => {
-    for (const line of clearanceUpsellLines) adjustQtyForSku(line.sku, 1);
+    for (const line of clearanceUpsellLines) adjustQtyForSku(line.sku, 1, "clearance");
   };
 
   useEffect(() => {
@@ -953,7 +986,7 @@ export default function OrderPage() {
 
     const currentQty = Number(catalogQtyMap[finalSku] || 0);
     const nextQty = currentQty + (Number(String(finalQty).replace(/[^0-9]/g, "")) || 1);
-    setQtyForSku(finalSku, String(nextQty));
+    adjustQtyForSku(finalSku, nextQty - currentQty, "normal");
 
     setSkuInput("");
     setQtyInput("");
@@ -1000,15 +1033,44 @@ export default function OrderPage() {
     const promoRemaining = getPromoRemainingForSku(cleanSku);
     if (clean && promoRemaining !== null && Number(clean) > promoRemaining) {
       alert(t.promoLimitAlert.replace("{sku}", cleanSku).replace("{qty}", String(promoRemaining)));
-      setQtyForSku(cleanSku, promoRemaining ? String(promoRemaining) : "");
+      setQtyForSku(cleanSku, promoRemaining ? String(promoRemaining) : "", "normal");
       return;
     }
 
-    setQtyForSku(cleanSku, clean);
+    setQtyForSku(sku, value, "normal");
+  };
+
+  const updateClearanceQty = (sku: string, value: string) => {
+    const cleanSku = sku.toUpperCase();
+    const clean = value.replace(/[^0-9]/g, "");
+
+    if (clean && Number(clean) > 0 && blockAddForSku(cleanSku)) {
+      return;
+    }
+
+    const clearanceRemaining = getClearanceRemainingForSku(cleanSku);
+    const currentNh = getNhQty({ total: catalogQtyMap, nh: nhItemsQtyMap }, cleanSku);
+    const currentTotal = Number(catalogQtyMap[cleanSku] || 0);
+    const requested = Number(clean) || 0;
+    if (clearanceRemaining !== null && requested > currentTotal) {
+      const nhIncrease = requested - currentTotal;
+      if (currentNh + nhIncrease > clearanceRemaining) {
+        alert(t.clearanceLimitAlert.replace("{sku}", cleanSku).replace("{qty}", String(clearanceRemaining)));
+        const maxTotal = currentTotal + Math.max(0, clearanceRemaining - currentNh);
+        setQtyForSku(cleanSku, maxTotal ? String(maxTotal) : "", "clearance");
+        return;
+      }
+    }
+
+    setQtyForSku(cleanSku, clean, "clearance");
   };
 
   const adjustCatalogQty = (sku: string, delta: number) => {
-    adjustQtyForSku(sku, delta);
+    adjustQtyForSku(sku, delta, "normal");
+  };
+
+  const adjustClearanceQty = (sku: string, delta: number) => {
+    adjustQtyForSku(sku, delta, "clearance");
   };
 
   const reorderItems = (items: CartItem[]) => {
@@ -1064,6 +1126,7 @@ export default function OrderPage() {
 
     setCart([]);
     setCatalogQtyMap({});
+    setNhItemsQtyMap({});
     setShowCart(false);
     setSkuInput("");
     setQtyInput("");
@@ -1100,7 +1163,7 @@ export default function OrderPage() {
   };
 
   const getCurrentSubmitItems = () => {
-    return catalogItemsForSubmit;
+    return expandOrderSubmitLines({ total: catalogQtyMap, nh: nhItemsQtyMap });
   };
 
   const downloadCsv = () => {
@@ -1165,6 +1228,7 @@ export default function OrderPage() {
       }
 
       setCatalogQtyMap(parsedMap);
+      setNhItemsQtyMap({});
       setCart(parsed);
       setSubmitMsg(`${parsed.length} ${t.items} loaded.`);
     } catch (error: any) {
@@ -1248,6 +1312,7 @@ export default function OrderPage() {
       setShowReview(false);
       setCart([]);
       setCatalogQtyMap({});
+      setNhItemsQtyMap({});
       setSkuInput("");
       setQtyInput("");
       setSelectedItem(null);
@@ -1841,7 +1906,7 @@ export default function OrderPage() {
                       unavailableNote={
                         notOrderable ? formatOrderNotAvailableMessage(sku, catalogItem.status, t) : undefined
                       }
-                      onAdjust={adjustCatalogQty} onUpdateQty={updateCatalogQty} />
+                      onAdjust={adjustClearanceQty} onUpdateQty={updateClearanceQty} />
                   );
                 })}
               </div>
@@ -1993,9 +2058,14 @@ export default function OrderPage() {
           setShowCart(false);
           openReview();
         }}
+        onConfirm={() => {
+          setShowCart(false);
+          openReview();
+        }}
+        statusMessage={submitMsg}
         lang={lang}
         items={catalogItemsForSubmit}
-        clearanceSkus={clearanceSkuSet}
+        nhItemsSkus={nhItemsSkuSetForOrder}
         lineCount={cartItemCount}
         totalCases={totalCases}
         submitting={submitting}
@@ -2048,39 +2118,14 @@ export default function OrderPage() {
         onClick={() => (showCart ? toggleCartPanel() : setShowCart(true))}
       />
 
-      <div className="order-fixed-bar">
-        <div className="order-fixed-bar-inner">
-          {submitMsg ? (
-            <div className={`order-fixed-msg${submitMsg.toLowerCase().includes("failed") ? " is-error" : " is-ok"}`}>
-              {submitMsg}
-            </div>
-          ) : null}
-          <div className="order-fixed-bar-layout order-fixed-bar-layout--fab">
-            <div className="order-fixed-cases-stat" aria-live="polite">
-              <span className="order-fixed-cases-stat-value">{totalCases}</span>
-              <span className="order-fixed-cases-stat-label">{t.cases}</span>
-            </div>
-            <button
-              type="button"
-              onClick={openReview}
-              disabled={submitting || cartItemCount === 0}
-              className="order-fixed-btn"
-              style={secondaryButtonStyle}
-            >
-              {t.reviewCart}
-            </button>
-            <button
-              type="button"
-              onClick={openReview}
-              disabled={submitting || cartItemCount === 0}
-              className="order-fixed-btn is-submit"
-              style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}
-            >
-              {submitting ? t.submitting : t.submitOrder}
-            </button>
-          </div>
+      {submitMsg && !showCart ? (
+        <div
+          className={`order-floating-toast${submitMsg.toLowerCase().includes("failed") ? " is-error" : " is-ok"}`}
+          role="status"
+        >
+          {submitMsg}
         </div>
-      </div>
+      ) : null}
 
         <OrderReviewModal
           open={showReview}
@@ -2089,9 +2134,9 @@ export default function OrderPage() {
           items={catalogItemsForSubmit}
           warnings={orderReviewWarnings}
           clearanceUpsellLines={clearanceUpsellLines}
-          onAddUpsellCase={(sku) => adjustQtyForSku(sku, 1)}
+          onAddUpsellCase={(sku) => adjustQtyForSku(sku, 1, "clearance")}
           onAddAllClearanceUpsell={addAllMissingClearanceUpsell}
-          clearanceSkus={clearanceSkuSet}
+          nhItemsSkus={nhItemsSkuSetForOrder}
           promoDealBySku={promoDealBySku}
           newItemsReminder={
             showNewItemsReviewReminder

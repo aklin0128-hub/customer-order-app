@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { prependOrderHistory } from "@/lib/orderHistory";
-import {
-  CLEARANCE_ORDER_EMAIL_TAG,
-  getActiveClearanceSkuSet,
-  incrementClearanceSold,
-} from "@/lib/clearance";
+import { CLEARANCE_ORDER_EMAIL_TAG, incrementClearanceSold } from "@/lib/clearance";
 import { incrementPromotionSold } from "@/lib/promotions";
 import { isValidOrderEmail, resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
 import { getCustomerByAccount, upsertCustomerContact } from "@/lib/customers";
@@ -23,24 +19,24 @@ function csvEscape(value: unknown) {
   return text;
 }
 
-type OrderLine = { sku: string; qty: string };
+type OrderLine = { sku: string; qty: string; nhItems?: boolean };
 
-function formatOrderLine(item: OrderLine, clearanceSkus: Set<string>) {
+function formatOrderLine(item: OrderLine) {
   const sku = String(item.sku || "").trim().toUpperCase();
   const qty = String(item.qty || "").trim();
-  if (clearanceSkus.has(sku)) {
+  if (item.nhItems) {
     return `${sku} - ${qty} - ${CLEARANCE_ORDER_EMAIL_TAG}`;
   }
   return `${sku} - ${qty}`;
 }
 
-function buildCsv(items: OrderLine[], clearanceSkus: Set<string>) {
+function buildCsv(items: OrderLine[]) {
   const rows = [["SKU", "Qty", "Tag"]];
 
   for (const item of items) {
     const sku = String(item.sku || "").trim().toUpperCase();
     const qty = String(item.qty || "").trim();
-    const tag = clearanceSkus.has(sku) ? CLEARANCE_ORDER_EMAIL_TAG : "";
+    const tag = item.nhItems ? CLEARANCE_ORDER_EMAIL_TAG : "";
     rows.push([sku, qty, tag]);
   }
 
@@ -77,6 +73,7 @@ export async function POST(req: Request) {
       .map((item: any) => ({
         sku: String(item?.sku || "").trim().toUpperCase(),
         qty: String(item?.qty || "").trim(),
+        nhItems: Boolean(item?.nhItems),
       }))
       .filter((item: OrderLine) => item.sku && item.qty);
 
@@ -115,11 +112,8 @@ export async function POST(req: Request) {
       orderRef ||
       `${accountNo}-${new Date().toISOString().slice(5, 10).replace("-", "")}`;
 
-    const clearanceSkus = await getActiveClearanceSkuSet();
-    const csv = buildCsv(cleanedItems, clearanceSkus);
-    const clearanceLineCount = cleanedItems.filter((item) =>
-      clearanceSkus.has(item.sku)
-    ).length;
+    const csv = buildCsv(cleanedItems);
+    const clearanceLineCount = cleanedItems.filter((item) => item.nhItems).length;
 
     const today = new Date().toISOString().slice(0, 10);
     const filename = `${accountNo}_order_${today}.csv`;
@@ -158,7 +152,7 @@ export async function POST(req: Request) {
         ...(clearanceLineCount > 0
           ? [`Clearance (${CLEARANCE_ORDER_EMAIL_TAG}): ${clearanceLineCount}`, ``]
           : []),
-        ...cleanedItems.map((item) => formatOrderLine(item, clearanceSkus)),
+        ...cleanedItems.map((item) => formatOrderLine(item)),
       ].join("\n"),
       attachments: [
         {
@@ -172,11 +166,17 @@ export async function POST(req: Request) {
       sku: item.sku,
       qty: Number(item.qty) || 0,
     }));
+    const nhSoldQtyItems = cleanedItems
+      .filter((item) => item.nhItems)
+      .map((item) => ({
+        sku: item.sku,
+        qty: Number(item.qty) || 0,
+      }));
 
     await prependOrderHistory(order);
     await mergeRecentItems(accountNo, cleanedItems);
     await incrementPromotionSold(soldQtyItems);
-    await incrementClearanceSold(soldQtyItems);
+    await incrementClearanceSold(nhSoldQtyItems);
 
     return NextResponse.json({
       success: true,
