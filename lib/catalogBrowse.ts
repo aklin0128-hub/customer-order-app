@@ -1,3 +1,5 @@
+import { isOrderableCatalogStatus } from "@/lib/orderableCatalog";
+
 export type CatalogBrowseItem = {
   sku: string;
   name?: string;
@@ -43,14 +45,23 @@ export function toCatalogBrowseItem(raw: Record<string, unknown>): CatalogBrowse
   };
 }
 
-export function mapProductsToCatalogBrowse(products: unknown[]): CatalogBrowseItem[] {
+export function filterAvailableCatalogBrowseItems(items: CatalogBrowseItem[]): CatalogBrowseItem[] {
+  return items.filter((item) => isOrderableCatalogStatus(item.status));
+}
+
+export function mapProductsToCatalogBrowse(
+  products: unknown[],
+  options?: { availableOnly?: boolean }
+): CatalogBrowseItem[] {
   const items: CatalogBrowseItem[] = [];
   for (const raw of products) {
     if (!raw || typeof raw !== "object") continue;
     const item = toCatalogBrowseItem(raw as Record<string, unknown>);
     if (item) items.push(item);
   }
-  return sortCatalogBrowseItems(items);
+  const sorted = sortCatalogBrowseItems(items);
+  if (options?.availableOnly === false) return sorted;
+  return filterAvailableCatalogBrowseItems(sorted);
 }
 
 export function filterCatalogBrowseItems(items: CatalogBrowseItem[], query: string): CatalogBrowseItem[] {

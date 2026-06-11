@@ -1,19 +1,19 @@
 "use client";
 
-import { useVirtualizer } from "@tanstack/react-virtual";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import type { Lang } from "@/app/order/types";
 import {
-  displayCatalogStatus,
   filterCatalogBrowseItems,
   mapProductsToCatalogBrowse,
   type CatalogBrowseItem,
 } from "@/lib/catalogBrowse";
 
-import "./catalog.css";
+import { CatalogBrowseGrid } from "./CatalogBrowseGrid";
 
-type Lang = "en" | "zh" | "ko" | "vi";
+import "../order/order.css";
+import "./catalog.css";
 
 const LANG_KEY = "catalog_lang";
 
@@ -21,7 +21,7 @@ const copy = {
   en: {
     brand: "Store Portal",
     title: "SKU catalog",
-    subtitle: "Product reference sorted by SKU number. Sign in to place orders.",
+    subtitle: "Available products only, sorted by SKU number. Sign in to place orders.",
     searchPlaceholder: "Search SKU, name, brand, UPC…",
     signIn: "Sign in to order",
     newItems: "New items",
@@ -31,20 +31,16 @@ const copy = {
     loading: "Loading catalog…",
     loadError: "Could not load catalog. Please refresh.",
     emptySearch: "No SKUs match your search.",
-    colSku: "SKU",
-    colBrand: "Brand",
-    colName: "Name",
-    colSize: "Size",
-    colUpc: "UPC",
-    colCategory: "Category",
-    colStatus: "Status",
-    colPallet: "Pallet",
     sortedBy: "Sorted by SKU (A→Z, numeric)",
+    size: "Size",
+    pallet: "Pallet",
+    upc: "UPC",
+    category: "Category",
   },
   zh: {
     brand: "门店订货",
     title: "SKU 目录",
-    subtitle: "按 SKU 编号排序的产品信息。登录后可下单。",
+    subtitle: "仅显示可下单商品，按 SKU 编号排序。登录后可下单。",
     searchPlaceholder: "搜索 SKU、品名、品牌、条码…",
     signIn: "登录下单",
     newItems: "新品",
@@ -54,20 +50,16 @@ const copy = {
     loading: "正在加载目录…",
     loadError: "无法加载目录，请刷新页面。",
     emptySearch: "没有匹配的 SKU。",
-    colSku: "SKU",
-    colBrand: "品牌",
-    colName: "品名",
-    colSize: "规格",
-    colUpc: "条码",
-    colCategory: "分类",
-    colStatus: "状态",
-    colPallet: "托盘",
     sortedBy: "按 SKU 编号排序",
+    size: "规格",
+    pallet: "托盘",
+    upc: "条码",
+    category: "分类",
   },
   ko: {
     brand: "매장 주문",
     title: "SKU 카탈로그",
-    subtitle: "SKU 번호순 제품 정보. 로그인 후 주문할 수 있습니다.",
+    subtitle: "주문 가능 상품만 SKU 번호순으로 표시합니다. 로그인 후 주문할 수 있습니다.",
     searchPlaceholder: "SKU, 품명, 브랜드, 바코드 검색…",
     signIn: "로그인 후 주문",
     newItems: "신상품",
@@ -77,20 +69,16 @@ const copy = {
     loading: "카탈로그 불러오는 중…",
     loadError: "카탈로그를 불러올 수 없습니다. 새로고침하세요.",
     emptySearch: "일치하는 SKU가 없습니다.",
-    colSku: "SKU",
-    colBrand: "브랜드",
-    colName: "품명",
-    colSize: "규격",
-    colUpc: "바코드",
-    colCategory: "분류",
-    colStatus: "상태",
-    colPallet: "팔레트",
     sortedBy: "SKU 번호순 정렬",
+    size: "규격",
+    pallet: "팔레트",
+    upc: "바코드",
+    category: "분류",
   },
   vi: {
     brand: "Cửa hàng",
     title: "Danh mục SKU",
-    subtitle: "Thông tin sản phẩm theo số SKU. Đăng nhập để đặt hàng.",
+    subtitle: "Chỉ hiển thị SKU có thể đặt, sắp xếp theo số SKU. Đăng nhập để đặt hàng.",
     searchPlaceholder: "Tìm SKU, tên, thương hiệu, mã vạch…",
     signIn: "Đăng nhập để đặt",
     newItems: "Hàng mới",
@@ -100,15 +88,11 @@ const copy = {
     loading: "Đang tải danh mục…",
     loadError: "Không tải được danh mục. Vui lòng tải lại.",
     emptySearch: "Không có SKU phù hợp.",
-    colSku: "SKU",
-    colBrand: "Thương hiệu",
-    colName: "Tên",
-    colSize: "Quy cách",
-    colUpc: "Mã vạch",
-    colCategory: "Loại",
-    colStatus: "Trạng thái",
-    colPallet: "Pallet",
     sortedBy: "Sắp xếp theo số SKU",
+    size: "Quy cách",
+    pallet: "Pallet",
+    upc: "Mã vạch",
+    category: "Loại",
   },
 };
 
@@ -119,83 +103,11 @@ const langLabels: Record<Lang, string> = {
   vi: "VI",
 };
 
-const ROW_HEIGHT = 52;
-
 function readLang(): Lang {
   if (typeof window === "undefined") return "en";
   const saved = localStorage.getItem(LANG_KEY);
   if (saved === "zh" || saved === "ko" || saved === "vi" || saved === "en") return saved;
   return "en";
-}
-
-function formatBrand(brand?: string) {
-  if (!brand) return "—";
-  return brand
-    .toLowerCase()
-    .split(/\s+/)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function itemName(item: CatalogBrowseItem, lang: Lang) {
-  if (lang === "ko" && item.name_k) return item.name_k;
-  return item.name || "—";
-}
-
-function StatusPill({ status }: { status?: string }) {
-  const label = displayCatalogStatus(status);
-  if (!label) return <span className="catalog-status catalog-status--normal">OK</span>;
-  const tone =
-    label === "DISCONTINUED"
-      ? "catalog-status--discontinued"
-      : label === "LIMITED" || label === "NEW"
-        ? "catalog-status--limited"
-        : "catalog-status--other";
-  return <span className={`catalog-status ${tone}`}>{label}</span>;
-}
-
-function CatalogThumb({ item }: { item: CatalogBrowseItem }) {
-  const [error, setError] = useState(false);
-  const src = item.imageUrl || `/product/${item.sku}.jpg`;
-
-  if (error) {
-    return <div className="catalog-thumb catalog-thumb--placeholder" aria-hidden />;
-  }
-
-  return (
-    <img
-      src={src}
-      alt=""
-      loading="lazy"
-      className="catalog-thumb"
-      onError={() => setError(true)}
-    />
-  );
-}
-
-function CatalogRow({ item, lang }: { item: CatalogBrowseItem; lang: Lang }) {
-  const upc = item.upc || item.barcode || "—";
-  return (
-    <div className="catalog-row">
-      <div className="catalog-cell catalog-cell--sku">{item.sku}</div>
-      <div className="catalog-cell catalog-cell--thumb">
-        <CatalogThumb item={item} />
-      </div>
-      <div className="catalog-cell catalog-cell--brand" title={item.brand || ""}>
-        {formatBrand(item.brand)}
-      </div>
-      <div className="catalog-cell catalog-cell--name" title={itemName(item, lang)}>
-        {itemName(item, lang)}
-      </div>
-      <div className="catalog-cell catalog-cell--size">{item.size || "—"}</div>
-      <div className="catalog-cell catalog-cell--upc">{upc}</div>
-      <div className="catalog-cell catalog-cell--category">{item.category || "—"}</div>
-      <div className="catalog-cell catalog-cell--status">
-        <StatusPill status={item.status} />
-      </div>
-      <div className="catalog-cell catalog-cell--pallet">{item.palletSize || "—"}</div>
-    </div>
-  );
 }
 
 export default function CatalogBrowseClient() {
@@ -204,8 +116,6 @@ export default function CatalogBrowseClient() {
   const [items, setItems] = useState<CatalogBrowseItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLang(readLang());
@@ -248,13 +158,6 @@ export default function CatalogBrowseClient() {
   const t = copy[lang];
 
   const filtered = useMemo(() => filterCatalogBrowseItems(items, query), [items, query]);
-
-  const virtualizer = useVirtualizer({
-    count: filtered.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_HEIGHT,
-    overscan: 12,
-  });
 
   const langButtons = useMemo(
     () =>
@@ -325,53 +228,24 @@ export default function CatalogBrowseClient() {
         </div>
       </header>
 
-      <div className="catalog-table-wrap">
-        <div className="catalog-table-head" aria-hidden>
-          <div className="catalog-row catalog-row--head">
-            <div className="catalog-cell catalog-cell--sku">{t.colSku}</div>
-            <div className="catalog-cell catalog-cell--thumb" />
-            <div className="catalog-cell catalog-cell--brand">{t.colBrand}</div>
-            <div className="catalog-cell catalog-cell--name">{t.colName}</div>
-            <div className="catalog-cell catalog-cell--size">{t.colSize}</div>
-            <div className="catalog-cell catalog-cell--upc">{t.colUpc}</div>
-            <div className="catalog-cell catalog-cell--category">{t.colCategory}</div>
-            <div className="catalog-cell catalog-cell--status">{t.colStatus}</div>
-            <div className="catalog-cell catalog-cell--pallet">{t.colPallet}</div>
-          </div>
-        </div>
-
-        <div ref={scrollRef} className="catalog-table-body">
-          {loading ? (
-            <div className="catalog-empty">{t.loading}</div>
-          ) : error ? (
-            <div className="catalog-empty catalog-empty--error">{t.loadError}</div>
-          ) : filtered.length === 0 ? (
-            <div className="catalog-empty">{t.emptySearch}</div>
-          ) : (
-            <div
-              className="catalog-virtual-spacer"
-              style={{ height: virtualizer.getTotalSize() }}
-            >
-              {virtualizer.getVirtualItems().map((vr) => {
-                const item = filtered[vr.index];
-                if (!item) return null;
-                return (
-                  <div
-                    key={item.sku}
-                    className="catalog-virtual-row"
-                    style={{
-                      transform: `translateY(${vr.start}px)`,
-                      height: ROW_HEIGHT,
-                    }}
-                  >
-                    <CatalogRow item={item} lang={lang} />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
+      <section className="catalog-grid-wrap order-shop-card">
+        {loading ? (
+          <div className="catalog-empty">{t.loading}</div>
+        ) : error ? (
+          <div className="catalog-empty catalog-empty--error">{t.loadError}</div>
+        ) : filtered.length === 0 ? (
+          <div className="catalog-empty">{t.emptySearch}</div>
+        ) : (
+          <CatalogBrowseGrid
+            items={filtered}
+            lang={lang}
+            sizeLabel={t.size}
+            palletLabel={t.pallet}
+            upcLabel={t.upc}
+            categoryLabel={t.category}
+          />
+        )}
+      </section>
     </div>
   );
 }

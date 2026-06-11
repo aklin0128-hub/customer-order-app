@@ -15,14 +15,29 @@ test("sortCatalogBrowseItems sorts SKU numerically", () => {
 });
 
 test("mapProductsToCatalogBrowse strips non-catalog fields", () => {
-  const items = mapProductsToCatalogBrowse([
-    { sku: "abc123", name: "Rice", bp: 9.99, inventory: 100 },
-    { sku: "bad sku", name: "Skip" },
-  ]);
+  const items = mapProductsToCatalogBrowse(
+    [
+      { sku: "abc123", name: "Rice", status: "NORMAL", bp: 9.99, inventory: 100 },
+      { sku: "bad sku", name: "Skip" },
+    ],
+    { availableOnly: false }
+  );
   assert.equal(items.length, 1);
   assert.equal(items[0]?.sku, "ABC123");
   assert.equal(items[0]?.name, "Rice");
   assert.equal("bp" in (items[0] || {}), false);
+});
+
+test("mapProductsToCatalogBrowse keeps only orderable statuses by default", () => {
+  const items = mapProductsToCatalogBrowse([
+    { sku: "A1", status: "NORMAL" },
+    { sku: "A2", status: "DISCONTINUED" },
+    { sku: "A3", status: "TBD" },
+  ]);
+  assert.deepEqual(
+    items.map((item) => item.sku),
+    ["A1", "A3"]
+  );
 });
 
 test("filterCatalogBrowseItems matches sku and upc digits", () => {
