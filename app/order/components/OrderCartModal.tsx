@@ -37,9 +37,9 @@ export function OrderCartModal({
   totalCases: number;
   submitting: boolean;
   statusMessage?: string;
-  onAdjustQty: (sku: string, delta: number) => void;
-  onQtyInput: (sku: string, value: string) => void;
-  onRemove: (sku: string) => void;
+  onAdjustQty: (sku: string, delta: number, nhItems?: boolean) => void;
+  onQtyInput: (sku: string, value: string, nhItems?: boolean) => void;
+  onRemove: (sku: string, nhItems?: boolean) => void;
   nudge?: ReactNode;
   tools?: ReactNode;
 }) {

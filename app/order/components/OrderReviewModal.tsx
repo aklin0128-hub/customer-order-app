@@ -64,9 +64,9 @@ export function OrderReviewModal({
   accountNo: string;
   storeName: string;
   submitting: boolean;
-  onAdjustQty: (sku: string, delta: number) => void;
-  onQtyInput: (sku: string, value: string) => void;
-  onRemove: (sku: string) => void;
+  onAdjustQty: (sku: string, delta: number, nhItems?: boolean) => void;
+  onQtyInput: (sku: string, value: string, nhItems?: boolean) => void;
+  onRemove: (sku: string, nhItems?: boolean) => void;
   onSubmit: () => void | Promise<void>;
 }) {
   useEffect(() => {
@@ -259,12 +259,12 @@ function OrderReviewModalContent({
             {items.map((item, index) => {
               const catalogItem = getCatalogItemBySku(item.sku);
               const cleanSku = item.sku.toUpperCase();
-              const isClearance = nhItemsSkus?.has(cleanSku) ?? false;
+              const isClearance = Boolean(item.nhItems);
               const promoDeal = promoDealBySku?.[cleanSku];
               const hasMetaLine = !!(catalogItem?.limitedQty || catalogItem?.palletSize);
 
               return (
-                <article key={`${item.sku}-${index}`} style={reviewItemStyle}>
+                <article key={`${item.sku}-${item.nhItems ? "nh" : "cat"}-${index}`} style={reviewItemStyle}>
                   <div style={{ flex: "1 1 min(260px, 100%)", minWidth: 0, display: "flex", gap: 10 }}>
                     <ProductImage sku={item.sku} alt={item.sku} size={48} imageUrl={catalogItem?.imageUrl} />
                     <div style={{ minWidth: 0 }}>
@@ -305,19 +305,19 @@ function OrderReviewModalContent({
 
                   <div style={compactQtyStripWrapStyle}>
                     <div style={{ ...reviewQtyControlStyle, width: "100%", maxWidth: 300 }}>
-                      <button type="button" onClick={() => onAdjustQty(item.sku, -1)} style={reviewQtyButtonStyle}>
+                      <button type="button" onClick={() => onAdjustQty(item.sku, -1, item.nhItems)} style={reviewQtyButtonStyle}>
                         −
                       </button>
                       <input
                         value={item.qty}
-                        onChange={(e) => onQtyInput(item.sku, e.target.value)}
+                        onChange={(e) => onQtyInput(item.sku, e.target.value, item.nhItems)}
                         inputMode="numeric"
                         style={reviewQtyInputStyle}
                       />
-                      <button type="button" onClick={() => onAdjustQty(item.sku, 1)} style={reviewQtyButtonStyle}>
+                      <button type="button" onClick={() => onAdjustQty(item.sku, 1, item.nhItems)} style={reviewQtyButtonStyle}>
                         +
                       </button>
-                      <button type="button" onClick={() => onRemove(item.sku)} style={reviewRemoveButtonStyle}>
+                      <button type="button" onClick={() => onRemove(item.sku, item.nhItems)} style={reviewRemoveButtonStyle}>
                         {t.remove}
                       </button>
                     </div>

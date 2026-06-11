@@ -31,9 +31,9 @@ export function OrderCartSection({
   onClose?: () => void;
   lineCount: number;
   totalCases: number;
-  onAdjustQty: (sku: string, delta: number) => void;
-  onQtyInput: (sku: string, value: string) => void;
-  onRemove: (sku: string) => void;
+  onAdjustQty: (sku: string, delta: number, nhItems?: boolean) => void;
+  onQtyInput: (sku: string, value: string, nhItems?: boolean) => void;
+  onRemove: (sku: string, nhItems?: boolean) => void;
   nudge?: ReactNode;
   tools?: ReactNode;
 }) {
@@ -94,8 +94,9 @@ export function OrderCartSection({
             <div className="order-cart-list">
               {items.map((item) => {
                 const catalogItem = getCatalogItemBySku(item.sku);
+                const lineKey = `${item.sku}-${item.nhItems ? "nh" : "cat"}`;
                 return (
-                  <div key={item.sku} className="order-cart-row">
+                  <div key={lineKey} className="order-cart-row">
                     <ProductImage sku={item.sku} alt={item.sku} size={48} imageUrl={catalogItem?.imageUrl} />
                     <div className="order-cart-row-info">
                       <div className="order-cart-row-sku">{item.sku}</div>
@@ -110,27 +111,27 @@ export function OrderCartSection({
                           {t.limited}: {catalogItem.limitedQty}
                         </div>
                       ) : null}
-                      {nhItemsSkus?.has(item.sku.toUpperCase()) ? (
+                      {item.nhItems ? (
                         <div style={{ ...clearancePolicyStyle, marginTop: 4, fontSize: 10 }}>{t.clearanceNoReturn}</div>
                       ) : null}
                     </div>
                     <div className="order-cart-row-actions">
                       <div className="order-cart-qty">
-                        <button type="button" onClick={() => onAdjustQty(item.sku, -1)} className="order-cart-qty-btn" aria-label="-">
+                        <button type="button" onClick={() => onAdjustQty(item.sku, -1, item.nhItems)} className="order-cart-qty-btn" aria-label="-">
                           −
                         </button>
                         <input
                           value={item.qty}
-                          onChange={(e) => onQtyInput(item.sku, e.target.value)}
+                          onChange={(e) => onQtyInput(item.sku, e.target.value, item.nhItems)}
                           inputMode="numeric"
                           className="order-cart-qty-input"
                           aria-label={item.sku}
                         />
-                        <button type="button" onClick={() => onAdjustQty(item.sku, 1)} className="order-cart-qty-btn" aria-label="+">
+                        <button type="button" onClick={() => onAdjustQty(item.sku, 1, item.nhItems)} className="order-cart-qty-btn" aria-label="+">
                           +
                         </button>
                       </div>
-                      <button type="button" onClick={() => onRemove(item.sku)} className="order-cart-remove-btn">
+                      <button type="button" onClick={() => onRemove(item.sku, item.nhItems)} className="order-cart-remove-btn">
                         {t.remove}
                       </button>
                     </div>
