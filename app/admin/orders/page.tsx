@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminPage } from "../_components/AdminPage";
 import { inputStyle, panel, panelTitle } from "../_components/admin-styles";
 import {
@@ -41,6 +41,14 @@ export default function AdminOrdersPage() {
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
 
+  const searchDebounced = search.trim();
+  const listDebounceMs = searchDebounced ? 300 : 0;
+
+  const onListError = useCallback((message: string) => {
+    setMsg(message);
+    setMsgTone("error");
+  }, []);
+
   const {
     items: orders,
     setItems: setOrders,
@@ -51,24 +59,31 @@ export default function AdminOrdersPage() {
     busy: listBusy,
     load: loadOrders,
   } = useAdminList<OrderRecord>({
-    buildParams: (page) => {
-      const params = new URLSearchParams({ page: String(page), limit: "40" });
-      if (search.trim()) params.set("q", search.trim());
-      return params;
-    },
+    buildParams: useCallback(
+      (page) => {
+        const params = new URLSearchParams({ page: String(page), limit: "40" });
+        if (searchDebounced) params.set("q", searchDebounced);
+        return params;
+      },
+      [searchDebounced]
+    ),
     fetchPath: "/api/admin/orders",
-    pickItems: (data) => (Array.isArray(data.orders) ? (data.orders as OrderRecord[]) : []),
-    pickMeta: (data) => ({
-      total: Number(data.total) || 0,
-      totalPages: Number(data.totalPages) || 1,
-      page: Number(data.page) || 1,
-    }),
-    debounceMs: search ? 300 : 0,
-    deps: [search],
-    onError: (message) => {
-      setMsg(message);
-      setMsgTone("error");
-    },
+    pickItems: useCallback(
+      (data: Record<string, unknown>) =>
+        Array.isArray(data.orders) ? (data.orders as OrderRecord[]) : [],
+      []
+    ),
+    pickMeta: useCallback(
+      (data: Record<string, unknown>) => ({
+        total: Number(data.total) || 0,
+        totalPages: Number(data.totalPages) || 1,
+        page: Number(data.page) || 1,
+      }),
+      []
+    ),
+    debounceMs: listDebounceMs,
+    deps: [searchDebounced],
+    onError: onListError,
   });
 
   useEffect(() => {
