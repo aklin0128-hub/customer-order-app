@@ -12,6 +12,7 @@ import { CatalogQtyCard } from "./components/CatalogQtyCard";
 import { OrderCartModal } from "./components/OrderCartModal";
 import { OrderFloatingCartFab } from "./components/OrderFloatingCartFab";
 import { OrderPastOrdersModal } from "./components/OrderPastOrdersModal";
+import { OrderQuickOrderPanel } from "./components/OrderQuickOrderPanel";
 import { OrderShopNudge } from "./components/OrderShopNudge";
 import { RecommendedStrip } from "./components/RecommendedStrip";
 import { OrderInput } from "./components/OrderInput";
@@ -78,10 +79,8 @@ import {
   modeButtonStyle,
   newItemsModeButtonStyle,
   primarySmallButtonStyle,
-  productSmallButtonStyle,
   clearanceModeButtonStyle,
   promoModeButtonStyle,
-  qtyButtonStyle,
   secondaryButtonStyle,
   sectionTitleStyle,
   sectionToggleStyle,
@@ -99,7 +98,6 @@ const ORDER_LANG_LABELS: Record<Lang, string> = {
   vi: "Tiếng Việt",
 };
 
-const quickQtyButtons = ["1", "2", "3", "4", "5", "10", "15", "20"];
 
 const categoryOptions = CATEGORY_OPTIONS;
 
@@ -111,6 +109,7 @@ export default function OrderPage() {
   const submitLockRef = useRef(false);
   const autoLoadedRef = useRef(false);
   const clearanceFetchedRef = useRef(false);
+  const transientMsgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draftSnapshotRef = useRef({
     accountNo: "",
     storeName: "",
@@ -140,6 +139,7 @@ export default function OrderPage() {
   const [brandFilter, setBrandFilter] = useState("ALL");
   const [submitting, setSubmitting] = useState(false);
   const [submitMsg, setSubmitMsg] = useState("");
+  const [toastMsg, setToastMsg] = useState("");
   const [showReview, setShowReview] = useState(false);
   const [lastSubmittedRef, setLastSubmittedRef] = useState("");
   const [lastSubmittedItems, setLastSubmittedItems] = useState<CartItem[]>([]);
@@ -152,7 +152,6 @@ export default function OrderPage() {
     Record<string, CustomerInvoicePriceEntry>
   >({});
   const [fullscreen, setFullscreen] = useState(false);
-  const [showRecent, setShowRecent] = useState(false);
   const [showPastOrders, setShowPastOrders] = useState(false);
   const [showCart, setShowCart] = useState(false);
   const [catalogShowSelectedOnly, setCatalogShowSelectedOnly] = useState(false);
@@ -180,6 +179,30 @@ export default function OrderPage() {
   const categoryAllActive = categoryFilters.length === 0;
 
   const t = copy[lang];
+
+  const showTransientToast = useCallback((message: string, ms = 4000) => {
+    if (transientMsgTimerRef.current) clearTimeout(transientMsgTimerRef.current);
+    setToastMsg(message);
+    transientMsgTimerRef.current = setTimeout(() => {
+      setToastMsg((current) => (current === message ? "" : current));
+      transientMsgTimerRef.current = null;
+    }, ms);
+  }, []);
+
+  const dismissFloatingNotice = useCallback(() => {
+    if (transientMsgTimerRef.current) {
+      clearTimeout(transientMsgTimerRef.current);
+      transientMsgTimerRef.current = null;
+    }
+    setToastMsg("");
+    setSubmitMsg("");
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (transientMsgTimerRef.current) clearTimeout(transientMsgTimerRef.current);
+    };
+  }, []);
 
   const invoicePriceLabelForSku = useCallback(
     (sku: string) =>
@@ -272,7 +295,7 @@ export default function OrderPage() {
   const changeMode = (next: OrderMode) => {
     setMode(next);
     localStorage.setItem("order_mode", next);
-    setSubmitMsg("");
+    dismissFloatingNotice();
   };
 
   const setFullscreenMode = async (next: boolean) => {
@@ -399,7 +422,7 @@ export default function OrderPage() {
         applyDraft(merged);
         localStorage.setItem(`draft_${accountNo}`, JSON.stringify(merged));
         if (countDraftItems(merged) > 0) {
-          setSubmitMsg(t.loadedDraft);
+          showTransientToast(t.loadedDraft);
         }
       }
 
@@ -444,7 +467,8 @@ export default function OrderPage() {
     };
 
     loadDrafts();
-  }, [ready, accountNo, autoLoaded, t.loadedDraft]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, accountNo, autoLoaded]);
 
   useEffect(() => {
     if (!ready || !accountNo || !autoLoaded) return;
@@ -1108,7 +1132,7 @@ export default function OrderPage() {
       }
       return next;
     });
-    setSubmitMsg(`${orderable.length} ${t.items} added.`);
+    showTransientToast(`${orderable.length} ${t.items} added.`);
     // Do not auto-focus SKU input; prevents page from jumping.
   };
 
@@ -1133,7 +1157,7 @@ export default function OrderPage() {
     setSkuInput("");
     setQtyInput("");
     setSelectedItem(null);
-    setSubmitMsg(t.cleared);
+    showTransientToast(t.cleared);
     localStorage.removeItem(`draft_${accountNo}`);
 
     try {
@@ -1232,7 +1256,7 @@ export default function OrderPage() {
       setCatalogQtyMap(parsedMap);
       setClearanceQtyMap({});
       setCart(parsed);
-      setSubmitMsg(`${parsed.length} ${t.items} loaded.`);
+      showTransientToast(`${parsed.length} ${t.items} loaded.`);
     } catch (error: any) {
       alert(error?.message || "Failed to read CSV.");
     } finally {
@@ -1601,175 +1625,73 @@ export default function OrderPage() {
             ) : null}
 
             {mode === "search" ? (
-              <div className="order-sticky-search-row is-single">
-                <input
-                  ref={skuInputRef}
-                  value={skuInput}
-                  onChange={(e) => setSkuInput(e.target.value.toUpperCase())}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addItem();
-                    }
-                  }}
-                  placeholder={t.searchPlaceholder}
-                  autoCapitalize="characters"
-                  className="order-sticky-search-input"
-                  aria-label={t.skuItem}
-                />
-              </div>
+              <>
+                <div className="order-sticky-search-row is-single">
+                  <input
+                    ref={skuInputRef}
+                    value={skuInput}
+                    onChange={(e) => setSkuInput(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addItem();
+                      }
+                    }}
+                    placeholder={t.searchPlaceholder}
+                    autoCapitalize="characters"
+                    className="order-sticky-search-input"
+                    aria-label={t.skuItem}
+                  />
+                </div>
+                <div className="order-sticky-search-row order-sticky-search-composer">
+                  <input
+                    value={qtyInput}
+                    onChange={(e) => setQtyInput(e.target.value.replace(/[^0-9]/g, ""))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addItem();
+                      }
+                    }}
+                    placeholder="1"
+                    inputMode="numeric"
+                    className="order-sticky-search-qty"
+                    aria-label={t.qty}
+                  />
+                  <button type="button" className="order-sticky-search-add" onClick={addItem}>
+                    {t.addItem}
+                  </button>
+                </div>
+              </>
             ) : null}
           </div>
         </div>
 
-        {mode === "search" && recentItems.length > 0 ? (
-          <section style={cardStyle} className="order-compact-fold order-aux-section">
-            <button type="button" onClick={() => setShowRecent((prev) => !prev)} className="order-compact-fold-btn">
-              <span className="order-compact-fold-title">{t.recent}</span>
-              <span className="order-compact-fold-action">{showRecent ? t.hide : t.show}</span>
-            </button>
-
-            {showRecent ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10, overflow: "visible" }}>
-                {recentItems.slice(0, 12).map((item) => {
-                  const catalogItem = getCatalogItemBySku(item.sku);
-                  return (
-                    <button key={item.sku} type="button" onClick={() => addSkuToCart(item.sku, item.qty || "1")} style={productSmallButtonStyle}>
-                      <ProductImage sku={item.sku} alt={item.sku} size={42} imageUrl={catalogItem?.imageUrl} />
-                      <div style={{ flex: 1, minWidth: 0, overflow: "visible" }}>
-                        <div style={{ fontSize: 13, fontWeight: 900 }}>{item.sku}</div>
-                        {catalogItem ? <div style={{ fontSize: 11, color: "#4b5563" }}>{catalogItem.brand ? `${catalogItem.brand} | ` : ""}{catalogItem.name || ""}</div> : null}
-                      </div>
-                      <div style={{ fontSize: 12, fontWeight: 800, color: "#2563eb" }}>+ {item.qty || "1"}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-
         {mode === "search" ? (
-          <section style={cardStyle} className="order-shop-card">
-            <div style={{ ...sectionTitleStyle, marginBottom: 8 }}>{t.addItems}</div>
-            <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 10px", lineHeight: 1.45 }}>{t.searchModeHint}</p>
-
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 800, color: "#374151", marginBottom: 10 }}>
-              <input type="checkbox" checked={showAvailableOnly} onChange={(e) => setShowAvailableOnly(e.target.checked)} />
-              {t.availableOnly}
-            </label>
-
-            {normalizedSkuInput && matchedItems.length === 0 ? (
-              <div style={{ marginTop: 10, padding: 12, borderRadius: 10, background: "#f9fafb", color: "#6b7280", fontSize: 13, textAlign: "center" }}>
-                {t.noMatches}
-              </div>
-            ) : null}
-
-            {matchedItems.length > 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
-                {matchedItems.slice(0, 40).map((item, index) => {
-                  const isActive = selectedItem?.sku === item.sku || (!selectedItem && index === 0);
-                  const inCart = Number(catalogQtyMap[(item.sku || "").toUpperCase()] || 0) > 0;
-                  const canOrder = isOrderableItem(item);
-                  return (
-                    <div
-                      key={item.sku}
-                      style={{
-                        position: "relative",
-                        border: isActive ? "2px solid #2563eb" : "1px solid #e5e7eb",
-                        background: inCart ? "#ecfdf5" : isActive ? "#eff6ff" : canOrder ? "#ffffff" : "#f3f4f6",
-                        borderRadius: 12,
-                        padding: 10,
-                        opacity: canOrder ? 1 : 0.72,
-                      }}
-                    >
-                      {showAdminEditLinks ? (
-                        <a
-                          href={`/admin/products?sku=${encodeURIComponent(item.sku)}`}
-                          style={{
-                            position: "absolute",
-                            top: 8,
-                            right: 8,
-                            zIndex: 2,
-                            border: "1px solid #bfdbfe",
-                            borderRadius: 999,
-                            background: "#eff6ff",
-                            color: "#2563eb",
-                            padding: "3px 8px",
-                            fontSize: 10,
-                            fontWeight: 900,
-                            textDecoration: "none",
-                          }}
-                        >
-                          {t.editProduct}
-                        </a>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => { setSelectedItem(item); setSkuInput(item.sku); }}
-                        style={{ width: "100%", border: "none", background: "transparent", padding: 0, textAlign: "left", cursor: "pointer" }}
-                      >
-                        <div style={{ display: "grid", gridTemplateColumns: "52px 1fr", gap: 10, alignItems: "start" }}>
-                          <ProductImage sku={item.sku} alt={item.name || item.sku} size={52} imageUrl={item.imageUrl} />
-                          <div>
-                            <div style={{ fontSize: 14, fontWeight: 800, color: "#111827" }}>
-                              {item.sku}{item.brand ? ` | ${item.brand}` : ""}
-                              {inCart ? <span style={{ marginLeft: 6, fontSize: 10, color: "#059669" }}>· {t.inCart}</span> : null}
-                            </div>
-                            <div style={{ fontSize: 12, color: "#374151", marginTop: 3, lineHeight: 1.4 }}>{item.name || "-"}</div>
-                            {renderProductMeta(item)}
-                            {invoicePriceLabelForSku(item.sku) ? (
-                              <div style={{ marginTop: 6, fontSize: 12, fontWeight: 800, color: "#0f766e" }}>
-                                {invoicePriceLabelForSku(item.sku)}
-                              </div>
-                            ) : null}
-                            {!canOrder ? (
-                              <div style={{ marginTop: 6, fontSize: 11, fontWeight: 800, color: "#b91c1c", lineHeight: 1.35 }}>
-                                {formatOrderNotAvailableMessage(item.sku || "", item.status, t)}
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-                      </button>
-                      <div style={{ display: "flex", gap: 6, marginTop: 8, alignItems: "center" }}>
-                        <button type="button" onClick={() => adjustCatalogQty(item.sku, -1)} disabled={!canOrder} style={{ ...stepButtonStyle, width: 36, opacity: canOrder ? 1 : 0.5 }}>−</button>
-                        <input
-                          value={catalogQtyMap[(item.sku || "").toUpperCase()] || ""}
-                          onChange={(e) => updateCatalogQty(item.sku, e.target.value)}
-                          placeholder="0"
-                          inputMode="numeric"
-                          disabled={!canOrder}
-                          style={{ ...stepInputStyle, flex: 1, opacity: canOrder ? 1 : 0.5 }}
-                        />
-                        <button type="button" onClick={() => adjustCatalogQty(item.sku, 1)} disabled={!canOrder} style={{ ...stepButtonStyle, width: 36, opacity: canOrder ? 1 : 0.5 }}>+</button>
-                        <button
-                          type="button"
-                          onClick={() => adjustCatalogQty(item.sku, 1)}
-                          disabled={!canOrder}
-                          style={{ flex: 1, border: "none", borderRadius: 10, background: canOrder ? "#2563eb" : "#9ca3af", color: "#fff", fontWeight: 800, padding: "8px 10px", cursor: canOrder ? "pointer" : "not-allowed", minHeight: 40 }}
-                        >
-                          {t.addOneCase}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
-
-            <div style={{ marginTop: 12 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 6 }}>
-                {t.qty} — {t.quickAddSelected}
-              </label>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 8 }}>
-                {quickQtyButtons.map((qty) => (
-                  <button key={qty} type="button" onClick={() => applyQuickQtyToSelected(qty)} style={qtyButtonStyle}>
-                    {qty}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
+          <OrderQuickOrderPanel
+            lang={lang}
+            normalizedQuery={normalizedSkuInput}
+            matchedItems={matchedItems}
+            selectedItem={selectedItem}
+            onSelectItem={(item) => {
+              setSelectedItem(item);
+              setSkuInput(item.sku || "");
+            }}
+            catalogQtyMap={catalogQtyMap}
+            recentItems={recentItems}
+            showAvailableOnly={showAvailableOnly}
+            onShowAvailableOnlyChange={setShowAvailableOnly}
+            showAdminEditLinks={showAdminEditLinks}
+            invoicePriceLabelForSku={invoicePriceLabelForSku}
+            productMeta={renderProductMeta}
+            qtyInput={qtyInput}
+            onQtyInputChange={setQtyInput}
+            onAddItem={addItem}
+            onApplyQuickQty={applyQuickQtyToSelected}
+            onAdjustQty={adjustCatalogQty}
+            onUpdateQty={updateCatalogQty}
+            onAddSkuToCart={addSkuFromSearch}
+          />
         ) : mode === "newItems" ? (
           <section
             className="order-shop-card"
@@ -2053,12 +1975,13 @@ export default function OrderPage() {
         onClick={() => (showCart ? toggleCartPanel() : setShowCart(true))}
       />
 
-      {submitMsg && !showCart ? (
+      {(toastMsg || submitMsg) && !showCart ? (
         <div
-          className={`order-floating-toast${submitMsg.toLowerCase().includes("failed") ? " is-error" : " is-ok"}`}
+          className={`order-floating-toast${(toastMsg || submitMsg).toLowerCase().includes("failed") ? " is-error" : " is-ok"}`}
           role="status"
+          onClick={dismissFloatingNotice}
         >
-          {submitMsg}
+          {toastMsg || submitMsg}
         </div>
       ) : null}
 
