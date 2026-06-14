@@ -1,6 +1,7 @@
 "use client";
 
 import { formatCatalogAddedDateForItem } from "@/lib/catalogNewItems";
+import { formatNewItemListPriceDisplay } from "@/lib/newItemListPrice";
 import { getDisplayStatus, getStatusBadgeStyle, isJustAddedItem, isOrderableItem } from "../catalogUtils";
 import type { CatalogItem, Lang } from "../types";
 import {
@@ -14,6 +15,9 @@ import {
   promoDetailsStyle,
   promoDealStyle,
   promoPriceStyle,
+  newItemListPriceBlockStyle,
+  newItemListPriceLabelStyle,
+  newItemListPriceValueStyle,
   promoTagStyle,
   justAddedTagStyle,
 } from "../orderStyles";
@@ -50,6 +54,9 @@ export function CatalogQtyCard({
   lang = "en",
   /** New-items tab: every card uses the red JUST ADDED pill (pin order still uses justAdded flag). */
   uniformNewPill,
+  /** New-items tab: show admin list price when set. */
+  showNewItemListPrice,
+  listPriceLabel,
 }: {
   item: CatalogItem;
   qty: string;
@@ -82,6 +89,8 @@ export function CatalogQtyCard({
   addedDateLabel?: string;
   lang?: Lang;
   uniformNewPill?: boolean;
+  showNewItemListPrice?: boolean;
+  listPriceLabel?: string;
 }) {
   const showJustAdded = Boolean(justAddedLabel && (uniformNewPill || isJustAddedItem(item)));
   const addedDateText =
@@ -99,6 +108,10 @@ export function CatalogQtyCard({
   const tierPrices = promoDealDetail?.includes(" · ")
     ? promoDealDetail.split(" · ").filter(Boolean)
     : null;
+  const listPriceText =
+    showNewItemListPrice && item.newItemListPrice
+      ? formatNewItemListPriceDisplay(item.newItemListPrice)
+      : "";
 
   return (
     <div
@@ -148,6 +161,13 @@ export function CatalogQtyCard({
       <div className="catalog-card-image-wrap" style={{ paddingTop: promoNote || showJustAdded || highlight ? 4 : 0 }}>
         <ProductImage sku={item.sku} alt={item.name || item.sku} size={96} imageUrl={item.imageUrl} />
       </div>
+
+      {listPriceText ? (
+        <div style={newItemListPriceBlockStyle}>
+          {listPriceLabel ? <div style={newItemListPriceLabelStyle}>{listPriceLabel}</div> : null}
+          <div style={newItemListPriceValueStyle}>{listPriceText}</div>
+        </div>
+      ) : null}
 
       <div style={{ fontSize: 13, fontWeight: 900, color: "#111827", lineHeight: 1.2 }}>{item.sku}</div>
       <div style={{ fontSize: 12, fontWeight: 800, color: "#374151" }}>{item.brand || "-"}</div>

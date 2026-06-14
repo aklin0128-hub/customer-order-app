@@ -263,6 +263,30 @@ export const promoPriceStyle: CSSProperties = {
   fontWeight: 900,
   color: "#0f766e",
 };
+export const newItemListPriceBlockStyle: CSSProperties = {
+  marginTop: 6,
+  padding: "8px 10px",
+  borderRadius: 10,
+  background: "linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%)",
+  border: "2px solid #34d399",
+  boxShadow: "0 3px 10px rgba(16, 185, 129, 0.18)",
+  textAlign: "center",
+  lineHeight: 1.2,
+};
+export const newItemListPriceLabelStyle: CSSProperties = {
+  fontSize: 9,
+  fontWeight: 900,
+  color: "#059669",
+  textTransform: "uppercase",
+  letterSpacing: "0.06em",
+  marginBottom: 3,
+};
+export const newItemListPriceValueStyle: CSSProperties = {
+  fontSize: 17,
+  fontWeight: 900,
+  color: "#047857",
+  letterSpacing: "-0.02em",
+};
 export const promoDealStyle: CSSProperties = {
   fontSize: 12,
   fontWeight: 900,

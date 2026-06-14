@@ -80,6 +80,25 @@
   color: #0f766e;
 }
 
+.showcase-card-list-price {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%);
+  border: 2px solid #34d399;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.22);
+  font-size: 20px;
+  font-weight: 900;
+  color: #047857;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  box-sizing: border-box;
+}
+
 .showcase-card-promo-deal {
   margin-top: 6px;
   padding: 6px 8px;

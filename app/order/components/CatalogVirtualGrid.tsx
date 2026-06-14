@@ -42,6 +42,8 @@ export function CatalogVirtualGrid({
   addedDateLabel,
   lang,
   showAdminEdit,
+  showNewItemListPrice,
+  listPriceLabel,
   canOrderItem,
   orderBlockedMessage,
   invoicePriceLabelForSku,
@@ -67,6 +69,8 @@ export function CatalogVirtualGrid({
   addedDateLabel?: string;
   lang?: Lang;
   showAdminEdit?: boolean;
+  showNewItemListPrice?: boolean;
+  listPriceLabel?: string;
   canOrderItem?: (item: CatalogItem) => boolean;
   orderBlockedMessage?: (item: CatalogItem) => string;
   invoicePriceLabelForSku?: (sku: string) => string | undefined;
@@ -182,6 +186,8 @@ export function CatalogVirtualGrid({
                     addedDateLabel={addedDateLabel}
                     lang={lang}
                     showAdminEdit={showAdminEdit}
+                    showNewItemListPrice={showNewItemListPrice}
+                    listPriceLabel={listPriceLabel}
                     disabled={!canOrder}
                     unavailableNote={!canOrder ? orderBlockedMessage?.(item) : undefined}
                     invoicePrice={invoicePriceLabelForSku?.(sku)}

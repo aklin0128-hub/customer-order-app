@@ -99,6 +99,12 @@ export function ShowcaseCard({
           />
         </div>
 
+        {listPriceText ? (
+          <div className="showcase-card-list-price" aria-label="List price">
+            {listPriceText}
+          </div>
+        ) : null}
+
         <div className="showcase-card-meta">
           <div className="showcase-card-sku">{item.sku}</div>
           {item.brand ? <div className="showcase-card-brand">{item.brand}</div> : null}
@@ -111,7 +117,6 @@ export function ShowcaseCard({
               {publishedDateLabel[lang]}: {publishedDateText}
             </div>
           ) : null}
-          {listPriceText ? <div className="showcase-card-price">{listPriceText}</div> : null}
           {promoDisplay?.tierPricesLine ? (
             <div className="showcase-card-promo-deal">
               {promoDisplay.priceLine ? (
