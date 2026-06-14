@@ -8,7 +8,11 @@ test("normalizeNewItemListPrice trims empty", () => {
   assert.equal(normalizeNewItemListPrice(""), undefined);
 });
 
-test("formatNewItemListPriceDisplay adds dollar sign", () => {
+test("formatNewItemListPriceDisplay adds dollar sign and two decimals", () => {
   assert.equal(formatNewItemListPriceDisplay("12.99"), "$12.99");
   assert.equal(formatNewItemListPriceDisplay("$12.99"), "$12.99");
+  assert.equal(formatNewItemListPriceDisplay("12"), "$12.00");
+  assert.equal(formatNewItemListPriceDisplay("$12"), "$12.00");
+  assert.equal(formatNewItemListPriceDisplay("12.9"), "$12.90");
+  assert.equal(formatNewItemListPriceDisplay("1,234.5"), "$1234.50");
 });

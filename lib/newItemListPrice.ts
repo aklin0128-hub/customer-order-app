@@ -5,8 +5,19 @@ export function normalizeNewItemListPrice(value: unknown): string | undefined {
   return trimmed || undefined;
 }
 
+function parseListPriceNumber(price: string) {
+  const cleaned = price.replace(/^\$/, "").replace(/,/g, "").trim();
+  if (!cleaned) return null;
+  const value = Number(cleaned);
+  return Number.isFinite(value) ? value : null;
+}
+
 export function formatNewItemListPriceDisplay(price?: string) {
   const trimmed = String(price || "").trim();
   if (!trimmed) return "";
-  return trimmed.startsWith("$") ? trimmed : `$${trimmed}`;
+
+  const amount = parseListPriceNumber(trimmed);
+  if (amount === null) return trimmed.startsWith("$") ? trimmed : `$${trimmed}`;
+
+  return `$${amount.toFixed(2)}`;
 }
