@@ -93,7 +93,24 @@ function safeString(value: unknown) {
 
 /** Normalize SKU for lookup (catalog `00002D` vs inventory `000020`). */
 export function normalizeInventorySku(sku: string) {
-  return String(sku || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const raw = String(sku || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+  if (!raw) return "";
+
+  // Excel often drops leading zeros (e.g. 2D instead of 00002D).
+  const shortLetter = raw.match(/^(\d{1,4})([A-Z])$/);
+  if (shortLetter) {
+    return `${shortLetter[1]!.padStart(5, "0")}${shortLetter[2]}`;
+  }
+
+  // Short numeric loc items (e.g. 20 → 000020).
+  if (/^\d{1,4}$/.test(raw)) {
+    return raw.padStart(6, "0");
+  }
+
+  return raw;
 }
 
 /** Keys used to match catalog SKUs to inventory loc items. */
@@ -674,16 +691,36 @@ export async function getSkuExpiration(
   sku: string,
   options: GetSkuExpirationOptions = {}
 ): Promise<SkuExpirationResult> {
-  if (options.filePath) {
-    const { loadInventoryLotsFromFile } = await import(
-      /* webpackIgnore: true */ "@/lib/inventoryExpiry.local"
-    );
-    await loadInventoryLotsFromFile(options.filePath);
-  } else {
-    await loadInventoryLots();
+  const index = await getIndex(options.filePath);
+  const querySku = normalizeInventorySku(sku);
+  const empty: SkuExpirationResult = {
+    sku: querySku,
+    found: false,
+    lots: [],
+    expireDates: [],
+    earliestExpireDate: null,
+    latestExpireDate: null,
+    totalOnHandQty: 0,
+  };
+
+  if (!querySku) return empty;
+
+  const matched: InventoryLot[] = [];
+  const seen = new Set<string>();
+
+  for (const key of skuLookupKeys(querySku)) {
+    for (const lot of index.get(key) || []) {
+      if (!inventorySkuMatchesQuery(lot.sku, querySku)) continue;
+      const id = `${lot.sku}|${lot.receivedDate}|${lot.expireDate}|${lot.sourceLine ?? ""}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      matched.push(lot);
+    }
   }
-  const rows = cached?.rows || [];
-  return querySkuExpiration(sku, rows, options);
+
+  if (matched.length === 0) return empty;
+
+  return querySkuExpiration(sku, matched, options);
 }
 
 export async function getSkuExpirationDates(sku: string, options?: GetSkuExpirationOptions) {

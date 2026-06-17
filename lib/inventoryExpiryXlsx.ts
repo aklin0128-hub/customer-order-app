@@ -130,7 +130,30 @@ export function sheetToInventoryRecords(sheet: XLSX.WorkSheet): Record<string, u
   }
 
   enrichDateFieldsFromSheet(sheet, records, headerRowIndex, headers);
+  enrichSkuFieldFromSheet(sheet, records, headerRowIndex, headers, cols.sku);
   return records;
+}
+
+function enrichSkuFieldFromSheet(
+  sheet: XLSX.WorkSheet,
+  records: Record<string, unknown>[],
+  headerRowIndex: number,
+  headers: string[],
+  skuColIndex: number
+) {
+  if (skuColIndex < 0) return;
+  const key = headers[skuColIndex];
+  if (!key || key.startsWith("__COL_")) return;
+
+  for (let i = 0; i < records.length; i++) {
+    const excelRow = headerRowIndex + 1 + i;
+    const record = records[i];
+    if (!record) continue;
+    const cell = sheet[XLSX.utils.encode_cell({ r: excelRow, c: skuColIndex })];
+    const v = cellFieldValue(cell);
+    if (v === "" || v == null) continue;
+    record[key] = typeof v === "number" && Number.isInteger(v) ? String(v) : String(v).trim();
+  }
 }
 
 export function parseInventoryXlsxBuffer(buffer: Buffer): { csvText: string; rows: InventoryLot[] } {

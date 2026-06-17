@@ -1,10 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 const STORAGE_KEY = "exp_access_password";
 
-export function useExpAuth() {
+type ExpAuthContextValue = {
+  ready: boolean;
+  authed: boolean;
+  password: string;
+  error: string;
+  loading: boolean;
+  login: (inputPassword: string) => Promise<boolean>;
+  logout: () => void;
+  expHeaders: (extra?: HeadersInit) => HeadersInit;
+};
+
+const ExpAuthContext = createContext<ExpAuthContextValue | null>(null);
+
+function useExpAuthState(): ExpAuthContextValue {
   const [ready, setReady] = useState(false);
   const [authed, setAuthed] = useState(false);
   const [password, setPassword] = useState("");
@@ -65,4 +78,17 @@ export function useExpAuth() {
   );
 
   return { ready, authed, password, error, loading, login, logout, expHeaders };
+}
+
+export function ExpAuthProvider({ children }: { children: ReactNode }) {
+  const value = useExpAuthState();
+  return <ExpAuthContext.Provider value={value}>{children}</ExpAuthContext.Provider>;
+}
+
+export function useExpAuth() {
+  const ctx = useContext(ExpAuthContext);
+  if (!ctx) {
+    throw new Error("useExpAuth must be used within ExpAuthProvider");
+  }
+  return ctx;
 }

@@ -32,6 +32,22 @@ test("skuLookupKeys bridges catalog and inventory formats", () => {
   assert.ok(skuLookupKeys("000020").includes("00002"));
 });
 
+test("normalizeInventorySku restores Excel-truncated loc items", () => {
+  assert.equal(normalizeInventorySku("2D"), "00002D");
+  assert.equal(normalizeInventorySku("20"), "000020");
+  assert.equal(normalizeInventorySku(" 000030 "), "000030");
+  assert.equal(normalizeInventorySku("10480K"), "10480K");
+});
+
+test("getSkuExpiration finds catalog sku when csv has truncated loc item", () => {
+  const csv = `Loc Item,Loc Item Desc,Loc Qty UM,Loc Inventory Status,Loc Received Date,Loc Expire Date,Loc On Hand Qty
+2D,RICE,BG,Available,2/11/2026,2/10/2028,10
+`;
+  const result = getSkuExpirationFromRows("00002D", parseInventoryCsvText(csv));
+  assert.equal(result.found, true);
+  assert.equal(result.lots.length, 1);
+});
+
 test("getSkuExpiration returns lots and sorted expire dates", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "inv-exp-"));
   const filePath = path.join(dir, "inventory.csv");

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { ExpAuthProvider } from "./useExpAuth";
+
 import "./exp.css";
 
 export const metadata: Metadata = {
@@ -9,5 +11,5 @@ export const metadata: Metadata = {
 };
 
 export default function ExpLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return <ExpAuthProvider>{children}</ExpAuthProvider>;
 }
