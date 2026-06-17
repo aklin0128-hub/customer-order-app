@@ -372,7 +372,7 @@ export default function AdminInvoicesPage() {
           ) : null}
         </div>
         <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
-          Latest price CSV uses the invoice date on each account invoice (not upload time). Columns: account, sku, price, invoice_date. Skips imports with no parsed invoice date.
+          Latest price CSV uses the invoice date on each account invoice (not upload time). Columns: Account, SKU, Price. Skips imports with no parsed invoice date.
         </p>
       </section>
 

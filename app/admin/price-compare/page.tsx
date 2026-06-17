@@ -1,108 +1,78 @@
 "use client";
 
-import { Fragment, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AdminPage } from "../_components/AdminPage";
-import { AdminSkuAutocomplete } from "../_components/AdminSkuAutocomplete";
-import { inputStyle, labelStyle, panel, panelTitle } from "../_components/admin-styles";
-import { Toast } from "../_components/admin-utils";
+import { FieldLabel, inputStyle } from "../_components/admin-sales-ui";
+import { panel, panelTitle } from "../_components/admin-styles";
+import { BtnPrimary, BtnSecondary, Panel, StatGrid, Toast } from "../_components/admin-utils";
+import {
+  AdminAccountPriceRows,
+  AdminPriceEmptyHint,
+  AdminPriceSectionTabs,
+  AdminSkuBuyersTable,
+  type PriceComparePriceData,
+  type SkuBuyersData,
+} from "../_components/admin-price-ui";
 import { useAdminAuth } from "../_components/useAdminAuth";
 
-type PriceHistoryPoint = {
-  accountNo: string;
-  sku: string;
-  invoiceNo: string | null;
-  invoiceDate: string;
-  qty: number;
-  price: number;
-  importId: string;
-};
+type PriceSection = "price" | "buyers";
 
-type AccountRow = {
-  sku: string;
-  name: string;
-  brand: string;
-  status: string;
-  latestPrice: number | null;
-  previousPrice: number | null;
-  changePct: number | null;
-  latestDate: string;
-  previousDate: string;
-  invoiceNo: string;
-  importId: string;
-  history: PriceHistoryPoint[];
-};
-
-type BuyerRow = {
-  accountNo: string;
-  totalQty: number;
-  invoiceCount: number;
-  latestPrice: number | null;
-  latestDate: string;
-};
-
-type PriceCompareData = {
-  accountRows: AccountRow[];
-  buyerRows: BuyerRow[];
-  skuProduct: { sku: string; name?: string; brand?: string; status?: string } | null;
-  pointCount: number;
-  importCount: number;
-};
-
-const moneyFmt = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 2,
-});
-
-function money(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value) ? moneyFmt.format(value) : "-";
-}
-
-function pct(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return "NEW";
-  const sign = value > 0 ? "+" : "";
-  return `${sign}${value.toFixed(1)}%`;
-}
-
-function pctStyle(value: number | null): CSSProperties {
-  if (value === null) return { color: "#2563eb", background: "#eff6ff", border: "1px solid #bfdbfe" };
-  if (value > 0.1) return { color: "#b91c1c", background: "#fef2f2", border: "1px solid #fecaca" };
-  if (value < -0.1) return { color: "#047857", background: "#ecfdf5", border: "1px solid #a7f3d0" };
-  return { color: "#4b5563", background: "#f3f4f6", border: "1px solid #d1d5db" };
-}
-
-function invoiceHref(importId: string) {
-  return `/api/admin/invoice-file?id=${encodeURIComponent(importId)}`;
+function buildUrl(section: PriceSection, accountNo: string, sku: string, days: string) {
+  const params = new URLSearchParams();
+  params.set("section", section);
+  if (accountNo.trim()) params.set("accountNo", accountNo.trim().toUpperCase());
+  if (sku.trim()) params.set("sku", sku.trim().toUpperCase());
+  if (days) params.set("days", days);
+  const qs = params.toString();
+  return qs ? `/admin/price-compare?${qs}` : "/admin/price-compare";
 }
 
 export default function AdminPriceComparePage() {
+  const router = useRouter();
   const { authed, adminHeaders } = useAdminAuth();
-  const [priceAccountNo, setPriceAccountNo] = useState("");
-  const [priceSku, setPriceSku] = useState("");
-  const [priceDays, setPriceDays] = useState("");
-  const [buyerSku, setBuyerSku] = useState("");
-  const [buyerDays, setBuyerDays] = useState("180");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [priceData, setPriceData] = useState<PriceCompareData | null>(null);
-  const [buyerData, setBuyerData] = useState<PriceCompareData | null>(null);
-  const [expandedSku, setExpandedSku] = useState("");
 
-  const loadPriceHistory = async () => {
-    if (!priceAccountNo.trim() || !priceSku.trim()) {
-      setMsg("Enter both account # and SKU for price history.");
+  const [section, setSection] = useState<PriceSection>("price");
+  const [accountNo, setAccountNo] = useState("");
+  const [sku, setSku] = useState("");
+  const [days, setDays] = useState("90");
+
+  const [priceBusy, setPriceBusy] = useState(false);
+  const [priceMsg, setPriceMsg] = useState("");
+  const [priceData, setPriceData] = useState<PriceComparePriceData | null>(null);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+
+  const [buyerBusy, setBuyerBusy] = useState(false);
+  const [buyerMsg, setBuyerMsg] = useState("");
+  const [buyerData, setBuyerData] = useState<SkuBuyersData | null>(null);
+
+  const syncUrl = useCallback(
+    (next: { section?: PriceSection; accountNo?: string; sku?: string; days?: string }) => {
+      const href = buildUrl(
+        next.section ?? section,
+        next.accountNo ?? accountNo,
+        next.sku ?? sku,
+        next.days ?? days
+      );
+      router.replace(href, { scroll: false });
+    },
+    [accountNo, days, router, section, sku]
+  );
+
+  const loadPriceHistory = useCallback(async () => {
+    const cleanAccount = accountNo.trim().toUpperCase();
+    const cleanSku = sku.trim().toUpperCase();
+    if (!cleanAccount || !cleanSku) {
+      setPriceMsg("Enter both account number and SKU.");
+      setPriceData(null);
       return;
     }
 
-    setBusy(true);
-    setMsg("");
+    setPriceBusy(true);
+    setPriceMsg("");
     try {
-      const params = new URLSearchParams();
-      params.set("mode", "price");
-      params.set("accountNo", priceAccountNo.trim().toUpperCase());
-      params.set("sku", priceSku.trim().toUpperCase());
-      if (priceDays) params.set("days", priceDays);
-
+      const params = new URLSearchParams({ mode: "price", accountNo: cleanAccount, sku: cleanSku });
+      if (days) params.set("days", days);
       const res = await fetch(`/api/admin/price-compare?${params.toString()}`, {
         cache: "no-store",
         headers: adminHeaders(),
@@ -110,197 +80,168 @@ export default function AdminPriceComparePage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || "Failed to load price history.");
       setPriceData(json);
-    } catch (err: any) {
-      setMsg(err?.message || "Failed to load price history.");
+      setExpandedKey(null);
+      syncUrl({ section: "price", accountNo: cleanAccount, sku: cleanSku });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to load price history.";
+      setPriceMsg(message);
+      setPriceData(null);
     } finally {
-      setBusy(false);
+      setPriceBusy(false);
     }
-  };
+  }, [accountNo, adminHeaders, days, sku, syncUrl]);
 
-  const loadTopBuyers = async () => {
-    if (!buyerSku.trim()) {
-      setMsg("Enter a SKU for top buyers.");
+  const loadBuyers = useCallback(async () => {
+    const cleanSku = sku.trim().toUpperCase();
+    if (!cleanSku) {
+      setBuyerMsg("Enter a SKU.");
+      setBuyerData(null);
       return;
     }
 
-    setBusy(true);
-    setMsg("");
+    setBuyerBusy(true);
+    setBuyerMsg("");
     try {
-      const params = new URLSearchParams();
-      params.set("mode", "buyers");
-      params.set("sku", buyerSku.trim().toUpperCase());
-      if (buyerDays) params.set("days", buyerDays);
-
+      const params = new URLSearchParams({ mode: "buyers", sku: cleanSku });
+      if (days) params.set("days", days);
       const res = await fetch(`/api/admin/price-compare?${params.toString()}`, {
         cache: "no-store",
         headers: adminHeaders(),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || "Failed to load top buyers.");
+      if (!res.ok) throw new Error(json?.error || "Failed to load buyers.");
       setBuyerData(json);
-    } catch (err: any) {
-      setMsg(err?.message || "Failed to load top buyers.");
+      syncUrl({ section: "buyers", sku: cleanSku });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to load buyers.";
+      setBuyerMsg(message);
+      setBuyerData(null);
     } finally {
-      setBusy(false);
+      setBuyerBusy(false);
     }
-  };
+  }, [adminHeaders, days, sku, syncUrl]);
+
+  const switchSection = useCallback(
+    (next: PriceSection) => {
+      setSection(next);
+      syncUrl({ section: next });
+    },
+    [syncUrl]
+  );
 
   useEffect(() => {
     if (!authed) return;
-    const acct = new URLSearchParams(window.location.search).get("accountNo");
-    if (acct) setPriceAccountNo(acct.trim().toUpperCase());
+    const params = new URLSearchParams(window.location.search);
+    const sectionParam = params.get("section");
+    if (sectionParam === "buyers" || sectionParam === "price") setSection(sectionParam);
+
+    const accountParam = params.get("accountNo")?.trim().toUpperCase() || "";
+    const skuParam = params.get("sku")?.trim().toUpperCase() || "";
+    const daysParam = params.get("days");
+
+    if (accountParam) setAccountNo(accountParam);
+    if (skuParam) setSku(skuParam);
+    if (daysParam !== null) setDays(daysParam);
+
+    const effectiveSection = sectionParam === "buyers" ? "buyers" : "price";
+    if (effectiveSection === "buyers" && skuParam) {
+      void (async () => {
+        setBuyerBusy(true);
+        setBuyerMsg("");
+        try {
+          const q = new URLSearchParams({ mode: "buyers", sku: skuParam });
+          if (daysParam) q.set("days", daysParam);
+          const res = await fetch(`/api/admin/price-compare?${q.toString()}`, {
+            cache: "no-store",
+            headers: adminHeaders(),
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json?.error || "Failed to load buyers.");
+          setBuyerData(json);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : "Failed to load buyers.";
+          setBuyerMsg(message);
+          setBuyerData(null);
+        } finally {
+          setBuyerBusy(false);
+        }
+      })();
+    } else if (accountParam && skuParam) {
+      void (async () => {
+        setPriceBusy(true);
+        setPriceMsg("");
+        try {
+          const q = new URLSearchParams({ mode: "price", accountNo: accountParam, sku: skuParam });
+          if (daysParam) q.set("days", daysParam);
+          const res = await fetch(`/api/admin/price-compare?${q.toString()}`, {
+            cache: "no-store",
+            headers: adminHeaders(),
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json?.error || "Failed to load price history.");
+          setPriceData(json);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : "Failed to load price history.";
+          setPriceMsg(message);
+          setPriceData(null);
+        } finally {
+          setPriceBusy(false);
+        }
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authed]);
+
+  const runSearch = () => {
+    if (section === "buyers") void loadBuyers();
+    else void loadPriceHistory();
+  };
 
   return (
     <AdminPage
       active="priceCompare"
       title="Price Compare"
-      subtitle="Two tools: account item price history, and SKU top buyers."
+      subtitle="Account price history and SKU buyer breakdown in one place."
     >
-      {msg ? <Toast tone="error" message={msg} /> : null}
+      {priceMsg ? <Toast tone="error" message={priceMsg} /> : null}
+      {buyerMsg ? <Toast tone="error" message={buyerMsg} /> : null}
 
       <section style={panel}>
-        <h2 style={panelTitle}>1. Account Item Price History</h2>
-        <p style={{ margin: "0 0 10px", fontSize: 13, color: "#6b7280" }}>
-          Use this to check one account's historical unit price for one SKU from uploaded invoices.
-        </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+        <AdminPriceSectionTabs section={section} onSectionChange={switchSection} />
+        <h2 style={{ ...panelTitle, marginTop: 16 }}>
+          {section === "price" ? "Account + SKU price history" : "Who buys this SKU?"}
+        </h2>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+            gap: 12,
+            marginTop: 12,
+          }}
+        >
+          {section === "price" ? (
+            <div>
+              <FieldLabel>Account #</FieldLabel>
+              <input
+                value={accountNo}
+                onChange={(e) => setAccountNo(e.target.value)}
+                placeholder="e.g. 12345"
+                style={inputStyle}
+              />
+            </div>
+          ) : null}
           <div>
-            <label style={labelStyle}>Account #</label>
-            <input value={priceAccountNo} onChange={(e) => setPriceAccountNo(e.target.value.toUpperCase())} placeholder="FL111" style={inputStyle} />
-          </div>
-          <div>
-            <label style={labelStyle}>SKU</label>
-            <AdminSkuAutocomplete value={priceSku} onChange={setPriceSku} placeholder="Type SKU or name…" />
-          </div>
-          <div>
-            <label style={labelStyle}>Date range</label>
-            <select value={priceDays} onChange={(e) => setPriceDays(e.target.value)} style={inputStyle}>
-              <option value="">All saved imports</option>
-              <option value="30">Last 30 days</option>
-              <option value="90">Last 90 days</option>
-              <option value="180">Last 180 days</option>
-              <option value="365">Last 365 days</option>
-            </select>
-          </div>
-          <div style={{ display: "flex", alignItems: "end" }}>
-            <button
-              type="button"
-              onClick={() => void loadPriceHistory()}
-              disabled={busy}
-              style={{
-                width: "100%",
-                border: "none",
-                borderRadius: 10,
-                padding: "11px 14px",
-                background: busy ? "#93c5fd" : "#2563eb",
-                color: "#fff",
-                fontWeight: 900,
-                cursor: busy ? "not-allowed" : "pointer",
-              }}
-            >
-              {busy ? "Loading..." : "Load price history"}
-            </button>
-          </div>
-        </div>
-        {priceData ? (
-          <p style={{ margin: "10px 0 0", color: "#6b7280", fontSize: 13 }}>
-            Found {priceData.pointCount} matching invoice lines from {priceData.importCount} saved imports.
-          </p>
-        ) : null}
-      </section>
-
-      {priceData?.accountRows.length ? (
-        <section style={panel}>
-          <h2 style={panelTitle}>Account Unit Price History</h2>
-          <div style={{ overflowX: "auto", marginTop: 10 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
-                <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
-                  <th style={{ padding: 8 }}>SKU</th>
-                  <th style={{ padding: 8 }}>Item</th>
-                  <th style={{ padding: 8 }}>Status</th>
-                  <th style={{ padding: 8 }}>Latest unit</th>
-                  <th style={{ padding: 8 }}>Previous unit</th>
-                  <th style={{ padding: 8 }}>Change</th>
-                  <th style={{ padding: 8 }}>Dates</th>
-                </tr>
-              </thead>
-              <tbody>
-                {priceData.accountRows.map((row) => {
-                  const expanded = expandedSku === row.sku;
-                  return (
-                    <Fragment key={row.sku}>
-                      <tr key={row.sku} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                        <td style={{ padding: 8, fontWeight: 900 }}>
-                          <button type="button" onClick={() => setExpandedSku(expanded ? "" : row.sku)} style={{ border: "none", background: "transparent", color: "#2563eb", fontWeight: 900, cursor: "pointer", padding: 0 }}>
-                            {row.sku}
-                          </button>
-                        </td>
-                        <td style={{ padding: 8, minWidth: 220 }}>
-                          <strong>{row.brand || "-"}</strong>
-                          <div style={{ color: "#6b7280", marginTop: 2 }}>{row.name || "-"}</div>
-                        </td>
-                        <td style={{ padding: 8 }}>{row.status || "-"}</td>
-                        <td style={{ padding: 8 }}>{money(row.latestPrice)}</td>
-                        <td style={{ padding: 8 }}>{money(row.previousPrice)}</td>
-                        <td style={{ padding: 8 }}>
-                          <span style={{ ...pctStyle(row.changePct), borderRadius: 999, padding: "3px 8px", fontWeight: 900 }}>
-                            {pct(row.changePct)}
-                          </span>
-                        </td>
-                        <td style={{ padding: 8 }}>
-                          {row.latestDate || "-"}
-                          {row.previousDate ? ` / ${row.previousDate}` : ""}
-                          {row.importId ? (
-                            <>
-                              {" · "}
-                              <a href={invoiceHref(row.importId)} target="_blank" rel="noreferrer">invoice</a>
-                            </>
-                          ) : null}
-                        </td>
-                      </tr>
-                      {expanded ? (
-                        <tr key={`${row.sku}-history`}>
-                          <td colSpan={7} style={{ padding: 8, background: "#f9fafb" }}>
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                              {row.history.map((point) => (
-                                <span key={`${point.importId}-${point.price}-${point.qty}`} style={{ border: "1px solid #e5e7eb", borderRadius: 999, padding: "4px 8px", background: "#fff" }}>
-                                  {point.invoiceDate}: {money(point.price)} x {point.qty}
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-                        </tr>
-                      ) : null}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ) : null}
-
-      {priceData && priceData.accountRows.length === 0 ? (
-        <section style={panel}>
-          <p style={{ margin: 0, color: "#6b7280", fontSize: 14 }}>No unit price history found for this account + SKU.</p>
-        </section>
-      ) : null}
-
-      <section style={panel}>
-        <h2 style={panelTitle}>2. SKU Top Buyers</h2>
-        <p style={{ margin: "0 0 10px", fontSize: 13, color: "#6b7280" }}>
-          Use this to see which accounts bought this SKU the most in the selected period.
-        </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-          <div>
-            <label style={labelStyle}>SKU</label>
-            <AdminSkuAutocomplete value={buyerSku} onChange={setBuyerSku} placeholder="Type SKU or name…" />
+            <FieldLabel>SKU</FieldLabel>
+            <input
+              value={sku}
+              onChange={(e) => setSku(e.target.value)}
+              placeholder="e.g. 000123"
+              style={inputStyle}
+            />
           </div>
           <div>
-            <label style={labelStyle}>Date range</label>
-            <select value={buyerDays} onChange={(e) => setBuyerDays(e.target.value)} style={inputStyle}>
+            <FieldLabel>Date range</FieldLabel>
+            <select value={days} onChange={(e) => setDays(e.target.value)} style={inputStyle}>
               <option value="30">Last 30 days</option>
               <option value="90">Last 90 days</option>
               <option value="180">Last 180 days</option>
@@ -308,67 +249,73 @@ export default function AdminPriceComparePage() {
               <option value="">All history</option>
             </select>
           </div>
-          <div style={{ display: "flex", alignItems: "end" }}>
-            <button
-              type="button"
-              onClick={() => void loadTopBuyers()}
-              disabled={busy}
-              style={{
-                width: "100%",
-                border: "none",
-                borderRadius: 10,
-                padding: "11px 14px",
-                background: busy ? "#93c5fd" : "#0f766e",
-                color: "#fff",
-                fontWeight: 900,
-                cursor: busy ? "not-allowed" : "pointer",
-              }}
-            >
-              {busy ? "Loading..." : "Load top buyers"}
-            </button>
+          <div style={{ display: "flex", alignItems: "end", gap: 8, flexWrap: "wrap" }}>
+            <BtnPrimary onClick={runSearch} disabled={section === "price" ? priceBusy : buyerBusy}>
+              {section === "price" ? (priceBusy ? "Loading…" : "Load history") : buyerBusy ? "Loading…" : "Load buyers"}
+            </BtnPrimary>
+            {section === "price" && priceData?.accountRows.length ? (
+              <BtnSecondary
+                onClick={() => {
+                  setAccountNo("");
+                  setSku("");
+                  setPriceData(null);
+                  setPriceMsg("");
+                  router.replace("/admin/price-compare?section=price", { scroll: false });
+                }}
+              >
+                Clear
+              </BtnSecondary>
+            ) : null}
           </div>
         </div>
+        {section === "price" ? (
+          <AdminPriceEmptyHint>
+            From Account 360 or Customers — open with <strong>?accountNo=…&sku=…</strong>. Expand a row for invoice-level
+            price changes.
+          </AdminPriceEmptyHint>
+        ) : (
+          <AdminPriceEmptyHint>
+            From Top SKUs — click a row to land here with <strong>?section=buyers&sku=…</strong>.
+          </AdminPriceEmptyHint>
+        )}
       </section>
 
-      {buyerData?.skuProduct ? (
-        <section style={panel}>
-          <h2 style={panelTitle}>SKU Buyer Status</h2>
-          <div style={{ fontSize: 14, color: "#374151", marginBottom: 10 }}>
-            <strong>{buyerData.skuProduct.sku}</strong>
-            {buyerData.skuProduct.brand ? ` · ${buyerData.skuProduct.brand}` : ""} · {buyerData.skuProduct.name || "-"} · Status:{" "}
-            <strong>{buyerData.skuProduct.status || "Not found in catalog"}</strong>
-          </div>
-          {buyerData.buyerRows.length ? (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead>
-                  <tr style={{ textAlign: "left", borderBottom: "1px solid #e5e7eb" }}>
-                    <th style={{ padding: 8 }}>Account</th>
-                    <th style={{ padding: 8 }}>Total qty</th>
-                    <th style={{ padding: 8 }}>Invoices</th>
-                    <th style={{ padding: 8 }}>Latest unit price</th>
-                    <th style={{ padding: 8 }}>Latest date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {buyerData.buyerRows.map((row) => (
-                    <tr key={row.accountNo} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                      <td style={{ padding: 8, fontWeight: 900 }}>{row.accountNo}</td>
-                      <td style={{ padding: 8 }}>{row.totalQty}</td>
-                      <td style={{ padding: 8 }}>{row.invoiceCount}</td>
-                      <td style={{ padding: 8 }}>{money(row.latestPrice)}</td>
-                      <td style={{ padding: 8 }}>{row.latestDate || "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p style={{ color: "#6b7280", fontSize: 13 }}>
-              No buyer history found for this SKU in the selected period.
-            </p>
-          )}
-        </section>
+      {section === "price" && priceData ? (
+        <>
+          <StatGrid
+            items={[
+              { label: "Account", value: priceData.filters.accountNo },
+              { label: "SKU filter", value: priceData.filters.sku || "All" },
+              { label: "SKUs matched", value: priceData.accountRows.length },
+              { label: "Priced lines", value: priceData.pricedPointCount },
+            ]}
+          />
+          <Panel title={`Price history (${priceData.accountRows.length})`}>
+            <AdminAccountPriceRows
+              rows={priceData.accountRows}
+              expandedKey={expandedKey}
+              onToggle={(key) => setExpandedKey((prev) => (prev === key ? null : key))}
+            />
+          </Panel>
+        </>
+      ) : null}
+
+      {section === "buyers" && buyerData ? (
+        <>
+          {buyerData.skuProduct ? (
+            <StatGrid
+              items={[
+                { label: "SKU", value: buyerData.skuProduct.sku },
+                { label: "Product", value: buyerData.skuProduct.name || "—" },
+                { label: "Brand", value: buyerData.skuProduct.brand || "—" },
+                { label: "Status", value: buyerData.skuProduct.status || "—" },
+              ]}
+            />
+          ) : null}
+          <Panel title={`Top buyers (${buyerData.buyerRows.length})`}>
+            <AdminSkuBuyersTable rows={buyerData.buyerRows} />
+          </Panel>
+        </>
       ) : null}
     </AdminPage>
   );

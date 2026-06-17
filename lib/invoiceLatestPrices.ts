@@ -120,8 +120,8 @@ export async function getInvoiceLatestPrices(options?: {
 }
 
 export function invoiceLatestPricesToCsv(rows: InvoiceLatestPriceRow[]): string {
-  const header = ["account", "sku", "price", "invoice_date"];
-  const body = rows.map((row) => [row.account, row.sku, row.price, row.invoiceDate]);
+  const header = ["Account", "SKU", "Price"];
+  const body = rows.map((row) => [row.account, row.sku, row.price.toFixed(2)]);
   return [header, ...body]
     .map((line) => line.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
     .join("\n");
