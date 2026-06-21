@@ -1871,6 +1871,7 @@
   max-width: none;
   overflow: hidden;
   gap: 6px;
+  justify-content: flex-start;
 }
 
 .order-page.is-fullscreen .order-top-card,
@@ -1938,8 +1939,9 @@
 
 .order-page.is-fullscreen .order-shop-card,
 .order-page:fullscreen .order-shop-card {
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
+  max-height: calc(100dvh - 120px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1947,10 +1949,11 @@
 
 .order-page.is-fullscreen .order-catalog-virtual-scroll,
 .order-page:fullscreen .order-catalog-virtual-scroll {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   height: auto !important;
   max-height: none !important;
+  overflow: auto;
 }
 
 .order-page.is-fullscreen .order-fixed-bar-inner,

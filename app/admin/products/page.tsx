@@ -25,6 +25,7 @@ import {
   readProductCategories,
 } from "@/lib/productCategories";
 import { CATEGORY_OPTIONS } from "@/lib/inferCategory";
+import { adminProductStatusOptions, ADMIN_PRODUCT_STATUS_OPTIONS } from "@/lib/catalogStatuses";
 
 type Product = {
   sku: string;
@@ -62,18 +63,6 @@ type StatusUploadResult = {
 };
 
 type ProductFilter = "all" | "redis" | "customized" | "new" | "justAdded" | "statusNew" | "discontinued" | "noImage";
-
-const statusOptions = [
-  "NORMAL",
-  "NORMAL_NBR",
-  "NORMAL_NOBR",
-  "TBD",
-  "NEW",
-  "LIMITED",
-  "SEASONAL",
-  "DISCONTINUED",
-  "INV",
-];
 
 const categoryOptions = CATEGORY_OPTIONS.filter((c) => c !== "ALL");
 const AUTO_SAVE_DELAY_MS = 1200;
@@ -149,6 +138,7 @@ export default function AdminProductsPage() {
     () => resolveNewItemStorageLabel({ categories, category: categories[0] }),
     [categories]
   );
+  const editStatusOptions = useMemo(() => adminProductStatusOptions(status), [status]);
 
   const [busy, setBusy] = useState(false);
   const [productsLoaded, setProductsLoaded] = useState(false);
@@ -703,7 +693,7 @@ export default function AdminProductsPage() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
               <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} style={inputStyle}>
                 <option value="">Keep status</option>
-                {statusOptions.map((s) => <option key={s} value={s}>{s}</option>)}
+                {ADMIN_PRODUCT_STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
               <select value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} style={inputStyle}>
                 <option value="">Keep category</option>
@@ -801,7 +791,7 @@ export default function AdminProductsPage() {
               <div>
                 <label style={labelStyle}>Status</label>
                 <select value={status} onChange={(e) => updateText(setStatus, e.target.value)} style={inputStyle}>
-                  {statusOptions.map((s) => (
+                  {editStatusOptions.map((s) => (
                     <option key={s} value={s}>
                       {s}
                     </option>
