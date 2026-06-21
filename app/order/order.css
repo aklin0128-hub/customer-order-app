@@ -1164,7 +1164,7 @@
 }
 
 .catalog-qty-card--price-aligned .catalog-qty-card-price-slot {
-  min-height: 36px;
+  min-height: 32px;
   display: flex;
   align-items: center;
   flex-shrink: 0;

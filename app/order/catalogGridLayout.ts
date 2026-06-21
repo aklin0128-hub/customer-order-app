@@ -5,10 +5,10 @@ export const CATALOG_MAX_COLUMNS = 12;
 export const CATALOG_MIN_COLUMNS = 2;
 
 /**
- * Fixed virtual row content height (badge + image + text + stepper).
- * Do not use dynamic measure — variable card content caused uneven row gaps when switching tabs.
+ * Fixed virtual row content height (badge + image + price band + text + stepper).
+ * Must fit new-items aligned cards (96px image + 36px price slot + badges).
  */
-export const CATALOG_ROW_HEIGHT_PX = 340;
+export const CATALOG_ROW_HEIGHT_PX = 400;
 
 export function catalogRowStridePx() {
   return CATALOG_ROW_HEIGHT_PX + CATALOG_GRID_GAP_PX;
