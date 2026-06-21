@@ -39,6 +39,7 @@ type Product = {
   newItemDescriptionPdfUrl?: string;
   newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
   newItemListPrice?: string;
+  newItemOutOfStock?: boolean;
   source?: string;
   updatedAt?: string;
 };
@@ -117,6 +118,7 @@ export async function POST(req: Request) {
     const categories = expandCategoryTags(parseCategoriesFromBody(body)).slice(0, 1);
     const isNew = Boolean(body?.isNew);
     const justAdded = Boolean(body?.justAdded);
+    const newItemOutOfStock = Boolean(body?.newItemOutOfStock);
     const newItemDescription = String(body?.newItemDescription || "").trim();
     const newItemDescriptionPdfUrl = String(body?.newItemDescriptionPdfUrl || "").trim();
     const publishedInput =
@@ -181,6 +183,7 @@ export async function POST(req: Request) {
       category: categories.length > 0 ? categories[0] : undefined,
       isNew,
       justAdded,
+      newItemOutOfStock: isNew ? newItemOutOfStock : false,
       newSince,
       newPublishedDate,
       newItemListPrice,

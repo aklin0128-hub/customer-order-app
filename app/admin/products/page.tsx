@@ -48,6 +48,7 @@ type Product = {
   newItemDescriptionPdfUrl?: string;
   newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
   newItemListPrice?: string;
+  newItemOutOfStock?: boolean;
   source?: string;
 };
 
@@ -133,6 +134,7 @@ export default function AdminProductsPage() {
   const [newItemDescriptionPdfUrl, setNewItemDescriptionPdfUrl] = useState("");
   const [newPublishedDate, setNewPublishedDate] = useState("");
   const [newItemListPrice, setNewItemListPrice] = useState("");
+  const [newItemOutOfStock, setNewItemOutOfStock] = useState(false);
 
   const showcaseStorageLabel = useMemo(
     () => resolveNewItemStorageLabel({ categories, category: categories[0] }),
@@ -275,6 +277,7 @@ export default function AdminProductsPage() {
     setNewItemDescriptionPdfUrl(p.newItemDescriptionPdfUrl || "");
     setNewPublishedDate(p.newPublishedDate || "");
     setNewItemListPrice(p.newItemListPrice || "");
+    setNewItemOutOfStock(Boolean(p.newItemOutOfStock));
     setFormDirty(false);
     setAutoSaveStatus("");
     notify(`Editing ${p.sku}`);
@@ -373,6 +376,7 @@ export default function AdminProductsPage() {
     setNewItemDescriptionPdfUrl("");
     setNewPublishedDate("");
     setNewItemListPrice("");
+    setNewItemOutOfStock(false);
     setFormDirty(false);
     setAutoSaveStatus("");
     setMsg("");
@@ -414,6 +418,7 @@ export default function AdminProductsPage() {
           newItemDescriptionPdfUrl,
           newPublishedDate: newPublishedDate || undefined,
           newItemListPrice: newItemListPrice || undefined,
+          newItemOutOfStock: isNew ? newItemOutOfStock : false,
         }),
       });
       const data = await readApiJson(res);
@@ -458,7 +463,7 @@ export default function AdminProductsPage() {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, newItemDescription, newItemDescriptionPdfUrl, newPublishedDate, newItemListPrice]);
+  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, newItemOutOfStock, newItemDescription, newItemDescriptionPdfUrl, newPublishedDate, newItemListPrice]);
 
   const uploadNewItemPdf = async (file: File | null) => {
     const finalSku = sku.trim().toUpperCase();
@@ -862,6 +867,7 @@ export default function AdminProductsPage() {
                     const next = e.target.checked;
                     setIsNew(next);
                     markDirty();
+                    if (!next) setNewItemOutOfStock(false);
                     if (next) {
                       requestAnimationFrame(() => {
                         document.getElementById("admin-new-item-showcase")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -981,6 +987,32 @@ export default function AdminProductsPage() {
                   <p style={{ fontSize: 11, color: "#64748b", margin: "6px 0 0" }}>
                     Shown on public /new/ only. Does not change order totals or catalog browse.
                   </p>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      marginTop: 14,
+                      border: "1px solid #fecaca",
+                      borderRadius: 12,
+                      padding: 12,
+                      background: newItemOutOfStock ? "#fef2f2" : "#fff",
+                      color: "#991b1b",
+                      fontSize: 13,
+                      fontWeight: 900,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={newItemOutOfStock}
+                      onChange={(e) => {
+                        setNewItemOutOfStock(e.target.checked);
+                        markDirty();
+                      }}
+                    />
+                    Out of stock — show stamp on /new/ and order New items
+                  </label>
                   <label style={{ ...labelStyle, marginTop: 12 }}>Published date</label>
                   <input
                     type="date"

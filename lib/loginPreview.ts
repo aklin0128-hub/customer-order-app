@@ -32,6 +32,7 @@ export type LoginPreviewCard = {
   newPublishedDate?: string;
   /** /new/ showcase only */
   newItemListPrice?: string;
+  newItemOutOfStock?: boolean;
 };
 
 export type ShowcaseData = {
@@ -88,6 +89,7 @@ function catalogToCard(item: Record<string, unknown>): LoginPreviewCard {
     newItemListPrice: formatNewItemListPriceDisplay(
       normalizeNewItemListPrice(item.newItemListPrice)
     ) || undefined,
+    newItemOutOfStock: Boolean(item.newItemOutOfStock),
   };
 }
 
