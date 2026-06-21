@@ -3,7 +3,6 @@ import { compareCatalogByNewestImport, parseNewPublishedDate } from "@/lib/catal
 import { formatNewItemListPriceDisplay, normalizeNewItemListPrice } from "@/lib/newItemListPrice";
 import { resolveNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import { getMergedCatalogProducts } from "@/lib/catalogMerge";
-import { readCatalogInventory } from "@/lib/catalogStock";
 import { getPromotionProducts, type PromotionProduct } from "@/lib/promotions";
 import { cachedServerData, SERVER_CACHE } from "@/lib/serverDataCache";
 import type { CatalogItem } from "@/app/order/types";
@@ -33,7 +32,6 @@ export type LoginPreviewCard = {
   newPublishedDate?: string;
   /** /new/ showcase only */
   newItemListPrice?: string;
-  inventory?: number;
 };
 
 export type ShowcaseData = {
@@ -90,7 +88,6 @@ function catalogToCard(item: Record<string, unknown>): LoginPreviewCard {
     newItemListPrice: formatNewItemListPriceDisplay(
       normalizeNewItemListPrice(item.newItemListPrice)
     ) || undefined,
-    inventory: readCatalogInventory(item.inventory) ?? undefined,
   };
 }
 

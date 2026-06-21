@@ -31,8 +31,6 @@ export type CatalogItem = {
   newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
   /** /new/ showcase only — optional list price (display) */
   newItemListPrice?: string;
-  /** Catalog master inventory (cases on hand) */
-  inventory?: number;
 };
 
 export type PromoPriceTier = {
