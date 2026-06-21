@@ -112,10 +112,35 @@ export function CatalogQtyCard({
     showNewItemListPrice && item.newItemListPrice
       ? formatNewItemListPriceDisplay(item.newItemListPrice)
       : "";
+  const alignedPriceLayout = Boolean(showNewItemListPrice);
+
+  const badgeRow =
+    promoNote || showJustAdded || highlight || promoRemaining ? (
+      <>
+        {showJustAdded ? <div style={justAddedTagStyle}>{justAddedLabel}</div> : null}
+        {!showJustAdded && promoNote ? <div style={promoTagStyle}>{promoNote}</div> : null}
+        {!showJustAdded && !promoNote && highlight ? <div style={promoTagStyle}>{promoBadgeLabel}</div> : null}
+        {promoRemaining ? (
+          <div style={{ ...promoTagStyle, background: disabled ? "#e5e7eb" : "#ffffff", color: disabled ? "#6b7280" : "#0f766e" }}>
+            {promoRemaining}
+          </div>
+        ) : null}
+      </>
+    ) : null;
+
+  const listPriceBlock = listPriceText ? (
+    <div
+      className={alignedPriceLayout ? "catalog-qty-card-price-block" : undefined}
+      style={newItemListPriceBlockStyle}
+    >
+      {listPriceLabel ? <div style={newItemListPriceLabelStyle}>{listPriceLabel}</div> : null}
+      <div style={newItemListPriceValueStyle}>{listPriceText}</div>
+    </div>
+  ) : null;
 
   return (
     <div
-      className="catalog-qty-card"
+      className={`catalog-qty-card${alignedPriceLayout ? " catalog-qty-card--price-aligned" : ""}`}
       style={{
         ...catalogCardStyle,
         background: disabled ? "#f3f4f6" : hasQty ? "#ecfdf5" : highlight ? "#f0fdfa" : "#ffffff",
@@ -145,29 +170,26 @@ export function CatalogQtyCard({
         </a>
       ) : null}
 
-      {promoNote || showJustAdded || highlight || promoRemaining ? (
+      {alignedPriceLayout ? (
+        <div className="catalog-qty-card-badge-slot">{badgeRow}</div>
+      ) : badgeRow ? (
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: showJustAdded || promoNote ? 4 : 0 }}>
-          {showJustAdded ? <div style={justAddedTagStyle}>{justAddedLabel}</div> : null}
-          {!showJustAdded && promoNote ? <div style={promoTagStyle}>{promoNote}</div> : null}
-          {!showJustAdded && !promoNote && highlight ? <div style={promoTagStyle}>{promoBadgeLabel}</div> : null}
-          {promoRemaining ? (
-            <div style={{ ...promoTagStyle, background: disabled ? "#e5e7eb" : "#ffffff", color: disabled ? "#6b7280" : "#0f766e" }}>
-              {promoRemaining}
-            </div>
-          ) : null}
+          {badgeRow}
         </div>
       ) : null}
 
-      <div className="catalog-card-image-wrap" style={{ paddingTop: promoNote || showJustAdded || highlight ? 4 : 0 }}>
+      <div
+        className={`catalog-card-image-wrap${alignedPriceLayout ? " catalog-card-image-wrap--fixed" : ""}`}
+        style={{ paddingTop: alignedPriceLayout ? 0 : promoNote || showJustAdded || highlight ? 4 : 0 }}
+      >
         <ProductImage sku={item.sku} alt={item.name || item.sku} size={96} imageUrl={item.imageUrl} />
       </div>
 
-      {listPriceText ? (
-        <div style={newItemListPriceBlockStyle}>
-          {listPriceLabel ? <div style={newItemListPriceLabelStyle}>{listPriceLabel}</div> : null}
-          <div style={newItemListPriceValueStyle}>{listPriceText}</div>
-        </div>
-      ) : null}
+      {alignedPriceLayout ? (
+        <div className="catalog-qty-card-price-slot">{listPriceBlock}</div>
+      ) : (
+        listPriceBlock
+      )}
 
       <div style={{ fontSize: 13, fontWeight: 900, color: "#111827", lineHeight: 1.2 }}>{item.sku}</div>
       <div style={{ fontSize: 12, fontWeight: 800, color: "#374151" }}>{item.brand || "-"}</div>

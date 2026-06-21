@@ -1717,6 +1717,7 @@ export default function OrderPage() {
                 showAdminEdit={showAdminEditLinks}
                 showNewItemListPrice
                 listPriceLabel={t.listPrice}
+                uniformNewPill
                 lang={lang}
                 canOrderItem={isOrderableItem}
                 orderBlockedMessage={(item) => formatOrderNotAvailableMessage(item.sku || "", item.status, t)}

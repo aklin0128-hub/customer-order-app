@@ -1137,6 +1137,44 @@
   max-width: 100%;
 }
 
+/* New-items grid — lock badge / image / price bands so rows line up */
+.catalog-qty-card--price-aligned .catalog-qty-card-badge-slot {
+  min-height: 24px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.catalog-qty-card--price-aligned .catalog-card-image-wrap--fixed {
+  height: 96px;
+  min-height: 96px;
+  max-height: 96px;
+  flex-shrink: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.catalog-qty-card--price-aligned .catalog-card-image-wrap--fixed img {
+  width: 96px !important;
+  height: 96px !important;
+  max-width: 96px;
+  object-fit: contain;
+}
+
+.catalog-qty-card--price-aligned .catalog-qty-card-price-slot {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.catalog-qty-card--price-aligned .catalog-qty-card-price-block {
+  width: 100%;
+  margin-top: 0 !important;
+}
+
 .order-promo-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 164px), 1fr));
