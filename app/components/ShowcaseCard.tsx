@@ -24,6 +24,13 @@ const publishedDateLabel: Record<Lang, string> = {
   vi: "Đăng",
 };
 
+const priceLabel: Record<Lang, string> = {
+  en: "Price:",
+  zh: "价格：",
+  ko: "가격:",
+  vi: "Giá:",
+};
+
 export function ShowcaseCard({
   item,
   lang,
@@ -100,8 +107,8 @@ export function ShowcaseCard({
         </div>
 
         {listPriceText ? (
-          <div className="showcase-card-list-price" aria-label="List price">
-            {listPriceText}
+          <div className="showcase-card-list-price" aria-label="Price">
+            {priceLabel[lang]} {listPriceText}
           </div>
         ) : null}
 
