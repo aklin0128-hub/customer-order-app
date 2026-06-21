@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { ShowcaseDescriptionModal } from "@/app/components/ShowcaseDescriptionModal";
+import { OutOfStockStamp } from "@/app/components/OutOfStockStamp";
 import { ProductImage } from "@/app/order/components/ProductImage";
 import { getJustAddedLabel, justAddedBadgeStyle } from "@/lib/justAddedBadge";
 import { formatNewItemPublishedDate } from "@/lib/catalogNewItems";
 import { formatNewItemListPriceDisplay } from "@/lib/newItemListPrice";
+import { isCatalogOutOfStock } from "@/lib/catalogStock";
 import { formatShowcasePromoDisplay, type Lang } from "@/lib/showcasePromoFormat";
 import type { LoginPreviewCard } from "@/lib/loginPreview";
 
@@ -80,9 +82,10 @@ export function ShowcaseCard({
     showNewDetails && item.newItemListPrice
       ? formatNewItemListPriceDisplay(item.newItemListPrice)
       : null;
+  const outOfStock = showNewDetails && isCatalogOutOfStock(item);
 
   return (
-    <article className={className}>
+    <article className={`${className}${outOfStock ? " showcase-card--out-of-stock" : ""}`}>
       {justAddedBadge || storageLabel ? (
         <div className="showcase-card-badge-row">
           {justAddedBadge ? <div style={justAddedBadgeStyle}>{justAddedBadge}</div> : null}
@@ -158,6 +161,8 @@ export function ShowcaseCard({
           </button>
         ) : null}
       </div>
+
+      {outOfStock ? <OutOfStockStamp /> : null}
 
       {detailsOpen ? (
         <ShowcaseDescriptionModal item={item} lang={lang} onClose={() => setDetailsOpen(false)} />
