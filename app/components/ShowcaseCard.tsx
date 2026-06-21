@@ -84,7 +84,7 @@ export function ShowcaseCard({
   const outOfStock = showNewDetails && Boolean(item.newItemOutOfStock);
 
   return (
-    <article className={`${className}${outOfStock ? " showcase-card--out-of-stock" : ""}`}>
+    <article className={className}>
       {justAddedBadge || storageLabel ? (
         <div className="showcase-card-badge-row">
           {justAddedBadge ? <div style={justAddedBadgeStyle}>{justAddedBadge}</div> : null}
@@ -99,13 +99,14 @@ export function ShowcaseCard({
       ) : null}
 
       <div className="showcase-card-body">
-        <div className="showcase-card-img-wrap">
+        <div className={`showcase-card-img-wrap${outOfStock ? " showcase-card-img-wrap--stamped" : ""}`}>
           <ProductImage
             sku={item.sku}
             alt={item.name || item.sku}
             size={resolvedImageSize}
             imageUrl={item.imageUrl}
           />
+          {outOfStock ? <OutOfStockStamp /> : null}
         </div>
 
         {listPriceText ? (
@@ -160,8 +161,6 @@ export function ShowcaseCard({
           </button>
         ) : null}
       </div>
-
-      {outOfStock ? <OutOfStockStamp /> : null}
 
       {detailsOpen ? (
         <ShowcaseDescriptionModal item={item} lang={lang} onClose={() => setDetailsOpen(false)} />

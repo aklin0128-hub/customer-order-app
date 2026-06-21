@@ -181,10 +181,11 @@ export function CatalogQtyCard({
       ) : null}
 
       <div
-        className={`catalog-card-image-wrap${alignedPriceLayout ? " catalog-card-image-wrap--fixed" : ""}`}
+        className={`catalog-card-image-wrap${alignedPriceLayout ? " catalog-card-image-wrap--fixed" : ""}${outOfStock ? " catalog-card-image-wrap--stamped" : ""}`}
         style={{ paddingTop: alignedPriceLayout ? 0 : promoNote || showJustAdded || highlight ? 4 : 0 }}
       >
         <ProductImage sku={item.sku} alt={item.name || item.sku} size={96} imageUrl={item.imageUrl} />
+        {outOfStock ? <OutOfStockStamp /> : null}
       </div>
 
       {alignedPriceLayout ? (
@@ -299,8 +300,6 @@ export function CatalogQtyCard({
           </button>
         ) : null}
       </div>
-
-      {outOfStock ? <OutOfStockStamp /> : null}
     </div>
   );
 }
