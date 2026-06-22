@@ -82,11 +82,7 @@ import {
   clearanceModeButtonStyle,
   promoModeButtonStyle,
   secondaryButtonStyle,
-  sectionTitleStyle,
-  sectionToggleStyle,
   smallButtonStyle,
-  stepButtonStyle,
-  stepInputStyle,
   submitButtonStyle,
 } from "./orderStyles";
 import type { CartItem, CatalogItem, ClearanceItem, Lang, OrderHistoryItem, OrderMode, PromotionItem } from "./types";
@@ -1538,7 +1534,7 @@ export default function OrderPage() {
                 {orderHistory.length > 0 ? (
                   <button
                     type="button"
-                    className="order-past-orders-chip"
+                    className="order-past-orders-chip order-past-orders-chip--compact"
                     onClick={() => setShowPastOrders(true)}
                     aria-label={`${t.history} (${orderHistory.length})`}
                   >
@@ -1547,7 +1543,7 @@ export default function OrderPage() {
                     </span>
                     <span className="order-past-orders-chip-text">
                       <strong>{t.history}</strong>
-                      <span>{t.historyChipHint}</span>
+                      <span className="order-past-orders-chip-hint">{t.historyChipHint}</span>
                     </span>
                     <span className="order-past-orders-chip-count">{orderHistory.length}</span>
                   </button>
@@ -1706,12 +1702,18 @@ export default function OrderPage() {
                     </div>
                   </>
                 ) : null}
+
+                {mode !== "catalog" ? (
+                  <div className="order-sticky-panel-footer order-sticky-panel-footer--end">
+                    {renderStickyPanelToggle(true)}
+                  </div>
+                ) : null}
               </>
             ) : (
               <div className="order-sticky-panel-collapsed">{stickyModeLabel}</div>
             )}
 
-            {mode !== "catalog" || !stickyPanelOpen ? renderStickyPanelToggle() : null}
+            {!stickyPanelOpen ? renderStickyPanelToggle() : null}
           </div>
         </div>
 
@@ -1741,12 +1743,7 @@ export default function OrderPage() {
             onAddSkuToCart={addSkuFromSearch}
           />
         ) : mode === "newItems" ? (
-          <section
-            className="order-shop-card"
-            style={{ ...cardStyle, border: "1px solid #fdba74", background: "linear-gradient(180deg, #fff7ed 0%, #ffffff 40%)" }}
-          >
-            <div style={sectionTitleStyle}>{t.newItemsMode}</div>
-
+          <section className="order-shop-card order-shop-card--new">
             {newItemCatalogItems.length === 0 ? (
               <div style={{ ...emptyStyle, border: "1px solid #fdba74", background: "#fff7ed", color: "#c2410c" }}>{t.noNewItems}</div>
             ) : (
@@ -1777,13 +1774,7 @@ export default function OrderPage() {
             )}
           </section>
         ) : mode === "promotion" ? (
-          <section
-            className="order-shop-card"
-            style={{ ...cardStyle, border: "1px solid #5eead4", background: "linear-gradient(180deg, #f0fdfa 0%, #ffffff 40%)" }}
-          >
-            <div style={sectionTitleStyle}>{t.promotionMode}</div>
-            <p className="order-promo-hint">{t.promotionHint}</p>
-
+          <section className="order-shop-card order-shop-card--promo">
             {promotionsLoading ? (
               <div style={{ ...emptyStyle, border: "1px solid #5eead4", background: "#f0fdfa", color: "#0f766e" }}>{t.loadingPromotions}</div>
             ) : promotionItems.length === 0 ? (
@@ -1846,14 +1837,9 @@ export default function OrderPage() {
             )}
           </section>
         ) : mode === "clearance" ? (
-          <section
-            className="order-shop-card"
-            style={{ ...cardStyle, border: "1px solid #fdba74", background: "linear-gradient(180deg, #fff7ed 0%, #ffffff 40%)" }}
-          >
-            <div style={sectionTitleStyle}>{t.clearanceMode}</div>
-            <p style={{ fontSize: 13, color: "#9a3412", margin: "4px 0 10px", lineHeight: 1.45 }}>{t.clearanceHint}</p>
+          <section className="order-shop-card order-shop-card--clearance">
             {clearanceItems.length > 0 ? (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+              <div className="order-clearance-bulk-row">
                 <button
                   type="button"
                   onClick={addAllClearanceOneCase}
@@ -1909,7 +1895,7 @@ export default function OrderPage() {
             )}
           </section>
         ) : (
-          <section style={cardStyle} className="order-shop-card">
+          <section className="order-shop-card order-shop-card--listing">
             {recommendedStripItems.length > 0 ? (
               <details className="order-details-fold">
                 <summary>

@@ -608,7 +608,7 @@ export const submittedOrderListStyle: CSSProperties = {
 /** Scroll area for virtualized catalog grid — shrinks to content, caps at viewport. */
 export const catalogVirtualScrollStyle: CSSProperties = {
   width: "100%",
-  maxHeight: "min(70vh, 900px)",
+  maxHeight: "calc(100dvh - 220px)",
   overflow: "auto",
   marginTop: 0,
   WebkitOverflowScrolling: "touch",
