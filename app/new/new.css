@@ -5,15 +5,15 @@
   background:
     radial-gradient(ellipse 90% 45% at 50% -5%, rgba(37, 99, 235, 0.14), transparent),
     linear-gradient(180deg, #f8fafc 0%, #eef2ff 40%, #f8fafc 100%);
-  padding: max(12px, env(safe-area-inset-top)) 14px 88px;
+  padding: max(12px, env(safe-area-inset-top)) clamp(12px, 2.5vw, 40px) 88px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   box-sizing: border-box;
 }
 
 .new-header {
-  max-width: 1440px;
-  margin: 0 auto 14px;
   width: 100%;
+  max-width: none;
+  margin: 0 auto 14px;
 }
 
 .new-header-top {
@@ -103,9 +103,9 @@
 
 .new-main {
   flex: 1;
-  max-width: 1440px;
-  margin: 0 auto;
   width: 100%;
+  max-width: none;
+  margin: 0 auto;
 }
 
 .new-tabs {
@@ -145,11 +145,11 @@
   color: #1d4ed8;
 }
 
-/* Auto-fill grid — readable card width, no overcrowding on wide screens */
+/* Auto-fill — column count grows with viewport width */
 .new-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: clamp(10px, 1.2vw, 16px);
   align-items: stretch;
 }
 
@@ -366,26 +366,14 @@
 }
 
 @media (min-width: 640px) {
-  .new-page {
-    padding-left: 18px;
-    padding-right: 18px;
-  }
-
   .new-grid {
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 176px), 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
   }
 }
 
 @media (min-width: 1024px) {
-  .new-page {
-    padding-left: 24px;
-    padding-right: 24px;
-  }
-
   .new-grid {
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 192px), 1fr));
-    gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(clamp(168px, 10vw, 196px), 1fr));
   }
 
   .new-card .showcase-card-img-wrap img,
@@ -399,8 +387,14 @@
   }
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1600px) {
   .new-grid {
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 204px), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
+  }
+}
+
+@media (min-width: 2200px) {
+  .new-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   }
 }
