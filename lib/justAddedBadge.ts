@@ -15,13 +15,14 @@ export function getJustAddedLabel(lang: JustAddedLang) {
 
 /** Same pill as order page CatalogQtyCard (justAddedTagStyle). */
 export const justAddedBadgeStyle: CSSProperties = {
-  alignSelf: "flex-start",
   padding: "4px 10px",
   borderRadius: 999,
   fontSize: 11,
   fontWeight: 950,
   letterSpacing: "0.06em",
+  lineHeight: 1.2,
   background: "#dc2626",
   color: "#ffffff",
   border: "1px solid #b91c1c",
+  flexShrink: 0,
 };

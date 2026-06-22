@@ -171,14 +171,15 @@ export default function PublicShowcaseClient({ data }: { data: ShowcaseData }) {
             ) : (
               <div className="new-grid" role="list">
                 {items.map((item) => (
-                  <ShowcaseCard
-                    key={item.sku}
-                    item={item}
-                    lang={lang}
-                    showPromo={tab === "promo"}
-                    showNewDetails={tab === "new"}
-                    className="new-card"
-                  />
+                  <div key={item.sku} role="listitem" className="new-grid-item">
+                    <ShowcaseCard
+                      item={item}
+                      lang={lang}
+                      showPromo={tab === "promo"}
+                      showNewDetails={tab === "new"}
+                      className="new-card"
+                    />
+                  </div>
                 ))}
               </div>
             )}

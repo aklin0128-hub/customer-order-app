@@ -1717,6 +1717,8 @@ export default function OrderPage() {
                 showAdminEdit={showAdminEditLinks}
                 showNewItemListPrice
                 showNewProductBadge
+                showPublishedDate
+                publishedDateLabel={t.publishedDate}
                 listPriceLabel={t.listPrice}
                 lang={lang}
                 canOrderItem={isOrderableItem}
@@ -1732,6 +1734,7 @@ export default function OrderPage() {
             style={{ ...cardStyle, border: "1px solid #5eead4", background: "linear-gradient(180deg, #f0fdfa 0%, #ffffff 40%)" }}
           >
             <div style={sectionTitleStyle}>{t.promotionMode}</div>
+            <p className="order-promo-hint">{t.promotionHint}</p>
 
             {promotionsLoading ? (
               <div style={{ ...emptyStyle, border: "1px solid #5eead4", background: "#f0fdfa", color: "#0f766e" }}>{t.loadingPromotions}</div>

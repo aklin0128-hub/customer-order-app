@@ -34,12 +34,14 @@ test("parseNewPublishedDate rejects invalid values", () => {
   assert.equal(parseNewPublishedDate(""), undefined);
 });
 
-test("compareCatalogByNewestImport sorts newest add date first", () => {
+test("compareCatalogByNewestImport: justAdded, then published date, then SKU", () => {
   const items = [
-    { sku: "A", importedAt: "2026-01-01T00:00:00.000Z" },
-    { sku: "B", importedAt: "2026-03-01T00:00:00.000Z" },
-    { sku: "C", importedAt: "2026-02-01T00:00:00.000Z" },
+    { sku: "C", newPublishedDate: "2026-06-01" },
+    { sku: "A", justAdded: true, newPublishedDate: "2026-05-01" },
+    { sku: "B", justAdded: true, newPublishedDate: "2026-06-01" },
+    { sku: "D", newPublishedDate: "2026-06-10" },
+    { sku: "E", importedAt: "2026-01-01T00:00:00.000Z" },
   ];
   const sorted = [...items].sort(compareCatalogByNewestImport);
-  assert.deepEqual(sorted.map((item) => item.sku), ["B", "C", "A"]);
+  assert.deepEqual(sorted.map((item) => item.sku), ["B", "A", "D", "C", "E"]);
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { ShowcaseDescriptionModal } from "@/app/components/ShowcaseDescriptionModal";
 import { OutOfStockStamp } from "@/app/components/OutOfStockStamp";
@@ -43,19 +43,9 @@ export function ShowcaseCard({
   imageSize?: number;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [desktopGrid, setDesktopGrid] = useState(false);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1100px)");
-    const sync = () => setDesktopGrid(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
 
   const isNewCard = className.includes("new-card");
-  const resolvedImageSize =
-    imageSize ?? (isNewCard ? (desktopGrid ? 80 : 96) : 80);
+  const resolvedImageSize = imageSize ?? (isNewCard ? 96 : 80);
 
   const promoDisplay = useMemo(
     () => (showPromo ? formatShowcasePromoDisplay(item, lang) : null),

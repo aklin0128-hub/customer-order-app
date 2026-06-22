@@ -65,6 +65,11 @@ export type CatalogNewFields = {
   name_k?: string;
 };
 
+/** Published date (YYYY-MM-DD) for new-item sort — no import/newSince fallback. */
+export function getNewItemPublishedSortMs(item?: CatalogNewFields | null) {
+  return parseNewPublishedDateMs(item?.newPublishedDate);
+}
+
 /** Best available "added" timestamp for new-item display/sort. */
 export function getNewItemAddedAtMs(
   item?: (CatalogNewFields & { updatedAt?: string }) | null
@@ -108,6 +113,7 @@ export function compareCatalogForDisplay(
   return String(a.sku || "").localeCompare(String(b.sku || ""));
 }
 
+/** New items: justAdded → published date (newest first) → SKU. */
 export function compareCatalogByNewestImport(
   a: CatalogNewFields & { sku?: string },
   b: CatalogNewFields & { sku?: string }
@@ -115,8 +121,8 @@ export function compareCatalogByNewestImport(
   const aPin = isJustAddedItem(a) ? 1 : 0;
   const bPin = isJustAddedItem(b) ? 1 : 0;
   if (bPin !== aPin) return bPin - aPin;
-  const aMs = getNewItemAddedAtMs(a) ?? 0;
-  const bMs = getNewItemAddedAtMs(b) ?? 0;
+  const aMs = getNewItemPublishedSortMs(a) ?? 0;
+  const bMs = getNewItemPublishedSortMs(b) ?? 0;
   if (bMs !== aMs) return bMs - aMs;
   return String(a.sku || "").localeCompare(String(b.sku || ""));
 }

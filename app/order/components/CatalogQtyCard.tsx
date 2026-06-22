@@ -1,6 +1,6 @@
 "use client";
 
-import { formatCatalogAddedDateForItem } from "@/lib/catalogNewItems";
+import { formatCatalogAddedDateForItem, formatNewItemPublishedDate } from "@/lib/catalogNewItems";
 import { formatNewItemListPriceDisplay } from "@/lib/newItemListPrice";
 import { OutOfStockStamp } from "@/app/components/OutOfStockStamp";
 import { NewProductBadge } from "@/app/components/NewProductBadge";
@@ -15,7 +15,6 @@ import {
   catalogStepperStyle,
   inCartTagStyle,
   clearancePolicyStyle,
-  promoDetailsStyle,
   promoDealStyle,
   promoPriceStyle,
   newItemListPriceBlockStyle,
@@ -54,6 +53,8 @@ export function CatalogQtyCard({
   /** Show catalog import date (New items tab). */
   showAddedDate,
   addedDateLabel,
+  showPublishedDate,
+  publishedDateLabel,
   lang = "en",
   /** New-items tab: every card uses the red JUST ADDED pill (pin order still uses justAdded flag). */
   uniformNewPill,
@@ -92,6 +93,8 @@ export function CatalogQtyCard({
   justAddedLabel?: string;
   showAddedDate?: boolean;
   addedDateLabel?: string;
+  showPublishedDate?: boolean;
+  publishedDateLabel?: string;
   lang?: Lang;
   uniformNewPill?: boolean;
   showNewItemListPrice?: boolean;
@@ -100,6 +103,10 @@ export function CatalogQtyCard({
 }) {
   const addedDateText =
     showAddedDate && addedDateLabel ? formatCatalogAddedDateForItem(item, lang) : null;
+  const publishedDateText =
+    showPublishedDate && publishedDateLabel && item.newPublishedDate
+      ? formatNewItemPublishedDate(item.newPublishedDate, lang)
+      : null;
   const hasQty = Number(qty) > 0;
   const qtyNum = Number(qty) || 0;
   const showBogoRoundUp =
@@ -161,10 +168,92 @@ export function CatalogQtyCard({
   const topBadgeCount = alignedPriceLayout
     ? [showPinnedJustAdded || showJustAdded, storageLabel, !showJustAdded && !showPinnedJustAdded && promoNote, promoRemaining].filter(Boolean).length
     : 0;
+  const promoLayout = Boolean(highlight && !alignedPriceLayout);
+
+  const productInfo = (
+    <>
+      <div style={{ fontSize: 13, fontWeight: 900, color: "#111827", lineHeight: 1.2 }}>{item.sku}</div>
+      <div style={{ fontSize: 12, fontWeight: 800, color: "#374151" }}>{item.brand || "-"}</div>
+      <div style={catalogNameStyle}>{item.name || "-"}</div>
+      {item.size ? <div style={{ fontSize: 11, color: "#6b7280" }}>{item.size}</div> : null}
+      {item.palletSize && palletLabel ? (
+        <div style={{ fontSize: 11, color: "#6b7280", marginTop: item.size ? 2 : 0 }}>
+          {palletLabel}: {item.palletSize}
+        </div>
+      ) : null}
+      {publishedDateText ? (
+        <div className="catalog-published-date">
+          {publishedDateLabel}: {publishedDateText}
+        </div>
+      ) : null}
+      {addedDateText ? (
+        <div className="catalog-added-date">
+          {addedDateLabel}: {addedDateText}
+        </div>
+      ) : null}
+      {!isOrderableItem(item) && getDisplayStatus(item.status) ? (
+        <span
+          style={{
+            display: "inline-block",
+            marginTop: 4,
+            padding: "2px 7px",
+            borderRadius: 999,
+            fontSize: 10,
+            fontWeight: 700,
+            ...getStatusBadgeStyle(item.status),
+          }}
+        >
+          {getDisplayStatus(item.status)}
+        </span>
+      ) : null}
+      {unavailableNote ? (
+        <div
+          style={{
+            marginTop: 4,
+            fontSize: 11,
+            fontWeight: 800,
+            color: "#b91c1c",
+            lineHeight: 1.35,
+          }}
+        >
+          {unavailableNote}
+        </div>
+      ) : null}
+    </>
+  );
+
+  const promoFooter = (
+    <>
+      {promoDealLabel ? (
+        <div className="catalog-qty-card-promo-deal" style={promoDealStyle}>
+          <div>{promoDealLabel}</div>
+          {tierPrices ? (
+            <div className="catalog-promo-deal-tiers">
+              {tierPrices.map((tier) => (
+                <div key={tier} className="catalog-promo-deal-tier">
+                  {tier}
+                </div>
+              ))}
+            </div>
+          ) : promoDealDetail ? (
+            <div className="catalog-qty-card-promo-deal-detail">{promoDealDetail}</div>
+          ) : null}
+        </div>
+      ) : null}
+      {promoPrice ? <div style={promoPriceStyle}>{promoPrice}</div> : null}
+      {!promoPrice && invoicePrice ? <div style={promoPriceStyle}>{invoicePrice}</div> : null}
+      {promoPrice && invoicePrice ? (
+        <div style={{ ...promoPriceStyle, color: "#1d4ed8", marginTop: promoPrice ? 2 : 0 }}>{invoicePrice}</div>
+      ) : null}
+      {promoDetails ? <div className="catalog-qty-card-promo-details">{promoDetails}</div> : null}
+      {policyNote ? <div style={clearancePolicyStyle}>{policyNote}</div> : null}
+      {hasQty ? <div style={inCartTagStyle}>{inCartLabel}: {qty}</div> : null}
+    </>
+  );
 
   return (
     <div
-      className={`catalog-qty-card${alignedPriceLayout ? " catalog-qty-card--price-aligned" : ""}${alignedPriceLayout ? ` catalog-qty-card--top-badges-${topBadgeCount}` : ""}${outOfStock ? " catalog-qty-card--out-of-stock" : ""}`}
+      className={`catalog-qty-card${alignedPriceLayout ? " catalog-qty-card--price-aligned" : ""}${alignedPriceLayout ? ` catalog-qty-card--top-badges-${topBadgeCount}` : ""}${promoLayout ? " catalog-qty-card--promo-layout" : ""}${outOfStock ? " catalog-qty-card--out-of-stock" : ""}`}
       style={{
         ...catalogCardStyle,
         background: disabled ? "#f3f4f6" : hasQty ? "#ecfdf5" : highlight ? "#f0fdfa" : "#ffffff",
@@ -220,72 +309,17 @@ export function CatalogQtyCard({
         listPriceBlock
       )}
 
-      <div style={{ fontSize: 13, fontWeight: 900, color: "#111827", lineHeight: 1.2 }}>{item.sku}</div>
-      <div style={{ fontSize: 12, fontWeight: 800, color: "#374151" }}>{item.brand || "-"}</div>
-      <div style={catalogNameStyle}>{item.name || "-"}</div>
-      {item.size ? <div style={{ fontSize: 11, color: "#6b7280" }}>{item.size}</div> : null}
-      {item.palletSize && palletLabel ? (
-        <div style={{ fontSize: 11, color: "#6b7280", marginTop: item.size ? 2 : 0 }}>
-          {palletLabel}: {item.palletSize}
+      {promoLayout ? (
+        <div className="catalog-qty-card-fill">
+          {productInfo}
+          <div className="catalog-qty-card-promo-footer">{promoFooter}</div>
         </div>
-      ) : null}
-      {addedDateText ? (
-        <div className="catalog-added-date">
-          {addedDateLabel}: {addedDateText}
-        </div>
-      ) : null}
-      {!isOrderableItem(item) && getDisplayStatus(item.status) ? (
-        <span
-          style={{
-            display: "inline-block",
-            marginTop: 4,
-            padding: "2px 7px",
-            borderRadius: 999,
-            fontSize: 10,
-            fontWeight: 700,
-            ...getStatusBadgeStyle(item.status),
-          }}
-        >
-          {getDisplayStatus(item.status)}
-        </span>
-      ) : null}
-      {unavailableNote ? (
-        <div
-          style={{
-            marginTop: 4,
-            fontSize: 11,
-            fontWeight: 800,
-            color: "#b91c1c",
-            lineHeight: 1.35,
-          }}
-        >
-          {unavailableNote}
-        </div>
-      ) : null}
-      {promoDealLabel ? (
-        <div style={promoDealStyle}>
-          <div>{promoDealLabel}</div>
-          {tierPrices ? (
-            <div className="catalog-promo-deal-tiers">
-              {tierPrices.map((tier) => (
-                <div key={tier} className="catalog-promo-deal-tier">
-                  {tier}
-                </div>
-              ))}
-            </div>
-          ) : promoDealDetail ? (
-            <div style={{ fontSize: 12, fontWeight: 800, marginTop: 4, lineHeight: 1.35 }}>{promoDealDetail}</div>
-          ) : null}
-        </div>
-      ) : null}
-      {promoPrice ? <div style={promoPriceStyle}>{promoPrice}</div> : null}
-      {!promoPrice && invoicePrice ? <div style={promoPriceStyle}>{invoicePrice}</div> : null}
-      {promoPrice && invoicePrice ? (
-        <div style={{ ...promoPriceStyle, color: "#1d4ed8", marginTop: promoPrice ? 2 : 0 }}>{invoicePrice}</div>
-      ) : null}
-      {promoDetails ? <div style={promoDetailsStyle}>{promoDetails}</div> : null}
-      {policyNote ? <div style={clearancePolicyStyle}>{policyNote}</div> : null}
-      {hasQty ? <div style={inCartTagStyle}>{inCartLabel}: {qty}</div> : null}
+      ) : (
+        <>
+          {productInfo}
+          {promoFooter}
+        </>
+      )}
 
       <div className="catalog-qty-card-stepper">
         <div style={catalogStepperStyle}>

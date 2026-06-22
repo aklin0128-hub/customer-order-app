@@ -38,6 +38,8 @@ export function CatalogVirtualGrid({
   uniformNewPill,
   showAddedDate,
   addedDateLabel,
+  showPublishedDate,
+  publishedDateLabel,
   lang,
   showAdminEdit,
   showNewItemListPrice,
@@ -67,6 +69,8 @@ export function CatalogVirtualGrid({
   uniformNewPill?: boolean;
   showAddedDate?: boolean;
   addedDateLabel?: string;
+  showPublishedDate?: boolean;
+  publishedDateLabel?: string;
   lang?: Lang;
   showAdminEdit?: boolean;
   showNewItemListPrice?: boolean;
@@ -192,6 +196,8 @@ export function CatalogVirtualGrid({
                     uniformNewPill={uniformNewPill}
                     showAddedDate={showAddedDate}
                     addedDateLabel={addedDateLabel}
+                    showPublishedDate={showPublishedDate}
+                    publishedDateLabel={publishedDateLabel}
                     lang={lang}
                     showAdminEdit={showAdminEdit}
                     showNewItemListPrice={showNewItemListPrice}
