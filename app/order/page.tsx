@@ -165,6 +165,7 @@ export default function OrderPage() {
   const [clearanceItems, setClearanceItems] = useState<ClearanceItem[]>([]);
   const [clearanceLoading, setClearanceLoading] = useState(false);
   const [showAdminEditLinks, setShowAdminEditLinks] = useState(false);
+  const [stickyPanelOpen, setStickyPanelOpen] = useState(true);
 
   const toggleCategoryFilter = (cat: string) => {
     if (cat === "ALL") {
@@ -1374,6 +1375,17 @@ export default function OrderPage() {
     </div>
   );
 
+  const stickyModeLabel =
+    mode === "promotion"
+      ? t.promotionMode
+      : mode === "newItems"
+        ? t.newItemsMode
+        : mode === "clearance"
+          ? t.clearanceMode
+          : mode === "catalog"
+            ? t.catalogMode
+            : t.searchMode;
+
   if (!ready) return null;
 
   return (
@@ -1440,81 +1452,83 @@ export default function OrderPage() {
                 </button>
               </div>
             ) : null}
-            <div className="order-mode-tabs" role="tablist" aria-label="Order mode">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === "promotion"}
-                onClick={() => changeMode("promotion")}
-                className="order-mode-tab"
-                style={promoModeButtonStyle(mode === "promotion")}
-              >
-                {t.promotionMode}
-                {promotionItems.length > 0 ? ` (${promotionItems.length})` : ""}
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === "newItems"}
-                onClick={() => changeMode("newItems")}
-                className="order-mode-tab"
-                style={newItemsModeButtonStyle(mode === "newItems")}
-              >
-                {t.newItemsMode}
-                {newItemCount > 0 ? ` (${newItemCount})` : ""}
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === "clearance"}
-                onClick={() => changeMode("clearance")}
-                className="order-mode-tab"
-                style={clearanceModeButtonStyle(mode === "clearance")}
-              >
-                {t.clearanceMode}
-                {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === "catalog"}
-                onClick={() => changeMode("catalog")}
-                className="order-mode-tab"
-                style={modeButtonStyle(mode === "catalog")}
-              >
-                {t.catalogMode}
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === "search"}
-                onClick={() => changeMode("search")}
-                className="order-mode-tab"
-                style={modeButtonStyle(mode === "search")}
-              >
-                {t.searchMode}
-              </button>
-            </div>
+            {stickyPanelOpen ? (
+              <>
+                <div className="order-mode-tabs" role="tablist" aria-label="Order mode">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === "promotion"}
+                    onClick={() => changeMode("promotion")}
+                    className="order-mode-tab"
+                    style={promoModeButtonStyle(mode === "promotion")}
+                  >
+                    {t.promotionMode}
+                    {promotionItems.length > 0 ? ` (${promotionItems.length})` : ""}
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === "newItems"}
+                    onClick={() => changeMode("newItems")}
+                    className="order-mode-tab"
+                    style={newItemsModeButtonStyle(mode === "newItems")}
+                  >
+                    {t.newItemsMode}
+                    {newItemCount > 0 ? ` (${newItemCount})` : ""}
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === "clearance"}
+                    onClick={() => changeMode("clearance")}
+                    className="order-mode-tab"
+                    style={clearanceModeButtonStyle(mode === "clearance")}
+                  >
+                    {t.clearanceMode}
+                    {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === "catalog"}
+                    onClick={() => changeMode("catalog")}
+                    className="order-mode-tab"
+                    style={modeButtonStyle(mode === "catalog")}
+                  >
+                    {t.catalogMode}
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={mode === "search"}
+                    onClick={() => changeMode("search")}
+                    className="order-mode-tab"
+                    style={modeButtonStyle(mode === "search")}
+                  >
+                    {t.searchMode}
+                  </button>
+                </div>
 
-            {orderHistory.length > 0 ? (
-              <button
-                type="button"
-                className="order-past-orders-chip"
-                onClick={() => setShowPastOrders(true)}
-                aria-label={`${t.history} (${orderHistory.length})`}
-              >
-                <span className="order-past-orders-chip-icon" aria-hidden>
-                  📋
-                </span>
-                <span className="order-past-orders-chip-text">
-                  <strong>{t.history}</strong>
-                  <span>{t.historyChipHint}</span>
-                </span>
-                <span className="order-past-orders-chip-count">{orderHistory.length}</span>
-              </button>
-            ) : null}
+                {orderHistory.length > 0 ? (
+                  <button
+                    type="button"
+                    className="order-past-orders-chip"
+                    onClick={() => setShowPastOrders(true)}
+                    aria-label={`${t.history} (${orderHistory.length})`}
+                  >
+                    <span className="order-past-orders-chip-icon" aria-hidden>
+                      📋
+                    </span>
+                    <span className="order-past-orders-chip-text">
+                      <strong>{t.history}</strong>
+                      <span>{t.historyChipHint}</span>
+                    </span>
+                    <span className="order-past-orders-chip-count">{orderHistory.length}</span>
+                  </button>
+                ) : null}
 
-            {mode === "catalog" ? (
+                {mode === "catalog" ? (
               <>
                 <div className="order-sticky-search-row">
                   <input
@@ -1624,46 +1638,73 @@ export default function OrderPage() {
               </>
             ) : null}
 
-            {mode === "search" ? (
-              <>
-                <div className="order-sticky-search-row is-single">
-                  <input
-                    ref={skuInputRef}
-                    value={skuInput}
-                    onChange={(e) => setSkuInput(e.target.value.toUpperCase())}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        addItem();
-                      }
-                    }}
-                    placeholder={t.searchPlaceholder}
-                    autoCapitalize="characters"
-                    className="order-sticky-search-input"
-                    aria-label={t.skuItem}
-                  />
-                </div>
-                <div className="order-sticky-search-row order-sticky-search-composer">
-                  <input
-                    value={qtyInput}
-                    onChange={(e) => setQtyInput(e.target.value.replace(/[^0-9]/g, ""))}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        addItem();
-                      }
-                    }}
-                    placeholder="1"
-                    inputMode="numeric"
-                    className="order-sticky-search-qty"
-                    aria-label={t.qty}
-                  />
-                  <button type="button" className="order-sticky-search-add" onClick={addItem}>
-                    {t.addItem}
-                  </button>
-                </div>
+                {mode === "search" ? (
+                  <>
+                    <div className="order-sticky-search-row is-single">
+                      <input
+                        ref={skuInputRef}
+                        value={skuInput}
+                        onChange={(e) => setSkuInput(e.target.value.toUpperCase())}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addItem();
+                          }
+                        }}
+                        placeholder={t.searchPlaceholder}
+                        autoCapitalize="characters"
+                        className="order-sticky-search-input"
+                        aria-label={t.skuItem}
+                      />
+                    </div>
+                    <div className="order-sticky-search-row order-sticky-search-composer">
+                      <input
+                        value={qtyInput}
+                        onChange={(e) => setQtyInput(e.target.value.replace(/[^0-9]/g, ""))}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            addItem();
+                          }
+                        }}
+                        placeholder="1"
+                        inputMode="numeric"
+                        className="order-sticky-search-qty"
+                        aria-label={t.qty}
+                      />
+                      <button type="button" className="order-sticky-search-add" onClick={addItem}>
+                        {t.addItem}
+                      </button>
+                    </div>
+                  </>
+                ) : null}
               </>
-            ) : null}
+            ) : (
+              <div className="order-sticky-panel-collapsed">{stickyModeLabel}</div>
+            )}
+
+            <button
+              type="button"
+              className="order-sticky-panel-toggle"
+              onClick={() => setStickyPanelOpen((open) => !open)}
+              aria-expanded={stickyPanelOpen}
+              aria-label={stickyPanelOpen ? t.hide : t.show}
+            >
+              <span className="order-sticky-panel-toggle-label">{stickyPanelOpen ? t.hide : t.show}</span>
+              <span className="order-sticky-panel-toggle-icon" aria-hidden>
+                {stickyPanelOpen ? (
+                  <svg viewBox="0 0 20 12" width="20" height="12" focusable="false">
+                    <path d="M3 9.5 10 3.5 17 9.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M3 5.5 10 1 17 5.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 20 12" width="20" height="12" focusable="false">
+                    <path d="M3 2.5 10 8.5 17 2.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M3 6.5 10 11 17 6.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </span>
+            </button>
           </div>
         </div>
 

@@ -101,6 +101,64 @@
   backdrop-filter: blur(8px);
 }
 
+.order-sticky-panel-toggle {
+  width: auto;
+  min-width: 72px;
+  margin-top: 8px;
+  margin-left: auto;
+  margin-right: auto;
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
+  border-radius: 999px;
+  padding: 6px 16px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748b;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.order-sticky-panel-collapsed {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #374151;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.order-sticky-bar-inner:has(.order-sticky-panel-collapsed) {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.order-sticky-bar-inner:has(.order-sticky-panel-collapsed) .order-sticky-panel-toggle {
+  margin-top: 4px;
+}
+
+.order-sticky-panel-toggle:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #2563eb;
+}
+
+.order-sticky-panel-toggle-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  color: #94a3b8;
+}
+
+.order-sticky-panel-toggle:hover .order-sticky-panel-toggle-icon {
+  color: #2563eb;
+}
+
 .order-past-orders-chip {
   width: 100%;
   margin-top: 8px;
