@@ -657,7 +657,10 @@ export default function OrderPage() {
   }, [orderHistory, recentItems, invoiceFrequentSkus]);
 
   const recommendedItemCount = useMemo(
-    () => catalogBrowseBase.filter((item) => recommendedSkuSet.has(item.sku?.toUpperCase() || "")).length,
+    () =>
+      catalogBrowseBase.filter(
+        (item) => recommendedSkuSet.has(item.sku?.toUpperCase() || "") && !isNewItem(item)
+      ).length,
     [catalogBrowseBase, recommendedSkuSet]
   );
 
@@ -675,6 +678,7 @@ export default function OrderPage() {
     const q = catalogSearch.trim().toUpperCase();
 
     return catalogBrowseBase
+      .filter((item) => !isNewItem(item))
       .filter((item) => {
         if (catalogShowSelectedOnly) {
           const sku = (item.sku || "").toUpperCase();
@@ -869,6 +873,7 @@ export default function OrderPage() {
     if (mode !== "catalog" || catalogShowRecommendedOnly) return [];
     return catalogBrowseBase
       .filter((item) => recommendedSkuSet.has((item.sku || "").toUpperCase()))
+      .filter((item) => !isNewItem(item))
       .filter((item) => Number(catalogQtyMap[(item.sku || "").toUpperCase()] || 0) <= 0)
       .slice(0, 8);
   }, [mode, catalogBrowseBase, recommendedSkuSet, catalogQtyMap, catalogShowRecommendedOnly]);
@@ -1383,6 +1388,31 @@ export default function OrderPage() {
 
   if (!ready) return null;
 
+  const renderStickyPanelToggle = (inline = false) => (
+    <button
+      type="button"
+      className={`order-sticky-panel-toggle${inline ? " order-sticky-panel-toggle--inline" : ""}`}
+      onClick={() => setStickyPanelOpen((open) => !open)}
+      aria-expanded={stickyPanelOpen}
+      aria-label={stickyPanelOpen ? t.hide : t.show}
+    >
+      <span className="order-sticky-panel-toggle-label">{stickyPanelOpen ? t.hide : t.show}</span>
+      <span className="order-sticky-panel-toggle-icon" aria-hidden>
+        {stickyPanelOpen ? (
+          <svg viewBox="0 0 20 12" width="20" height="12" focusable="false">
+            <path d="M3 9.5 10 3.5 17 9.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M3 5.5 10 1 17 5.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 20 12" width="20" height="12" focusable="false">
+            <path d="M3 2.5 10 8.5 17 2.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M3 6.5 10 11 17 6.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+      </span>
+    </button>
+  );
+
   return (
     <main ref={mainRef} className={`order-page${fullscreen ? " is-fullscreen" : ""}`}>
       <div className="order-container">
@@ -1563,8 +1593,11 @@ export default function OrderPage() {
                     {t.availableOnly}
                   </label>
                 </div>
-                <div className="order-sticky-catalog-meta">
-                  {t.selected}: {cartItemCount} · {t.showing} {orderableCatalogItems.length} {t.catalogCount}
+                <div className="order-sticky-catalog-footer">
+                  <div className="order-sticky-catalog-meta">
+                    {t.selected}: {cartItemCount} · {t.showing} {orderableCatalogItems.length} {t.catalogCount}
+                  </div>
+                  {renderStickyPanelToggle(true)}
                 </div>
                 {catalogFiltersOpen ? (
                   <div className="order-sticky-filters">
@@ -1678,28 +1711,7 @@ export default function OrderPage() {
               <div className="order-sticky-panel-collapsed">{stickyModeLabel}</div>
             )}
 
-            <button
-              type="button"
-              className="order-sticky-panel-toggle"
-              onClick={() => setStickyPanelOpen((open) => !open)}
-              aria-expanded={stickyPanelOpen}
-              aria-label={stickyPanelOpen ? t.hide : t.show}
-            >
-              <span className="order-sticky-panel-toggle-label">{stickyPanelOpen ? t.hide : t.show}</span>
-              <span className="order-sticky-panel-toggle-icon" aria-hidden>
-                {stickyPanelOpen ? (
-                  <svg viewBox="0 0 20 12" width="20" height="12" focusable="false">
-                    <path d="M3 9.5 10 3.5 17 9.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M3 5.5 10 1 17 5.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 20 12" width="20" height="12" focusable="false">
-                    <path d="M3 2.5 10 8.5 17 2.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M3 6.5 10 11 17 6.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
-              </span>
-            </button>
+            {mode !== "catalog" || !stickyPanelOpen ? renderStickyPanelToggle() : null}
           </div>
         </div>
 
@@ -1922,9 +1934,6 @@ export default function OrderPage() {
               justAddedLabel={t.justAdded}
               promoBadgeLabel={t.promoBadge}
               weeklyPickSkus={promoSkuSet}
-              newItemChecker={isNewItem}
-              newProductBadgeChecker={isNewItem}
-              newBadgeLabel={t.newItems}
               editLabel={t.editProduct}
               showAdminEdit={showAdminEditLinks}
               canOrderItem={isOrderableItem}

@@ -610,7 +610,7 @@ export const catalogVirtualScrollStyle: CSSProperties = {
   width: "100%",
   maxHeight: "min(70vh, 900px)",
   overflow: "auto",
-  marginTop: 4,
+  marginTop: 0,
   WebkitOverflowScrolling: "touch",
   boxSizing: "border-box",
 };
