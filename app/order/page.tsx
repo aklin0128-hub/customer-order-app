@@ -835,11 +835,6 @@ export default function OrderPage() {
     [promotionItems]
   );
 
-  const clearanceSkuSet = useMemo(
-    () => new Set(clearanceItems.map((item) => item.sku?.toUpperCase()).filter(Boolean)),
-    [clearanceItems]
-  );
-
   const nhItemsSkuSetForOrder = useMemo(() => nhItemsSkuSet(qtyMaps), [qtyMaps]);
 
   const promoDealBySku = useMemo(() => {
@@ -1927,10 +1922,8 @@ export default function OrderPage() {
               justAddedLabel={t.justAdded}
               promoBadgeLabel={t.promoBadge}
               weeklyPickSkus={promoSkuSet}
-              clearancePickSkus={clearanceSkuSet}
               newItemChecker={isNewItem}
               newProductBadgeChecker={isNewItem}
-              clearanceBadgeLabel={t.clearanceBadge}
               newBadgeLabel={t.newItems}
               editLabel={t.editProduct}
               showAdminEdit={showAdminEditLinks}

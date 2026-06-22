@@ -28,9 +28,7 @@ export function CatalogVirtualGrid({
   inCartLabel,
   promoBadgeLabel,
   weeklyPickSkus,
-  clearancePickSkus,
   newItemChecker,
-  clearanceBadgeLabel,
   newBadgeLabel,
   editLabel,
   palletLabel,
@@ -59,9 +57,7 @@ export function CatalogVirtualGrid({
   inCartLabel: string;
   promoBadgeLabel: string;
   weeklyPickSkus?: Set<string>;
-  clearancePickSkus?: Set<string>;
   newItemChecker?: (item: CatalogItem) => boolean;
-  clearanceBadgeLabel?: string;
   newBadgeLabel?: string;
   editLabel?: string;
   palletLabel?: string;
@@ -169,17 +165,14 @@ export function CatalogVirtualGrid({
                 const sku = item.sku?.toUpperCase() || "";
                 const qty = catalogQtyMap[sku] || "";
                 const isWeekly = weeklyPickSkus?.has(sku);
-                const isClearance = clearancePickSkus?.has(sku);
                 const showItemNewBadge = Boolean(showNewProductBadge || newProductBadgeChecker?.(item));
                 const promoNote = uniformNewPill || showItemNewBadge
                   ? undefined
                   : isWeekly
                     ? promoBadgeLabel
-                    : isClearance
-                      ? clearanceBadgeLabel || promoBadgeLabel
-                      : newItemChecker?.(item)
-                        ? newBadgeLabel
-                        : undefined;
+                    : newItemChecker?.(item)
+                      ? newBadgeLabel
+                      : undefined;
                 const canOrder = canOrderItem?.(item) ?? true;
                 return (
                   <CatalogQtyCard
@@ -189,7 +182,7 @@ export function CatalogVirtualGrid({
                     promoNote={promoNote}
                     inCartLabel={inCartLabel}
                     promoBadgeLabel={promoBadgeLabel}
-                    highlight={Boolean(isWeekly || isClearance)}
+                    highlight={Boolean(isWeekly)}
                     editLabel={editLabel}
                     palletLabel={palletLabel}
                     justAddedLabel={justAddedLabel}
