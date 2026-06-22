@@ -161,7 +161,7 @@
   background: #fff;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   min-width: 0;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -169,32 +169,43 @@
 
 .new-card .showcase-card-body {
   flex: 1;
-  gap: 10px;
+  gap: 5px;
 }
 
 .new-card .showcase-card-badge-row {
   margin-bottom: 0;
-  gap: 6px;
-  min-height: 22px;
+  gap: 4px;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.new-card.new-card--top-badges-2 .showcase-card-badge-row {
+  gap: 3px;
 }
 
 .new-card .showcase-card-img-wrap {
-  min-height: 108px;
+  min-height: 0;
   width: 100%;
   margin-bottom: 0;
-  padding: 12px 8px;
+  padding: 6px 8px;
   box-sizing: border-box;
+  overflow: visible;
+}
+
+.new-card .showcase-card-img-wrap--stamped {
+  overflow: visible;
+  margin-bottom: 6px;
 }
 
 .new-card .showcase-card-img-wrap img,
 .new-card .showcase-card-img-fallback {
-  width: 88px;
-  height: 88px;
+  width: 96px;
+  height: 96px;
 }
 
 .new-card .showcase-card-meta {
-  gap: 5px;
-  padding-top: 2px;
+  gap: 3px;
+  padding-top: 0;
 }
 
 .new-card .showcase-card-sku {
@@ -243,6 +254,17 @@
   padding: 6px 7px;
   margin-top: 5px;
   border-radius: 8px;
+}
+
+.new-card .new-product-list-price {
+  margin-top: 2px;
+  font-size: 16px;
+}
+
+@media (min-width: 1100px) {
+  .new-card .new-product-list-price {
+    font-size: 18px;
+  }
 }
 
 .new-card .showcase-card-promo-deal {
@@ -376,23 +398,22 @@
   }
 
   .new-card .showcase-card-body {
-    gap: 8px;
-  }
-
-  .new-card .showcase-card-badge-row {
-    min-height: 20px;
     gap: 4px;
   }
 
+  .new-card .showcase-card-badge-row {
+    gap: 3px;
+  }
+
   .new-card .showcase-card-img-wrap {
-    min-height: 84px;
-    padding: 8px 6px;
+    min-height: 0;
+    padding: 4px 6px;
   }
 
   .new-card .showcase-card-img-wrap img,
   .new-card .showcase-card-img-fallback {
-    width: 72px;
-    height: 72px;
+    width: 80px;
+    height: 80px;
   }
 
   .new-card .showcase-card-meta {

@@ -16,9 +16,9 @@ export function getJustAddedLabel(lang: JustAddedLang) {
 /** Same pill as order page CatalogQtyCard (justAddedTagStyle). */
 export const justAddedBadgeStyle: CSSProperties = {
   alignSelf: "flex-start",
-  padding: "3px 8px",
+  padding: "4px 10px",
   borderRadius: 999,
-  fontSize: 10,
+  fontSize: 11,
   fontWeight: 950,
   letterSpacing: "0.06em",
   background: "#dc2626",

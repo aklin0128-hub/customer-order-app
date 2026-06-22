@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { ShowcaseDescriptionModal } from "@/app/components/ShowcaseDescriptionModal";
 import { OutOfStockStamp } from "@/app/components/OutOfStockStamp";
+import { NewProductBadge } from "@/app/components/NewProductBadge";
 import { ProductImage } from "@/app/order/components/ProductImage";
 import { getJustAddedLabel, justAddedBadgeStyle } from "@/lib/justAddedBadge";
 import { formatNewItemPublishedDate } from "@/lib/catalogNewItems";
@@ -23,13 +24,6 @@ const publishedDateLabel: Record<Lang, string> = {
   zh: "上架",
   ko: "게시",
   vi: "Đăng",
-};
-
-const priceLabel: Record<Lang, string> = {
-  en: "Price:",
-  zh: "价格：",
-  ko: "가격:",
-  vi: "Giá:",
 };
 
 export function ShowcaseCard({
@@ -61,7 +55,7 @@ export function ShowcaseCard({
 
   const isNewCard = className.includes("new-card");
   const resolvedImageSize =
-    imageSize ?? (isNewCard ? (desktopGrid ? 72 : 88) : 80);
+    imageSize ?? (isNewCard ? (desktopGrid ? 80 : 96) : 80);
 
   const promoDisplay = useMemo(
     () => (showPromo ? formatShowcasePromoDisplay(item, lang) : null),
@@ -82,9 +76,10 @@ export function ShowcaseCard({
       ? formatNewItemListPriceDisplay(item.newItemListPrice)
       : null;
   const outOfStock = showNewDetails && Boolean(item.newItemOutOfStock);
+  const topBadgeCount = (justAddedBadge ? 1 : 0) + (storageLabel ? 1 : 0);
 
   return (
-    <article className={className}>
+    <article className={`${className}${topBadgeCount ? ` new-card--top-badges-${topBadgeCount}` : ""}`}>
       {justAddedBadge || storageLabel ? (
         <div className="showcase-card-badge-row">
           {justAddedBadge ? <div style={justAddedBadgeStyle}>{justAddedBadge}</div> : null}
@@ -109,9 +104,15 @@ export function ShowcaseCard({
           {outOfStock ? <OutOfStockStamp /> : null}
         </div>
 
+        {showNewDetails ? (
+          <div className="showcase-card-new-badge-slot">
+            <NewProductBadge lang={lang} />
+          </div>
+        ) : null}
+
         {listPriceText ? (
-          <div className="showcase-card-list-price" aria-label="Price">
-            {priceLabel[lang]} {listPriceText}
+          <div className="new-product-list-price" aria-label="Price">
+            {listPriceText}
           </div>
         ) : null}
 

@@ -1,33 +1,48 @@
 .out-of-stock-stamp-overlay {
   position: absolute;
-  inset: 0;
-  z-index: 4;
+  inset: -55%;
+  z-index: 5;
   pointer-events: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .out-of-stock-stamp-overlay img {
-  width: 102%;
+  width: 100%;
   max-width: none;
   height: auto;
-  transform: rotate(-20deg);
-  opacity: 0.96;
-  filter: drop-shadow(0 1px 4px rgba(185, 28, 28, 0.22));
+  transform: rotate(-18deg) scale(1.65);
+  transform-origin: center center;
+  opacity: 0.98;
+  filter: drop-shadow(0 2px 8px rgba(185, 28, 28, 0.32));
   user-select: none;
+}
+
+.catalog-card-image-wrap--stamped .out-of-stock-stamp-overlay img,
+.showcase-card-img-wrap--stamped .out-of-stock-stamp-overlay img {
+  transform: rotate(-18deg) scale(1.75);
 }
 
 .catalog-card-image-wrap--stamped,
 .showcase-card-img-wrap--stamped {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  z-index: 2;
 }
 
-.catalog-qty-card--out-of-stock .catalog-card-image-wrap--stamped img,
-.showcase-card-img-wrap--stamped img {
-  opacity: 0.72;
+.showcase-card-img-wrap--stamped {
+  margin-bottom: 4px;
+}
+
+.catalog-qty-card--out-of-stock {
+  overflow: visible;
+}
+
+.catalog-qty-card--out-of-stock .catalog-card-image-wrap--stamped > :first-child,
+.showcase-card-img-wrap--stamped > :first-child {
+  opacity: 0.68;
 }
 
 .catalog-qty-card--out-of-stock .catalog-qty-card-stepper {

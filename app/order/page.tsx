@@ -1716,8 +1716,8 @@ export default function OrderPage() {
                 editLabel={t.editProduct}
                 showAdminEdit={showAdminEditLinks}
                 showNewItemListPrice
+                showNewProductBadge
                 listPriceLabel={t.listPrice}
-                uniformNewPill
                 lang={lang}
                 canOrderItem={isOrderableItem}
                 orderBlockedMessage={(item) => formatOrderNotAvailableMessage(item.sku || "", item.status, t)}
@@ -1885,6 +1885,7 @@ export default function OrderPage() {
               weeklyPickSkus={promoSkuSet}
               clearancePickSkus={clearanceSkuSet}
               newItemChecker={isNewItem}
+              newProductBadgeChecker={isNewItem}
               clearanceBadgeLabel={t.clearanceBadge}
               newBadgeLabel={t.newItems}
               editLabel={t.editProduct}

@@ -1,0 +1,49 @@
+/* Costco-style blue "New" flag — slanted right edge, below product image */
+.new-product-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  padding: 6px 22px 6px 12px;
+  background: linear-gradient(180deg, #0060aa 0%, #004b8d 100%);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 100%, 0 100%);
+  box-shadow: 0 1px 3px rgba(0, 45, 98, 0.28);
+}
+
+.new-product-badge-slot {
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.showcase-card-new-badge-slot {
+  width: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  margin-top: 0;
+}
+
+/* Costco-style list price — large bold dark text below New badge */
+.new-product-list-price {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+  text-align: left;
+  font-size: 17px;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  flex-shrink: 0;
+}

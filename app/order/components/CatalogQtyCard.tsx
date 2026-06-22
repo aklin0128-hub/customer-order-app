@@ -3,6 +3,8 @@
 import { formatCatalogAddedDateForItem } from "@/lib/catalogNewItems";
 import { formatNewItemListPriceDisplay } from "@/lib/newItemListPrice";
 import { OutOfStockStamp } from "@/app/components/OutOfStockStamp";
+import { NewProductBadge } from "@/app/components/NewProductBadge";
+import { resolveNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import { getDisplayStatus, getStatusBadgeStyle, isJustAddedItem, isOrderableItem } from "../catalogUtils";
 import type { CatalogItem, Lang } from "../types";
 import {
@@ -57,6 +59,8 @@ export function CatalogQtyCard({
   uniformNewPill,
   /** New-items tab: show admin list price when set. */
   showNewItemListPrice,
+  /** New-items tab: blue Costco-style New badge below image. */
+  showNewProductBadge,
   listPriceLabel,
 }: {
   item: CatalogItem;
@@ -91,9 +95,9 @@ export function CatalogQtyCard({
   lang?: Lang;
   uniformNewPill?: boolean;
   showNewItemListPrice?: boolean;
+  showNewProductBadge?: boolean;
   listPriceLabel?: string;
 }) {
-  const showJustAdded = Boolean(justAddedLabel && (uniformNewPill || isJustAddedItem(item)));
   const addedDateText =
     showAddedDate && addedDateLabel ? formatCatalogAddedDateForItem(item, lang) : null;
   const hasQty = Number(qty) > 0;
@@ -115,13 +119,26 @@ export function CatalogQtyCard({
       : "";
   const alignedPriceLayout = Boolean(showNewItemListPrice);
   const outOfStock = alignedPriceLayout && Boolean(item.newItemOutOfStock);
+  const showNewItemExtras = Boolean(showNewProductBadge || showNewItemListPrice);
+  const storageLabel = showNewItemExtras ? resolveNewItemStorageLabel(item) : undefined;
+  const showJustAdded = Boolean(justAddedLabel && !showNewProductBadge && (uniformNewPill || isJustAddedItem(item)));
+  const showPinnedJustAdded = Boolean(justAddedLabel && showNewProductBadge && isJustAddedItem(item));
 
   const badgeRow =
-    promoNote || showJustAdded || highlight || promoRemaining ? (
+    promoNote || showPinnedJustAdded || showJustAdded || storageLabel || highlight || promoRemaining ? (
       <>
-        {showJustAdded ? <div style={justAddedTagStyle}>{justAddedLabel}</div> : null}
-        {!showJustAdded && promoNote ? <div style={promoTagStyle}>{promoNote}</div> : null}
-        {!showJustAdded && !promoNote && highlight ? <div style={promoTagStyle}>{promoBadgeLabel}</div> : null}
+        {showPinnedJustAdded || showJustAdded ? (
+          <div style={justAddedTagStyle}>{justAddedLabel}</div>
+        ) : null}
+        {storageLabel ? (
+          <div className={`catalog-item-storage catalog-item-storage--${storageLabel.toLowerCase()}`}>
+            {storageLabel}
+          </div>
+        ) : null}
+        {!showJustAdded && !showPinnedJustAdded && promoNote ? <div style={promoTagStyle}>{promoNote}</div> : null}
+        {!showJustAdded && !showPinnedJustAdded && !promoNote && highlight ? (
+          <div style={promoTagStyle}>{promoBadgeLabel}</div>
+        ) : null}
         {promoRemaining ? (
           <div style={{ ...promoTagStyle, background: disabled ? "#e5e7eb" : "#ffffff", color: disabled ? "#6b7280" : "#0f766e" }}>
             {promoRemaining}
@@ -131,18 +148,23 @@ export function CatalogQtyCard({
     ) : null;
 
   const listPriceBlock = listPriceText ? (
-    <div
-      className={alignedPriceLayout ? "catalog-qty-card-price-block" : undefined}
-      style={newItemListPriceBlockStyle}
-    >
-      {listPriceLabel ? <div style={newItemListPriceLabelStyle}>{listPriceLabel}</div> : null}
-      <div style={newItemListPriceValueStyle}>{listPriceText}</div>
-    </div>
+    alignedPriceLayout ? (
+      <div className="catalog-qty-card-price-block new-product-list-price">{listPriceText}</div>
+    ) : (
+      <div style={newItemListPriceBlockStyle}>
+        {listPriceLabel ? <div style={newItemListPriceLabelStyle}>{listPriceLabel}</div> : null}
+        <div style={newItemListPriceValueStyle}>{listPriceText}</div>
+      </div>
+    )
   ) : null;
+
+  const topBadgeCount = alignedPriceLayout
+    ? [showPinnedJustAdded || showJustAdded, storageLabel, !showJustAdded && !showPinnedJustAdded && promoNote, promoRemaining].filter(Boolean).length
+    : 0;
 
   return (
     <div
-      className={`catalog-qty-card${alignedPriceLayout ? " catalog-qty-card--price-aligned" : ""}${outOfStock ? " catalog-qty-card--out-of-stock" : ""}`}
+      className={`catalog-qty-card${alignedPriceLayout ? " catalog-qty-card--price-aligned" : ""}${alignedPriceLayout ? ` catalog-qty-card--top-badges-${topBadgeCount}` : ""}${outOfStock ? " catalog-qty-card--out-of-stock" : ""}`}
       style={{
         ...catalogCardStyle,
         background: disabled ? "#f3f4f6" : hasQty ? "#ecfdf5" : highlight ? "#f0fdfa" : "#ffffff",
@@ -172,23 +194,27 @@ export function CatalogQtyCard({
         </a>
       ) : null}
 
-      {alignedPriceLayout ? (
+      {alignedPriceLayout && badgeRow ? (
         <div className="catalog-qty-card-badge-slot">{badgeRow}</div>
       ) : badgeRow ? (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: showJustAdded || promoNote ? 4 : 0 }}>
-          {badgeRow}
-        </div>
+        <div className="catalog-qty-card-top-badges">{badgeRow}</div>
       ) : null}
 
       <div
         className={`catalog-card-image-wrap${alignedPriceLayout ? " catalog-card-image-wrap--fixed" : ""}${outOfStock ? " catalog-card-image-wrap--stamped" : ""}`}
-        style={{ paddingTop: alignedPriceLayout ? 0 : promoNote || showJustAdded || highlight ? 4 : 0 }}
+        style={{ paddingTop: alignedPriceLayout ? 0 : badgeRow ? 2 : 0 }}
       >
         <ProductImage sku={item.sku} alt={item.name || item.sku} size={96} imageUrl={item.imageUrl} />
         {outOfStock ? <OutOfStockStamp /> : null}
       </div>
 
-      {alignedPriceLayout ? (
+      {showNewProductBadge ? (
+        <div className="new-product-badge-slot">
+          <NewProductBadge lang={lang} />
+        </div>
+      ) : null}
+
+      {alignedPriceLayout && listPriceBlock ? (
         <div className="catalog-qty-card-price-slot">{listPriceBlock}</div>
       ) : (
         listPriceBlock

@@ -8,6 +8,7 @@ import type { ShowcaseData } from "@/lib/loginPreview";
 
 import "../showcase.css";
 import "../components/out-of-stock-stamp.css";
+import "../components/new-product-badge.css";
 import "./new.css";
 
 type Lang = "en" | "zh" | "ko" | "vi";

@@ -1094,12 +1094,21 @@
 }
 
 .order-catalog-virtual-row {
-  overflow: hidden;
+  overflow: visible;
+  align-items: stretch;
+}
+
+.catalog-qty-card-top-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 2px;
 }
 
 .catalog-qty-card-stepper {
   margin-top: auto;
-  padding-top: 8px;
+  padding-top: 6px;
 }
 
 .catalog-promo-deal-tiers {
@@ -1130,21 +1139,57 @@
   justify-content: center;
   align-items: center;
   min-height: 0;
-  padding: 2px 0;
+  padding: 0;
 }
 
 .catalog-card-image-wrap img {
   max-width: 100%;
 }
 
-/* New-items grid — lock badge / image / price bands so rows line up */
+/* New-items grid — badge / image / price follow content height */
 .catalog-qty-card--price-aligned .catalog-qty-card-badge-slot {
-  min-height: 24px;
+  min-height: 0;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  flex-wrap: nowrap;
   align-items: flex-start;
-  gap: 6px;
+  gap: 3px;
   flex-shrink: 0;
+  margin-bottom: 2px;
+}
+
+.catalog-qty-card .new-product-badge-slot {
+  min-height: 0;
+  margin: 0;
+}
+
+.catalog-item-storage {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+  padding: 4px 10px;
+  width: fit-content;
+  line-height: 1.2;
+}
+
+.catalog-item-storage--dry {
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+}
+
+.catalog-item-storage--frozen {
+  color: #0c4a6e;
+  background: #e0f2fe;
+  border: 1px solid #7dd3fc;
+}
+
+.catalog-item-storage--fresh {
+  color: #14532d;
+  background: #dcfce7;
+  border: 1px solid #86efac;
 }
 
 .catalog-qty-card--price-aligned .catalog-card-image-wrap--fixed {
@@ -1156,6 +1201,14 @@
   overflow: hidden;
 }
 
+/* Out-of-stock stamp must paint outside the image box */
+.catalog-qty-card--price-aligned .catalog-card-image-wrap--fixed.catalog-card-image-wrap--stamped,
+.catalog-card-image-wrap--stamped {
+  overflow: visible;
+  z-index: 2;
+  margin-bottom: 6px;
+}
+
 .catalog-qty-card--price-aligned .catalog-card-image-wrap--fixed img {
   width: 96px !important;
   height: 96px !important;
@@ -1164,15 +1217,23 @@
 }
 
 .catalog-qty-card--price-aligned .catalog-qty-card-price-slot {
-  min-height: 32px;
+  min-height: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   flex-shrink: 0;
+  margin-bottom: 2px;
 }
 
-.catalog-qty-card--price-aligned .catalog-qty-card-price-block {
+.catalog-qty-card--price-aligned .new-product-badge-slot {
+  min-height: 0;
+  flex-shrink: 0;
+  margin-bottom: 2px;
+}
+
+.catalog-qty-card--price-aligned .catalog-qty-card-price-block.new-product-list-price {
   width: 100%;
   margin-top: 0 !important;
+  font-size: 16px;
 }
 
 .order-promo-grid {

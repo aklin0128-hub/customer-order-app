@@ -1,14 +1,11 @@
 /** Shared catalog grid sizing for virtual + CSS grids */
-export const CATALOG_GRID_GAP_PX = 8;
+export const CATALOG_GRID_GAP_PX = 4;
 export const CATALOG_MIN_CARD_WIDTH_PX = 164;
 export const CATALOG_MAX_COLUMNS = 12;
 export const CATALOG_MIN_COLUMNS = 2;
 
-/**
- * Fixed virtual row content height (badge + image + price band + text + stepper).
- * Must fit new-items aligned cards (96px image + 36px price slot + badges).
- */
-export const CATALOG_ROW_HEIGHT_PX = 400;
+/** Initial virtual-row height estimate; rows are measured from tallest card content. */
+export const CATALOG_ROW_HEIGHT_PX = 320;
 
 export function catalogRowStridePx() {
   return CATALOG_ROW_HEIGHT_PX + CATALOG_GRID_GAP_PX;

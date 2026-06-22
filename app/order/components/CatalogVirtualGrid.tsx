@@ -7,15 +7,13 @@ import {
   catalogColumnCountForWidth,
   CATALOG_GRID_GAP_PX,
   CATALOG_ROW_HEIGHT_PX,
-  catalogRowStridePx,
 } from "../catalogGridLayout";
 import { catalogVirtualScrollStyle } from "../orderStyles";
 import type { CatalogItem, Lang } from "../types";
 import { CatalogQtyCard } from "./CatalogQtyCard";
 
 const GAP = CATALOG_GRID_GAP_PX;
-const ROW_HEIGHT = CATALOG_ROW_HEIGHT_PX;
-const ROW_STRIDE = catalogRowStridePx();
+const ROW_ESTIMATE = CATALOG_ROW_HEIGHT_PX;
 
 function readScrollContainerWidth(el: HTMLElement | null) {
   if (!el) return 0;
@@ -43,6 +41,8 @@ export function CatalogVirtualGrid({
   lang,
   showAdminEdit,
   showNewItemListPrice,
+  showNewProductBadge,
+  newProductBadgeChecker,
   listPriceLabel,
   canOrderItem,
   orderBlockedMessage,
@@ -70,6 +70,9 @@ export function CatalogVirtualGrid({
   lang?: Lang;
   showAdminEdit?: boolean;
   showNewItemListPrice?: boolean;
+  showNewProductBadge?: boolean;
+  /** Per-item blue New badge (e.g. catalog browse). Combined with showNewProductBadge. */
+  newProductBadgeChecker?: (item: CatalogItem) => boolean;
   listPriceLabel?: string;
   canOrderItem?: (item: CatalogItem) => boolean;
   orderBlockedMessage?: (item: CatalogItem) => string;
@@ -113,13 +116,19 @@ export function CatalogVirtualGrid({
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_STRIDE,
+    estimateSize: () => ROW_ESTIMATE,
+    gap: GAP,
     overscan: 3,
+    measureElement: (el) => el.getBoundingClientRect().height,
   });
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
   }, [gridKey, columnCount]);
+
+  useLayoutEffect(() => {
+    rowVirtualizer.measure();
+  }, [items.length, columnCount, gridKey, width, rowVirtualizer]);
 
   if (items.length === 0) return null;
 
@@ -137,6 +146,7 @@ export function CatalogVirtualGrid({
           return (
             <div
               key={vr.key}
+              ref={rowVirtualizer.measureElement}
               data-index={vr.index}
               className="order-catalog-virtual-row"
               style={{
@@ -144,9 +154,6 @@ export function CatalogVirtualGrid({
                 top: 0,
                 left: 0,
                 width: "100%",
-                height: ROW_HEIGHT,
-                paddingBottom: GAP,
-                boxSizing: "content-box",
                 transform: `translateY(${vr.start}px)`,
                 display: "grid",
                 gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
@@ -159,7 +166,8 @@ export function CatalogVirtualGrid({
                 const qty = catalogQtyMap[sku] || "";
                 const isWeekly = weeklyPickSkus?.has(sku);
                 const isClearance = clearancePickSkus?.has(sku);
-                const promoNote = uniformNewPill
+                const showItemNewBadge = Boolean(showNewProductBadge || newProductBadgeChecker?.(item));
+                const promoNote = uniformNewPill || showItemNewBadge
                   ? undefined
                   : isWeekly
                     ? promoBadgeLabel
@@ -187,6 +195,7 @@ export function CatalogVirtualGrid({
                     lang={lang}
                     showAdminEdit={showAdminEdit}
                     showNewItemListPrice={showNewItemListPrice}
+                    showNewProductBadge={showItemNewBadge}
                     listPriceLabel={listPriceLabel}
                     disabled={!canOrder}
                     unavailableNote={!canOrder ? orderBlockedMessage?.(item) : undefined}
