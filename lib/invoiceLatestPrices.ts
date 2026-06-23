@@ -1,4 +1,5 @@
 import { cleanSku, formatDate, loadInvoiceImports, parseDate } from "@/lib/analyticsCommon";
+import { resolveInvoiceCaseUnitPrice } from "@/lib/invoice/invoiceCaseUnitPrice";
 import type { InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
 
 export type InvoiceLatestPriceRow = {
@@ -18,10 +19,12 @@ type LatestEntry = {
 };
 
 function priceForLine(line: InvoiceImportRecord["lines"][number]) {
-  if (typeof line.unitPrice === "number" && Number.isFinite(line.unitPrice) && line.unitPrice > 0) {
-    return line.unitPrice;
-  }
-  return null;
+  const price = resolveInvoiceCaseUnitPrice({
+    qty: line.qty,
+    unitPrice: line.unitPrice,
+    lineTotal: line.lineTotal,
+  });
+  return typeof price === "number" && Number.isFinite(price) && price > 0 ? price : null;
 }
 
 function invoiceDateFromRecord(record: InvoiceImportRecord): { ms: number; label: string } | null {

@@ -1,3 +1,5 @@
+import { resolveInvoiceCaseUnitPrice } from "./invoiceCaseUnitPrice";
+
 /** Structured fields pulled from invoice text (PDF or OCR). */
 
 export type ParsedInvoiceLine = {
@@ -22,6 +24,27 @@ function money(s: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+function buildParsedLine(
+  sku: string,
+  qty: number,
+  unitCol: string | undefined,
+  eachCol: string | undefined,
+  totalCol: string | undefined,
+  rawLine: string
+): ParsedInvoiceLine | null {
+  if (!sku || !qty) return null;
+
+  const lineTotal = money(totalCol ?? "");
+  const unitPrice = resolveInvoiceCaseUnitPrice({
+    qty,
+    unitPrice: money(unitCol ?? ""),
+    eachPrice: money(eachCol ?? ""),
+    lineTotal,
+  });
+
+  return { sku, qty, unitPrice, lineTotal, rawLine };
+}
+
 function tryParseNoBrandInvoiceRow(line: string): ParsedInvoiceLine | null {
   const normalized = line.trim().replace(/\s+/g, " ");
   const rx = /^(\d{4,7}[A-Z0-9]{0,3})\s+\S+\s+.+?\s+(\d{1,5})\s+(?:Case|CS|CA|EA|Each|BX|Box|PK|Pack|BG|Bag)\s+\S+\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*$/i;
@@ -30,11 +53,7 @@ function tryParseNoBrandInvoiceRow(line: string): ParsedInvoiceLine | null {
 
   const sku = match[1].toUpperCase();
   const qty = Math.max(1, parseInt(match[2], 10) || 0);
-  const unitPrice = money(match[3]);
-  const lineTotal = money(match[5]);
-  if (!sku || !qty) return null;
-
-  return { sku, qty, unitPrice, lineTotal, rawLine: line };
+  return buildParsedLine(sku, qty, match[3], match[4], match[5], line);
 }
 
 function parseFlexibleNoRow(line: string): ParsedInvoiceLine | null {
@@ -64,11 +83,16 @@ function parseFlexibleNoRow(line: string): ParsedInvoiceLine | null {
     .filter((value): value is number => typeof value === "number");
   if (prices.length === 0) return null;
 
-  const unitPrice =
-    prices.length >= 3 ? prices[prices.length - 3] : prices.length >= 2 ? prices[prices.length - 2] : prices[0];
-  const lineTotal = prices.at(-1);
+  const unitCol = prices.length >= 3 ? String(prices[prices.length - 3]) : undefined;
+  const eachCol =
+    prices.length >= 3
+      ? String(prices[prices.length - 2])
+      : prices.length === 2
+        ? String(prices[0])
+        : undefined;
+  const totalCol = String(prices.at(-1));
 
-  return { sku, qty, unitPrice, lineTotal, rawLine: line };
+  return buildParsedLine(sku, qty, unitCol, eachCol, totalCol, line);
 }
 
 /**
@@ -94,18 +118,12 @@ function tryParseTableRow(line: string): ParsedInvoiceLine | null {
     if (!m) return parseFlexibleNoRow(line);
     const sku = m[1].toUpperCase();
     const qty = Math.max(1, parseInt(m[2], 10) || 0);
-    const unitPrice = money(m[4]);
-    const lineTotal = money(m[6]);
-    if (!sku || !qty) return null;
-    return { sku, qty, unitPrice, lineTotal, rawLine: line };
+    return buildParsedLine(sku, qty, m[4], m[5], m[6], line);
   }
 
   const sku = m[1].toUpperCase();
   const qty = Math.max(1, parseInt(m[2], 10) || 0);
-  const unitPrice = money(m[3]);
-  const lineTotal = money(m[5]);
-  if (!sku || !qty) return null;
-  return { sku, qty, unitPrice, lineTotal, rawLine: line };
+  return buildParsedLine(sku, qty, m[3], m[4], m[5], line);
 }
 
 export function parseInvoiceText(raw: string): ParsedInvoice {

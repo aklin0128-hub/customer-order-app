@@ -23,6 +23,21 @@ function record(partial: Partial<InvoiceImportRecord> & Pick<InvoiceImportRecord
   };
 }
 
+test("buildLatestInvoicePricesFromImports uses case unit from line total when each was stored", () => {
+  const imports: InvoiceImportRecord[] = [
+    record({
+      id: "each-stored",
+      accountNo: "FL100",
+      invoiceDate: "1/15/2026",
+      lines: [{ sku: "00100", qty: 5, unitPrice: 3.75, lineTotal: 225, inCatalog: true }],
+    }),
+  ];
+
+  assert.deepEqual(buildLatestInvoicePricesFromImports(imports), [
+    { account: "FL100", sku: "00100", price: 45, invoiceDate: "2026-01-15" },
+  ]);
+});
+
 test("buildLatestInvoicePricesFromImports uses invoice date not upload time", () => {
   const imports: InvoiceImportRecord[] = [
     record({

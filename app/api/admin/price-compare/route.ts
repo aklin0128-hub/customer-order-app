@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
+import { resolveInvoiceCaseUnitPrice } from "@/lib/invoice/invoiceCaseUnitPrice";
 import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
 import { redis } from "@/lib/redis";
 
@@ -76,8 +77,13 @@ function displayDate(invoiceDate: string | null, uploadedAt: string) {
 }
 
 function priceForLine(line: InvoiceImportRecord["lines"][number]) {
-  if (typeof line.unitPrice === "number" && Number.isFinite(line.unitPrice)) return line.unitPrice;
-  return null;
+  return (
+    resolveInvoiceCaseUnitPrice({
+      qty: line.qty,
+      unitPrice: line.unitPrice,
+      lineTotal: line.lineTotal,
+    }) ?? null
+  );
 }
 
 async function getProductMap(skus: string[]) {

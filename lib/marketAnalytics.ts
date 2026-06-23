@@ -4,6 +4,7 @@ import {
   marketRegionLabel,
   type CustomerRegionValue,
 } from "@/lib/customerRegion";
+import { resolveInvoiceCaseUnitPrice } from "@/lib/invoice/invoiceCaseUnitPrice";
 import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
 import { redis } from "@/lib/redis";
 
@@ -319,9 +320,11 @@ export async function getMarketAnalytics(period: MarketPeriod): Promise<MarketAn
       if (!sku || qty <= 0) continue;
 
       const unitPrice =
-        typeof line.unitPrice === "number" && Number.isFinite(line.unitPrice)
-          ? line.unitPrice
-          : null;
+        resolveInvoiceCaseUnitPrice({
+          qty: line.qty,
+          unitPrice: line.unitPrice,
+          lineTotal: line.lineTotal,
+        }) ?? null;
 
       if (inCurrent) {
         addPurchase(buckets.current, qty, unitPrice, invoiceKey);

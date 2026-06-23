@@ -7,6 +7,7 @@ import {
   sinceFromDays,
 } from "@/lib/analyticsCommon";
 import { getAllCustomers } from "@/lib/customers";
+import { resolveInvoiceCaseUnitPrice } from "@/lib/invoice/invoiceCaseUnitPrice";
 
 export type AccountPriceRow = {
   accountNo: string;
@@ -61,11 +62,12 @@ export async function getPriceDistribution(options: {
 
     for (const line of record.lines || []) {
       if (cleanSku(line.sku) !== sku) continue;
-      const price =
-        typeof line.unitPrice === "number" && Number.isFinite(line.unitPrice)
-          ? line.unitPrice
-          : null;
-      if (price === null || price <= 0) continue;
+      const price = resolveInvoiceCaseUnitPrice({
+        qty: line.qty,
+        unitPrice: line.unitPrice,
+        lineTotal: line.lineTotal,
+      });
+      if (price === undefined || price <= 0) continue;
 
       const qty = Number(line.qty) || 0;
       const prev = latestByAccount.get(acct);

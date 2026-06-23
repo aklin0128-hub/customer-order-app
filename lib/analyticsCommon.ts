@@ -1,6 +1,7 @@
 import catalogData from "@/data/catalog_sku_master_extracted.json";
 import { cleanSku, parseQty } from "@/lib/analyticsPure";
 import { analyticsCacheKey, cachedAnalytics } from "@/lib/analyticsCache";
+import { resolveInvoiceCaseUnitPrice } from "@/lib/invoice/invoiceCaseUnitPrice";
 import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
 import { loadRedisProducts } from "@/lib/productRedisStore";
 import { loadAllOrderHistories } from "@/lib/orderHistory";
@@ -159,9 +160,11 @@ async function collectSaleEventsUncached(
       if (!sku || qty <= 0) continue;
 
       const unitPrice =
-        typeof line.unitPrice === "number" && Number.isFinite(line.unitPrice)
-          ? line.unitPrice
-          : 0;
+        resolveInvoiceCaseUnitPrice({
+          qty: line.qty,
+          unitPrice: line.unitPrice,
+          lineTotal: line.lineTotal,
+        }) ?? 0;
 
       events.push({
         accountNo: acct,
