@@ -18,11 +18,8 @@ async function loadInvoiceBlobBuffer(record: InvoiceImportRecord): Promise<Buffe
     throw new Error("Invoice file not found in storage.");
   }
 
-  const chunks: Buffer[] = [];
-  for await (const chunk of result.stream as AsyncIterable<Uint8Array | Buffer>) {
-    chunks.push(Buffer.from(chunk));
-  }
-  return Buffer.concat(chunks);
+  const arrayBuffer = await new Response(result.stream).arrayBuffer();
+  return Buffer.from(arrayBuffer);
 }
 
 /** Re-read stored PDF/image and refresh parsed lines using the current parser. */
