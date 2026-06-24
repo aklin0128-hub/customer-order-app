@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 
 import { get } from "@vercel/blob";
 
-import { skuIsInCatalog } from "@/lib/invoice/catalogSku";
+import { resolveInvoiceLineSku } from "@/lib/invoice/catalogSku";
 import { extractInvoiceText } from "@/lib/invoice/extractText";
 import {
   resolveInvoiceBlobPathname,
@@ -35,10 +35,14 @@ export async function reparseInvoiceImportRecord(
   const parsed = parseInvoiceText(text);
 
   const linesWithFlags: InvoiceLineWithCatalog[] = await Promise.all(
-    parsed.lines.map(async (line) => ({
-      ...line,
-      inCatalog: await skuIsInCatalog(line.sku),
-    }))
+    parsed.lines.map(async (line) => {
+      const resolved = await resolveInvoiceLineSku(line.sku);
+      return {
+        ...line,
+        sku: resolved.sku,
+        inCatalog: resolved.inCatalog,
+      };
+    })
   );
 
   const warnings = [...parsed.warnings];

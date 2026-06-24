@@ -278,6 +278,11 @@ export default function AdminInvoicesPage() {
   });
   const allVisibleSelected = imports.length > 0 && selectedImportIds.length === imports.length;
 
+  const lastRecordUnknownSkus = useMemo(
+    () => (lastRecord?.lines || []).filter((line) => !line.inCatalog && line.sku).map((line) => line.sku),
+    [lastRecord]
+  );
+
   const invoiceQuality = quality;
 
   const toggleImportSelection = (id: string) => {
@@ -398,7 +403,7 @@ export default function AdminInvoicesPage() {
         <p style={{ margin: "0 0 10px", fontSize: 13, color: "#374151", lineHeight: 1.5 }}>
           {invoiceQuality.total} imports · {invoiceQuality.last30Days} in last 30 days ·{" "}
           {invoiceQuality.missingAccount} missing account · {invoiceQuality.zeroLines} empty parses ·{" "}
-          {invoiceQuality.unknownSkus.length} unknown SKUs
+          {invoiceQuality.unknownSkus.length} unknown SKUs (across all imports)
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: invoiceQuality.unknownSkus.length > 0 ? 8 : 0 }}>
           <button
@@ -558,9 +563,15 @@ export default function AdminInvoicesPage() {
             </ul>
           ) : null}
 
-          {unknownSkus.length > 0 ? (
+          {lastRecordUnknownSkus.length > 0 ? (
             <p style={{ marginTop: 12, fontSize: 13, color: "#b91c1c", fontWeight: 700 }}>
-              SKUs not in catalog + Redis overrides: {unknownSkus.join(", ")}
+              {lastRecordUnknownSkus.length} SKU(s) not in catalog master or Redis product overrides:{" "}
+              {lastRecordUnknownSkus.join(", ")}
+            </p>
+          ) : null}
+          {unknownSkus.length > lastRecordUnknownSkus.length ? (
+            <p style={{ marginTop: 8, fontSize: 12, color: "#92400e" }}>
+              Batch total unknown SKUs (all files): {unknownSkus.join(", ")}
             </p>
           ) : null}
 
@@ -577,7 +588,13 @@ export default function AdminInvoicesPage() {
               </thead>
               <tbody>
                 {lastRecord.lines.map((line) => (
-                  <tr key={line.sku} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                  <tr
+                    key={`${line.sku}-${line.qty}-${line.lineTotal ?? ""}`}
+                    style={{
+                      borderBottom: "1px solid #f3f4f6",
+                      background: line.inCatalog ? undefined : "#fef2f2",
+                    }}
+                  >
                     <td style={{ padding: 8, fontWeight: 800 }}>{line.sku}</td>
                     <td style={{ padding: 8 }}>{line.qty}</td>
                     <td style={{ padding: 8 }}>{line.unitPrice ?? "—"}</td>

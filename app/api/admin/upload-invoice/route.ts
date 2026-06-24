@@ -4,7 +4,7 @@ import { Buffer } from "node:buffer";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
-import { skuIsInCatalog } from "@/lib/invoice/catalogSku";
+import { resolveInvoiceLineSku } from "@/lib/invoice/catalogSku";
 import { extractInvoiceText } from "@/lib/invoice/extractText";
 import {
   IMPORT_LIST_KEY,
@@ -77,10 +77,14 @@ export async function POST(req: Request) {
       : null;
 
     const linesWithFlags: InvoiceLineWithCatalog[] = await Promise.all(
-      parsed.lines.map(async (line) => ({
-        ...line,
-        inCatalog: await skuIsInCatalog(line.sku),
-      }))
+      parsed.lines.map(async (line) => {
+        const resolved = await resolveInvoiceLineSku(line.sku);
+        return {
+          ...line,
+          sku: resolved.sku,
+          inCatalog: resolved.inCatalog,
+        };
+      })
     );
 
     const unknownSkus = linesWithFlags.filter((l) => !l.inCatalog).map((l) => l.sku);
