@@ -24,6 +24,125 @@ function money(s: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+const INVOICE_TABLE_HEADER_RE =
+  /\bNo\.?\b.*\b(?:Brand|Description|Qty\.?|UM|Unit|Each|Total)\b/i;
+
+function isInvoiceTableEndLine(line: string) {
+  return /^subtotal|^amount\s+due|^grand\s+total|^thank\s+you/i.test(line.trim());
+}
+
+/** Keep only lines between the product table header and subtotal/footer. */
+export function sliceInvoiceProductSectionLines(rawLines: string[]) {
+  const productLines: string[] = [];
+  let inTable = false;
+
+  for (const raw of rawLines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (!inTable) {
+      if (INVOICE_TABLE_HEADER_RE.test(line.replace(/\s+/g, " "))) inTable = true;
+      continue;
+    }
+    if (isInvoiceTableEndLine(line)) break;
+    productLines.push(raw);
+  }
+
+  return productLines.length > 0 ? productLines : rawLines;
+}
+
+function isLikelyAddressOrHeaderLine(line: string) {
+  const normalized = line.trim().replace(/\s+/g, " ");
+  if (
+    /\b\d+\s+(?:N\.?|S\.?|E\.?|W\.?)?\s*(?:COCA\s*COLA|COCA|UNIVERSITY|PETERS|[A-Z][A-Z0-9&.'-]{2,})\s+(?:ROAD|DRIVE|DR\.?|STREET|ST\.?|AVENUE|AVE\.?|BLVD|BOULEVARD|HWY|HIGHWAY|LANE|LN\.?|WAY|COURT|CT\.?)\b/i.test(
+      normalized
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\b\d+\s+(?:COCA\s*COLA|COCA|PETERS|ROAD|DRIVE|DR\.?|STREET|ST\.?|AVENUE|AVE\.?|BLVD|BOULEVARD|HWY|HIGHWAY|LANE|LN\.?|WAY|COURT|CT\.?)\b/i.test(
+      normalized
+    )
+  ) {
+    return true;
+  }
+  if (/\b(?:BILL\s*TO|SHIP\s*TO|INVOICE\s*NO|ORDER\s*NO|CUSTOMER\s*NO|DUE\s*DATE|SALESPERSON|TERMS)\b/i.test(normalized)) {
+    return true;
+  }
+  if (/,?\s*(?:FL|MD|VA|GA|NY|NJ|TX|CA|USA)\s*,?\s*\d{5}\b/i.test(normalized)) return true;
+  if (/\b(?:FT\.?\s*LAUDERDALE|DAVIE|HANOVER|MARYLAND|FLORIDA)\b/i.test(normalized)) return true;
+  if (/\b(?:RHEEBROS|HANOVER|DAVIE|MARYLAND|FLORIDA)\b/i.test(normalized) && /\b\d{5}\b/.test(normalized)) {
+    return true;
+  }
+  if (/\b\d{3}-\d{3}-\d{4}\b/.test(normalized)) return true;
+  return false;
+}
+
+/** Drop Bill To / Ship To blocks above the product table (street numbers are not SKUs). */
+export function stripInvoiceAddressSections(rawLines: string[]) {
+  const result: string[] = [];
+  let skippingAddressBlock = false;
+
+  for (const raw of rawLines) {
+    const line = raw.trim();
+    if (!line) {
+      if (!skippingAddressBlock) result.push(raw);
+      continue;
+    }
+
+    const normalized = line.replace(/\s+/g, " ");
+    if (INVOICE_TABLE_HEADER_RE.test(normalized)) {
+      skippingAddressBlock = false;
+      result.push(raw);
+      continue;
+    }
+
+    if (/\b(?:BILL\s*TO|SHIP\s*TO)\b/i.test(normalized)) {
+      skippingAddressBlock = true;
+      continue;
+    }
+
+    if (skippingAddressBlock) {
+      if (isLikelyAddressOrHeaderLine(line) || /^[A-Z0-9&.'\s,-]{3,}$/i.test(line)) {
+        continue;
+      }
+      skippingAddressBlock = false;
+    }
+
+    result.push(raw);
+  }
+
+  return result;
+}
+
+/** Rheebros item numbers are catalog SKUs like 00012D — not street numbers or zip codes. */
+export function isRheebrosInvoiceItemSku(sku: string, line = "") {
+  const token = String(sku || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+  if (!token) return false;
+
+  if (/^\d{4,7}[A-Z][A-Z0-9]{0,2}$/.test(token)) return true;
+
+  // PDF sometimes drops the suffix letter; allow short numeric only on real product rows.
+  if (/^\d{4,5}$/.test(token)) {
+    if (isLikelyAddressOrHeaderLine(line)) return false;
+    const normalized = line.trim().replace(/\s+/g, " ");
+    if (!/\b(?:Case|CS|CA|EA|Each|BX|Box|PK|Pack|BG|Bag)\b/i.test(normalized)) return false;
+    if (token.startsWith("0")) return true;
+    return /\b(?:Dry|Frozen|Chilled|REF|COOL|WET|GROC)\b/i.test(normalized);
+  }
+
+  return false;
+}
+
+function extractInvoiceSkuToken(line: string) {
+  const normalized = line.trim().replace(/\s+/g, " ");
+  const skuMatch = normalized.match(/^(\d{4,7}[A-Z0-9]{0,3})\b/i);
+  return skuMatch?.[1]?.toUpperCase() ?? null;
+}
+
 function buildParsedLine(
   sku: string,
   qty: number,
@@ -94,7 +213,9 @@ function tryParseRheebrosPriceTail(normalized: string): {
   return null;
 }
 
-function lineStartsSku(line: string) {  return /^\d{4,7}[A-Z0-9]{0,3}\b/i.test(line.trim());
+function lineStartsSku(line: string) {
+  const sku = extractInvoiceSkuToken(line);
+  return Boolean(sku && isRheebrosInvoiceItemSku(sku, line));
 }
 
 function lineHasInvoicePriceTail(line: string) {
@@ -142,20 +263,15 @@ function joinSplitInvoiceLines(rawLines: string[]): string[] {
  * RHEEBROS-style row: SKU … (description) … Qty Case Type Unit Each Total
  */
 function tryParseTableRow(line: string): ParsedInvoiceLine | null {
+  if (isLikelyAddressOrHeaderLine(line)) return null;
+
   const normalized = line.trim().replace(/\s+/g, " ");
-  const skuMatch = normalized.match(/^(\d{4,7}[A-Z0-9]{0,3})\b/i);
-  if (!skuMatch?.[1]) return null;
+  const sku = extractInvoiceSkuToken(line);
+  if (!sku || !isRheebrosInvoiceItemSku(sku, line)) return null;
 
   const tail = tryParseRheebrosPriceTail(normalized);
   if (tail) {
-    return buildParsedLine(
-      skuMatch[1].toUpperCase(),
-      tail.qty,
-      tail.unitCol,
-      tail.eachCol,
-      tail.totalCol,
-      line
-    );
+    return buildParsedLine(sku, tail.qty, tail.unitCol, tail.eachCol, tail.totalCol, line);
   }
 
   return null;
@@ -186,8 +302,11 @@ export function parseInvoiceText(raw: string): ParsedInvoice {
     null;
 
   const merged = new Map<string, ParsedInvoiceLine>();
+  const sectionLines = sliceInvoiceProductSectionLines(
+    stripInvoiceAddressSections(text.split("\n"))
+  );
 
-  for (const rawLine of joinSplitInvoiceLines(text.split("\n"))) {
+  for (const rawLine of joinSplitInvoiceLines(sectionLines)) {
     const line = rawLine.trim();
     if (line.length < 12) continue;
     if (/^page\b/i.test(line)) continue;

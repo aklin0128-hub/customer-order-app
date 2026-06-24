@@ -128,3 +128,53 @@ test("parseInvoiceText reads laver SKU with product count in name (16P)", () => 
   assert.equal(line.qty, 80);
   assert.equal(line.unitPrice, 59);
 });
+
+test("parseInvoiceText ignores company and ship-to street numbers like 7461 and 7700", () => {
+  const parsed = parseInvoiceText(`
+RHEEBROS
+7461 Coca Cola Dr, Hanover, MD 21076
+Phone 410-381-9000
+Invoice No PSI-0176747
+Customer No FL410
+Bill To ENSON MARKET
+7700 PETERS ROAD, DAVIE, FL 33324, USA
+No. Brand Description Size Qty. UM Type Unit Each Total
+00012D RHEECHUN EXTRA FANCY BROWN RICE 15 LB 10 Case Dry 13.00 1.30 130.00
+01045D ASSI RICE 9X5 LB 2 Case Dry 50.15 5.02 100.30
+Subtotal 230.30
+`);
+  assert.equal(parsed.lines.length, 2);
+  assert.deepEqual(
+    parsed.lines.map((line) => line.sku),
+    ["00012D", "01045D"]
+  );
+  assert.equal(parsed.lines.some((line) => line.sku === "7461"), false);
+  assert.equal(parsed.lines.some((line) => line.sku === "7700"), false);
+});
+
+test("parseInvoiceText ignores bill-to street number 4850 N.UNIVERSITY DR", () => {
+  const parsed = parseInvoiceText(`
+Customer No FL111
+Bill To
+KIM & LEE ORIENTAL
+KIM
+4850 N.UNIVERSITY DR
+FT. LAUDERDALE, FL 33351, USA
+No. Brand Description Size Qty. UM Type Unit Each Total
+06201C BRAND ITEM A 10 Case Dry 98.00 9.80 980.00
+08038K BRAND ITEM B 2 Case Dry 50.00 5.00 100.00
+Subtotal 1080.00
+`);
+  assert.equal(parsed.lines.length, 2);
+  assert.deepEqual(
+    parsed.lines.map((line) => line.sku),
+    ["06201C", "08038K"]
+  );
+  assert.equal(parsed.lines.some((line) => line.sku === "4850"), false);
+});
+
+test("parseInvoiceText still reads short numeric item# on product rows when suffix is missing", () => {
+  const line = lineParsed("8180 BRAND NAME 15 LB 10 Case Dry 13.00 1.30 130.00");
+  assert.equal(line.sku, "8180");
+  assert.equal(line.qty, 10);
+});
