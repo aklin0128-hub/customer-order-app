@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   compareCatalogByNewestImport,
+  compareCatalogForDisplay,
   getNewItemAddedAtMs,
   parseNewPublishedDate,
 } from "./catalogNewItems";
@@ -32,6 +33,16 @@ test("parseNewPublishedDate rejects invalid values", () => {
   assert.equal(parseNewPublishedDate("2026-05-20"), "2026-05-20");
   assert.equal(parseNewPublishedDate("20/05/2026"), undefined);
   assert.equal(parseNewPublishedDate(""), undefined);
+});
+
+test("compareCatalogForDisplay sorts by SKU only without justAdded pin", () => {
+  const items = [
+    { sku: "10495K", justAdded: true },
+    { sku: "01020D" },
+    { sku: "08180K", justAdded: true },
+  ];
+  const sorted = [...items].sort(compareCatalogForDisplay);
+  assert.deepEqual(sorted.map((item) => item.sku), ["01020D", "08180K", "10495K"]);
 });
 
 test("compareCatalogByNewestImport: justAdded, then published date, then SKU", () => {

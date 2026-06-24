@@ -909,7 +909,7 @@ export default function AdminProductsPage() {
                     markDirty();
                   }}
                 />
-                JUST ADDED — pin to top on customer order (red badge)
+                JUST ADDED — red badge on customer order
               </label>
               <div style={{ gridColumn: "1 / -1", fontSize: 11, color: "#6b7280", marginTop: -4 }}>
                 Catalog import time (reference only):{" "}

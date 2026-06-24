@@ -21,7 +21,7 @@ import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
 import { buildClearanceUpsellLines } from "./salesFlow";
 import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog } from "./catalogState";
-import { compareCatalogForDisplay, compareCatalogByNewestImport } from "@/lib/catalogNewItems";
+import { compareCatalogForDisplay } from "@/lib/catalogNewItems";
 import {
   formatBrandLabel,
   formatClearanceDetails,
@@ -573,7 +573,7 @@ export default function OrderPage() {
         const bNormal = isOrderableItem(b.item);
         if (aNormal !== bNormal) return aNormal ? -1 : 1;
         if (b.score !== a.score) return b.score - a.score;
-        return (a.item.sku || "").localeCompare(b.item.sku || "");
+        return compareCatalogForDisplay(a.item, b.item);
       })
       .map((x) => x.item)
       .slice(0, 60);
@@ -598,7 +598,7 @@ export default function OrderPage() {
     () =>
       catalogBrowseBase
         .filter((item) => isNewItem(item))
-        .sort(compareCatalogByNewestImport),
+        .sort(compareCatalogForDisplay),
     [catalogBrowseBase]
   );
 
@@ -674,7 +674,6 @@ export default function OrderPage() {
     const q = catalogSearch.trim().toUpperCase();
 
     return catalogBrowseBase
-      .filter((item) => !isNewItem(item))
       .filter((item) => {
         if (catalogShowSelectedOnly) {
           const sku = (item.sku || "").toUpperCase();
@@ -1920,6 +1919,8 @@ export default function OrderPage() {
               justAddedLabel={t.justAdded}
               promoBadgeLabel={t.promoBadge}
               weeklyPickSkus={promoSkuSet}
+              showNewProductBadge
+              newProductBadgeChecker={isNewItem}
               editLabel={t.editProduct}
               showAdminEdit={showAdminEditLinks}
               canOrderItem={isOrderableItem}

@@ -1,3 +1,5 @@
+import { compareSkuAsc } from "@/lib/catalogBrowse";
+
 export function parseImportedAtMs(value?: string | null) {
   const ms = Date.parse(String(value || "").trim());
   return Number.isFinite(ms) ? ms : null;
@@ -102,15 +104,12 @@ export function isJustAddedItem(item?: CatalogNewFields | null) {
   return Boolean(item?.justAdded);
 }
 
-/** Pin justAdded first, then SKU. */
+/** Catalog / quick order display: numeric SKU order only (no JUST ADDED pin). */
 export function compareCatalogForDisplay(
   a: CatalogNewFields & { sku?: string },
   b: CatalogNewFields & { sku?: string }
 ) {
-  const aPin = isJustAddedItem(a) ? 1 : 0;
-  const bPin = isJustAddedItem(b) ? 1 : 0;
-  if (bPin !== aPin) return bPin - aPin;
-  return String(a.sku || "").localeCompare(String(b.sku || ""));
+  return compareSkuAsc(String(a.sku || ""), String(b.sku || ""));
 }
 
 /** New items: justAdded → published date (newest first) → SKU. */
