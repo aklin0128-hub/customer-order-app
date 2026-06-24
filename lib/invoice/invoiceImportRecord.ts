@@ -22,3 +22,22 @@ export type InvoiceImportRecord = {
 };
 
 export const IMPORT_LIST_KEY = "invoiceImports:list";
+
+export function resolveInvoiceBlobPathname(
+  record: Pick<InvoiceImportRecord, "blobPathname" | "blobUrl">
+): string | null {
+  const pathname = String(record.blobPathname || "").trim();
+  if (pathname.startsWith("invoices/")) return pathname;
+
+  const blobUrl = String(record.blobUrl || "").trim();
+  if (!blobUrl) return null;
+
+  try {
+    const fromPath = new URL(blobUrl).pathname.replace(/^\//, "");
+    if (fromPath.startsWith("invoices/")) return fromPath;
+  } catch {
+    // ignore invalid URLs
+  }
+
+  return null;
+}

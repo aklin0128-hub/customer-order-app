@@ -1,6 +1,10 @@
 import { get } from "@vercel/blob";
 import { NextResponse } from "next/server";
-import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
+import {
+  IMPORT_LIST_KEY,
+  resolveInvoiceBlobPathname,
+  type InvoiceImportRecord,
+} from "@/lib/invoice/invoiceImportRecord";
 import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
@@ -14,14 +18,14 @@ export async function GET(req: Request) {
 
     const imports = (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
     const record = imports.find((item) => item.id === id);
-    const pathname = record?.blobPathname;
+    const pathname = record ? resolveInvoiceBlobPathname(record) : null;
 
-    if (!record || !pathname || !pathname.startsWith("invoices/")) {
+    if (!record || !pathname) {
       return NextResponse.json({ error: "Not found." }, { status: 404 });
     }
 
     const result = await get(pathname, { access: "private" });
-    if (!result || result.statusCode !== 200 || !result.stream) {
+    if (!result?.stream) {
       return NextResponse.json({ error: "Not found." }, { status: 404 });
     }
 

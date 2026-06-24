@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { downloadCsv } from "../_components/admin-analytics-ui";
+import { downloadInvoiceFile, openInvoiceFile } from "../_components/invoiceFileClient";
 
 import { AdminPage } from "../_components/AdminPage";
 import { inputStyle, panel, panelTitle } from "../_components/admin-styles";
@@ -45,14 +46,6 @@ type InvoiceSortField = "uploadedAt" | "account" | "invoiceDate" | "invoiceNo";
 type SortDir = "asc" | "desc";
 
 const labelStyle = { display: "block" as const, fontSize: 12, fontWeight: 700, marginBottom: 6, color: "#374151" };
-
-function invoiceFileHref(row: Pick<ImportRecord, "id" | "blobUrl" | "blobPathname">) {
-  return row.blobPathname ? `/api/admin/invoice-file?id=${encodeURIComponent(row.id)}` : row.blobUrl;
-}
-
-function invoiceDownloadHref(row: Pick<ImportRecord, "id" | "blobUrl" | "blobPathname">) {
-  return row.blobPathname ? `/api/admin/invoice-file?id=${encodeURIComponent(row.id)}&download=1` : row.blobUrl;
-}
 
 export default function AdminInvoicesPage() {
   const { authed, adminHeaders } = useAdminAuth();
@@ -374,20 +367,22 @@ export default function AdminInvoicesPage() {
     }
   };
 
-  const bulkDownloadImports = () => {
+  const bulkDownloadImports = async () => {
     if (selectedImports.length === 0) return;
 
-    selectedImports.forEach((row, index) => {
-      setTimeout(() => {
-        const link = document.createElement("a");
-        link.href = invoiceDownloadHref(row);
-        link.download = "";
-        link.target = "_blank";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }, index * 250);
-    });
+    setBusy(true);
+    try {
+      for (const row of selectedImports) {
+        await downloadInvoiceFile(row, adminHeaders);
+      }
+      setMsg(`Downloaded ${selectedImports.length} invoice file(s).`);
+      setMsgTone("success");
+    } catch (err: unknown) {
+      setMsg(err instanceof Error ? err.message : "Failed to download invoice.");
+      setMsgTone("error");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -543,9 +538,13 @@ export default function AdminInvoicesPage() {
             <strong>{lastRecord.invoiceNo || "(none)"}</strong> · Method:{" "}
             <strong>{lastRecord.extractMethod}</strong> · Chars extracted:{" "}
             <strong>{parsedChars}</strong> · Blob:{" "}
-            <a href={invoiceFileHref(lastRecord)} target="_blank" rel="noreferrer">
+            <button
+              type="button"
+              onClick={() => void openInvoiceFile(lastRecord, adminHeaders)}
+              style={{ border: "none", background: "none", color: "#2563eb", cursor: "pointer", padding: 0, textDecoration: "underline", font: "inherit" }}
+            >
               open
-            </a>
+            </button>
           </p>
           <p style={{ fontSize: 13, color: "#16a34a", fontWeight: 800 }}>
             {lastRecord.appliedToHistory ? "Applied to Recent items / history." : "Not applied (see warnings)."}
@@ -722,10 +721,12 @@ export default function AdminInvoicesPage() {
                       {new Date(row.uploadedAt).toLocaleString()} · {row.extractMethod}
                     </div>
                   </div>
-                  <a
-                    href={invoiceDownloadHref(row)}
-                    target="_blank"
-                    rel="noreferrer"
+                  <button
+                    type="button"
+                    onClick={() => void downloadInvoiceFile(row, adminHeaders).catch((err: unknown) => {
+                      setMsg(err instanceof Error ? err.message : "Failed to download invoice.");
+                      setMsgTone("error");
+                    })}
                     title="Download invoice"
                     aria-label={`Download invoice ${row.invoiceNo || row.id}`}
                     style={{
@@ -740,12 +741,12 @@ export default function AdminInvoicesPage() {
                       justifyContent: "center",
                       fontSize: 16,
                       fontWeight: 900,
-                      textDecoration: "none",
                       flexShrink: 0,
+                      cursor: "pointer",
                     }}
                   >
                     ↓
-                  </a>
+                  </button>
                   <button
                     type="button"
                     onClick={() => void reparseImport(row)}

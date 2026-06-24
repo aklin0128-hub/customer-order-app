@@ -4,17 +4,21 @@ import { get } from "@vercel/blob";
 
 import { skuIsInCatalog } from "@/lib/invoice/catalogSku";
 import { extractInvoiceText } from "@/lib/invoice/extractText";
-import type { InvoiceImportRecord, InvoiceLineWithCatalog } from "@/lib/invoice/invoiceImportRecord";
+import {
+  resolveInvoiceBlobPathname,
+  type InvoiceImportRecord,
+  type InvoiceLineWithCatalog,
+} from "@/lib/invoice/invoiceImportRecord";
 import { parseInvoiceText } from "@/lib/invoice/parseInvoiceText";
 
 async function loadInvoiceBlobBuffer(record: InvoiceImportRecord): Promise<Buffer> {
-  const pathname = record.blobPathname;
-  if (!pathname || !pathname.startsWith("invoices/")) {
+  const pathname = resolveInvoiceBlobPathname(record);
+  if (!pathname) {
     throw new Error("No stored invoice file for this import.");
   }
 
   const result = await get(pathname, { access: "private" });
-  if (!result || result.statusCode !== 200 || !result.stream) {
+  if (!result?.stream) {
     throw new Error("Invoice file not found in storage.");
   }
 
