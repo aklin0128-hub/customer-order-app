@@ -28,3 +28,32 @@ test("parseInvoiceText flexible parser uses case unit when only each and total a
   const price = linePrice("10495K ABC CO 5 Case 3.75 225.00");
   assert.equal(price, 45);
 });
+
+function lineParsed(raw: string) {
+  const parsed = parseInvoiceText(raw);
+  assert.equal(parsed.lines.length, 1, `expected one line in: ${raw}`);
+  return parsed.lines[0];
+}
+
+test("parseInvoiceText reads 03540K with pack size decimal 7.05 OZ on one line", () => {
+  const line = lineParsed(
+    "03540K SAMYANG BULDAK HOT CHICKEN FLAVOR SAUCE 2X12X7.05 OZ 300 Case Dry 80.00 3.33 24000.00"
+  );
+  assert.equal(line.qty, 300);
+  assert.equal(line.unitPrice, 80);
+  assert.equal(line.lineTotal, 24000);
+});
+
+test("parseInvoiceText joins split line when size contains 7.05 before qty Case", () => {
+  const line = lineParsed(
+    "03540K SAMYANG BULDAK HOT CHICKEN FLAVOR SAUCE 2X12X7.05 OZ\n300 Case Dry 80.00 3.33 24,000.00"
+  );
+  assert.equal(line.qty, 300);
+  assert.equal(line.unitPrice, 80);
+  assert.equal(line.lineTotal, 24000);
+});
+
+test("parseInvoiceText ignores partial row with only pack size decimal", () => {
+  const parsed = parseInvoiceText("03540K SAMYANG BULDAK HOT CHICKEN FLAVOR SAUCE 2X12X7.05 OZ");
+  assert.equal(parsed.lines.length, 0);
+});

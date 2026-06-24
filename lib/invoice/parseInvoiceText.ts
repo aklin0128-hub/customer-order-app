@@ -56,43 +56,103 @@ function tryParseNoBrandInvoiceRow(line: string): ParsedInvoiceLine | null {
   return buildParsedLine(sku, qty, match[3], match[4], match[5], line);
 }
 
+function tryParseRheebrosPriceTail(normalized: string): {
+  qty: number;
+  unitCol: string;
+  eachCol?: string;
+  totalCol: string;
+} | null {
+  const unitWord = "(?:Case|CS|CA|EA|Each|BX|Box|PK|Pack|BG|Bag)";
+  const money = "([\\d,]+\\.\\d{2})";
+
+  const rx3 = new RegExp(
+    `\\b(\\d{1,5})\\s+${unitWord}\\s+(\\S+)\\s+${money}\\s+${money}\\s+${money}\\s*$`,
+    "i"
+  );
+  let m = normalized.match(rx3);
+  if (m) {
+    const qty = parseInt(m[1], 10);
+    if (!qty) return null;
+    return { qty, unitCol: m[3], eachCol: m[4], totalCol: m[5] };
+  }
+
+  const rx2WithType = new RegExp(
+    `\\b(\\d{1,5})\\s+${unitWord}\\s+(\\S+)\\s+${money}\\s+${money}\\s*$`,
+    "i"
+  );
+  m = normalized.match(rx2WithType);
+  if (m) {
+    const qty = parseInt(m[1], 10);
+    if (!qty) return null;
+    return { qty, unitCol: m[3], eachCol: m[4], totalCol: m[5] };
+  }
+
+  const rx2 = new RegExp(`\\b(\\d{1,5})\\s+${unitWord}\\s+${money}\\s+${money}\\s*$`, "i");
+  m = normalized.match(rx2);
+  if (m) {
+    const qty = parseInt(m[1], 10);
+    if (!qty) return null;
+    return { qty, unitCol: m[2], totalCol: m[3] };
+  }
+
+  return null;
+}
+
+function lineStartsSku(line: string) {
+  return /^\d{4,7}[A-Z0-9]{0,3}\b/i.test(line.trim());
+}
+
+function lineHasInvoicePriceTail(line: string) {
+  return tryParseRheebrosPriceTail(line.trim().replace(/\s+/g, " ")) !== null;
+}
+
+/** PDFs often break before "Qty Case Type Unit Each Total" when size contains decimals like 2X12X7.05 OZ. */
+function joinSplitInvoiceLines(rawLines: string[]): string[] {
+  const result: string[] = [];
+  let pending = "";
+
+  for (const raw of rawLines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (/^page\b/i.test(line)) continue;
+    if (/^subtotal|^amount\s+due|^grand\s+total|^thank\s+you/i.test(line)) continue;
+
+    if (pending) {
+      const merged = `${pending} ${line}`;
+      if (lineHasInvoicePriceTail(merged)) {
+        result.push(merged);
+        pending = "";
+        continue;
+      }
+      if (lineStartsSku(line)) {
+        pending = line;
+        continue;
+      }
+      pending = merged;
+      continue;
+    }
+
+    if (lineStartsSku(line) && !lineHasInvoicePriceTail(line)) {
+      pending = line;
+      continue;
+    }
+
+    result.push(line);
+  }
+
+  return result;
+}
+
 function parseFlexibleNoRow(line: string): ParsedInvoiceLine | null {
   const normalized = line.trim().replace(/\s+/g, " ");
-  const moneyMatches = Array.from(normalized.matchAll(/\$?(\d[\d,]*\.\d{2})/g));
-  if (moneyMatches.length === 0) return null;
-
-  const skuMatch = normalized.match(
-    /(?:^|\s)(?:NO\.?\s*)?(\d{4,7}[A-Z0-9]{0,3})(?=\s)/i
-  );
-  if (!skuMatch?.[1] || skuMatch.index === undefined) return null;
+  const skuMatch = normalized.match(/(?:^|\s)(?:NO\.?\s*)?(\d{4,7}[A-Z0-9]{0,3})(?=\s)/i);
+  if (!skuMatch?.[1]) return null;
 
   const sku = skuMatch[1].toUpperCase();
-  const skuEnd = skuMatch.index + skuMatch[0].length;
-  const firstMoneyIndex = moneyMatches[0].index ?? normalized.length;
-  const middle = normalized.slice(skuEnd, firstMoneyIndex);
+  const tail = tryParseRheebrosPriceTail(normalized);
+  if (!tail) return null;
 
-  const qtyUnitMatches = Array.from(
-    middle.matchAll(/\b(\d{1,5})\s*(?:Case|CS|CA|EA|Each|BX|Box|PK|Pack|BG|Bag)\b/gi)
-  );
-  const qtyText = qtyUnitMatches.at(-1)?.[1] ?? Array.from(middle.matchAll(/\b(\d{1,5})\b/g)).at(-1)?.[1];
-  const qty = Math.max(1, parseInt(qtyText || "", 10) || 0);
-  if (!sku || !qty) return null;
-
-  const prices = moneyMatches
-    .map((match) => money(match[1]))
-    .filter((value): value is number => typeof value === "number");
-  if (prices.length === 0) return null;
-
-  const unitCol = prices.length >= 3 ? String(prices[prices.length - 3]) : undefined;
-  const eachCol =
-    prices.length >= 3
-      ? String(prices[prices.length - 2])
-      : prices.length === 2
-        ? String(prices[0])
-        : undefined;
-  const totalCol = String(prices.at(-1));
-
-  return buildParsedLine(sku, qty, unitCol, eachCol, totalCol, line);
+  return buildParsedLine(sku, tail.qty, tail.unitCol, tail.eachCol, tail.totalCol, line);
 }
 
 /**
@@ -152,7 +212,7 @@ export function parseInvoiceText(raw: string): ParsedInvoice {
 
   const merged = new Map<string, ParsedInvoiceLine>();
 
-  for (const rawLine of text.split("\n")) {
+  for (const rawLine of joinSplitInvoiceLines(text.split("\n"))) {
     const line = rawLine.trim();
     if (line.length < 12) continue;
     if (/^page\b/i.test(line)) continue;
