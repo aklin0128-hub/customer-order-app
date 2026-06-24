@@ -57,3 +57,74 @@ test("parseInvoiceText ignores partial row with only pack size decimal", () => {
   const parsed = parseInvoiceText("03540K SAMYANG BULDAK HOT CHICKEN FLAVOR SAUCE 2X12X7.05 OZ");
   assert.equal(parsed.lines.length, 0);
 });
+
+test("parseInvoiceText reads laver SKUs with small pack decimals 0.14 and 0.17", () => {
+  const cases = [
+    {
+      sku: "07192K",
+      raw: "07192K DONGWON ROASTED SEASONED LAVER 10X12X0.17 OZ 50 Case Dry 46.00 3.83 2300.00",
+      qty: 50,
+      unit: 46,
+      total: 2300,
+    },
+    {
+      sku: "07196K",
+      raw: "07196K KWANGCHEON ROASTED SEASONED LAVER 8X16X0.14 OZ 100 Case Dry 44.00 2.75 4400.00",
+      qty: 100,
+      unit: 44,
+      total: 4400,
+    },
+    {
+      sku: "07300K",
+      raw: "07300K ASSI ROASTED SEASONED LAVER 10X20X0.14 OZ 80 Case Dry 59.00 2.95 4720.00",
+      qty: 80,
+      unit: 59,
+      total: 4720,
+    },
+  ];
+
+  for (const row of cases) {
+    const line = lineParsed(row.raw);
+    assert.equal(line.sku, row.sku, row.sku);
+    assert.equal(line.qty, row.qty, row.sku);
+    assert.equal(line.unitPrice, row.unit, row.sku);
+    assert.equal(line.lineTotal, row.total, row.sku);
+  }
+});
+
+test("parseInvoiceText joins laver SKU lines split after pack size decimal", () => {
+  const line = lineParsed(
+    "07196K KWANGCHEON ROASTED SEASONED LAVER 8X16X0.14 OZ\n100 Case Dry 44.00 2.75 4,400.00"
+  );
+  assert.equal(line.qty, 100);
+  assert.equal(line.unitPrice, 44);
+  assert.equal(line.lineTotal, 4400);
+});
+
+test("parseInvoiceText does not treat pack size decimal as unit price for laver SKUs", () => {
+  const parsed = parseInvoiceText("07196K KWANGCHEON ROASTED SEASONED LAVER 8X16X0.14 OZ");
+  assert.equal(parsed.lines.length, 0);
+});
+
+test("parseInvoiceText reads integer unit and each amounts before decimal total", () => {
+  const line = lineParsed(
+    "07196K KWANGCHEON ROASTED SEASONED LAVER 8X16X0.14 OZ 100 Case Dry 44 2.75 4400.00"
+  );
+  assert.equal(line.unitPrice, 44);
+  assert.equal(line.lineTotal, 4400);
+});
+
+test("parseInvoiceText ignores false 14 Case from pack size 0.14", () => {
+  const parsed = parseInvoiceText(
+    "07196K KWANGCHEON ROASTED SEASONED LAVER 8X16X0.14 Case Dry 44.00 2.75 4400.00"
+  );
+  assert.equal(parsed.lines.length, 0);
+});
+
+test("parseInvoiceText reads laver SKU with product count in name (16P)", () => {
+  const line = lineParsed(
+    "07300K ASSI ROASTED SEASONED LAVER (16+4P) 10X20X0.14 OZ 80 Case Dry 59 2.95 4720.00"
+  );
+  assert.equal(line.qty, 80);
+  assert.equal(line.unitPrice, 59);
+});

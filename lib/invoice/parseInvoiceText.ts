@@ -45,17 +45,6 @@ function buildParsedLine(
   return { sku, qty, unitPrice, lineTotal, rawLine };
 }
 
-function tryParseNoBrandInvoiceRow(line: string): ParsedInvoiceLine | null {
-  const normalized = line.trim().replace(/\s+/g, " ");
-  const rx = /^(\d{4,7}[A-Z0-9]{0,3})\s+\S+\s+.+?\s+(\d{1,5})\s+(?:Case|CS|CA|EA|Each|BX|Box|PK|Pack|BG|Bag)\s+\S+\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s+([\d,]+\.\d{2})\s*$/i;
-  const match = normalized.match(rx);
-  if (!match) return null;
-
-  const sku = match[1].toUpperCase();
-  const qty = Math.max(1, parseInt(match[2], 10) || 0);
-  return buildParsedLine(sku, qty, match[3], match[4], match[5], line);
-}
-
 function tryParseRheebrosPriceTail(normalized: string): {
   qty: number;
   unitCol: string;
@@ -63,43 +52,49 @@ function tryParseRheebrosPriceTail(normalized: string): {
   totalCol: string;
 } | null {
   const unitWord = "(?:Case|CS|CA|EA|Each|BX|Box|PK|Pack|BG|Bag)";
-  const money = "([\\d,]+\\.\\d{2})";
+  const priceCol = "([\\d,]+(?:\\.\\d{2})?)";
 
   const rx3 = new RegExp(
-    `\\b(\\d{1,5})\\s+${unitWord}\\s+(\\S+)\\s+${money}\\s+${money}\\s+${money}\\s*$`,
-    "i"
+    `(\\d{1,5})\\s+${unitWord}\\s+(\\S+)\\s+${priceCol}\\s+${priceCol}\\s+${priceCol}\\s*$`,
+    "gi"
   );
-  let m = normalized.match(rx3);
-  if (m) {
-    const qty = parseInt(m[1], 10);
-    if (!qty) return null;
-    return { qty, unitCol: m[3], eachCol: m[4], totalCol: m[5] };
+  let last3: RegExpExecArray | null = null;
+  let match: RegExpExecArray | null;
+  while ((match = rx3.exec(normalized)) !== null) {
+    const qtyIndex = match.index ?? 0;
+    if (qtyIndex > 0 && normalized[qtyIndex - 1] === ".") continue;
+    if (!parseInt(match[1], 10)) continue;
+    last3 = match;
+  }
+  if (last3) {
+    return {
+      qty: parseInt(last3[1], 10),
+      unitCol: last3[3],
+      eachCol: last3[4],
+      totalCol: last3[5],
+    };
   }
 
-  const rx2WithType = new RegExp(
-    `\\b(\\d{1,5})\\s+${unitWord}\\s+(\\S+)\\s+${money}\\s+${money}\\s*$`,
-    "i"
-  );
-  m = normalized.match(rx2WithType);
-  if (m) {
-    const qty = parseInt(m[1], 10);
-    if (!qty) return null;
-    return { qty, unitCol: m[3], eachCol: m[4], totalCol: m[5] };
+  const rx2 = new RegExp(`(\\d{1,5})\\s+${unitWord}\\s+${priceCol}\\s+${priceCol}\\s*$`, "gi");
+  let last2: RegExpExecArray | null = null;
+  while ((match = rx2.exec(normalized)) !== null) {
+    const qtyIndex = match.index ?? 0;
+    if (qtyIndex > 0 && normalized[qtyIndex - 1] === ".") continue;
+    if (!parseInt(match[1], 10)) continue;
+    last2 = match;
   }
-
-  const rx2 = new RegExp(`\\b(\\d{1,5})\\s+${unitWord}\\s+${money}\\s+${money}\\s*$`, "i");
-  m = normalized.match(rx2);
-  if (m) {
-    const qty = parseInt(m[1], 10);
-    if (!qty) return null;
-    return { qty, unitCol: m[2], totalCol: m[3] };
+  if (last2) {
+    return {
+      qty: parseInt(last2[1], 10),
+      unitCol: last2[2],
+      totalCol: last2[3],
+    };
   }
 
   return null;
 }
 
-function lineStartsSku(line: string) {
-  return /^\d{4,7}[A-Z0-9]{0,3}\b/i.test(line.trim());
+function lineStartsSku(line: string) {  return /^\d{4,7}[A-Z0-9]{0,3}\b/i.test(line.trim());
 }
 
 function lineHasInvoicePriceTail(line: string) {
@@ -143,47 +138,27 @@ function joinSplitInvoiceLines(rawLines: string[]): string[] {
   return result;
 }
 
-function parseFlexibleNoRow(line: string): ParsedInvoiceLine | null {
-  const normalized = line.trim().replace(/\s+/g, " ");
-  const skuMatch = normalized.match(/(?:^|\s)(?:NO\.?\s*)?(\d{4,7}[A-Z0-9]{0,3})(?=\s)/i);
-  if (!skuMatch?.[1]) return null;
-
-  const sku = skuMatch[1].toUpperCase();
-  const tail = tryParseRheebrosPriceTail(normalized);
-  if (!tail) return null;
-
-  return buildParsedLine(sku, tail.qty, tail.unitCol, tail.eachCol, tail.totalCol, line);
-}
-
 /**
  * RHEEBROS-style row: SKU … (description) … Qty Case Type Unit Each Total
  */
 function tryParseTableRow(line: string): ParsedInvoiceLine | null {
-  const noBrandRow = tryParseNoBrandInvoiceRow(line);
-  if (noBrandRow) return noBrandRow;
+  const normalized = line.trim().replace(/\s+/g, " ");
+  const skuMatch = normalized.match(/^(\d{4,7}[A-Z0-9]{0,3})\b/i);
+  if (!skuMatch?.[1]) return null;
 
-  const typeWord = "(?:Dry|Frozen|Chilled|REF|COOL|WET)";
-  const rxLoose = new RegExp(
-    `^(\\d{4,7}[A-Z0-9]{0,3})\\s+.+\\s+(\\d+)\\s+Case\\s+${typeWord}\\s+([\\d,]+\\.\\d{2})\\s+([\\d,]+\\.\\d{2})\\s+([\\d,]+\\.\\d{2})\\s*$`,
-    "i"
-  );
-  let m = line.trim().match(rxLoose);
-
-  if (!m) {
-    const rxAnyType = new RegExp(
-      `^(\\d{4,7}[A-Z0-9]{0,3})\\s+.+\\s+(\\d+)\\s+Case\\s+(\\S+)\\s+([\\d,]+\\.\\d{2})\\s+([\\d,]+\\.\\d{2})\\s+([\\d,]+\\.\\d{2})\\s*$`,
-      "i"
+  const tail = tryParseRheebrosPriceTail(normalized);
+  if (tail) {
+    return buildParsedLine(
+      skuMatch[1].toUpperCase(),
+      tail.qty,
+      tail.unitCol,
+      tail.eachCol,
+      tail.totalCol,
+      line
     );
-    m = line.trim().match(rxAnyType);
-    if (!m) return parseFlexibleNoRow(line);
-    const sku = m[1].toUpperCase();
-    const qty = Math.max(1, parseInt(m[2], 10) || 0);
-    return buildParsedLine(sku, qty, m[4], m[5], m[6], line);
   }
 
-  const sku = m[1].toUpperCase();
-  const qty = Math.max(1, parseInt(m[2], 10) || 0);
-  return buildParsedLine(sku, qty, m[3], m[4], m[5], line);
+  return null;
 }
 
 export function parseInvoiceText(raw: string): ParsedInvoice {
