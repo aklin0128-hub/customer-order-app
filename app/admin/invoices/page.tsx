@@ -199,6 +199,47 @@ export default function AdminInvoicesPage() {
     }
   };
 
+  const reparseImport = async (row: ImportRecord, options: { skipConfirm?: boolean } = {}) => {
+    if (
+      !options.skipConfirm &&
+      !confirm(
+        `Re-parse invoice ${row.invoiceNo || row.id}? This keeps the same import and file, but refreshes SKU/qty/prices with the latest parser.`
+      )
+    ) {
+      return false;
+    }
+
+    setBusy(true);
+    setMsg("");
+    try {
+      const res = await fetch("/api/admin/invoice-imports/reparse", {
+        method: "POST",
+        headers: { ...adminHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ id: row.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to re-parse invoice.");
+
+      const updated = Array.isArray(data.updated) ? data.updated[0] : null;
+      if (updated?.id) {
+        await loadImports(listPage);
+      }
+      setMsg(
+        updated
+          ? `Re-parsed ${row.invoiceNo || row.id}: ${updated.lineCount} lines.`
+          : "Re-parse finished."
+      );
+      setMsgTone("success");
+      return true;
+    } catch (err: unknown) {
+      setMsg(err instanceof Error ? err.message : "Failed to re-parse invoice.");
+      setMsgTone("error");
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const deleteImport = async (row: ImportRecord, options: { skipConfirm?: boolean } = {}) => {
     if (!options.skipConfirm && !confirm(`Delete invoice import ${row.invoiceNo || row.id}? This removes the saved import and invoice file, but does not undo customer history/recent items.`)) return false;
 
@@ -248,6 +289,40 @@ export default function AdminInvoicesPage() {
 
   const toggleImportSelection = (id: string) => {
     setSelectedImportIds((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]);
+  };
+
+  const bulkReparseImports = async () => {
+    if (selectedImports.length === 0) return;
+    if (
+      !confirm(
+        `Re-parse ${selectedImports.length} selected invoices with the latest parser? Import ids and files stay the same; only parsed lines/prices update.`
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setMsg("");
+    try {
+      const res = await fetch("/api/admin/invoice-imports/reparse", {
+        method: "POST",
+        headers: { ...adminHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selectedImports.map((row) => row.id) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to re-parse invoices.");
+
+      await loadImports(listPage);
+      const updatedCount = Array.isArray(data.updated) ? data.updated.length : 0;
+      const errorCount = Array.isArray(data.errors) ? data.errors.length : 0;
+      setMsg(`Re-parsed ${updatedCount} invoice(s)${errorCount ? `; ${errorCount} failed.` : "."}`);
+      setMsgTone(errorCount && updatedCount === 0 ? "error" : "success");
+    } catch (err: unknown) {
+      setMsg(err instanceof Error ? err.message : "Failed to re-parse invoices.");
+      setMsgTone("error");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const bulkDeleteImports = async () => {
@@ -372,7 +447,7 @@ export default function AdminInvoicesPage() {
           ) : null}
         </div>
         <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
-          Latest price CSV: one row per account + SKU with columns account, sku, price only (from the newest invoice that contains each SKU).
+          Latest price CSV: one row per account + SKU with columns account, sku, price only. Re-parse saved imports to refresh prices after parser updates without deleting or re-uploading.
         </p>
       </section>
 
@@ -587,6 +662,23 @@ export default function AdminInvoicesPage() {
             </button>
             <button
               type="button"
+              onClick={() => void bulkReparseImports()}
+              disabled={busy || selectedImports.length === 0}
+              style={{
+                border: "1px solid #bbf7d0",
+                background: "#f0fdf4",
+                color: "#15803d",
+                borderRadius: 10,
+                padding: "7px 10px",
+                fontSize: 12,
+                fontWeight: 900,
+                cursor: busy || selectedImports.length === 0 ? "not-allowed" : "pointer",
+              }}
+            >
+              Re-parse selected ({selectedImports.length})
+            </button>
+            <button
+              type="button"
               onClick={() => void bulkDeleteImports()}
               disabled={busy || selectedImports.length === 0}
               style={{
@@ -603,7 +695,7 @@ export default function AdminInvoicesPage() {
               Delete selected ({selectedImports.length})
             </button>
             <span style={{ fontSize: 12, color: "#6b7280" }}>
-              Deleting imports does not undo customer recent/history.
+              Re-parse keeps the file and import id; delete does not undo customer recent/history.
             </span>
           </div>
         ) : null}
@@ -654,6 +746,30 @@ export default function AdminInvoicesPage() {
                   >
                     ↓
                   </a>
+                  <button
+                    type="button"
+                    onClick={() => void reparseImport(row)}
+                    disabled={busy}
+                    title="Re-parse invoice"
+                    aria-label={`Re-parse invoice ${row.invoiceNo || row.id}`}
+                    style={{
+                      border: "1px solid #bbf7d0",
+                      background: "#f0fdf4",
+                      color: "#15803d",
+                      borderRadius: 10,
+                      width: 34,
+                      height: 34,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 16,
+                      fontWeight: 900,
+                      flexShrink: 0,
+                      cursor: busy ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    ↻
+                  </button>
                   <button
                     type="button"
                     onClick={() => void deleteImport(row)}
