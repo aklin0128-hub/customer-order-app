@@ -61,15 +61,8 @@ test("buildLatestInvoicePricesFromImports uses invoice date not upload time", ()
   ]);
 });
 
-test("buildLatestInvoicePricesFromImports skips imports without invoice date", () => {
+test("buildLatestInvoicePricesFromImports uses upload date when invoice date is missing", () => {
   const imports: InvoiceImportRecord[] = [
-    record({
-      id: "no-date",
-      accountNo: "FL100",
-      invoiceDate: null,
-      uploadedAt: "2026-05-01T12:00:00.000Z",
-      lines: [{ sku: "00100", qty: 1, unitPrice: 50, inCatalog: true }],
-    }),
     record({
       id: "with-date",
       accountNo: "FL100",
@@ -77,16 +70,49 @@ test("buildLatestInvoicePricesFromImports skips imports without invoice date", (
       uploadedAt: "2026-01-01T12:00:00.000Z",
       lines: [{ sku: "00100", qty: 1, unitPrice: 11, inCatalog: true }],
     }),
+    record({
+      id: "no-date",
+      accountNo: "FL100",
+      invoiceDate: null,
+      uploadedAt: "2026-05-01T12:00:00.000Z",
+      lines: [{ sku: "00100", qty: 1, unitPrice: 50, inCatalog: true }],
+    }),
   ];
 
   assert.deepEqual(buildLatestInvoicePricesFromImports(imports), [
-    { account: "FL100", sku: "00100", price: 11, invoiceDate: "2026-03-01" },
+    { account: "FL100", sku: "00100", price: 50, invoiceDate: "2026-05-01" },
   ]);
 });
 
-test("invoiceLatestPricesToCsv uses Account, SKU, Price header", () => {
+test("buildLatestInvoicePricesFromImports keeps price from newest invoice that contains each sku", () => {
+  const imports: InvoiceImportRecord[] = [
+    record({
+      id: "older",
+      accountNo: "FL100",
+      invoiceDate: "1/10/2026",
+      lines: [
+        { sku: "00100", qty: 1, unitPrice: 10, inCatalog: true },
+        { sku: "00200", qty: 1, unitPrice: 20, inCatalog: true },
+      ],
+    }),
+    record({
+      id: "newer",
+      accountNo: "FL100",
+      invoiceDate: "3/10/2026",
+      lines: [{ sku: "00100", qty: 1, unitPrice: 12, inCatalog: true }],
+    }),
+  ];
+
+  assert.deepEqual(buildLatestInvoicePricesFromImports(imports), [
+    { account: "FL100", sku: "00100", price: 12, invoiceDate: "2026-03-10" },
+    { account: "FL100", sku: "00200", price: 20, invoiceDate: "2026-01-10" },
+  ]);
+});
+
+test("invoiceLatestPricesToCsv outputs only account, sku, price columns", () => {
   const csv = invoiceLatestPricesToCsv([
     { account: "FL1", sku: "ABC", price: 9.99, invoiceDate: "2026-04-01" },
   ]);
-  assert.equal(csv, '"Account","SKU","Price"\n"FL1","ABC","9.99"');
+  assert.equal(csv, '"account","sku","price"\n"FL1","ABC","9.99"');
+  assert.equal(csv.includes("invoice"), false);
 });

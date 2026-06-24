@@ -1,6 +1,11 @@
 import { cleanSku, formatDate, loadInvoiceImports, parseDate } from "@/lib/analyticsCommon";
 import { resolveInvoiceCaseUnitPrice } from "@/lib/invoice/invoiceCaseUnitPrice";
 import type { InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
+import {
+  invoiceDateLabel,
+  invoiceRecencyKey,
+  sortImportsByRecency,
+} from "@/lib/invoice/invoiceRecency";
 
 export type InvoiceLatestPriceRow = {
   account: string;
@@ -12,10 +17,7 @@ export type InvoiceLatestPriceRow = {
 
 type LatestEntry = {
   price: number;
-  invoiceDateMs: number;
   invoiceDateLabel: string;
-  uploadedMs: number;
-  invoiceNo: string;
 };
 
 function priceForLine(line: InvoiceImportRecord["lines"][number]) {
@@ -27,30 +29,9 @@ function priceForLine(line: InvoiceImportRecord["lines"][number]) {
   return typeof price === "number" && Number.isFinite(price) && price > 0 ? price : null;
 }
 
-function invoiceDateFromRecord(record: InvoiceImportRecord): { ms: number; label: string } | null {
-  const parsed = parseDate(record.invoiceDate);
-  if (!parsed) return null;
-  const raw = String(record.invoiceDate || "").trim();
-  return {
-    ms: parsed.getTime(),
-    label: raw || formatDate(parsed),
-  };
-}
-
-function isNewerInvoice(
-  next: { invoiceDateMs: number; uploadedMs: number; invoiceNo: string },
-  prev: LatestEntry
-) {
-  if (next.invoiceDateMs > prev.invoiceDateMs) return true;
-  if (next.invoiceDateMs < prev.invoiceDateMs) return false;
-  if (next.uploadedMs > prev.uploadedMs) return true;
-  if (next.uploadedMs < prev.uploadedMs) return false;
-  return next.invoiceNo.localeCompare(prev.invoiceNo) > 0;
-}
-
 /**
- * Latest unit price per account + SKU using each import's **invoice date** (not upload time).
- * Imports without a parsed invoice date are skipped.
+ * Latest case unit price per account + SKU from the newest invoice import that contains the SKU.
+ * Recency uses invoice date when parsed, otherwise upload time.
  */
 export function buildLatestInvoicePricesFromImports(
   imports: InvoiceImportRecord[],
@@ -60,19 +41,17 @@ export function buildLatestInvoicePricesFromImports(
   const accountFilter = String(options?.accountNo || "").trim().toUpperCase();
   const latest = new Map<string, LatestEntry>();
 
-  for (const record of imports) {
+  for (const record of sortImportsByRecency(imports)) {
     const account = String(record.accountNo || "").trim().toUpperCase();
     if (!account) continue;
     if (accountFilter && account !== accountFilter) continue;
 
-    const invoiceDate = invoiceDateFromRecord(record);
-    if (!invoiceDate) continue;
+    const recency = invoiceRecencyKey(record);
+    if (!recency) continue;
+    if (sinceMs != null && recency.effectiveDateMs < sinceMs) continue;
 
-    const { ms: invoiceDateMs, label: invoiceDateLabel } = invoiceDate;
-    if (sinceMs != null && invoiceDateMs < sinceMs) continue;
-
-    const uploadedMs = parseDate(record.uploadedAt)?.getTime() ?? 0;
-    const invoiceNo = String(record.invoiceNo || record.id || "").trim().toUpperCase();
+    const effective = new Date(recency.effectiveDateMs);
+    const dateLabel = invoiceDateLabel(record, effective);
 
     for (const line of record.lines || []) {
       const sku = cleanSku(line.sku);
@@ -80,18 +59,12 @@ export function buildLatestInvoicePricesFromImports(
       if (!sku || price === null) continue;
 
       const key = `${account}|${sku}`;
-      const prev = latest.get(key);
-      const candidate = { invoiceDateMs, uploadedMs, invoiceNo };
+      if (latest.has(key)) continue;
 
-      if (!prev || isNewerInvoice(candidate, prev)) {
-        latest.set(key, {
-          price,
-          invoiceDateMs,
-          invoiceDateLabel,
-          uploadedMs,
-          invoiceNo,
-        });
-      }
+      latest.set(key, {
+        price,
+        invoiceDateLabel: dateLabel,
+      });
     }
   }
 
@@ -123,7 +96,7 @@ export async function getInvoiceLatestPrices(options?: {
 }
 
 export function invoiceLatestPricesToCsv(rows: InvoiceLatestPriceRow[]): string {
-  const header = ["Account", "SKU", "Price"];
+  const header = ["account", "sku", "price"];
   const body = rows.map((row) => [row.account, row.sku, row.price.toFixed(2)]);
   return [header, ...body]
     .map((line) => line.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))

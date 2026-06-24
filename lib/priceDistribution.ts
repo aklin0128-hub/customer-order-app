@@ -3,11 +3,11 @@ import {
   cleanSku,
   loadInvoiceImports,
   median,
-  parseDate,
   sinceFromDays,
 } from "@/lib/analyticsCommon";
 import { getAllCustomers } from "@/lib/customers";
 import { resolveInvoiceCaseUnitPrice } from "@/lib/invoice/invoiceCaseUnitPrice";
+import { invoiceRecencyKey, sortImportsByRecency } from "@/lib/invoice/invoiceRecency";
 
 export type AccountPriceRow = {
   accountNo: string;
@@ -53,15 +53,18 @@ export async function getPriceDistribution(options: {
   >();
 
   const imports = await loadInvoiceImports();
-  for (const record of imports) {
+  for (const record of sortImportsByRecency(imports)) {
     const acct = String(record.accountNo || "").trim().toUpperCase();
     if (!acct) continue;
 
-    const effectiveDate = parseDate(record.invoiceDate) || parseDate(record.uploadedAt);
-    if (!effectiveDate || (since && effectiveDate < since)) continue;
+    const recency = invoiceRecencyKey(record);
+    if (!recency) continue;
+    if (since && recency.effectiveDateMs < since.getTime()) continue;
 
     for (const line of record.lines || []) {
       if (cleanSku(line.sku) !== sku) continue;
+      if (latestByAccount.has(acct)) continue;
+
       const price = resolveInvoiceCaseUnitPrice({
         qty: line.qty,
         unitPrice: line.unitPrice,
@@ -70,10 +73,11 @@ export async function getPriceDistribution(options: {
       if (price === undefined || price <= 0) continue;
 
       const qty = Number(line.qty) || 0;
-      const prev = latestByAccount.get(acct);
-      if (!prev || effectiveDate >= prev.date) {
-        latestByAccount.set(acct, { price, date: effectiveDate, qty });
-      }
+      latestByAccount.set(acct, {
+        price,
+        date: new Date(recency.effectiveDateMs),
+        qty,
+      });
     }
   }
 
