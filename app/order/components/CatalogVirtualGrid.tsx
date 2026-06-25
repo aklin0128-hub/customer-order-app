@@ -71,7 +71,7 @@ export function CatalogVirtualGrid({
   showAdminEdit?: boolean;
   showNewItemListPrice?: boolean;
   showNewProductBadge?: boolean;
-  /** Per-item blue New badge (e.g. catalog browse). Combined with showNewProductBadge. */
+  /** When set with showNewProductBadge, only matching items get the blue New badge. */
   newProductBadgeChecker?: (item: CatalogItem) => boolean;
   listPriceLabel?: string;
   canOrderItem?: (item: CatalogItem) => boolean;
@@ -165,7 +165,9 @@ export function CatalogVirtualGrid({
                 const sku = item.sku?.toUpperCase() || "";
                 const qty = catalogQtyMap[sku] || "";
                 const isWeekly = weeklyPickSkus?.has(sku);
-                const showItemNewBadge = Boolean(showNewProductBadge || newProductBadgeChecker?.(item));
+                const showItemNewBadge = Boolean(
+                  showNewProductBadge && (!newProductBadgeChecker || newProductBadgeChecker(item))
+                );
                 const promoNote = uniformNewPill || showItemNewBadge
                   ? undefined
                   : isWeekly
