@@ -21,7 +21,7 @@ import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
 import { buildClearanceUpsellLines } from "./salesFlow";
 import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog } from "./catalogState";
-import { compareCatalogForDisplay } from "@/lib/catalogNewItems";
+import { compareCatalogByNewestImport, compareCatalogForDisplay } from "@/lib/catalogNewItems";
 import {
   formatBrandLabel,
   formatClearanceDetails,
@@ -598,7 +598,7 @@ export default function OrderPage() {
     () =>
       catalogBrowseBase
         .filter((item) => isNewItem(item))
-        .sort(compareCatalogForDisplay),
+        .sort(compareCatalogByNewestImport),
     [catalogBrowseBase]
   );
 
