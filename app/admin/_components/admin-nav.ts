@@ -55,6 +55,13 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       },
       { id: "insights", label: "Insights", href: "/admin/insights", hint: "Health · brands · price", icon: "💡" },
       { id: "market", label: "Market", href: "/admin/market", hint: "City growth", icon: "🌴" },
+      {
+        id: "weeklySales",
+        label: "Weekly Sales",
+        href: "/admin/weekly-sales-report",
+        hint: "S70 report download",
+        icon: "📋",
+      },
       { id: "topSkus", label: "Top SKUs", href: "/admin/top-skus", hint: "Sales ranking", icon: "📊" },
     ],
   },
