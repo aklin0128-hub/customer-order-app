@@ -660,6 +660,35 @@ export default function OrderPage() {
     [catalogBrowseBase, recommendedSkuSet]
   );
 
+  const frequentCatalogItems = useMemo(
+    () =>
+      invoiceFrequentSkus
+        .map((sku) => getCatalogItemBySku(sku))
+        .filter((item): item is CatalogItem => Boolean(item))
+        .filter((item) => (showAvailableOnly ? isOrderableItem(item) : true))
+        .slice(0, 14),
+    [invoiceFrequentSkus, showAvailableOnly, catalogVersion]
+  );
+
+  const cycleQuickOrderMatch = (direction: 1 | -1) => {
+    if (matchedItems.length === 0) return;
+    const currentIndex = selectedItem
+      ? matchedItems.findIndex((item) => item.sku === selectedItem.sku)
+      : -1;
+    const nextIndex =
+      direction === 1
+        ? currentIndex < 0
+          ? 0
+          : Math.min(currentIndex + 1, matchedItems.length - 1)
+        : currentIndex < 0
+          ? 0
+          : Math.max(currentIndex - 1, 0);
+    const next = matchedItems[nextIndex];
+    if (!next) return;
+    setSelectedItem(next);
+    setSkuInput(next.sku || "");
+  };
+
   const activeCatalogFilterCount = useMemo(() => {
     let count = 0;
     if (showAvailableOnly) count += 1;
@@ -1672,6 +1701,16 @@ export default function OrderPage() {
                           if (e.key === "Enter") {
                             e.preventDefault();
                             addItem();
+                            return;
+                          }
+                          if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            cycleQuickOrderMatch(1);
+                            return;
+                          }
+                          if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            cycleQuickOrderMatch(-1);
                           }
                         }}
                         placeholder={t.searchPlaceholder}
@@ -1728,14 +1767,12 @@ export default function OrderPage() {
             }}
             catalogQtyMap={catalogQtyMap}
             recentItems={recentItems}
+            frequentItems={frequentCatalogItems}
             showAvailableOnly={showAvailableOnly}
             onShowAvailableOnlyChange={setShowAvailableOnly}
             showAdminEditLinks={showAdminEditLinks}
             invoicePriceLabelForSku={invoicePriceLabelForSku}
             productMeta={renderProductMeta}
-            qtyInput={qtyInput}
-            onQtyInputChange={setQtyInput}
-            onAddItem={addItem}
             onApplyQuickQty={applyQuickQtyToSelected}
             onAdjustQty={adjustCatalogQty}
             onUpdateQty={updateCatalogQty}

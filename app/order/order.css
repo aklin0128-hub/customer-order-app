@@ -825,6 +825,14 @@
   line-height: 1.45;
 }
 
+.order-quick-panel-kbd {
+  margin: 4px 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
 .order-quick-filter {
   display: flex;
   align-items: center;
@@ -886,6 +894,28 @@
   font-size: 11px;
   font-weight: 800;
   color: #059669;
+}
+
+.order-quick-frequent-chip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #fde68a;
+  border-radius: 999px;
+  background: #fffbeb;
+  padding: 6px 10px;
+  cursor: pointer;
+  min-height: 36px;
+}
+
+.order-quick-frequent-chip:hover {
+  border-color: #f59e0b;
+  background: #fef3c7;
+}
+
+.order-quick-frequent {
+  margin-bottom: 12px;
 }
 
 .order-quick-focus {
@@ -1095,10 +1125,26 @@
   margin-bottom: 8px;
 }
 
+.order-quick-matches--first {
+  margin-bottom: 12px;
+}
+
 .order-quick-match-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+}
+
+.order-quick-match-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.order-quick-match-wrap.is-active .order-quick-match-add {
+  border-color: #2563eb;
+  background: #eff6ff;
 }
 
 .order-quick-match {
@@ -1156,6 +1202,38 @@
   white-space: nowrap;
 }
 
+.order-quick-match-price {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #047857;
+}
+
+.order-quick-match-status {
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #b45309;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.order-quick-match-new {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 10px;
+  font-weight: 900;
+  vertical-align: middle;
+}
+
+.order-quick-match-new--focus {
+  margin-left: 8px;
+}
+
 .order-quick-match-side {
   display: flex;
   flex-direction: column;
@@ -1189,6 +1267,29 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.order-quick-match-add {
+  align-self: stretch;
+  min-width: 44px;
+  border: 1px solid #93c5fd;
+  border-radius: 12px;
+  background: #fff;
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+  padding: 0 10px;
+}
+
+.order-quick-match-add:hover:not(:disabled) {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.order-quick-match-add:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .order-quick-match-more {
@@ -1225,14 +1326,6 @@
 
   .order-quick-focus-add-one {
     width: 100%;
-  }
-
-  .order-quick-composer--panel {
-    display: none;
-  }
-
-  .order-quick-composer-tip {
-    display: none;
   }
 }
 
