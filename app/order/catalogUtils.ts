@@ -271,6 +271,38 @@ export function findCatalogItemByScanCode(query: string) {
   return catalog.find((item) => catalogItemMatchesScanCode(item, q)) || null;
 }
 
+/** + / - (and = / _) in SKU search — adjust qty, do not type into the field. */
+export function isOrderSearchQtyAdjustKey(key: string) {
+  return key === "+" || key === "=" || key === "-" || key === "_";
+}
+
+export function resolveQuickSearchTargetItem(
+  query: string,
+  options: {
+    selected: CatalogItem | null;
+    matched: CatalogItem[];
+  }
+): CatalogItem | null {
+  if (options.selected) return options.selected;
+  const trimmed = query.trim();
+  if (!trimmed) return options.matched[0] || null;
+  const upper = trimmed.toUpperCase();
+  const exact =
+    catalog.find((item) => item.sku?.toUpperCase() === upper) || findCatalogItemByScanCode(trimmed);
+  return exact || options.matched[0] || null;
+}
+
+export function resolveCatalogFilterTargetItem(query: string, filtered: CatalogItem[]): CatalogItem | null {
+  const trimmed = query.trim();
+  if (!trimmed) return null;
+  const upper = trimmed.toUpperCase();
+  const exact =
+    catalog.find((item) => item.sku?.toUpperCase() === upper) || findCatalogItemByScanCode(trimmed);
+  if (exact) return exact;
+  if (filtered.length === 1) return filtered[0] || null;
+  return null;
+}
+
 export function scoreCatalogSearchQuery(item: CatalogItem, query: string) {
   const q = query.trim().toUpperCase();
   if (!q) return -1;

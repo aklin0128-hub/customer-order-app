@@ -37,6 +37,9 @@ import {
   getStatusBadgeStyle,
   formatOrderNotAvailableMessage,
   findCatalogItemByScanCode,
+  isOrderSearchQtyAdjustKey,
+  resolveCatalogFilterTargetItem,
+  resolveQuickSearchTargetItem,
   isNewItem,
   isOrderableItem,
   scoreCatalogSearchQuery,
@@ -1120,6 +1123,16 @@ export default function OrderPage() {
     adjustQtyForSku(sku, delta, "normal");
   };
 
+  const handleSearchQtyKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    target: CatalogItem | null
+  ) => {
+    if (!target?.sku || !isOrderSearchQtyAdjustKey(e.key)) return false;
+    e.preventDefault();
+    adjustCatalogQty(target.sku, e.key === "-" || e.key === "_" ? -1 : 1);
+    return true;
+  };
+
   const adjustClearanceQty = (sku: string, delta: number) => {
     adjustQtyForSku(sku, delta, "clearance");
   };
@@ -1583,6 +1596,12 @@ export default function OrderPage() {
                   <input
                     value={catalogSearch}
                     onChange={(e) => setCatalogSearch(e.target.value)}
+                    onKeyDown={(e) => {
+                      handleSearchQtyKeyDown(
+                        e,
+                        resolveCatalogFilterTargetItem(catalogSearch, orderableCatalogItems)
+                      );
+                    }}
                     placeholder={t.catalogSearch}
                     className="order-sticky-search-input"
                     aria-label={t.catalogSearch}
@@ -1698,6 +1717,17 @@ export default function OrderPage() {
                         value={skuInput}
                         onChange={(e) => setSkuInput(e.target.value.toUpperCase())}
                         onKeyDown={(e) => {
+                          if (
+                            handleSearchQtyKeyDown(
+                              e,
+                              resolveQuickSearchTargetItem(skuInput, {
+                                selected: selectedItem,
+                                matched: matchedItems,
+                              })
+                            )
+                          ) {
+                            return;
+                          }
                           if (e.key === "Enter") {
                             e.preventDefault();
                             addItem();
