@@ -31,7 +31,7 @@ export type CatalogItem = {
   newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
   /** /new/ showcase only — optional list price (display) */
   newItemListPrice?: string;
-  /** Admin: show OUT OF STOCK stamp on /new/ and order New items */
+  /** Admin: show Coming Soon tag on /new/ and order New items (not orderable yet) */
   newItemOutOfStock?: boolean;
 };
 

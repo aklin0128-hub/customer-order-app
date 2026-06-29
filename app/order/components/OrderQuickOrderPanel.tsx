@@ -8,6 +8,7 @@ import {
   isNewItem,
   isOrderableItem,
 } from "../catalogUtils";
+import { getComingSoonBadgeLabel, isComingSoonNewItem } from "@/lib/comingSoonBadge";
 import { copy } from "../orderCopy";
 import { qtyButtonStyle, stepButtonStyle, stepInputStyle } from "../orderStyles";
 import type { CartItem, CatalogItem, Lang } from "../types";
@@ -61,6 +62,8 @@ export function OrderQuickOrderPanel({
   const focusSku = focusItem?.sku?.toUpperCase() || "";
   const focusInCart = focusSku ? Number(catalogQtyMap[focusSku] || 0) : 0;
   const focusCanOrder = focusItem ? isOrderableItem(focusItem) : false;
+  const focusComingSoon = focusItem ? isComingSoonNewItem(focusItem) : false;
+  const focusCanAdd = focusCanOrder && !focusComingSoon;
 
   const visibleMatches = useMemo(() => {
     const limit = showAllMatches ? MATCH_EXPANDED : MATCH_PREVIEW;
@@ -85,6 +88,8 @@ export function OrderQuickOrderPanel({
     const status = getDisplayStatus(item.status);
     const invoicePrice = invoicePriceLabelForSku(sku);
     const isNew = isNewItem(item);
+    const comingSoon = isComingSoonNewItem(item);
+    const canAdd = canOrder && !comingSoon;
 
     return (
       <div key={item.sku} className={`order-quick-match-wrap${isActive ? " is-active" : ""}`}>
@@ -100,6 +105,9 @@ export function OrderQuickOrderPanel({
               {item.sku}
               {item.brand ? ` · ${item.brand}` : ""}
               {isNew ? <span className="order-quick-match-new">{t.newItems}</span> : null}
+              {comingSoon ? (
+                <span className="order-quick-match-coming-soon">{getComingSoonBadgeLabel(lang)}</span>
+              ) : null}
             </div>
             <div className="order-quick-match-name">{item.name || "—"}</div>
             {invoicePrice ? <div className="order-quick-match-price">{invoicePrice}</div> : null}
@@ -114,7 +122,7 @@ export function OrderQuickOrderPanel({
         <button
           type="button"
           className="order-quick-match-add"
-          disabled={!canOrder}
+          disabled={!canAdd}
           title={t.addOneCase}
           aria-label={`${t.addOneCase} ${sku}`}
           onClick={() => onAdjustQty(item.sku, 1)}
@@ -194,6 +202,11 @@ export function OrderQuickOrderPanel({
                 {isNewItem(focusItem) ? (
                   <span className="order-quick-match-new order-quick-match-new--focus">{t.newItems}</span>
                 ) : null}
+                {focusComingSoon ? (
+                  <span className="order-quick-match-coming-soon order-quick-match-coming-soon--focus">
+                    {getComingSoonBadgeLabel(lang)}
+                  </span>
+                ) : null}
               </div>
               <div className="order-quick-focus-name">{focusItem.name || "—"}</div>
               {productMeta(focusItem)}
@@ -204,6 +217,8 @@ export function OrderQuickOrderPanel({
                 <div className="order-quick-focus-blocked">
                   {formatOrderNotAvailableMessage(focusItem.sku || "", focusItem.status, t)}
                 </div>
+              ) : focusComingSoon ? (
+                <div className="order-quick-focus-blocked">{getComingSoonBadgeLabel(lang)}</div>
               ) : null}
               {focusInCart > 0 ? (
                 <div className="order-quick-focus-in-cart">
@@ -226,7 +241,7 @@ export function OrderQuickOrderPanel({
               <button
                 type="button"
                 onClick={() => onAdjustQty(focusItem.sku, -1)}
-                disabled={!focusCanOrder}
+                disabled={!focusCanAdd}
                 style={stepButtonStyle}
                 aria-label="-"
               >
@@ -237,14 +252,14 @@ export function OrderQuickOrderPanel({
                 onChange={(e) => onUpdateQty(focusItem.sku, e.target.value)}
                 placeholder="0"
                 inputMode="numeric"
-                disabled={!focusCanOrder}
+                disabled={!focusCanAdd}
                 style={stepInputStyle}
                 aria-label={t.qty}
               />
               <button
                 type="button"
                 onClick={() => onAdjustQty(focusItem.sku, 1)}
-                disabled={!focusCanOrder}
+                disabled={!focusCanAdd}
                 style={stepButtonStyle}
                 aria-label="+"
               >
@@ -254,7 +269,7 @@ export function OrderQuickOrderPanel({
             <button
               type="button"
               className="order-quick-focus-add-one"
-              disabled={!focusCanOrder}
+              disabled={!focusCanAdd}
               onClick={() => onAdjustQty(focusItem.sku, 1)}
             >
               {t.addOneCase}
@@ -268,7 +283,7 @@ export function OrderQuickOrderPanel({
                 type="button"
                 onClick={() => onApplyQuickQty(qty)}
                 style={qtyButtonStyle}
-                disabled={!focusCanOrder}
+                disabled={!focusCanAdd}
               >
                 {qty}
               </button>

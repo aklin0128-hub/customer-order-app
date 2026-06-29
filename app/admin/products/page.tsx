@@ -1011,7 +1011,7 @@ export default function AdminProductsPage() {
                         markDirty();
                       }}
                     />
-                    Out of stock — show stamp on /new/ and order New items
+                    Coming soon — show tag on /new/ and order New items (not orderable yet)
                   </label>
                   <label style={{ ...labelStyle, marginTop: 12 }}>Published date</label>
                   <input

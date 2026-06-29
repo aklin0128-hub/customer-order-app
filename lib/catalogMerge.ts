@@ -20,6 +20,7 @@ export type MergedCatalogProduct = {
   newItemDescriptionPdfUrl?: string;
   newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
   newItemListPrice?: string;
+  newItemOutOfStock?: boolean;
   name_k?: string;
   [key: string]: unknown;
 };

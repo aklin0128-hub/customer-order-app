@@ -3,10 +3,11 @@
 import { useMemo, useState } from "react";
 
 import { ShowcaseDescriptionModal } from "@/app/components/ShowcaseDescriptionModal";
-import { OutOfStockStamp } from "@/app/components/OutOfStockStamp";
+import { ComingSoonStamp } from "@/app/components/ComingSoonStamp";
 import { NewProductBadge } from "@/app/components/NewProductBadge";
 import { ProductImage } from "@/app/order/components/ProductImage";
 import { getJustAddedLabel, justAddedBadgeStyle } from "@/lib/justAddedBadge";
+import { isComingSoonNewItem } from "@/lib/comingSoonBadge";
 import { formatNewItemPublishedDate } from "@/lib/catalogNewItems";
 import { formatNewItemListPriceDisplay } from "@/lib/newItemListPrice";
 import { formatShowcasePromoDisplay, type Lang } from "@/lib/showcasePromoFormat";
@@ -65,7 +66,7 @@ export function ShowcaseCard({
     showNewDetails && item.newItemListPrice
       ? formatNewItemListPriceDisplay(item.newItemListPrice)
       : null;
-  const outOfStock = showNewDetails && Boolean(item.newItemOutOfStock);
+  const comingSoon = showNewDetails && isComingSoonNewItem(item);
   const topBadgeCount = (justAddedBadge ? 1 : 0) + (storageLabel ? 1 : 0);
 
   return (
@@ -84,14 +85,14 @@ export function ShowcaseCard({
       ) : null}
 
       <div className="showcase-card-body">
-        <div className={`showcase-card-img-wrap${outOfStock ? " showcase-card-img-wrap--stamped" : ""}`}>
+        <div className={`showcase-card-img-wrap${comingSoon ? " showcase-card-img-wrap--stamped" : ""}`}>
           <ProductImage
             sku={item.sku}
             alt={item.name || item.sku}
             size={resolvedImageSize}
             imageUrl={item.imageUrl}
           />
-          {outOfStock ? <OutOfStockStamp /> : null}
+          {comingSoon ? <ComingSoonStamp lang={lang} /> : null}
         </div>
 
         {showNewDetails ? (

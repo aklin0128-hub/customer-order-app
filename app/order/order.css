@@ -1218,6 +1218,22 @@
   letter-spacing: 0.03em;
 }
 
+.order-quick-match-coming-soon {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #b45309;
+  font-size: 10px;
+  font-weight: 900;
+  vertical-align: middle;
+}
+
+.order-quick-match-coming-soon--focus {
+  margin-left: 8px;
+}
+
 .order-quick-match-new {
   display: inline-block;
   margin-left: 6px;
