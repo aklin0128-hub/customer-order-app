@@ -7,10 +7,45 @@ const LABELS: Record<ComingSoonBadgeLang, string> = {
   vi: "Sắp có",
 };
 
+export type NewItemStampFields = {
+  isNew?: boolean;
+  newItemOutOfStock?: boolean;
+  newItemComingSoon?: boolean;
+};
+
 export function getComingSoonBadgeLabel(lang: ComingSoonBadgeLang) {
   return LABELS[lang];
 }
 
-export function isComingSoonNewItem(item?: { isNew?: boolean; newItemOutOfStock?: boolean } | null) {
-  return Boolean(item?.isNew && item?.newItemOutOfStock);
+/** Coming Soon stamp — separate from out-of-stock. */
+export function isComingSoonNewItem(item?: NewItemStampFields | null) {
+  if (!item?.isNew) return false;
+  if (typeof item.newItemComingSoon === "boolean") return item.newItemComingSoon;
+  // Legacy: before the split, newItemOutOfStock drove the Coming Soon stamp only.
+  return Boolean(item.newItemOutOfStock);
+}
+
+/** Out of stock stamp for new-item cards. */
+export function isNewItemOutOfStockStamp(item?: NewItemStampFields | null) {
+  if (!item?.isNew) return false;
+  if (typeof item.newItemComingSoon === "boolean") return Boolean(item.newItemOutOfStock);
+  // Legacy records only had the coming-soon meaning for this flag.
+  return false;
+}
+
+export function isNewItemOrderingBlocked(item?: NewItemStampFields | null) {
+  return isComingSoonNewItem(item) || isNewItemOutOfStockStamp(item);
+}
+
+/** Admin form: map stored product flags to separate checkboxes. */
+export function readNewItemOutOfStockForAdmin(item?: NewItemStampFields | null) {
+  if (!item?.isNew) return false;
+  if (typeof item.newItemComingSoon === "boolean") return Boolean(item.newItemOutOfStock);
+  return false;
+}
+
+export function readNewItemComingSoonForAdmin(item?: NewItemStampFields | null) {
+  if (!item?.isNew) return false;
+  if (typeof item.newItemComingSoon === "boolean") return item.newItemComingSoon;
+  return Boolean(item.newItemOutOfStock);
 }

@@ -49,3 +49,25 @@
   opacity: 0.45;
   pointer-events: none;
 }
+
+.catalog-card-image-wrap--dual-stamped .coming-soon-stamp-overlay,
+.showcase-card-img-wrap--dual-stamped .coming-soon-stamp-overlay {
+  inset: -50% -58% -62% -52%;
+  z-index: 6;
+}
+
+.catalog-card-image-wrap--dual-stamped .coming-soon-stamp-overlay img,
+.showcase-card-img-wrap--dual-stamped .coming-soon-stamp-overlay img {
+  transform: rotate(-12deg) scale(1.35) translate(-8%, -10%);
+}
+
+.catalog-card-image-wrap--dual-stamped .out-of-stock-stamp-overlay,
+.showcase-card-img-wrap--dual-stamped .out-of-stock-stamp-overlay {
+  inset: -62% -52% -50% -58%;
+  z-index: 5;
+}
+
+.catalog-card-image-wrap--dual-stamped .out-of-stock-stamp-overlay img,
+.showcase-card-img-wrap--dual-stamped .out-of-stock-stamp-overlay img {
+  transform: rotate(-18deg) scale(1.35) translate(8%, 10%);
+}

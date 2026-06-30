@@ -33,6 +33,7 @@ export type CatalogItem = {
   newItemListPrice?: string;
   /** Admin: show Coming Soon tag on /new/ and order New items (not orderable yet) */
   newItemOutOfStock?: boolean;
+  newItemComingSoon?: boolean;
 };
 
 export type PromoPriceTier = {

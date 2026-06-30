@@ -21,6 +21,7 @@ export type MergedCatalogProduct = {
   newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
   newItemListPrice?: string;
   newItemOutOfStock?: boolean;
+  newItemComingSoon?: boolean;
   name_k?: string;
   [key: string]: unknown;
 };
