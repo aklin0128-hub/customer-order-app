@@ -8,7 +8,7 @@ import {
   isNewItem,
   isOrderableItem,
 } from "../catalogUtils";
-import { getComingSoonBadgeLabel, isComingSoonNewItem } from "@/lib/comingSoonBadge";
+import { getComingSoonBadgeLabel, isComingSoonNewItem, isNewItemOrderingBlocked } from "@/lib/comingSoonBadge";
 import { copy } from "../orderCopy";
 import { qtyButtonStyle, stepButtonStyle, stepInputStyle } from "../orderStyles";
 import type { CartItem, CatalogItem, Lang } from "../types";
@@ -63,7 +63,7 @@ export function OrderQuickOrderPanel({
   const focusInCart = focusSku ? Number(catalogQtyMap[focusSku] || 0) : 0;
   const focusCanOrder = focusItem ? isOrderableItem(focusItem) : false;
   const focusComingSoon = focusItem ? isComingSoonNewItem(focusItem) : false;
-  const focusCanAdd = focusCanOrder && !focusComingSoon;
+  const focusCanAdd = focusCanOrder && !isNewItemOrderingBlocked(focusItem);
 
   const visibleMatches = useMemo(() => {
     const limit = showAllMatches ? MATCH_EXPANDED : MATCH_PREVIEW;
@@ -89,7 +89,7 @@ export function OrderQuickOrderPanel({
     const invoicePrice = invoicePriceLabelForSku(sku);
     const isNew = isNewItem(item);
     const comingSoon = isComingSoonNewItem(item);
-    const canAdd = canOrder && !comingSoon;
+    const canAdd = canOrder && !isNewItemOrderingBlocked(item);
 
     return (
       <div key={item.sku} className={`order-quick-match-wrap${isActive ? " is-active" : ""}`}>

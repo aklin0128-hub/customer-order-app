@@ -40,6 +40,7 @@ type Product = {
   newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
   newItemListPrice?: string;
   newItemOutOfStock?: boolean;
+  newItemComingSoon?: boolean;
   source?: string;
   updatedAt?: string;
 };
@@ -119,6 +120,7 @@ export async function POST(req: Request) {
     const isNew = Boolean(body?.isNew);
     const justAdded = Boolean(body?.justAdded);
     const newItemOutOfStock = Boolean(body?.newItemOutOfStock);
+    const newItemComingSoon = Boolean(body?.newItemComingSoon);
     const newItemDescription = String(body?.newItemDescription || "").trim();
     const newItemDescriptionPdfUrl = String(body?.newItemDescriptionPdfUrl || "").trim();
     const publishedInput =
@@ -184,6 +186,7 @@ export async function POST(req: Request) {
       isNew,
       justAdded,
       newItemOutOfStock: isNew ? newItemOutOfStock : false,
+      newItemComingSoon: isNew ? newItemComingSoon : false,
       newSince,
       newPublishedDate,
       newItemListPrice,

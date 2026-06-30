@@ -4,7 +4,12 @@ import { formatCatalogAddedDateForItem, formatNewItemPublishedDate } from "@/lib
 import { formatNewItemListPriceDisplay } from "@/lib/newItemListPrice";
 import { ComingSoonStamp } from "@/app/components/ComingSoonStamp";
 import { NewProductBadge } from "@/app/components/NewProductBadge";
-import { isComingSoonNewItem } from "@/lib/comingSoonBadge";
+import { OutOfStockStamp } from "@/app/components/OutOfStockStamp";
+import {
+  isComingSoonNewItem,
+  isNewItemOrderingBlocked,
+  isNewItemOutOfStockStamp,
+} from "@/lib/comingSoonBadge";
 import { resolveNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import { getDisplayStatus, getStatusBadgeStyle, isJustAddedItem, isOrderableItem } from "../catalogUtils";
 import type { CatalogItem, Lang } from "../types";
@@ -127,6 +132,9 @@ export function CatalogQtyCard({
       : "";
   const alignedPriceLayout = Boolean(showNewItemListPrice);
   const comingSoon = alignedPriceLayout && isComingSoonNewItem(item);
+  const outOfStock = alignedPriceLayout && isNewItemOutOfStockStamp(item);
+  const stamped = comingSoon || outOfStock;
+  const orderingBlocked = alignedPriceLayout && isNewItemOrderingBlocked(item);
   const showNewItemExtras = Boolean(showNewProductBadge || showNewItemListPrice);
   const storageLabel = showNewItemExtras ? resolveNewItemStorageLabel(item) : undefined;
   const showJustAdded = Boolean(justAddedLabel && !showNewProductBadge && (uniformNewPill || isJustAddedItem(item)));
@@ -254,7 +262,7 @@ export function CatalogQtyCard({
 
   return (
     <div
-      className={`catalog-qty-card${alignedPriceLayout ? " catalog-qty-card--price-aligned" : ""}${alignedPriceLayout ? ` catalog-qty-card--top-badges-${topBadgeCount}` : ""}${promoLayout ? " catalog-qty-card--promo-layout" : ""}${comingSoon ? " catalog-qty-card--out-of-stock" : ""}`}
+      className={`catalog-qty-card${alignedPriceLayout ? " catalog-qty-card--price-aligned" : ""}${alignedPriceLayout ? ` catalog-qty-card--top-badges-${topBadgeCount}` : ""}${promoLayout ? " catalog-qty-card--promo-layout" : ""}${stamped ? " catalog-qty-card--out-of-stock" : ""}${comingSoon && outOfStock ? " catalog-qty-card--dual-stamped" : ""}`}
       style={{
         ...catalogCardStyle,
         background: disabled ? "#f3f4f6" : hasQty ? "#ecfdf5" : highlight ? "#f0fdfa" : "#ffffff",
@@ -291,11 +299,12 @@ export function CatalogQtyCard({
       ) : null}
 
       <div
-        className={`catalog-card-image-wrap${alignedPriceLayout ? " catalog-card-image-wrap--fixed" : ""}${comingSoon ? " catalog-card-image-wrap--stamped" : ""}`}
+        className={`catalog-card-image-wrap${alignedPriceLayout ? " catalog-card-image-wrap--fixed" : ""}${stamped ? " catalog-card-image-wrap--stamped" : ""}${comingSoon && outOfStock ? " catalog-card-image-wrap--dual-stamped" : ""}`}
         style={{ paddingTop: alignedPriceLayout ? 0 : badgeRow ? 2 : 0 }}
       >
         <ProductImage sku={item.sku} alt={item.name || item.sku} size={96} imageUrl={item.imageUrl} />
         {comingSoon ? <ComingSoonStamp lang={lang} /> : null}
+        {outOfStock ? <OutOfStockStamp /> : null}
       </div>
 
       {showNewProductBadge ? (
@@ -324,7 +333,7 @@ export function CatalogQtyCard({
 
       <div className="catalog-qty-card-stepper">
         <div style={catalogStepperStyle}>
-          <button type="button" onClick={() => onAdjust(item.sku, -1)} disabled={disabled || comingSoon} style={catalogStepBtnStyle}>
+          <button type="button" onClick={() => onAdjust(item.sku, -1)} disabled={disabled || orderingBlocked} style={catalogStepBtnStyle}>
             −
           </button>
           <input
@@ -332,10 +341,10 @@ export function CatalogQtyCard({
             onChange={(e) => onUpdateQty(item.sku, e.target.value)}
             placeholder="0"
             inputMode="numeric"
-            disabled={disabled || comingSoon}
-            style={{ ...catalogStepInputStyle, opacity: disabled || comingSoon ? 0.5 : 1 }}
+            disabled={disabled || orderingBlocked}
+            style={{ ...catalogStepInputStyle, opacity: disabled || orderingBlocked ? 0.5 : 1 }}
           />
-          <button type="button" onClick={() => onAdjust(item.sku, 1)} disabled={disabled || comingSoon} style={catalogStepBtnStyle}>
+          <button type="button" onClick={() => onAdjust(item.sku, 1)} disabled={disabled || orderingBlocked} style={catalogStepBtnStyle}>
             +
           </button>
         </div>

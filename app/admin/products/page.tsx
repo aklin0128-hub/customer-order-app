@@ -19,6 +19,7 @@ import {
 import { AdminPublicShowcaseHint } from "../_components/AdminPublicShowcaseHint";
 import { useAdminAuth } from "../_components/useAdminAuth";
 import { isJustAddedItem, parseImportedAtMs } from "@/lib/catalogNewItems";
+import { readNewItemComingSoonForAdmin, readNewItemOutOfStockForAdmin } from "@/lib/comingSoonBadge";
 import { resolveNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import {
   expandCategoryTags,
@@ -49,6 +50,7 @@ type Product = {
   newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
   newItemListPrice?: string;
   newItemOutOfStock?: boolean;
+  newItemComingSoon?: boolean;
   source?: string;
 };
 
@@ -135,6 +137,7 @@ export default function AdminProductsPage() {
   const [newPublishedDate, setNewPublishedDate] = useState("");
   const [newItemListPrice, setNewItemListPrice] = useState("");
   const [newItemOutOfStock, setNewItemOutOfStock] = useState(false);
+  const [newItemComingSoon, setNewItemComingSoon] = useState(false);
 
   const showcaseStorageLabel = useMemo(
     () => resolveNewItemStorageLabel({ categories, category: categories[0] }),
@@ -277,7 +280,8 @@ export default function AdminProductsPage() {
     setNewItemDescriptionPdfUrl(p.newItemDescriptionPdfUrl || "");
     setNewPublishedDate(p.newPublishedDate || "");
     setNewItemListPrice(p.newItemListPrice || "");
-    setNewItemOutOfStock(Boolean(p.newItemOutOfStock));
+    setNewItemOutOfStock(readNewItemOutOfStockForAdmin(p));
+    setNewItemComingSoon(readNewItemComingSoonForAdmin(p));
     setFormDirty(false);
     setAutoSaveStatus("");
     notify(`Editing ${p.sku}`);
@@ -377,6 +381,7 @@ export default function AdminProductsPage() {
     setNewPublishedDate("");
     setNewItemListPrice("");
     setNewItemOutOfStock(false);
+    setNewItemComingSoon(false);
     setFormDirty(false);
     setAutoSaveStatus("");
     setMsg("");
@@ -419,6 +424,7 @@ export default function AdminProductsPage() {
           newPublishedDate: newPublishedDate || undefined,
           newItemListPrice: newItemListPrice || undefined,
           newItemOutOfStock: isNew ? newItemOutOfStock : false,
+          newItemComingSoon: isNew ? newItemComingSoon : false,
         }),
       });
       const data = await readApiJson(res);
@@ -463,7 +469,7 @@ export default function AdminProductsPage() {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, newItemOutOfStock, newItemDescription, newItemDescriptionPdfUrl, newPublishedDate, newItemListPrice]);
+  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, newItemOutOfStock, newItemComingSoon, newItemDescription, newItemDescriptionPdfUrl, newPublishedDate, newItemListPrice]);
 
   const uploadNewItemPdf = async (file: File | null) => {
     const finalSku = sku.trim().toUpperCase();
@@ -867,7 +873,10 @@ export default function AdminProductsPage() {
                     const next = e.target.checked;
                     setIsNew(next);
                     markDirty();
-                    if (!next) setNewItemOutOfStock(false);
+                    if (!next) {
+                      setNewItemOutOfStock(false);
+                      setNewItemComingSoon(false);
+                    }
                     if (next) {
                       requestAnimationFrame(() => {
                         document.getElementById("admin-new-item-showcase")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -1011,7 +1020,33 @@ export default function AdminProductsPage() {
                         markDirty();
                       }}
                     />
-                    Coming soon — show tag on /new/ and order New items (not orderable yet)
+                    Out of stock — show stamp on /new/ and order New items
+                  </label>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      marginTop: 10,
+                      border: "1px solid #fed7aa",
+                      borderRadius: 12,
+                      padding: 12,
+                      background: newItemComingSoon ? "#fff7ed" : "#fff",
+                      color: "#9a3412",
+                      fontSize: 13,
+                      fontWeight: 900,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={newItemComingSoon}
+                      onChange={(e) => {
+                        setNewItemComingSoon(e.target.checked);
+                        markDirty();
+                      }}
+                    />
+                    Coming soon — show stamp on /new/ and order New items (not orderable yet)
                   </label>
                   <label style={{ ...labelStyle, marginTop: 12 }}>Published date</label>
                   <input
