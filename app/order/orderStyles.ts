@@ -232,7 +232,7 @@ export const catalogCardStyle: CSSProperties = {
   padding: 10,
   display: "flex",
   flexDirection: "column",
-  gap: 3,
+  gap: 4,
   overflow: "visible",
   position: "relative",
   minWidth: 0,
@@ -242,11 +242,11 @@ export const catalogNameStyle: CSSProperties = {
   fontSize: 12,
   color: "#4b5563",
   lineHeight: 1.3,
-  maxHeight: 40,
+  maxHeight: 36,
   overflow: "hidden",
   display: "-webkit-box",
   WebkitBoxOrient: "vertical",
-  WebkitLineClamp: 3,
+  WebkitLineClamp: 2,
 };
 export const promoTagStyle: CSSProperties = {
   alignSelf: "flex-start",
