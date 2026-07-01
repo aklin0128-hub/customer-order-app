@@ -1536,44 +1536,214 @@ export default function OrderPage() {
     </div>
   );
 
-  const renderMobileAccountBar = () => (
-    <div className="order-mobile-account-bar">
-      <span className="order-mobile-account-meta">
-        {accountNo} · {storeName}
-      </span>
-      <div className="order-mobile-account-actions">
-        {orderHistory.length > 0 ? (
-          <button
-            type="button"
-            className="order-past-orders-icon-btn"
-            onClick={() => setShowPastOrders(true)}
-            aria-label={`${t.history} (${orderHistory.length})`}
-          >
-            <span aria-hidden>📋</span>
-            <span className="order-past-orders-icon-btn-count">{orderHistory.length}</span>
-          </button>
-        ) : null}
-        <div className="order-mobile-lang" role="group" aria-label="Language">
-          {(["en", "zh", "ko", "vi"] as Lang[]).map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => changeLang(item)}
-              className={`order-mobile-lang-btn${lang === item ? " is-active" : ""}`}
-            >
-              {ORDER_LANG_LABELS[item]}
-            </button>
-          ))}
-        </div>
-        <button type="button" onClick={logout} className="order-mobile-logout-btn">
-          {t.logout}
-        </button>
-        {isMobileViewport && mode === "catalog" ? null : renderStickyPanelToggle(true)}
-      </div>
+  const renderMobileModeTags = () => (
+    <div className="order-shop-mode-tags" role="tablist" aria-label="Order mode">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "promotion"}
+        onClick={() => changeMode("promotion")}
+        className={`order-shop-tag order-shop-tag--promo${mode === "promotion" ? " is-active" : ""}`}
+      >
+        {t.promotionMode}
+        {promotionItems.length > 0 ? ` (${promotionItems.length})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "newItems"}
+        onClick={() => changeMode("newItems")}
+        className={`order-shop-tag order-shop-tag--new${mode === "newItems" ? " is-active" : ""}`}
+      >
+        {t.newItemsMode}
+        {newItemCount > 0 ? ` (${newItemCount})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "clearance"}
+        onClick={() => changeMode("clearance")}
+        className={`order-shop-tag order-shop-tag--clearance${mode === "clearance" ? " is-active" : ""}`}
+      >
+        {t.clearanceMode}
+        {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "catalog"}
+        onClick={() => changeMode("catalog")}
+        className={`order-shop-tag order-shop-tag--catalog${mode === "catalog" ? " is-active" : ""}`}
+      >
+        {t.catalogMode}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "search"}
+        onClick={() => changeMode("search")}
+        className={`order-shop-tag order-shop-tag--quick${mode === "search" ? " is-active" : ""}`}
+      >
+        {t.searchMode}
+      </button>
     </div>
   );
 
-  const showCatalogSearch = mode === "catalog" && (stickyPanelOpen || isMobileViewport);
+  const renderMobileShopHeader = () => (
+    <div className="order-shop-header">
+      <div className="order-shop-header-top">
+        <div className="order-shop-store">
+          <span className="order-shop-store-name">{storeName}</span>
+          <span className="order-shop-store-id">{accountNo}</span>
+        </div>
+        <div className="order-shop-header-actions">
+          <div className="order-shop-lang" role="group" aria-label="Language">
+            {(["en", "zh", "ko", "vi"] as Lang[]).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => changeLang(item)}
+                className={`order-shop-lang-btn${lang === item ? " is-active" : ""}`}
+              >
+                {ORDER_LANG_LABELS[item]}
+              </button>
+            ))}
+          </div>
+          {orderHistory.length > 0 ? (
+            <button
+              type="button"
+              className="order-shop-icon-btn"
+              onClick={() => setShowPastOrders(true)}
+              aria-label={`${t.history} (${orderHistory.length})`}
+            >
+              <span aria-hidden>📋</span>
+              <span className="order-shop-icon-badge">{orderHistory.length}</span>
+            </button>
+          ) : null}
+          <button type="button" onClick={logout} className="order-shop-icon-btn order-shop-icon-btn--text">
+            {t.logout}
+          </button>
+        </div>
+      </div>
+
+      {mode === "catalog" ? (
+        <div className="order-shop-search-row">
+          <label className="order-shop-search-field">
+            <span className="order-shop-search-icon" aria-hidden>
+              <svg viewBox="0 0 24 24" width="18" height="18" focusable="false">
+                <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="2.2" />
+                <path d="M20 20l-3.5-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+              </svg>
+            </span>
+            <input
+              value={catalogSearch}
+              onChange={(e) => setCatalogSearch(e.target.value)}
+              onKeyDown={(e) => {
+                handleSearchQtyKeyDown(e, resolveCatalogFilterTargetItem(catalogSearch, orderableCatalogItems));
+              }}
+              placeholder={t.catalogSearch}
+              className="order-shop-search-input"
+              aria-label={t.catalogSearch}
+            />
+          </label>
+          <button
+            type="button"
+            className={`order-shop-filter-btn${catalogFiltersOpen || activeCatalogFilterCount > 0 ? " is-active" : ""}`}
+            onClick={() => setCatalogFiltersOpen((prev) => !prev)}
+            aria-label={catalogFiltersOpen ? t.hideFilters : t.showFilters}
+            aria-pressed={catalogFiltersOpen}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" focusable="false" aria-hidden>
+              <path
+                d="M4 7h16M7 12h10M10 17h4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+              />
+            </svg>
+            {activeCatalogFilterCount > 0 ? (
+              <span className="order-shop-filter-badge">{activeCatalogFilterCount}</span>
+            ) : null}
+          </button>
+        </div>
+      ) : null}
+
+      {mode === "search" ? (
+        <>
+          <div className="order-shop-search-row">
+            <label className="order-shop-search-field">
+              <span className="order-shop-search-icon" aria-hidden>
+                <svg viewBox="0 0 24 24" width="18" height="18" focusable="false">
+                  <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="2.2" />
+                  <path d="M20 20l-3.5-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                </svg>
+              </span>
+              <input
+                ref={skuInputRef}
+                value={skuInput}
+                onChange={(e) => setSkuInput(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (
+                    handleSearchQtyKeyDown(
+                      e,
+                      resolveQuickSearchTargetItem(skuInput, {
+                        selected: selectedItem,
+                        matched: matchedItems,
+                      })
+                    )
+                  ) {
+                    return;
+                  }
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addItem();
+                    return;
+                  }
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    cycleQuickOrderMatch(1);
+                    return;
+                  }
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    cycleQuickOrderMatch(-1);
+                  }
+                }}
+                placeholder={t.searchPlaceholder}
+                autoCapitalize="characters"
+                className="order-shop-search-input"
+                aria-label={t.skuItem}
+              />
+            </label>
+          </div>
+          <div className="order-shop-quick-row">
+            <input
+              value={qtyInput}
+              onChange={(e) => setQtyInput(e.target.value.replace(/[^0-9]/g, ""))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addItem();
+                }
+              }}
+              placeholder="1"
+              inputMode="numeric"
+              className="order-shop-qty-input"
+              aria-label={t.qty}
+            />
+            <button type="button" className="order-shop-add-btn" onClick={addItem}>
+              {t.addItem}
+            </button>
+          </div>
+        </>
+      ) : null}
+
+      {renderMobileModeTags()}
+    </div>
+  );
+
+  const showCatalogSearch = mode === "catalog" && stickyPanelOpen && !isMobileViewport;
 
   const renderCatalogFiltersPanel = () =>
     catalogFiltersOpen && mode === "catalog" ? (
@@ -1736,7 +1906,13 @@ export default function OrderPage() {
                 </button>
               </div>
             ) : null}
-            {isMobileViewport && !fullscreen ? renderMobileAccountBar() : null}
+            {isMobileViewport && !fullscreen ? (
+              <>
+                {renderMobileShopHeader()}
+                {renderCatalogFiltersPanel()}
+              </>
+            ) : (
+              <>
             {renderModeTabs()}
 
             {showCatalogSearch ? renderCatalogSearchRow() : null}
@@ -1776,7 +1952,7 @@ export default function OrderPage() {
                   </>
                 ) : null}
 
-                {mode === "search" ? (
+                {mode === "search" && !isMobileViewport ? (
                   <>
                     <div className="order-sticky-search-row is-single">
                       <input
@@ -1849,6 +2025,8 @@ export default function OrderPage() {
             )}
 
             {!stickyPanelOpen && !isMobileViewport ? renderStickyPanelToggle() : null}
+              </>
+            )}
           </div>
         </div>
 
