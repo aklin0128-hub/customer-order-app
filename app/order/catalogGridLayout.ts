@@ -1,6 +1,6 @@
 /** Shared catalog grid sizing for virtual + CSS grids */
-export const CATALOG_GRID_GAP_PX = 4;
-export const CATALOG_MIN_CARD_WIDTH_PX = 164;
+export const CATALOG_GRID_GAP_PX = 8;
+export const CATALOG_MIN_CARD_WIDTH_PX = 168;
 export const CATALOG_MAX_COLUMNS = 12;
 export const CATALOG_MIN_COLUMNS = 2;
 

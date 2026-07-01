@@ -180,13 +180,15 @@ export function CatalogQtyCard({
   const promoLayout = Boolean(highlight && !alignedPriceLayout);
 
   const productInfo = (
-    <>
-      <div style={{ fontSize: 13, fontWeight: 900, color: "#111827", lineHeight: 1.2 }}>{item.sku}</div>
-      <div style={{ fontSize: 12, fontWeight: 800, color: "#374151" }}>{item.brand || "-"}</div>
-      <div style={catalogNameStyle}>{item.name || "-"}</div>
-      {item.size ? <div style={{ fontSize: 11, color: "#6b7280" }}>{item.size}</div> : null}
+    <div className="catalog-qty-card-meta">
+      <div className="catalog-qty-card-sku">{item.sku}</div>
+      <div className="catalog-qty-card-brand">{item.brand || "-"}</div>
+      <div className="catalog-qty-card-name" style={catalogNameStyle}>
+        {item.name || "-"}
+      </div>
+      {item.size ? <div className="catalog-qty-card-size">{item.size}</div> : null}
       {item.palletSize && palletLabel ? (
-        <div style={{ fontSize: 11, color: "#6b7280", marginTop: item.size ? 2 : 0 }}>
+        <div className="catalog-qty-card-pallet">
           {palletLabel}: {item.palletSize}
         </div>
       ) : null}
@@ -228,7 +230,7 @@ export function CatalogQtyCard({
           {unavailableNote}
         </div>
       ) : null}
-    </>
+    </div>
   );
 
   const promoFooter = (

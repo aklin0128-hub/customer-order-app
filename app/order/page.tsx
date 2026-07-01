@@ -1623,7 +1623,7 @@ export default function OrderPage() {
                   >
                     {t.recommended} ({recommendedItemCount})
                   </button>
-                  <label style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 800, color: "#374151", cursor: "pointer", whiteSpace: "nowrap" }}>
+                  <label className="order-sticky-filter-check">
                     <input
                       type="checkbox"
                       checked={catalogShowSelectedOnly}
@@ -1631,7 +1631,7 @@ export default function OrderPage() {
                     />
                     {t.selectedOnly} ({cartItemCount})
                   </label>
-                  <label style={{ display: "flex", alignItems: "center", gap: 4, fontWeight: 800, color: "#374151", cursor: "pointer", whiteSpace: "nowrap" }}>
+                  <label className="order-sticky-filter-check">
                     <input type="checkbox" checked={showAvailableOnly} onChange={(e) => setShowAvailableOnly(e.target.checked)} />
                     {t.availableOnly}
                   </label>
