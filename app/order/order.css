@@ -2921,6 +2921,15 @@
   max-height: calc(100dvh - 188px);
 }
 
+.order-sticky-catalog-chips--in-filters {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.order-sticky-catalog-meta--in-filters {
+  margin-bottom: 10px;
+}
+
 @media (min-width: 768px) {
   .order-shop-header,
   .order-shop-search-row,
