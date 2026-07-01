@@ -2606,6 +2606,154 @@
   }
 
   .order-catalog-virtual-scroll {
-    max-height: calc(100dvh - 280px);
+    max-height: calc(100dvh - 200px);
+  }
+}
+
+/* Mobile shop focus — maximize catalog viewport */
+.order-page--mobile-shop .order-top-card {
+  display: none;
+}
+
+.order-page--mobile-shop .order-sticky-bar {
+  margin-bottom: 6px;
+}
+
+.order-page--mobile-shop .order-sticky-bar-inner {
+  padding: 8px 10px;
+}
+
+.order-mobile-account-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  min-width: 0;
+}
+
+.order-mobile-account-meta {
+  font-size: 11px;
+  font-weight: 800;
+  color: #475569;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-mobile-account-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.order-past-orders-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 999px;
+  padding: 4px 8px;
+  min-height: 30px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.order-past-orders-icon-btn-count {
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.order-mobile-lang {
+  display: flex;
+  gap: 2px;
+  max-width: 108px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.order-mobile-lang::-webkit-scrollbar {
+  display: none;
+}
+
+.order-mobile-lang-btn {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #6b7280;
+  border-radius: 999px;
+  padding: 3px 6px;
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.order-mobile-lang-btn.is-active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.order-mobile-logout-btn {
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #374151;
+  border-radius: 8px;
+  padding: 4px 7px;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.order-page--mobile-shop .order-sticky-panel-toggle--inline {
+  margin-top: 0;
+  min-width: 52px;
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 9px;
+}
+
+.order-page--mobile-shop .order-mode-tabs {
+  margin-bottom: 4px;
+}
+
+.order-page--mobile-shop .order-sticky-search-row {
+  margin-top: 0;
+}
+
+.order-page--mobile-shop .order-sticky-search-row--always {
+  margin-top: 4px;
+}
+
+.order-sticky-catalog-chips--in-filters {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.order-sticky-catalog-meta--in-filters {
+  margin-bottom: 10px;
+}
+
+.order-page--mobile-shop .order-details-fold {
+  margin-bottom: 6px;
+}
+
+.order-page--mobile-shop .order-shop-card--listing {
+  padding-top: 4px !important;
+}
+
+@media (min-width: 768px) {
+  .order-mobile-account-bar,
+  .order-past-orders-icon-btn,
+  .order-mobile-lang,
+  .order-mobile-logout-btn {
+    display: none;
   }
 }

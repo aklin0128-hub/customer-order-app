@@ -70,6 +70,7 @@ import {
   type QtyMaps,
 } from "@/lib/orderNhItems";
 import { copy } from "./orderCopy";
+import { readInitialStickyPanelOpen, useMobileViewport } from "./useMobileViewport";
 import {
   brandSelectStyle,
   cardStyle,
@@ -164,7 +165,14 @@ export default function OrderPage() {
   const [clearanceItems, setClearanceItems] = useState<ClearanceItem[]>([]);
   const [clearanceLoading, setClearanceLoading] = useState(false);
   const [showAdminEditLinks, setShowAdminEditLinks] = useState(false);
-  const [stickyPanelOpen, setStickyPanelOpen] = useState(true);
+  const [stickyPanelOpen, setStickyPanelOpen] = useState(readInitialStickyPanelOpen);
+  const isMobileViewport = useMobileViewport();
+
+  useEffect(() => {
+    if (isMobileViewport && mode === "search") {
+      setStickyPanelOpen(true);
+    }
+  }, [isMobileViewport, mode]);
 
   const toggleCategoryFilter = (cat: string) => {
     if (cat === "ALL") {
@@ -1423,6 +1431,220 @@ export default function OrderPage() {
             ? t.catalogMode
             : t.searchMode;
 
+  const renderCatalogSearchRow = (className = "") => (
+    <div className={`order-sticky-search-row${className ? ` ${className}` : ""}`}>
+      <input
+        value={catalogSearch}
+        onChange={(e) => setCatalogSearch(e.target.value)}
+        onKeyDown={(e) => {
+          handleSearchQtyKeyDown(e, resolveCatalogFilterTargetItem(catalogSearch, orderableCatalogItems));
+        }}
+        placeholder={t.catalogSearch}
+        className="order-sticky-search-input"
+        aria-label={t.catalogSearch}
+      />
+      <button
+        type="button"
+        onClick={() => setCatalogFiltersOpen((prev) => !prev)}
+        style={categoryButtonStyle(catalogFiltersOpen || activeCatalogFilterCount > 0)}
+      >
+        {catalogFiltersOpen ? t.hideFilters : t.showFilters}
+        {activeCatalogFilterCount > 0 ? ` (${activeCatalogFilterCount})` : ""}
+      </button>
+    </div>
+  );
+
+  const renderCatalogScopeChips = (className = "") => (
+    <div className={`order-sticky-catalog-chips${className ? ` ${className}` : ""}`}>
+      <button
+        type="button"
+        onClick={() => setCatalogShowRecommendedOnly((prev) => !prev)}
+        style={categoryButtonStyle(catalogShowRecommendedOnly)}
+      >
+        {t.recommended} ({recommendedItemCount})
+      </button>
+      <label className="order-sticky-filter-check">
+        <input
+          type="checkbox"
+          checked={catalogShowSelectedOnly}
+          onChange={(e) => setCatalogShowSelectedOnly(e.target.checked)}
+        />
+        {t.selectedOnly} ({cartItemCount})
+      </label>
+      <label className="order-sticky-filter-check">
+        <input type="checkbox" checked={showAvailableOnly} onChange={(e) => setShowAvailableOnly(e.target.checked)} />
+        {t.availableOnly}
+      </label>
+    </div>
+  );
+
+  const renderModeTabs = () => (
+    <div className="order-mode-tabs" role="tablist" aria-label="Order mode">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "promotion"}
+        onClick={() => changeMode("promotion")}
+        className="order-mode-tab"
+        style={promoModeButtonStyle(mode === "promotion")}
+      >
+        {t.promotionMode}
+        {promotionItems.length > 0 ? ` (${promotionItems.length})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "newItems"}
+        onClick={() => changeMode("newItems")}
+        className="order-mode-tab"
+        style={newItemsModeButtonStyle(mode === "newItems")}
+      >
+        {t.newItemsMode}
+        {newItemCount > 0 ? ` (${newItemCount})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "clearance"}
+        onClick={() => changeMode("clearance")}
+        className="order-mode-tab"
+        style={clearanceModeButtonStyle(mode === "clearance")}
+      >
+        {t.clearanceMode}
+        {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "catalog"}
+        onClick={() => changeMode("catalog")}
+        className="order-mode-tab"
+        style={modeButtonStyle(mode === "catalog")}
+      >
+        {t.catalogMode}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "search"}
+        onClick={() => changeMode("search")}
+        className="order-mode-tab"
+        style={modeButtonStyle(mode === "search")}
+      >
+        {t.searchMode}
+      </button>
+    </div>
+  );
+
+  const renderMobileAccountBar = () => (
+    <div className="order-mobile-account-bar">
+      <span className="order-mobile-account-meta">
+        {accountNo} · {storeName}
+      </span>
+      <div className="order-mobile-account-actions">
+        {orderHistory.length > 0 ? (
+          <button
+            type="button"
+            className="order-past-orders-icon-btn"
+            onClick={() => setShowPastOrders(true)}
+            aria-label={`${t.history} (${orderHistory.length})`}
+          >
+            <span aria-hidden>📋</span>
+            <span className="order-past-orders-icon-btn-count">{orderHistory.length}</span>
+          </button>
+        ) : null}
+        <div className="order-mobile-lang" role="group" aria-label="Language">
+          {(["en", "zh", "ko", "vi"] as Lang[]).map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => changeLang(item)}
+              className={`order-mobile-lang-btn${lang === item ? " is-active" : ""}`}
+            >
+              {ORDER_LANG_LABELS[item]}
+            </button>
+          ))}
+        </div>
+        <button type="button" onClick={logout} className="order-mobile-logout-btn">
+          {t.logout}
+        </button>
+        {isMobileViewport && mode === "catalog" ? null : renderStickyPanelToggle(true)}
+      </div>
+    </div>
+  );
+
+  const showCatalogSearch = mode === "catalog" && (stickyPanelOpen || isMobileViewport);
+
+  const renderCatalogFiltersPanel = () =>
+    catalogFiltersOpen && mode === "catalog" ? (
+      <div className="order-sticky-filters">
+        {isMobileViewport ? (
+          <>
+            {renderCatalogScopeChips("order-sticky-catalog-chips--in-filters")}
+            <div className="order-sticky-catalog-meta order-sticky-catalog-meta--in-filters">
+              {t.selected}: {cartItemCount} · {t.showing} {orderableCatalogItems.length} {t.catalogCount}
+            </div>
+          </>
+        ) : null}
+        <div style={filterBlockStyle}>
+          <div style={filterLabelStyle}>{t.category}</div>
+          <div style={categoryBarStyle} className="order-category-filters">
+            {categoryOptions.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => toggleCategoryFilter(cat)}
+                style={categoryButtonStyle(cat === "ALL" ? categoryAllActive : categoryFilters.includes(cat))}
+                aria-pressed={cat === "ALL" ? categoryAllActive : categoryFilters.includes(cat)}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {(brandSplit.topBrands.length > 0 || brandSplit.moreBrands.length > 0) ? (
+          <div style={filterBlockStyle}>
+            <div style={filterLabelStyle}>{t.brand}</div>
+            <div style={categoryBarStyle}>
+              <button
+                type="button"
+                onClick={() => setBrandFilter("ALL")}
+                style={categoryButtonStyle(brandFilter === "ALL")}
+              >
+                {t.allBrands}
+              </button>
+              {brandSplit.topBrands.slice(0, 8).map((brand) => (
+                <button
+                  key={brand}
+                  type="button"
+                  onClick={() => setBrandFilter(brand)}
+                  style={categoryButtonStyle(brandFilter === brand)}
+                >
+                  {formatBrandLabel(brand)}
+                </button>
+              ))}
+              {brandSplit.moreBrands.length > 0 ? (
+                <select
+                  aria-label={t.moreBrandsPick}
+                  value={brandFilter !== "ALL" && brandSplit.moreBrands.includes(brandFilter) ? brandFilter : ""}
+                  onChange={(e) => setBrandFilter(e.target.value ? e.target.value : "ALL")}
+                  style={brandSelectStyle}
+                >
+                  <option value="">{t.moreBrandsPick}</option>
+                  {brandSplit.moreBrands.map((brand) => (
+                    <option key={brand} value={brand}>
+                      {formatBrandLabel(brand)}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    ) : null;
+
   if (!ready) return null;
 
   const renderStickyPanelToggle = (inline = false) => (
@@ -1451,7 +1673,7 @@ export default function OrderPage() {
   );
 
   return (
-    <main ref={mainRef} className={`order-page${fullscreen ? " is-fullscreen" : ""}`}>
+    <main ref={mainRef} className={`order-page${fullscreen ? " is-fullscreen" : ""}${isMobileViewport ? " order-page--mobile-shop" : ""}`}>
       <div className="order-container">
         <section style={cardStyle} className="order-top-card order-compact-card">
           <div className="order-header-bar">
@@ -1514,65 +1736,15 @@ export default function OrderPage() {
                 </button>
               </div>
             ) : null}
+            {isMobileViewport && !fullscreen ? renderMobileAccountBar() : null}
+            {renderModeTabs()}
+
+            {showCatalogSearch ? renderCatalogSearchRow() : null}
+            {renderCatalogFiltersPanel()}
+
             {stickyPanelOpen ? (
               <>
-                <div className="order-mode-tabs" role="tablist" aria-label="Order mode">
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={mode === "promotion"}
-                    onClick={() => changeMode("promotion")}
-                    className="order-mode-tab"
-                    style={promoModeButtonStyle(mode === "promotion")}
-                  >
-                    {t.promotionMode}
-                    {promotionItems.length > 0 ? ` (${promotionItems.length})` : ""}
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={mode === "newItems"}
-                    onClick={() => changeMode("newItems")}
-                    className="order-mode-tab"
-                    style={newItemsModeButtonStyle(mode === "newItems")}
-                  >
-                    {t.newItemsMode}
-                    {newItemCount > 0 ? ` (${newItemCount})` : ""}
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={mode === "clearance"}
-                    onClick={() => changeMode("clearance")}
-                    className="order-mode-tab"
-                    style={clearanceModeButtonStyle(mode === "clearance")}
-                  >
-                    {t.clearanceMode}
-                    {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={mode === "catalog"}
-                    onClick={() => changeMode("catalog")}
-                    className="order-mode-tab"
-                    style={modeButtonStyle(mode === "catalog")}
-                  >
-                    {t.catalogMode}
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={mode === "search"}
-                    onClick={() => changeMode("search")}
-                    className="order-mode-tab"
-                    style={modeButtonStyle(mode === "search")}
-                  >
-                    {t.searchMode}
-                  </button>
-                </div>
-
-                {orderHistory.length > 0 ? (
+                {!isMobileViewport && orderHistory.length > 0 ? (
                   <button
                     type="button"
                     className="order-past-orders-chip order-past-orders-chip--compact"
@@ -1591,123 +1763,18 @@ export default function OrderPage() {
                 ) : null}
 
                 {mode === "catalog" ? (
-              <>
-                <div className="order-sticky-search-row">
-                  <input
-                    value={catalogSearch}
-                    onChange={(e) => setCatalogSearch(e.target.value)}
-                    onKeyDown={(e) => {
-                      handleSearchQtyKeyDown(
-                        e,
-                        resolveCatalogFilterTargetItem(catalogSearch, orderableCatalogItems)
-                      );
-                    }}
-                    placeholder={t.catalogSearch}
-                    className="order-sticky-search-input"
-                    aria-label={t.catalogSearch}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setCatalogFiltersOpen((prev) => !prev)}
-                    style={categoryButtonStyle(catalogFiltersOpen || activeCatalogFilterCount > 0)}
-                  >
-                    {catalogFiltersOpen ? t.hideFilters : t.showFilters}
-                    {activeCatalogFilterCount > 0 ? ` (${activeCatalogFilterCount})` : ""}
-                  </button>
-                </div>
-                <div className="order-sticky-catalog-chips">
-                  <button
-                    type="button"
-                    onClick={() => setCatalogShowRecommendedOnly((prev) => !prev)}
-                    style={categoryButtonStyle(catalogShowRecommendedOnly)}
-                  >
-                    {t.recommended} ({recommendedItemCount})
-                  </button>
-                  <label className="order-sticky-filter-check">
-                    <input
-                      type="checkbox"
-                      checked={catalogShowSelectedOnly}
-                      onChange={(e) => setCatalogShowSelectedOnly(e.target.checked)}
-                    />
-                    {t.selectedOnly} ({cartItemCount})
-                  </label>
-                  <label className="order-sticky-filter-check">
-                    <input type="checkbox" checked={showAvailableOnly} onChange={(e) => setShowAvailableOnly(e.target.checked)} />
-                    {t.availableOnly}
-                  </label>
-                </div>
-                <div className="order-sticky-catalog-footer">
-                  <div className="order-sticky-catalog-meta">
-                    {t.selected}: {cartItemCount} · {t.showing} {orderableCatalogItems.length} {t.catalogCount}
-                  </div>
-                  {renderStickyPanelToggle(true)}
-                </div>
-                {catalogFiltersOpen ? (
-                  <div className="order-sticky-filters">
-                    <div style={filterBlockStyle}>
-                      <div style={filterLabelStyle}>{t.category}</div>
-                      <div style={categoryBarStyle} className="order-category-filters">
-                        {categoryOptions.map((cat) => (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => toggleCategoryFilter(cat)}
-                            style={categoryButtonStyle(cat === "ALL" ? categoryAllActive : categoryFilters.includes(cat))}
-                            aria-pressed={cat === "ALL" ? categoryAllActive : categoryFilters.includes(cat)}
-                          >
-                            {cat}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {(brandSplit.topBrands.length > 0 || brandSplit.moreBrands.length > 0) ? (
-                      <div style={filterBlockStyle}>
-                        <div style={filterLabelStyle}>{t.brand}</div>
-                        <div style={categoryBarStyle}>
-                          <button
-                            type="button"
-                            onClick={() => setBrandFilter("ALL")}
-                            style={categoryButtonStyle(brandFilter === "ALL")}
-                          >
-                            {t.allBrands}
-                          </button>
-                          {brandSplit.topBrands.slice(0, 8).map((brand) => (
-                            <button
-                              key={brand}
-                              type="button"
-                              onClick={() => setBrandFilter(brand)}
-                              style={categoryButtonStyle(brandFilter === brand)}
-                            >
-                              {formatBrandLabel(brand)}
-                            </button>
-                          ))}
-                          {brandSplit.moreBrands.length > 0 ? (
-                            <select
-                              aria-label={t.moreBrandsPick}
-                              value={
-                                brandFilter !== "ALL" && brandSplit.moreBrands.includes(brandFilter)
-                                  ? brandFilter
-                                  : ""
-                              }
-                              onChange={(e) => setBrandFilter(e.target.value ? e.target.value : "ALL")}
-                              style={brandSelectStyle}
-                            >
-                              <option value="">{t.moreBrandsPick}</option>
-                              {brandSplit.moreBrands.map((brand) => (
-                                <option key={brand} value={brand}>
-                                  {formatBrandLabel(brand)}
-                                </option>
-                              ))}
-                            </select>
-                          ) : null}
+                  <>
+                    {!isMobileViewport ? renderCatalogScopeChips() : null}
+                    {!isMobileViewport ? (
+                      <div className="order-sticky-catalog-footer">
+                        <div className="order-sticky-catalog-meta">
+                          {t.selected}: {cartItemCount} · {t.showing} {orderableCatalogItems.length} {t.catalogCount}
                         </div>
+                        {renderStickyPanelToggle(true)}
                       </div>
                     ) : null}
-                  </div>
+                  </>
                 ) : null}
-              </>
-            ) : null}
 
                 {mode === "search" ? (
                   <>
@@ -1771,17 +1838,17 @@ export default function OrderPage() {
                   </>
                 ) : null}
 
-                {mode !== "catalog" ? (
+                {mode !== "catalog" && !isMobileViewport ? (
                   <div className="order-sticky-panel-footer order-sticky-panel-footer--end">
                     {renderStickyPanelToggle(true)}
                   </div>
                 ) : null}
               </>
             ) : (
-              <div className="order-sticky-panel-collapsed">{stickyModeLabel}</div>
+              !isMobileViewport ? <div className="order-sticky-panel-collapsed">{stickyModeLabel}</div> : null
             )}
 
-            {!stickyPanelOpen ? renderStickyPanelToggle() : null}
+            {!stickyPanelOpen && !isMobileViewport ? renderStickyPanelToggle() : null}
           </div>
         </div>
 
