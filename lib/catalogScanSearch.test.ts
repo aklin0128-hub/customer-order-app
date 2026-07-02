@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   catalogItemMatchesScanCode,
+  catalogSearchQueryFromScan,
   normalizeUpcScanCode,
   scoreCatalogSearchQuery,
 } from "../app/order/catalogUtils";
@@ -59,4 +60,13 @@ test("scoreCatalogSearchQuery ignores punctuation and spaces in queries", () => 
   assert.ok(scoreCatalogSearchQuery(item, "o tube") >= 540);
   assert.ok(scoreCatalogSearchQuery(item, "otube") >= 560);
   assert.ok(scoreCatalogSearchQuery(item, "o-tube") >= 560);
+});
+
+test("catalogSearchQueryFromScan returns digits when no catalog match", () => {
+  assert.equal(catalogSearchQueryFromScan("123456789012"), "123456789012");
+});
+
+test("catalogSearchQueryFromScan returns SKU when UPC matches catalog", () => {
+  assert.equal(catalogSearchQueryFromScan("081652000020"), "00002D");
+  assert.equal(catalogSearchQueryFromScan("81652000020"), "00002D");
 });

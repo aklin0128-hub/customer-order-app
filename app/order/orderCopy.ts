@@ -172,6 +172,10 @@ export const copy = {
     moreBrandsPick: "More brands…",
     enterFullscreen: "Full screen",
     exitFullscreen: "Exit full screen",
+    scanBarcode: "Scan barcode",
+    scanBarcodeTitle: "Scan barcode",
+    scanBarcodeHint: "Point your camera at the UPC on the package",
+    scanBarcodeCameraError: "Could not access the camera. Check permissions or type the code manually.",
   },
   zh: {
     title: "门店订货",
@@ -346,6 +350,10 @@ export const copy = {
     moreBrandsPick: "更多品牌…",
     enterFullscreen: "全屏",
     exitFullscreen: "退出全屏",
+    scanBarcode: "扫码",
+    scanBarcodeTitle: "扫描条码",
+    scanBarcodeHint: "将摄像头对准包装上的条码",
+    scanBarcodeCameraError: "无法使用摄像头，请检查权限或改用手动输入。",
   },
   ko: {
     title: "매장 주문",
@@ -520,6 +528,10 @@ export const copy = {
     moreBrandsPick: "다른 브랜드…",
     enterFullscreen: "전체 화면",
     exitFullscreen: "전체 화면 종료",
+    scanBarcode: "바코드 스캔",
+    scanBarcodeTitle: "바코드 스캔",
+    scanBarcodeHint: "포장의 UPC 바코드에 카메라를 맞추세요",
+    scanBarcodeCameraError: "카메라를 사용할 수 없습니다. 권한을 확인하거나 직접 입력하세요.",
   },
   vi: {
     title: "Đặt hàng cửa hàng",
@@ -694,6 +706,10 @@ export const copy = {
     moreBrandsPick: "Thương hiệu khác…",
     enterFullscreen: "Toàn màn hình",
     exitFullscreen: "Thoát toàn màn hình",
+    scanBarcode: "Quét mã",
+    scanBarcodeTitle: "Quét mã vạch",
+    scanBarcodeHint: "Hướng camera vào mã UPC trên bao bì",
+    scanBarcodeCameraError: "Không thể dùng camera. Kiểm tra quyền hoặc nhập mã thủ công.",
   },
 } as const;
 

@@ -271,6 +271,17 @@ export function findCatalogItemByScanCode(query: string) {
   return catalog.find((item) => catalogItemMatchesScanCode(item, q)) || null;
 }
 
+/** Best search string after a barcode scan — SKU when known, else digits / raw text. */
+export function catalogSearchQueryFromScan(query: string) {
+  const trimmed = query.trim();
+  if (!trimmed) return "";
+  const matched = findCatalogItemByScanCode(trimmed);
+  if (matched?.sku) return matched.sku.toUpperCase();
+  const digits = normalizeScanDigits(trimmed);
+  if (digits) return digits;
+  return trimmed.toUpperCase();
+}
+
 /** + / - (and = / _) in SKU search — adjust qty, do not type into the field. */
 export function isOrderSearchQtyAdjustKey(key: string) {
   return key === "+" || key === "=" || key === "-" || key === "_";

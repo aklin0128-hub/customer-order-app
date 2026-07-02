@@ -2877,6 +2877,104 @@
   outline: 2px solid rgba(255, 255, 255, 0.85);
 }
 
+.order-shop-scan-btn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+  color: #374151;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.order-barcode-scanner {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.order-barcode-scanner-backdrop {
+  position: absolute;
+  inset: 0;
+  border: none;
+  padding: 0;
+  background: rgba(15, 23, 42, 0.55);
+  cursor: pointer;
+}
+
+.order-barcode-scanner-panel {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 480px;
+  max-height: 92vh;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  border-radius: 20px 20px 0 0;
+  background: #fff;
+  box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.18);
+}
+
+.order-barcode-scanner-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.order-barcode-scanner-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.order-barcode-scanner-close {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.order-barcode-scanner-hint {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.order-barcode-scanner-error {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+.order-barcode-scanner-view {
+  overflow: hidden;
+  border-radius: 14px;
+  background: #111827;
+  min-height: 240px;
+}
+
+.order-barcode-scanner-view video {
+  width: 100%;
+  display: block;
+  border-radius: 14px;
+}
+
 .order-shop-filter-badge {
   position: absolute;
   top: -2px;

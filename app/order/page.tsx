@@ -10,6 +10,7 @@ import { CATEGORY_OPTIONS } from "@/lib/inferCategory";
 import { CatalogVirtualGrid } from "./components/CatalogVirtualGrid";
 import { CatalogQtyCard } from "./components/CatalogQtyCard";
 import { OrderCartModal } from "./components/OrderCartModal";
+import { OrderBarcodeScanner } from "./components/OrderBarcodeScanner";
 import { OrderFloatingCartFab } from "./components/OrderFloatingCartFab";
 import { OrderPastOrdersModal } from "./components/OrderPastOrdersModal";
 import { OrderQuickOrderPanel } from "./components/OrderQuickOrderPanel";
@@ -37,6 +38,7 @@ import {
   getStatusBadgeStyle,
   formatOrderNotAvailableMessage,
   findCatalogItemByScanCode,
+  catalogSearchQueryFromScan,
   isOrderSearchQtyAdjustKey,
   resolveCatalogFilterTargetItem,
   resolveQuickSearchTargetItem,
@@ -157,6 +159,7 @@ export default function OrderPage() {
   const [catalogShowSelectedOnly, setCatalogShowSelectedOnly] = useState(false);
   const [catalogShowRecommendedOnly, setCatalogShowRecommendedOnly] = useState(false);
   const [catalogFiltersOpen, setCatalogFiltersOpen] = useState(false);
+  const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false);
   const [recentItems, setRecentItems] = useState<CartItem[]>([]);
   const [orderHistory, setOrderHistory] = useState<OrderHistoryItem[]>([]);
   const [catalogVersion, setCatalogVersion] = useState(0);
@@ -1033,6 +1036,43 @@ export default function OrderPage() {
     setSelectedItem(matchedItems.length > 0 ? matchedItems[0] : null);
   }, [normalizedSkuInput, matchedItems, showAvailableOnly]);
 
+  const handleBarcodeScan = useCallback(
+    (raw: string) => {
+      const term = catalogSearchQueryFromScan(raw);
+      if (!term) return;
+      setBarcodeScannerOpen(false);
+      if (mode === "catalog") {
+        setCatalogSearch(term);
+        return;
+      }
+      if (mode === "search") {
+        setSkuInput(term);
+        requestAnimationFrame(() => skuInputRef.current?.focus());
+      }
+    },
+    [mode]
+  );
+
+  const renderMobileScanButton = () => (
+    <button
+      type="button"
+      className="order-shop-scan-btn"
+      onClick={() => setBarcodeScannerOpen(true)}
+      aria-label={t.scanBarcode}
+    >
+      <svg viewBox="0 0 24 24" width="20" height="20" focusable="false" aria-hidden>
+        <path
+          d="M3 5a2 2 0 012-2h3v2H5v3H3V5zm13-2h3a2 2 0 012 2v3h-2V5h-3V3zm2 13h3v-3h2v4a2 2 0 01-2 2h-3v-2zm-13 2H5v-3H3v4a2 2 0 002 2h3v-2z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        <path d="M8 9h1.5v6H8V9zm3.25 0H13v6h-1.75V9zm3.25 0H18v6h-1.5V9z" fill="currentColor" />
+      </svg>
+    </button>
+  );
+
   const syncCatalogQty = (sku: string, qty: string) => {
     const cleanSku = sku.trim().toUpperCase();
     const qtyNumber = Number(String(qty || "").replace(/[^0-9]/g, ""));
@@ -1646,6 +1686,7 @@ export default function OrderPage() {
               aria-label={t.catalogSearch}
             />
           </label>
+          {renderMobileScanButton()}
           <button
             type="button"
             className={`order-shop-filter-btn${catalogFiltersOpen || activeCatalogFilterCount > 0 ? " is-active" : ""}`}
@@ -1716,6 +1757,7 @@ export default function OrderPage() {
                 aria-label={t.skuItem}
               />
             </label>
+            {renderMobileScanButton()}
           </div>
           <div className="order-shop-quick-row">
             <input
@@ -2327,10 +2369,22 @@ export default function OrderPage() {
         onReorder={reorderItems}
       />
 
+      <OrderBarcodeScanner
+        open={barcodeScannerOpen}
+        onClose={() => setBarcodeScannerOpen(false)}
+        onScan={handleBarcodeScan}
+        labels={{
+          title: t.scanBarcodeTitle,
+          hint: t.scanBarcodeHint,
+          close: t.close,
+          cameraError: t.scanBarcodeCameraError,
+        }}
+      />
+
       <OrderFloatingCartFab
         count={cartItemCount}
         label={t.cartSummary}
-        hidden={showCart || showPastOrders}
+        hidden={showCart || showPastOrders || barcodeScannerOpen}
         onClick={() => (showCart ? toggleCartPanel() : setShowCart(true))}
       />
 
