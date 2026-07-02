@@ -42,7 +42,35 @@ export function OrderBarcodeScanner({ open, onClose, onScan, labels }: Props) {
   const lastScanRef = useRef<{ code: string; at: number } | null>(null);
   const onScanRef = useRef(onScan);
   const scannerRef = useRef<import("html5-qrcode").Html5Qrcode | null>(null);
+  const startingRef = useRef(false);
   onScanRef.current = onScan;
+
+  const refreshTorchAvailability = useCallback(() => {
+    const scanner = scannerRef.current;
+    if (!scanner) {
+      setTorchAvailable(false);
+      return;
+    }
+    try {
+      setTorchAvailable(scanner.getRunningTrackCameraCapabilities().torchFeature().isSupported());
+    } catch {
+      setTorchAvailable(false);
+    }
+  }, []);
+
+  const turnOffTorch = useCallback(async () => {
+    const scanner = scannerRef.current;
+    if (!scanner) return;
+    try {
+      const torch = scanner.getRunningTrackCameraCapabilities().torchFeature();
+      if (torch.value()) {
+        await torch.apply(false);
+      }
+    } catch {
+      // Torch may be unavailable after pause.
+    }
+    setTorchOn(false);
+  }, []);
 
   const toggleTorch = useCallback(async () => {
     const scanner = scannerRef.current;
@@ -58,37 +86,66 @@ export function OrderBarcodeScanner({ open, onClose, onScan, labels }: Props) {
   }, [torchOn]);
 
   useEffect(() => {
-    if (!open) {
-      setError(null);
-      setTorchOn(false);
-      setTorchAvailable(false);
+    return () => {
+      const scanner = scannerRef.current;
+      if (!scanner) return;
+      scanner
+        .stop()
+        .then(() => scanner.clear())
+        .catch(() => {});
       scannerRef.current = null;
-      return;
-    }
+    };
+  }, []);
 
-    let scanner: import("html5-qrcode").Html5Qrcode | null = null;
+  useEffect(() => {
     let mounted = true;
 
-    (async () => {
-      try {
-        const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
-        if (!mounted) return;
+    const syncScanner = async () => {
+      const { Html5Qrcode, Html5QrcodeSupportedFormats, Html5QrcodeScannerState } = await import(
+        "html5-qrcode"
+      );
+      if (!mounted) return;
 
-        const formats = [
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.CODE_128,
-        ];
-
+      let scanner = scannerRef.current;
+      if (!scanner) {
         scanner = new Html5Qrcode(readerId, {
           verbose: false,
-          formatsToSupport: formats,
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.CODE_128,
+          ],
           useBarCodeDetectorIfSupported: true,
         });
         scannerRef.current = scanner;
+      }
 
+      const state = scanner.getState();
+
+      if (!open) {
+        if (state === Html5QrcodeScannerState.SCANNING) {
+          await turnOffTorch();
+          scanner.pause(true);
+        }
+        return;
+      }
+
+      setError(null);
+
+      if (state === Html5QrcodeScannerState.PAUSED) {
+        scanner.resume();
+        refreshTorchAvailability();
+        return;
+      }
+
+      if (state === Html5QrcodeScannerState.SCANNING || startingRef.current) {
+        return;
+      }
+
+      startingRef.current = true;
+      try {
         await scanner.start(
           cameraConstraints,
           {
@@ -120,34 +177,34 @@ export function OrderBarcodeScanner({ open, onClose, onScan, labels }: Props) {
           // Some browsers reject advanced focus hints — camera still works.
         }
 
-        try {
-          setTorchAvailable(scanner.getRunningTrackCameraCapabilities().torchFeature().isSupported());
-        } catch {
-          setTorchAvailable(false);
-        }
+        refreshTorchAvailability();
       } catch (err) {
         if (!mounted) return;
         console.error(err);
         setError(labels.cameraError);
+      } finally {
+        startingRef.current = false;
       }
-    })();
-
-    return () => {
-      mounted = false;
-      scannerRef.current = null;
-      if (!scanner) return;
-      scanner
-        .stop()
-        .then(() => scanner?.clear())
-        .catch(() => {});
     };
-  }, [open, readerId, labels.cameraError]);
 
-  if (!open) return null;
+    void syncScanner();
+  }, [open, readerId, labels.cameraError, refreshTorchAvailability, turnOffTorch]);
 
   return (
-    <div className="order-barcode-scanner" role="dialog" aria-modal="true" aria-label={labels.title}>
-      <button type="button" className="order-barcode-scanner-backdrop" onClick={onClose} aria-label={labels.close} />
+    <div
+      className={`order-barcode-scanner${open ? "" : " is-hidden"}`}
+      role="dialog"
+      aria-modal={open}
+      aria-hidden={!open}
+      aria-label={labels.title}
+    >
+      <button
+        type="button"
+        className="order-barcode-scanner-backdrop"
+        onClick={onClose}
+        aria-label={labels.close}
+        tabIndex={open ? 0 : -1}
+      />
       <div className="order-barcode-scanner-panel">
         <div className="order-barcode-scanner-header">
           <h2 className="order-barcode-scanner-title">{labels.title}</h2>
@@ -159,11 +216,18 @@ export function OrderBarcodeScanner({ open, onClose, onScan, labels }: Props) {
                 onClick={() => void toggleTorch()}
                 aria-label={torchOn ? labels.torchOff : labels.torchOn}
                 aria-pressed={torchOn}
+                tabIndex={open ? 0 : -1}
               >
                 {torchOn ? "🔦" : "💡"}
               </button>
             ) : null}
-            <button type="button" className="order-barcode-scanner-close" onClick={onClose} aria-label={labels.close}>
+            <button
+              type="button"
+              className="order-barcode-scanner-close"
+              onClick={onClose}
+              aria-label={labels.close}
+              tabIndex={open ? 0 : -1}
+            >
               ×
             </button>
           </div>

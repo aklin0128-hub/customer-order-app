@@ -2901,6 +2901,12 @@
   justify-content: center;
 }
 
+.order-barcode-scanner.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
+  z-index: -1;
+}
+
 .order-barcode-scanner-backdrop {
   position: absolute;
   inset: 0;
