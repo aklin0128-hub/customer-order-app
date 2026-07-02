@@ -2930,6 +2930,29 @@
   margin-bottom: 8px;
 }
 
+.order-barcode-scanner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.order-barcode-scanner-torch {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 999px;
+  background: #f3f4f6;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.order-barcode-scanner-torch.is-on {
+  background: #dbeafe;
+  outline: 2px solid #93c5fd;
+}
+
 .order-barcode-scanner-title {
   margin: 0;
   font-size: 18px;
@@ -2966,7 +2989,7 @@
   overflow: hidden;
   border-radius: 14px;
   background: #111827;
-  min-height: 240px;
+  min-height: 280px;
 }
 
 .order-barcode-scanner-view video {

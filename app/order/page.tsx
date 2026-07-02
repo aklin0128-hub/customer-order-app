@@ -2378,6 +2378,8 @@ export default function OrderPage() {
           hint: t.scanBarcodeHint,
           close: t.close,
           cameraError: t.scanBarcodeCameraError,
+          torchOn: t.scanBarcodeTorchOn,
+          torchOff: t.scanBarcodeTorchOff,
         }}
       />
 

@@ -174,8 +174,10 @@ export const copy = {
     exitFullscreen: "Exit full screen",
     scanBarcode: "Scan barcode",
     scanBarcodeTitle: "Scan barcode",
-    scanBarcodeHint: "Point your camera at the UPC on the package",
+    scanBarcodeHint: "Center the barcode in the frame and hold steady. Move closer if it does not scan.",
     scanBarcodeCameraError: "Could not access the camera. Check permissions or type the code manually.",
+    scanBarcodeTorchOn: "Turn on light",
+    scanBarcodeTorchOff: "Turn off light",
   },
   zh: {
     title: "门店订货",
@@ -352,8 +354,10 @@ export const copy = {
     exitFullscreen: "退出全屏",
     scanBarcode: "扫码",
     scanBarcodeTitle: "扫描条码",
-    scanBarcodeHint: "将摄像头对准包装上的条码",
+    scanBarcodeHint: "将条码对准框内并保持平稳，读不出可靠近一些。",
     scanBarcodeCameraError: "无法使用摄像头，请检查权限或改用手动输入。",
+    scanBarcodeTorchOn: "打开灯光",
+    scanBarcodeTorchOff: "关闭灯光",
   },
   ko: {
     title: "매장 주문",
@@ -530,8 +534,10 @@ export const copy = {
     exitFullscreen: "전체 화면 종료",
     scanBarcode: "바코드 스캔",
     scanBarcodeTitle: "바코드 스캔",
-    scanBarcodeHint: "포장의 UPC 바코드에 카메라를 맞추세요",
+    scanBarcodeHint: "바코드를 프레임 안에 맞추고 잠시 고정하세요. 안 되면 가까이 대 보세요.",
     scanBarcodeCameraError: "카메라를 사용할 수 없습니다. 권한을 확인하거나 직접 입력하세요.",
+    scanBarcodeTorchOn: "조명 켜기",
+    scanBarcodeTorchOff: "조명 끄기",
   },
   vi: {
     title: "Đặt hàng cửa hàng",
@@ -708,8 +714,10 @@ export const copy = {
     exitFullscreen: "Thoát toàn màn hình",
     scanBarcode: "Quét mã",
     scanBarcodeTitle: "Quét mã vạch",
-    scanBarcodeHint: "Hướng camera vào mã UPC trên bao bì",
+    scanBarcodeHint: "Căn mã trong khung và giữ yên. Nếu không đọc được, đưa camera lại gần hơn.",
     scanBarcodeCameraError: "Không thể dùng camera. Kiểm tra quyền hoặc nhập mã thủ công.",
+    scanBarcodeTorchOn: "Bật đèn",
+    scanBarcodeTorchOff: "Tắt đèn",
   },
 } as const;
 

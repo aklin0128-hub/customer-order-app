@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 export type OrderBarcodeScannerLabels = {
   title: string;
   hint: string;
   close: string;
   cameraError: string;
+  torchOn: string;
+  torchOff: string;
 };
 
 type Props = {
@@ -16,18 +18,51 @@ type Props = {
   labels: OrderBarcodeScannerLabels;
 };
 
-const SCAN_COOLDOWN_MS = 2000;
+const SCAN_COOLDOWN_MS = 800;
+
+const cameraConstraints = {
+  facingMode: { ideal: "environment" },
+  width: { ideal: 1920, min: 1280 },
+  height: { ideal: 1080, min: 720 },
+  focusMode: { ideal: "continuous" },
+} as MediaTrackConstraints;
+
+function scanRegionSize(viewfinderWidth: number, viewfinderHeight: number) {
+  return {
+    width: Math.min(Math.round(viewfinderWidth * 0.96), 480),
+    height: Math.min(Math.round(viewfinderHeight * 0.5), 220),
+  };
+}
 
 export function OrderBarcodeScanner({ open, onClose, onScan, labels }: Props) {
   const readerId = useId().replace(/:/g, "");
   const [error, setError] = useState<string | null>(null);
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchAvailable, setTorchAvailable] = useState(false);
   const lastScanRef = useRef<{ code: string; at: number } | null>(null);
   const onScanRef = useRef(onScan);
+  const scannerRef = useRef<import("html5-qrcode").Html5Qrcode | null>(null);
   onScanRef.current = onScan;
+
+  const toggleTorch = useCallback(async () => {
+    const scanner = scannerRef.current;
+    if (!scanner) return;
+    try {
+      const torch = scanner.getRunningTrackCameraCapabilities().torchFeature();
+      const next = !torchOn;
+      await torch.apply(next);
+      setTorchOn(next);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [torchOn]);
 
   useEffect(() => {
     if (!open) {
       setError(null);
+      setTorchOn(false);
+      setTorchAvailable(false);
+      scannerRef.current = null;
       return;
     }
 
@@ -50,18 +85,17 @@ export function OrderBarcodeScanner({ open, onClose, onScan, labels }: Props) {
         scanner = new Html5Qrcode(readerId, {
           verbose: false,
           formatsToSupport: formats,
+          useBarCodeDetectorIfSupported: true,
         });
+        scannerRef.current = scanner;
 
         await scanner.start(
-          { facingMode: "environment" },
+          cameraConstraints,
           {
-            fps: 10,
-            qrbox: (viewfinderWidth, viewfinderHeight) => {
-              const width = Math.min(viewfinderWidth * 0.85, 320);
-              const height = Math.min(viewfinderHeight * 0.35, 160);
-              return { width, height };
-            },
-            disableFlip: true,
+            fps: 18,
+            qrbox: scanRegionSize,
+            aspectRatio: 1.777778,
+            videoConstraints: cameraConstraints,
           },
           (decodedText) => {
             const code = decodedText.trim();
@@ -74,6 +108,23 @@ export function OrderBarcodeScanner({ open, onClose, onScan, labels }: Props) {
           },
           () => {}
         );
+
+        if (!mounted) return;
+
+        try {
+          await scanner.applyVideoConstraints({
+            focusMode: "continuous",
+            advanced: [{ focusMode: "continuous" }],
+          } as unknown as MediaTrackConstraints);
+        } catch {
+          // Some browsers reject advanced focus hints — camera still works.
+        }
+
+        try {
+          setTorchAvailable(scanner.getRunningTrackCameraCapabilities().torchFeature().isSupported());
+        } catch {
+          setTorchAvailable(false);
+        }
       } catch (err) {
         if (!mounted) return;
         console.error(err);
@@ -83,6 +134,7 @@ export function OrderBarcodeScanner({ open, onClose, onScan, labels }: Props) {
 
     return () => {
       mounted = false;
+      scannerRef.current = null;
       if (!scanner) return;
       scanner
         .stop()
@@ -99,9 +151,22 @@ export function OrderBarcodeScanner({ open, onClose, onScan, labels }: Props) {
       <div className="order-barcode-scanner-panel">
         <div className="order-barcode-scanner-header">
           <h2 className="order-barcode-scanner-title">{labels.title}</h2>
-          <button type="button" className="order-barcode-scanner-close" onClick={onClose} aria-label={labels.close}>
-            ×
-          </button>
+          <div className="order-barcode-scanner-actions">
+            {torchAvailable ? (
+              <button
+                type="button"
+                className={`order-barcode-scanner-torch${torchOn ? " is-on" : ""}`}
+                onClick={() => void toggleTorch()}
+                aria-label={torchOn ? labels.torchOff : labels.torchOn}
+                aria-pressed={torchOn}
+              >
+                {torchOn ? "🔦" : "💡"}
+              </button>
+            ) : null}
+            <button type="button" className="order-barcode-scanner-close" onClick={onClose} aria-label={labels.close}>
+              ×
+            </button>
+          </div>
         </div>
         <p className="order-barcode-scanner-hint">{labels.hint}</p>
         {error ? <p className="order-barcode-scanner-error">{error}</p> : null}
