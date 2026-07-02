@@ -5,15 +5,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import {
   catalogColumnCountForWidth,
-  CATALOG_GRID_GAP_PX,
-  CATALOG_ROW_HEIGHT_PX,
+  catalogGridGapPx,
+  catalogRowEstimatePx,
 } from "../catalogGridLayout";
 import { catalogVirtualScrollStyle } from "../orderStyles";
 import type { CatalogItem, Lang } from "../types";
 import { CatalogQtyCard } from "./CatalogQtyCard";
-
-const GAP = CATALOG_GRID_GAP_PX;
-const ROW_ESTIMATE = CATALOG_ROW_HEIGHT_PX;
 
 function readScrollContainerWidth(el: HTMLElement | null) {
   if (!el) return 0;
@@ -111,14 +108,17 @@ export function CatalogVirtualGrid({
     return 4;
   }, [width]);
 
+  const rowGap = useMemo(() => catalogGridGapPx(columnCount), [columnCount]);
+  const rowEstimate = useMemo(() => catalogRowEstimatePx(columnCount), [columnCount]);
+
   const rowCount = Math.max(1, Math.ceil(items.length / columnCount));
 
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_ESTIMATE,
-    gap: GAP,
-    overscan: 3,
+    estimateSize: () => rowEstimate,
+    gap: rowGap,
+    overscan: 2,
     measureElement: (el) => el.getBoundingClientRect().height,
   });
 
@@ -133,7 +133,29 @@ export function CatalogVirtualGrid({
       window.requestAnimationFrame(() => rowVirtualizer.measure());
     });
     return () => window.cancelAnimationFrame(t1);
-  }, [items.length, columnCount, gridKey, width, rowVirtualizer]);
+  }, [items.length, columnCount, gridKey, width, rowEstimate, rowVirtualizer]);
+
+  useLayoutEffect(() => {
+    const root = scrollRef.current;
+    if (!root) return;
+
+    const remeasure = () => rowVirtualizer.measure();
+    const resizeObserver = new ResizeObserver(remeasure);
+    const observeRows = () => {
+      resizeObserver.disconnect();
+      root.querySelectorAll(".order-catalog-virtual-row").forEach((row) => resizeObserver.observe(row));
+      remeasure();
+    };
+
+    observeRows();
+    const mutationObserver = new MutationObserver(observeRows);
+    mutationObserver.observe(root, { childList: true, subtree: true });
+
+    return () => {
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+    };
+  }, [items.length, columnCount, gridKey, rowVirtualizer]);
 
   if (items.length === 0) return null;
 
@@ -163,7 +185,7 @@ export function CatalogVirtualGrid({
                 display: "grid",
                 gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
                 alignItems: "stretch",
-                columnGap: GAP,
+                columnGap: rowGap,
               }}
             >
               {rowItems.map((item) => {

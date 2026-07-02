@@ -303,29 +303,81 @@ export function resolveCatalogFilterTargetItem(query: string, filtered: CatalogI
   return null;
 }
 
+function catalogSearchTokens(value: string) {
+  return String(value || "")
+    .toUpperCase()
+    .split(/[^A-Z0-9\u4e00-\u9fff]+/)
+    .filter(Boolean);
+}
+
+/** Drop spaces and punctuation so `o tube`, `o!tube`, and `otube` match the same text. */
+function catalogSearchCompact(value: string) {
+  return catalogSearchTokens(value).join("");
+}
+
+function catalogNameHasWordStartingWith(name: string, q: string) {
+  return catalogSearchTokens(name).some((token) => token.startsWith(q));
+}
+
+function catalogTokensMatchInOrder(haystackTokens: string[], needleTokens: string[]) {
+  if (needleTokens.length === 0) return false;
+  let index = 0;
+  for (const needle of needleTokens) {
+    while (index < haystackTokens.length && !haystackTokens[index].startsWith(needle)) {
+      index += 1;
+    }
+    if (index >= haystackTokens.length) return false;
+    index += 1;
+  }
+  return true;
+}
+
 export function scoreCatalogSearchQuery(item: CatalogItem, query: string) {
-  const q = query.trim().toUpperCase();
-  if (!q) return -1;
+  const raw = query.trim();
+  if (!raw) return -1;
+
+  const q = raw.toUpperCase();
+  const qCompact = catalogSearchCompact(raw);
+  const qTokens = catalogSearchTokens(raw);
 
   const sku = item.sku?.toUpperCase() || "";
   const name = item.name?.toUpperCase() || "";
   const brand = item.brand?.toUpperCase() || "";
   const barcode = item.barcode?.toUpperCase() || "";
   const upc = item.upc?.toUpperCase() || "";
+  const size = item.size?.toUpperCase() || "";
 
-  if (sku === q) return 1000;
-  if (sku.startsWith(q)) return 900;
-  if (catalogItemMatchesScanCode(item, q) || barcode === q || upc === q) return 850;
-  if (catalogItemScanCodeStartsWith(item, q) || barcode.startsWith(q) || upc.startsWith(q)) return 800;
-  if (sku.includes(q)) return 700;
-  if (q.length >= 3 && brand.startsWith(q)) return 500;
-  if (q.length >= 3 && name.startsWith(q)) return 450;
-  if (
-    q.length >= 3 &&
-    (name.includes(q) || brand.includes(q) || barcode.includes(q) || upc.includes(q))
-  ) {
-    return 200;
+  const skuCompact = catalogSearchCompact(item.sku);
+  const nameCompact = catalogSearchCompact(item.name);
+  const brandCompact = catalogSearchCompact(item.brand);
+  const sizeCompact = catalogSearchCompact(item.size);
+  const nameTokens = catalogSearchTokens(name);
+  const brandTokens = catalogSearchTokens(brand);
+
+  if (sku === q || (qCompact && skuCompact === qCompact)) return 1000;
+  if (sku.startsWith(q) || (qCompact && skuCompact.startsWith(qCompact))) return 900;
+  if (catalogItemMatchesScanCode(item, raw) || barcode === q || upc === q) return 850;
+  if (catalogItemScanCodeStartsWith(item, raw) || barcode.startsWith(q) || upc.startsWith(q)) return 800;
+  if (sku.includes(q) || (qCompact.length >= 2 && skuCompact.includes(qCompact))) return 700;
+
+  if (qCompact.length >= 2 && nameCompact.startsWith(qCompact)) return 580;
+  if (qCompact.length >= 2 && brandCompact.startsWith(qCompact)) return 570;
+  if (qCompact.length >= 2 && nameCompact.includes(qCompact)) return 560;
+  if (qTokens.length >= 2 && catalogTokensMatchInOrder(nameTokens, qTokens)) return 540;
+  if (qCompact.length >= 2 && brandCompact.includes(qCompact)) return 530;
+
+  if (brand.startsWith(q) || (qCompact.length === 1 && brandCompact.startsWith(qCompact))) return 600;
+  if (catalogNameHasWordStartingWith(name, qTokens[0] || q)) return 550;
+  if (q.length >= 2 && name.startsWith(q)) return 520;
+  if (q.length >= 2 && brand.includes(q)) return 480;
+  if (q.length >= 2 && (name.includes(q) || size.includes(q) || sizeCompact.includes(qCompact))) return 450;
+  if (qTokens.length >= 2 && catalogTokensMatchInOrder(brandTokens, qTokens)) return 440;
+
+  if (q.length >= 1 && /[^\x00-\x7F]/.test(q)) {
+    if (name.includes(q) || brand.includes(q)) return 400;
   }
+
+  if (q.length >= 3 && (barcode.includes(q) || upc.includes(q))) return 200;
   return -1;
 }
 

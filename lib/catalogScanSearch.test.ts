@@ -27,3 +27,36 @@ test("catalogItemMatchesScanCode matches stored UPC without leading zero input",
 test("scoreCatalogSearchQuery ranks exact UPC highly", () => {
   assert.equal(scoreCatalogSearchQuery(sample, "81652000020"), 850);
 });
+
+test("scoreCatalogSearchQuery matches single-letter brand and name prefixes", () => {
+  const item: CatalogItem = {
+    sku: "99100",
+    name: "ORANGE JUICE DRINK",
+    brand: "ORION",
+  };
+  assert.equal(scoreCatalogSearchQuery(item, "o"), 600);
+  assert.ok(scoreCatalogSearchQuery({ sku: "99200", name: "OIL NOODLE", brand: "ABC" }, "o") >= 550);
+  assert.equal(scoreCatalogSearchQuery({ sku: "99300", name: "MILK", brand: "ABC" }, "o"), -1);
+});
+
+test("scoreCatalogSearchQuery matches two-letter name and brand substrings", () => {
+  const item: CatalogItem = {
+    sku: "99400",
+    name: "GREEN TEA",
+    brand: "NONGSHIM",
+  };
+  assert.equal(scoreCatalogSearchQuery(item, "gr"), 580);
+  assert.equal(scoreCatalogSearchQuery(item, "ng"), 530);
+});
+
+test("scoreCatalogSearchQuery ignores punctuation and spaces in queries", () => {
+  const item: CatalogItem = {
+    sku: "88100",
+    name: "O!TUBE NOODLE",
+    brand: "NONGSHIM",
+  };
+  assert.ok(scoreCatalogSearchQuery(item, "o!tube") >= 560);
+  assert.ok(scoreCatalogSearchQuery(item, "o tube") >= 540);
+  assert.ok(scoreCatalogSearchQuery(item, "otube") >= 560);
+  assert.ok(scoreCatalogSearchQuery(item, "o-tube") >= 560);
+});
