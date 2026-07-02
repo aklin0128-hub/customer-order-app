@@ -14,6 +14,7 @@ import { OrderBarcodeScanner } from "./components/OrderBarcodeScanner";
 import { OrderFloatingCartFab } from "./components/OrderFloatingCartFab";
 import { OrderPastOrdersModal } from "./components/OrderPastOrdersModal";
 import { OrderQuickOrderPanel } from "./components/OrderQuickOrderPanel";
+import { OrderQuickPicksStrip } from "./components/OrderQuickPicksStrip";
 import { OrderShopNudge } from "./components/OrderShopNudge";
 import { RecommendedStrip } from "./components/RecommendedStrip";
 import { OrderInput } from "./components/OrderInput";
@@ -1682,6 +1683,8 @@ export default function OrderPage() {
         </div>
       </div>
 
+      {renderMobileModeTags()}
+
       {mode === "catalog" ? (
         <div className="order-shop-search-row">
           <label className="order-shop-search-field">
@@ -1793,7 +1796,17 @@ export default function OrderPage() {
         </div>
       ) : null}
 
-      {renderMobileModeTags()}
+      {mode === "search" && !normalizedSkuInput ? (
+        <OrderQuickPicksStrip
+          lang={lang}
+          compact
+          recentItems={recentItems}
+          frequentItems={frequentCatalogItems}
+          catalogQtyMap={catalogQtyMap}
+          onAddSkuToCart={addSkuFromSearch}
+          onAdjustQty={adjustCatalogQty}
+        />
+      ) : null}
     </div>
   );
 
@@ -2084,10 +2097,11 @@ export default function OrderPage() {
           </div>
         </div>
 
-        {mode === "search" ? (
+        {mode === "search" && (!isMobileViewport || normalizedSkuInput) ? (
           <OrderQuickOrderPanel
             lang={lang}
             compact={isMobileViewport}
+            hideQuickPicks={isMobileViewport}
             normalizedQuery={normalizedSkuInput}
             matchedItems={matchedItems}
             selectedItem={selectedItem}

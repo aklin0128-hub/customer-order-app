@@ -12,6 +12,7 @@ import { copy } from "../orderCopy";
 import { stepButtonStyle, stepInputStyle } from "../orderStyles";
 import type { CartItem, CatalogItem, Lang } from "../types";
 import { ProductImage } from "./ProductImage";
+import { OrderQuickPicksStrip } from "./OrderQuickPicksStrip";
 
 const MATCH_PREVIEW_COMPACT = 5;
 const MATCH_PREVIEW_DESKTOP = 8;
@@ -21,6 +22,7 @@ const MATCH_EXPANDED_DESKTOP = 30;
 export function OrderQuickOrderPanel({
   lang,
   compact = false,
+  hideQuickPicks = false,
   normalizedQuery,
   matchedItems,
   selectedItem,
@@ -38,6 +40,7 @@ export function OrderQuickOrderPanel({
 }: {
   lang: Lang;
   compact?: boolean;
+  hideQuickPicks?: boolean;
   normalizedQuery: string;
   matchedItems: CatalogItem[];
   selectedItem: CatalogItem | null;
@@ -58,8 +61,6 @@ export function OrderQuickOrderPanel({
   const activeMatchRef = useRef<HTMLButtonElement | null>(null);
 
   const focusItem = selectedItem;
-  const focusSku = focusItem?.sku?.toUpperCase() || "";
-  const focusCanAdd = focusItem ? isOrderableItem(focusItem) && !isNewItemOrderingBlocked(focusItem) : false;
 
   const matchPreview = compact ? MATCH_PREVIEW_COMPACT : MATCH_PREVIEW_DESKTOP;
   const matchExpanded = compact ? MATCH_EXPANDED_COMPACT : MATCH_EXPANDED_DESKTOP;
@@ -69,39 +70,6 @@ export function OrderQuickOrderPanel({
     const limit = showAllMatches ? matchExpanded : matchPreview;
     return matchedItems.slice(0, limit);
   }, [matchedItems, showAllMatches, matchExpanded, matchPreview]);
-
-  const quickPicks = useMemo(() => {
-    const seen = new Set<string>();
-    const picks: Array<{ sku: string; qty: string; onClick: () => void; className: string }> = [];
-
-    for (const item of recentItems.slice(0, compact ? 8 : 12)) {
-      const sku = item.sku?.toUpperCase() || "";
-      if (!sku || seen.has(sku)) continue;
-      seen.add(sku);
-      picks.push({
-        sku,
-        qty: item.qty || "1",
-        onClick: () => onAddSkuToCart({ sku: item.sku } as CatalogItem, item.qty || "1"),
-        className: "order-quick-recent-chip",
-      });
-    }
-
-    for (const item of frequentItems) {
-      const sku = item.sku?.toUpperCase() || "";
-      if (!sku || seen.has(sku)) continue;
-      seen.add(sku);
-      const inCart = Number(catalogQtyMap[sku] || 0);
-      picks.push({
-        sku,
-        qty: inCart > 0 ? String(inCart) : "1",
-        onClick: () => onAdjustQty(item.sku, 1),
-        className: "order-quick-frequent-chip",
-      });
-      if (picks.length >= (compact ? 14 : 18)) break;
-    }
-
-    return picks;
-  }, [recentItems, frequentItems, catalogQtyMap, compact, onAddSkuToCart, onAdjustQty]);
 
   useEffect(() => {
     setShowAllMatches(false);
@@ -238,25 +206,21 @@ export function OrderQuickOrderPanel({
       ) : null}
 
       {!normalizedQuery ? (
-        quickPicks.length > 0 ? (
-          <div className="order-quick-picks">
-            <div className="order-quick-recent-label">{compact ? t.quickOrderPicks : t.quickOrderFrequent}</div>
-            <div className="order-quick-recent-track">
-              {quickPicks.map((pick) => (
-                <button
-                  key={`${pick.className}-${pick.sku}`}
-                  type="button"
-                  className={pick.className}
-                  onClick={pick.onClick}
-                >
-                  <span className="order-quick-recent-chip-sku">{pick.sku}</span>
-                  <span className="order-quick-recent-chip-qty">+{pick.qty}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : compact ? null : (
-          <div className="order-quick-empty-focus">{t.quickOrderEmptyHint}</div>
+        hideQuickPicks ? null : (
+          <>
+            <OrderQuickPicksStrip
+              lang={lang}
+              compact={compact}
+              recentItems={recentItems}
+              frequentItems={frequentItems}
+              catalogQtyMap={catalogQtyMap}
+              onAddSkuToCart={onAddSkuToCart}
+              onAdjustQty={onAdjustQty}
+            />
+            {!compact && recentItems.length === 0 && frequentItems.length === 0 ? (
+              <div className="order-quick-empty-focus">{t.quickOrderEmptyHint}</div>
+            ) : null}
+          </>
         )
       ) : matchedItems.length === 0 ? (
         <div className="order-quick-no-match">{t.noMatches}</div>
@@ -281,6 +245,7 @@ export function OrderQuickOrderPanel({
           ) : null}
         </div>
       )}
+
     </section>
   );
 }
