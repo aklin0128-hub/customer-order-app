@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 
 import { isMarketRegionId } from "@/lib/customerRegion";
 import {
+  applyWeeklySalesClientRows,
   applyWeeklySalesOverrides,
   buildWeeklySalesReport,
   defaultBiweeklyReportRange,
+  isFullWeeklySalesClientRow,
   type WeeklySalesReportInput,
 } from "@/lib/weeklySalesReport";
 import { weeklySalesReportToXlsxBuffer } from "@/lib/weeklySalesReportXlsx";
@@ -94,10 +96,12 @@ export async function POST(req: Request) {
       endDate: String(body?.endDate ?? base.endDate).trim(),
     };
 
-    const report = applyWeeklySalesOverrides(
-      await buildWeeklySalesReport(input),
-      Array.isArray(body?.rows) ? body.rows : undefined
-    );
+    const clientRows = Array.isArray(body?.rows) ? body.rows : undefined;
+    const baseReport = await buildWeeklySalesReport(input);
+    const report =
+      clientRows?.some(isFullWeeklySalesClientRow)
+        ? applyWeeklySalesClientRows(baseReport, clientRows)
+        : applyWeeklySalesOverrides(baseReport, clientRows);
 
     if (format === "json") {
       return NextResponse.json({ success: true, ...report });

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MARKET_REGIONS } from "@/lib/customerRegion";
+import { parseUsDateToIso, WEEKDAY_OPTIONS, weekdayFromDateInput } from "@/lib/weeklySalesReportUi";
 import { AdminPage } from "../_components/AdminPage";
 import { inputStyle, labelStyle, panel, panelTitle } from "../_components/admin-styles";
 import { BtnPrimary, BtnRow, BtnSecondary, StatGrid, Toast } from "../_components/admin-utils";
@@ -15,6 +16,7 @@ type ReportRow = {
   notes: string;
   orderRef: string;
   gpPercent?: number | null;
+  orderDate?: string;
 };
 
 type ReportPreview = {
@@ -32,7 +34,21 @@ type ReportPreview = {
   rows: ReportRow[];
 };
 
-type EditableRow = ReportRow & { gpInput: string };
+type EditableRow = {
+  id: string;
+  weekday: string;
+  orderDate: string;
+  cid: string;
+  salesInput: string;
+  gpInput: string;
+  insights: string;
+  notes: string;
+};
+
+type CustomerOption = {
+  accountNo: string;
+  storeName: string;
+};
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -45,6 +61,64 @@ function biweeklyDefaults() {
   return {
     startDate: start.toISOString().slice(0, 10),
     endDate: end.toISOString().slice(0, 10),
+  };
+}
+
+
+function newRowId() {
+  return `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function emptyEditableRow(): EditableRow {
+  const orderDate = todayIso();
+  return {
+    id: newRowId(),
+    weekday: weekdayFromDateInput(orderDate),
+    orderDate,
+    cid: "",
+    salesInput: "",
+    gpInput: "",
+    insights: "",
+    notes: "",
+  };
+}
+
+function rowToEditable(row: ReportRow): EditableRow {
+  const orderDate = row.orderDate ? parseUsDateToIso(row.orderDate) : "";
+  return {
+    id: newRowId(),
+    weekday: row.weekday || weekdayFromDateInput(orderDate),
+    orderDate,
+    cid: row.cid || "",
+    salesInput: row.sales != null ? String(row.sales) : "",
+    gpInput: row.gpPercent != null ? String(row.gpPercent) : "",
+    insights: row.insights || "",
+    notes: row.notes || "",
+  };
+}
+
+function computeRowStats(rows: EditableRow[]) {
+  let totalSales: number | null = null;
+  let pricedRows = 0;
+  const gpValues: number[] = [];
+
+  for (const row of rows) {
+    const sales = row.salesInput.trim() === "" ? null : Number(row.salesInput);
+    if (sales != null && Number.isFinite(sales)) {
+      totalSales = (totalSales ?? 0) + sales;
+      pricedRows += 1;
+    }
+    const gp = row.gpInput.trim() === "" ? null : Number(row.gpInput);
+    if (gp != null && Number.isFinite(gp)) gpValues.push(gp);
+  }
+
+  return {
+    orderCount: rows.filter((row) => row.cid.trim()).length,
+    totalSales: pricedRows > 0 ? Math.round((totalSales ?? 0) * 100) / 100 : null,
+    averageGpPercent:
+      gpValues.length > 0
+        ? Math.round((gpValues.reduce((sum, value) => sum + value, 0) / gpValues.length) * 100) / 100
+        : null,
   };
 }
 
@@ -69,6 +143,7 @@ export default function AdminWeeklySalesReportPage() {
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
   const [preview, setPreview] = useState<ReportPreview | null>(null);
   const [editableRows, setEditableRows] = useState<EditableRow[]>([]);
+  const [customerOptions, setCustomerOptions] = useState<CustomerOption[]>([]);
 
   const queryBase = useMemo(() => {
     const params = new URLSearchParams({
@@ -94,19 +169,15 @@ export default function AdminWeeklySalesReportPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to preview report.");
       setPreview(data);
-      setEditableRows(
-        (data.rows as ReportRow[]).map((row) => ({
-          ...row,
-          gpInput: row.gpPercent != null ? String(row.gpPercent) : "",
-        }))
-      );
+      const rows = Array.isArray(data.rows) ? (data.rows as ReportRow[]) : [];
+      setEditableRows(rows.length > 0 ? rows.map(rowToEditable) : [emptyEditableRow()]);
       setMsg(`Preview: ${data.meta.orderCount} orders · ${data.meta.periodLabel}`);
       setMsgTone("success");
     } catch (err: unknown) {
       setMsg(err instanceof Error ? err.message : "Failed to preview report.");
       setMsgTone("error");
       setPreview(null);
-      setEditableRows([]);
+      setEditableRows([emptyEditableRow()]);
     } finally {
       setBusy(false);
     }
@@ -121,6 +192,47 @@ export default function AdminWeeklySalesReportPage() {
     const label = MARKET_REGIONS.find((r) => r.id === region)?.label.toUpperCase() || region.toUpperCase();
     setVisitArea(label);
   }, [region]);
+
+  useEffect(() => {
+    if (!authed) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/admin/customers?region=${encodeURIComponent(region)}&limit=100`, {
+          cache: "no-store",
+          headers: adminHeaders(),
+        });
+        const data = await res.json();
+        if (!res.ok || cancelled) return;
+        const customers = Array.isArray(data.customers) ? data.customers : [];
+        setCustomerOptions(
+          customers.map((customer: CustomerOption) => ({
+            accountNo: String(customer.accountNo || "").toUpperCase(),
+            storeName: String(customer.storeName || ""),
+          }))
+        );
+      } catch {
+        if (!cancelled) setCustomerOptions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authed, region, adminHeaders]);
+
+  const rowStats = useMemo(() => computeRowStats(editableRows), [editableRows]);
+
+  const updateRow = (idx: number, patch: Partial<EditableRow>) => {
+    setEditableRows((prev) => prev.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
+  };
+
+  const addRow = () => {
+    setEditableRows((prev) => [...prev, emptyEditableRow()]);
+  };
+
+  const removeRow = (idx: number) => {
+    setEditableRows((prev) => (prev.length <= 1 ? [emptyEditableRow()] : prev.filter((_, i) => i !== idx)));
+  };
 
   const downloadXlsx = async () => {
     setBusy(true);
@@ -141,9 +253,13 @@ export default function AdminWeeklySalesReportPage() {
           startDate,
           endDate,
           rows: editableRows.map((row) => ({
+            weekday: row.weekday,
+            orderDate: row.orderDate,
+            cid: row.cid.trim().toUpperCase(),
+            sales: row.salesInput.trim() === "" ? null : Number(row.salesInput),
+            gpPercent: row.gpInput.trim() === "" ? null : Number(row.gpInput),
             insights: row.insights,
             notes: row.notes,
-            gpPercent: row.gpInput.trim() === "" ? null : Number(row.gpInput),
           })),
         }),
       });
@@ -174,7 +290,7 @@ export default function AdminWeeklySalesReportPage() {
     <AdminPage
       active="weeklySales"
       title="Weekly Sales Report"
-      subtitle="S70 weekly report · fill insights & GP before download · Sales from invoice prices"
+      subtitle="S70 weekly report · edit visit rows below or load from portal orders"
     >
       <Toast message={msg} tone={msgTone} />
 
@@ -272,86 +388,147 @@ export default function AdminWeeklySalesReportPage() {
         <div style={{ ...panel, marginTop: 14 }}>
           <StatGrid
             items={[
-              { label: "Orders in period", value: String(preview.meta.orderCount) },
-              { label: "Total Sales ($)", value: preview.meta.totalSales != null ? preview.meta.totalSales.toFixed(2) : "—" },
-              { label: "Avg GP (%)", value: preview.meta.averageGpPercent != null ? preview.meta.averageGpPercent.toFixed(2) : "—" },
+              { label: "Rows with CID", value: String(rowStats.orderCount) },
+              {
+                label: "Total Sales ($)",
+                value: rowStats.totalSales != null ? rowStats.totalSales.toFixed(2) : "—",
+              },
+              {
+                label: "Avg GP (%)",
+                value: rowStats.averageGpPercent != null ? rowStats.averageGpPercent.toFixed(2) : "—",
+              },
               { label: "Period", value: preview.meta.periodLabel },
             ]}
           />
 
-          <p style={{ margin: "12px 0 0", fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>
-            Edit <strong>Insights</strong>, <strong>GP (%)</strong>, and <strong>Notes</strong> below before download — same as your S70 template.
-          </p>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginTop: 12 }}>
+            <p style={{ margin: 0, fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>
+              Edit <strong>date</strong>, <strong>CID</strong>, <strong>Sales</strong>, GP, insights, and notes — or use{" "}
+              <strong>Refresh preview</strong> to pull portal orders, then adjust.
+            </p>
+            <BtnSecondary onClick={addRow} disabled={busy}>
+              + Add row
+            </BtnSecondary>
+          </div>
 
           <div style={{ overflowX: "auto", marginTop: 12 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ background: "#f3f4f6", textAlign: "left" }}>
-                  <th style={{ padding: 8, border: "1px solid #d1d5db" }}>Day</th>
-                  <th style={{ padding: 8, border: "1px solid #d1d5db" }}>CID</th>
-                  <th style={{ padding: 8, border: "1px solid #d1d5db" }}>Sales ($)</th>
+                  <th style={{ padding: 8, border: "1px solid #d1d5db", minWidth: 130 }}>Visit date</th>
+                  <th style={{ padding: 8, border: "1px solid #d1d5db", minWidth: 90 }}>Day</th>
+                  <th style={{ padding: 8, border: "1px solid #d1d5db", minWidth: 110 }}>CID</th>
+                  <th style={{ padding: 8, border: "1px solid #d1d5db", minWidth: 110 }}>Sales ($)</th>
                   <th style={{ padding: 8, border: "1px solid #d1d5db", minWidth: 90 }}>GP (%)</th>
                   <th style={{ padding: 8, border: "1px solid #d1d5db", minWidth: 220 }}>Customer / market insights</th>
                   <th style={{ padding: 8, border: "1px solid #d1d5db", minWidth: 160 }}>Notes</th>
+                  <th style={{ padding: 8, border: "1px solid #d1d5db", width: 72 }} />
                 </tr>
               </thead>
               <tbody>
-                {editableRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} style={{ padding: 12, border: "1px solid #e5e7eb", color: "#6b7280" }}>
-                      No portal orders in this period for customers assigned to {preview.meta.regionLabel}. Assign region in Admin → Customers.
+                {editableRows.map((row, idx) => (
+                  <tr key={row.id}>
+                    <td style={{ padding: 6, border: "1px solid #e5e7eb" }}>
+                      <input
+                        type="date"
+                        value={row.orderDate}
+                        onChange={(e) => {
+                          const orderDate = e.target.value;
+                          updateRow(idx, {
+                            orderDate,
+                            weekday: weekdayFromDateInput(orderDate),
+                          });
+                        }}
+                        style={{ ...inputStyle, width: "100%", padding: "6px 8px" }}
+                      />
+                    </td>
+                    <td style={{ padding: 6, border: "1px solid #e5e7eb" }}>
+                      <select
+                        value={row.weekday}
+                        onChange={(e) => updateRow(idx, { weekday: e.target.value })}
+                        style={{ ...inputStyle, width: "100%", padding: "6px 8px" }}
+                      >
+                        {WEEKDAY_OPTIONS.map((day) => (
+                          <option key={day} value={day}>
+                            {day}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td style={{ padding: 6, border: "1px solid #e5e7eb" }}>
+                      <input
+                        list="weekly-sales-cid-options"
+                        value={row.cid}
+                        onChange={(e) => updateRow(idx, { cid: e.target.value.toUpperCase() })}
+                        placeholder="FL342"
+                        style={{ ...inputStyle, width: "100%", padding: "6px 8px" }}
+                      />
+                    </td>
+                    <td style={{ padding: 6, border: "1px solid #e5e7eb" }}>
+                      <input
+                        value={row.salesInput}
+                        onChange={(e) => updateRow(idx, { salesInput: e.target.value })}
+                        placeholder="0.00"
+                        inputMode="decimal"
+                        style={{ ...inputStyle, width: "100%", padding: "6px 8px" }}
+                      />
+                    </td>
+                    <td style={{ padding: 6, border: "1px solid #e5e7eb" }}>
+                      <input
+                        value={row.gpInput}
+                        onChange={(e) => updateRow(idx, { gpInput: e.target.value })}
+                        placeholder="—"
+                        inputMode="decimal"
+                        style={{ ...inputStyle, width: "100%", padding: "6px 8px" }}
+                      />
+                    </td>
+                    <td style={{ padding: 6, border: "1px solid #e5e7eb" }}>
+                      <textarea
+                        value={row.insights}
+                        onChange={(e) => updateRow(idx, { insights: e.target.value })}
+                        rows={2}
+                        placeholder="e.g. Business remains stable"
+                        style={{ ...inputStyle, width: "100%", resize: "vertical", padding: "6px 8px" }}
+                      />
+                    </td>
+                    <td style={{ padding: 6, border: "1px solid #e5e7eb" }}>
+                      <textarea
+                        value={row.notes}
+                        onChange={(e) => updateRow(idx, { notes: e.target.value })}
+                        rows={2}
+                        style={{ ...inputStyle, width: "100%", resize: "vertical", padding: "6px 8px" }}
+                      />
+                    </td>
+                    <td style={{ padding: 6, border: "1px solid #e5e7eb", textAlign: "center" }}>
+                      <button
+                        type="button"
+                        onClick={() => removeRow(idx)}
+                        disabled={busy}
+                        style={{
+                          border: "1px solid #e5e7eb",
+                          background: "#fff",
+                          borderRadius: 8,
+                          padding: "6px 8px",
+                          cursor: "pointer",
+                          fontSize: 12,
+                        }}
+                      >
+                        Remove
+                      </button>
                     </td>
                   </tr>
-                ) : (
-                  editableRows.map((row, idx) => (
-                    <tr key={`${row.cid}-${row.orderRef}-${idx}`}>
-                      <td style={{ padding: 8, border: "1px solid #e5e7eb" }}>{row.weekday}</td>
-                      <td style={{ padding: 8, border: "1px solid #e5e7eb", fontWeight: 700 }}>{row.cid}</td>
-                      <td style={{ padding: 8, border: "1px solid #e5e7eb" }}>
-                        {row.sales != null ? row.sales.toFixed(2) : "—"}
-                      </td>
-                      <td style={{ padding: 6, border: "1px solid #e5e7eb" }}>
-                        <input
-                          value={row.gpInput}
-                          onChange={(e) =>
-                            setEditableRows((prev) =>
-                              prev.map((r, i) => (i === idx ? { ...r, gpInput: e.target.value } : r))
-                            )
-                          }
-                          placeholder="—"
-                          style={{ ...inputStyle, width: "100%", padding: "6px 8px" }}
-                        />
-                      </td>
-                      <td style={{ padding: 6, border: "1px solid #e5e7eb" }}>
-                        <textarea
-                          value={row.insights}
-                          onChange={(e) =>
-                            setEditableRows((prev) =>
-                              prev.map((r, i) => (i === idx ? { ...r, insights: e.target.value } : r))
-                            )
-                          }
-                          rows={2}
-                          placeholder="e.g. Business remains stable"
-                          style={{ ...inputStyle, width: "100%", resize: "vertical", padding: "6px 8px" }}
-                        />
-                      </td>
-                      <td style={{ padding: 6, border: "1px solid #e5e7eb" }}>
-                        <textarea
-                          value={row.notes}
-                          onChange={(e) =>
-                            setEditableRows((prev) =>
-                              prev.map((r, i) => (i === idx ? { ...r, notes: e.target.value } : r))
-                            )
-                          }
-                          rows={2}
-                          style={{ ...inputStyle, width: "100%", resize: "vertical", padding: "6px 8px" }}
-                        />
-                      </td>
-                    </tr>
-                  ))
-                )}
+                ))}
               </tbody>
             </table>
+            <datalist id="weekly-sales-cid-options">
+              {customerOptions.map((customer) => (
+                <option
+                  key={customer.accountNo}
+                  value={customer.accountNo}
+                  label={customer.storeName ? `${customer.accountNo} — ${customer.storeName}` : customer.accountNo}
+                />
+              ))}
+            </datalist>
           </div>
         </div>
       ) : null}

@@ -4,6 +4,7 @@ import { marketRegionLabel, type MarketRegionId } from "@/lib/customerRegion";
 import { buildLatestInvoicePricesFromImports } from "@/lib/invoiceLatestPrices";
 import { getMarketPeriodWindows } from "@/lib/marketAnalytics";
 import { loadAllOrderHistories, type OrderHistoryEntry } from "@/lib/orderHistory";
+import { parseUsDateToIso, WEEKDAY_OPTIONS } from "@/lib/weeklySalesReportUi";
 
 export type WeeklySalesReportRow = {
   weekday: string;
@@ -51,7 +52,64 @@ export type WeeklySalesReportResult = {
   rows: WeeklySalesReportRow[];
 };
 
-const WEEKDAY_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri"] as const;
+const WEEKDAY_ORDER = WEEKDAY_OPTIONS;
+
+export type WeeklySalesClientRow = {
+  weekday?: string;
+  orderDate?: string;
+  cid?: string;
+  sales?: number | null;
+  gpPercent?: number | null;
+  insights?: string;
+  notes?: string;
+};
+
+export { parseUsDateToIso, WEEKDAY_OPTIONS } from "@/lib/weeklySalesReportUi";
+
+export function parseWeeklySalesValue(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
+}
+
+export function normalizeWeekday(value?: string, orderDate?: string): (typeof WEEKDAY_ORDER)[number] {
+  const direct = String(value || "").trim();
+  if (WEEKDAY_ORDER.includes(direct as (typeof WEEKDAY_ORDER)[number])) {
+    return direct as (typeof WEEKDAY_ORDER)[number];
+  }
+  if (orderDate) {
+    const iso = orderDate.includes("T") ? orderDate : `${orderDate}T12:00:00`;
+    const fromDate = weekdayInFlorida(iso);
+    if (fromDate) return fromDate as (typeof WEEKDAY_ORDER)[number];
+  }
+  return "Mon";
+}
+
+export function parseWeeklySalesClientRows(clientRows: WeeklySalesClientRow[]): WeeklySalesReportRow[] {
+  return clientRows
+    .map((row) => {
+      const orderDate = String(row.orderDate || "").trim();
+      const cid = normalizeAccountNo(String(row.cid || ""));
+      return {
+        weekday: normalizeWeekday(row.weekday, orderDate),
+        cid,
+        storeName: "",
+        sales: parseWeeklySalesValue(row.sales),
+        gpPercent: parseWeeklySalesValue(row.gpPercent),
+        insights: String(row.insights || "").trim(),
+        notes: String(row.notes || "").trim(),
+        orderRef: "",
+        orderDate: orderDate ? formatUsDate(orderDate) : "",
+      };
+    })
+    .filter((row) => row.cid || row.sales != null || row.insights || row.notes);
+}
+
+export function isFullWeeklySalesClientRow(row: unknown): row is WeeklySalesClientRow {
+  if (!row || typeof row !== "object") return false;
+  const record = row as Record<string, unknown>;
+  return "cid" in record || "orderDate" in record || "weekday" in record || "sales" in record;
+}
 
 export function averageGpPercent(rows: WeeklySalesReportRow[]): number | null {
   const values = rows
@@ -293,6 +351,19 @@ export async function buildWeeklySalesReport(
       regionLabel: marketRegionLabel(input.region),
     }),
     rows,
+  };
+}
+
+export function applyWeeklySalesClientRows(
+  report: WeeklySalesReportResult,
+  clientRows?: WeeklySalesClientRow[]
+): WeeklySalesReportResult {
+  if (!clientRows?.length) return report;
+  const rows = parseWeeklySalesClientRows(clientRows);
+  const { orderCount: _o, totalSales: _t, averageGpPercent: _a, ...rest } = report.meta;
+  return {
+    rows,
+    meta: finalizeReportMeta(rows, rest),
   };
 }
 
