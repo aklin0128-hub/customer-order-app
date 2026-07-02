@@ -343,7 +343,7 @@ export default function AdminPromotionsPage() {
     <AdminPage
       active="promotions"
       title="Promotions"
-      subtitle="Click a row to edit · Active promos sync to /new/ and customer Weekly picks."
+      subtitle="Click a row to edit · Active promos sync to /new/ and customer Promotions tab."
       actions={
         <BtnSecondary onClick={() => setForm(emptyForm())} disabled={busy}>
           + New promo
@@ -643,7 +643,7 @@ export default function AdminPromotionsPage() {
                 checked={form.pinned}
                 onChange={(e) => setForm((f) => ({ ...f, pinned: e.target.checked }))}
               />
-              Pin to top — show first in customer Weekly picks and /order promotion tab
+              Pin to top — show first in customer Promotions tab and /order promotion tab
             </label>
 
             <label
@@ -661,7 +661,7 @@ export default function AdminPromotionsPage() {
                 checked={form.promotionEnded}
                 onChange={(e) => setForm((f) => ({ ...f, promotionEnded: e.target.checked }))}
               />
-              Promotion ended (hide from store weekly picks)
+              Promotion ended (hide from store promotions)
             </label>
 
             <label

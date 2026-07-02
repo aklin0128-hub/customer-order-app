@@ -19,8 +19,8 @@ const linkStyle: CSSProperties = {
 
 const copy = {
   promotions: {
-    title: "Public page: /new/ (Weekly picks)",
-    body: "Promotions with status Active appear on the public showcase and in the customer order Weekly picks tab. Data is shared — no separate publish step. Refresh /new/ after you save.",
+    title: "Public page: /new/ (Promotions)",
+    body: "Promotions with status Active appear on the public showcase and in the customer order Promotions tab. Data is shared — no separate publish step. Refresh /new/ after you save.",
   },
   products: {
     title: "Public page: /new/ (New items)",
