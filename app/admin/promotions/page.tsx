@@ -137,6 +137,7 @@ export default function AdminPromotionsPage() {
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
   const [catalogLookup, setCatalogLookup] = useState<PromotionProduct | null>(null);
+  const [bulkSkuText, setBulkSkuText] = useState("");
 
   const notify = (text: string, tone: "success" | "error" = "success") => {
     setMsg(text);
@@ -314,6 +315,37 @@ export default function AdminPromotionsPage() {
     }
   };
 
+  const bulkImportPromotions = async () => {
+    const text = bulkSkuText.trim();
+    if (!text) return notify("Paste at least one SKU.", "error");
+
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/promotions/bulk", {
+        method: "POST",
+        headers: adminHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to bulk import promotions.");
+
+      const parts = [`Added ${data.added?.length || 0} promotion(s)`];
+      if (data.skippedExisting?.length) parts.push(`${data.skippedExisting.length} already existed`);
+      if (data.missingCatalog?.length) {
+        parts.push(`${data.missingCatalog.length} not in catalog (saved anyway — fix SKU or add product)`);
+      }
+      notify(parts.join(" · "));
+      setBulkSkuText("");
+      setPromotions(Array.isArray(data.promotions) ? data.promotions : []);
+      setProducts(Array.isArray(data.products) ? data.products : []);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to bulk import promotions.";
+      notify(message, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const removePromotion = async (targetSku: string) => {
     const finalSku = targetSku.trim().toUpperCase();
     if (!confirm(`Remove ${finalSku} from promotions?`)) return;
@@ -364,6 +396,27 @@ export default function AdminPromotionsPage() {
       />
 
       <AdminPublicShowcaseHint variant="promotions" />
+
+      <Panel title="Bulk add SKUs">
+        <p style={{ margin: "0 0 10px", fontSize: 12, color: "#6b7280" }}>
+          Create blank promotions now — set price, dates, and deals later.
+        </p>
+        <textarea
+          value={bulkSkuText}
+          onChange={(e) => setBulkSkuText(e.target.value)}
+          placeholder={"Paste SKUs — one per line, or separated by commas\n00100\n00200, 00300"}
+          rows={6}
+          style={{ ...inputStyle, width: "100%", resize: "vertical", fontFamily: "inherit" }}
+        />
+        <BtnRow>
+          <BtnPrimary onClick={() => void bulkImportPromotions()} disabled={busy || !bulkSkuText.trim()}>
+            Bulk add promotions
+          </BtnPrimary>
+          <BtnSecondary onClick={() => setBulkSkuText("")} disabled={busy || !bulkSkuText}>
+            Clear
+          </BtnSecondary>
+        </BtnRow>
+      </Panel>
 
       {!promotionsLoaded && busy ? (
         <Panel title="Loading promotions">

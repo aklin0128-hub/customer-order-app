@@ -432,3 +432,60 @@ export function validatePromotionInput(input: {
     } as Partial<PromotionRecord>,
   };
 }
+
+/** Parse pasted SKU lists — newlines, commas, tabs, semicolons. */
+export function parsePromotionSkuList(text: string) {
+  const seen = new Set<string>();
+  const skus: string[] = [];
+
+  for (const token of String(text || "").split(/[\s,;|\t\r\n]+/)) {
+    const sku = token.trim().toUpperCase();
+    if (!sku || seen.has(sku)) continue;
+    seen.add(sku);
+    skus.push(sku);
+  }
+
+  return skus;
+}
+
+export type BulkImportPromotionResult = {
+  added: string[];
+  skippedExisting: string[];
+  missingCatalog: string[];
+};
+
+/** Create bare promotion rows for many SKUs — edit pricing/dates later in admin. */
+export async function bulkImportPromotionSkus(skus: string[]): Promise<BulkImportPromotionResult> {
+  const parsed = parsePromotionSkuList(skus.join("\n"));
+  if (parsed.length === 0) {
+    return { added: [], skippedExisting: [], missingCatalog: [] };
+  }
+
+  const current = await getPromotionRecords();
+  const existing = new Set(current.map((record) => record.sku));
+  const catalogMap = await buildCatalogMap(parsed);
+  const now = new Date().toISOString();
+
+  const added: string[] = [];
+  const skippedExisting: string[] = [];
+  const missingCatalog: string[] = [];
+  const newRecords: PromotionRecord[] = [];
+
+  for (const sku of parsed) {
+    if (existing.has(sku)) {
+      skippedExisting.push(sku);
+      continue;
+    }
+
+    existing.add(sku);
+    newRecords.push({ sku, updatedAt: now });
+    added.push(sku);
+    if (!catalogMap.has(sku)) missingCatalog.push(sku);
+  }
+
+  if (newRecords.length > 0) {
+    await savePromotionRecords([...newRecords, ...current]);
+  }
+
+  return { added, skippedExisting, missingCatalog };
+}
