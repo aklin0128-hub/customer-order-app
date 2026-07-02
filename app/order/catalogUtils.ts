@@ -311,8 +311,8 @@ function catalogSearchTokens(value: string) {
 }
 
 /** Drop spaces and punctuation so `o tube`, `o!tube`, and `otube` match the same text. */
-function catalogSearchCompact(value: string) {
-  return catalogSearchTokens(value).join("");
+function catalogSearchCompact(value?: string | null) {
+  return catalogSearchTokens(value || "").join("");
 }
 
 function catalogNameHasWordStartingWith(name: string, q: string) {
