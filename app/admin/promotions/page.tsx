@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { AdminPage } from "../_components/AdminPage";
 import { AdminSkuAutocomplete } from "../_components/AdminSkuAutocomplete";
@@ -138,6 +138,7 @@ export default function AdminPromotionsPage() {
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
   const [catalogLookup, setCatalogLookup] = useState<PromotionProduct | null>(null);
   const [bulkSkuText, setBulkSkuText] = useState("");
+  const bulkTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const notify = (text: string, tone: "success" | "error" = "success") => {
     setMsg(text);
@@ -377,9 +378,20 @@ export default function AdminPromotionsPage() {
       title="Promotions"
       subtitle="Click a row to edit · Active promos sync to /new/ and customer Promotions tab."
       actions={
-        <BtnSecondary onClick={() => setForm(emptyForm())} disabled={busy}>
-          + New promo
-        </BtnSecondary>
+        <>
+          <BtnSecondary
+            onClick={() => {
+              bulkTextareaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+              bulkTextareaRef.current?.focus();
+            }}
+            disabled={busy}
+          >
+            Bulk add SKUs
+          </BtnSecondary>
+          <BtnSecondary onClick={() => setForm(emptyForm())} disabled={busy}>
+            + New promo
+          </BtnSecondary>
+        </>
       }
     >
       <StatGrid
@@ -396,27 +408,6 @@ export default function AdminPromotionsPage() {
       />
 
       <AdminPublicShowcaseHint variant="promotions" />
-
-      <Panel title="Bulk add SKUs">
-        <p style={{ margin: "0 0 10px", fontSize: 12, color: "#6b7280" }}>
-          Create blank promotions now — set price, dates, and deals later.
-        </p>
-        <textarea
-          value={bulkSkuText}
-          onChange={(e) => setBulkSkuText(e.target.value)}
-          placeholder={"Paste SKUs — one per line, or separated by commas\n00100\n00200, 00300"}
-          rows={6}
-          style={{ ...inputStyle, width: "100%", resize: "vertical", fontFamily: "inherit" }}
-        />
-        <BtnRow>
-          <BtnPrimary onClick={() => void bulkImportPromotions()} disabled={busy || !bulkSkuText.trim()}>
-            Bulk add promotions
-          </BtnPrimary>
-          <BtnSecondary onClick={() => setBulkSkuText("")} disabled={busy || !bulkSkuText}>
-            Clear
-          </BtnSecondary>
-        </BtnRow>
-      </Panel>
 
       {!promotionsLoaded && busy ? (
         <Panel title="Loading promotions">
@@ -521,6 +512,25 @@ export default function AdminPromotionsPage() {
 
         <div style={splitForm} className="admin-catalog-form-sticky">
           <Panel title={editingSku ? `Edit ${editingSku}` : "Add promotion"}>
+            <FormSection title="Bulk add SKUs" hint="Paste many SKUs — edit price and dates later">
+              <textarea
+                ref={bulkTextareaRef}
+                value={bulkSkuText}
+                onChange={(e) => setBulkSkuText(e.target.value)}
+                placeholder={"One per line, or comma / tab separated\n00100\n00200, 00300"}
+                rows={5}
+                style={{ ...inputStyle, width: "100%", resize: "vertical", fontFamily: "inherit" }}
+              />
+              <BtnRow>
+                <BtnPrimary onClick={() => void bulkImportPromotions()} disabled={busy || !bulkSkuText.trim()}>
+                  Bulk add promotions
+                </BtnPrimary>
+                <BtnSecondary onClick={() => setBulkSkuText("")} disabled={busy || !bulkSkuText}>
+                  Clear
+                </BtnSecondary>
+              </BtnRow>
+            </FormSection>
+
             <FormSection title="SKU & label" hint="Required to save">
               <div style={formGrid}>
                 <div>
