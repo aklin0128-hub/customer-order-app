@@ -128,6 +128,11 @@ export function CatalogVirtualGrid({
 
   useLayoutEffect(() => {
     rowVirtualizer.measure();
+    const t1 = window.requestAnimationFrame(() => {
+      rowVirtualizer.measure();
+      window.requestAnimationFrame(() => rowVirtualizer.measure());
+    });
+    return () => window.cancelAnimationFrame(t1);
   }, [items.length, columnCount, gridKey, width, rowVirtualizer]);
 
   if (items.length === 0) return null;

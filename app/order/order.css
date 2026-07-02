@@ -818,7 +818,7 @@
 }
 
 .order-shop-card:has(.order-catalog-virtual-scroll) {
-  padding-top: 0 !important;
+  padding-top: 4px !important;
 }
 
 .order-clearance-bulk-row {
@@ -1405,8 +1405,7 @@
 
 .catalog-qty-card {
   align-self: stretch;
-  height: 100%;
-  min-height: 0;
+  height: auto;
   box-sizing: border-box;
 }
 
@@ -1441,6 +1440,11 @@
 .order-catalog-virtual-row {
   overflow: visible;
   align-items: stretch;
+  isolation: isolate;
+}
+
+.order-catalog-virtual-row[data-index] {
+  z-index: 1;
 }
 
 .catalog-qty-card-top-badges {
@@ -1452,23 +1456,32 @@
   width: 100%;
 }
 
+.catalog-qty-card--price-aligned {
+  overflow: visible;
+}
+
 .catalog-qty-card--price-aligned .catalog-qty-card-badge-slot {
-  min-height: 0;
+  min-height: auto;
   display: flex;
   flex-direction: column;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: 3px;
+  flex: 0 0 auto;
   flex-shrink: 0;
   margin-bottom: 2px;
+  overflow: visible;
+  position: relative;
+  z-index: 4;
 }
 
 .catalog-qty-card--price-aligned.catalog-qty-card--top-badges-2 .catalog-qty-card-badge-slot {
   flex-direction: row;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  align-content: center;
+  align-content: flex-start;
+  width: 100%;
 }
 
 .catalog-qty-card--top-badges-2 .catalog-item-storage {

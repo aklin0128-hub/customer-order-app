@@ -5,7 +5,7 @@ export const CATALOG_MAX_COLUMNS = 12;
 export const CATALOG_MIN_COLUMNS = 2;
 
 /** Initial virtual-row height estimate; rows are measured from tallest card content. */
-export const CATALOG_ROW_HEIGHT_PX = 320;
+export const CATALOG_ROW_HEIGHT_PX = 360;
 
 export function catalogRowStridePx() {
   return CATALOG_ROW_HEIGHT_PX + CATALOG_GRID_GAP_PX;
