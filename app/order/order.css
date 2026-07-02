@@ -599,36 +599,6 @@
   font-size: 11px !important;
 }
 
-.order-mode-tabs {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 0 0 4px;
-  margin-top: 0;
-  -webkit-overflow-scrolling: touch;
-  scroll-snap-type: x proximity;
-  scrollbar-width: none;
-}
-
-.order-mode-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.order-mode-tab {
-  flex: 0 0 auto;
-  min-width: 92px;
-  max-width: 38vw;
-  padding: 9px 10px !important;
-  font-size: 11px !important;
-  line-height: 1.25;
-  border-radius: 12px !important;
-  min-height: 42px;
-  white-space: normal;
-  text-align: center;
-  scroll-snap-align: start;
-}
-
 .order-customer-fields {
   display: grid;
   grid-template-columns: 1fr;
@@ -1458,9 +1428,19 @@
 
 .catalog-qty-card--price-aligned {
   overflow: visible;
+  position: relative;
+}
+
+.catalog-qty-card--price-aligned.catalog-qty-card--top-badges-1,
+.catalog-qty-card--price-aligned.catalog-qty-card--top-badges-2 {
+  padding-top: 30px;
 }
 
 .catalog-qty-card--price-aligned .catalog-qty-card-badge-slot {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
   min-height: auto;
   display: flex;
   flex-direction: column;
@@ -1469,10 +1449,9 @@
   gap: 3px;
   flex: 0 0 auto;
   flex-shrink: 0;
-  margin-bottom: 2px;
+  margin-bottom: 0;
   overflow: visible;
-  position: relative;
-  z-index: 4;
+  z-index: 5;
 }
 
 .catalog-qty-card--price-aligned.catalog-qty-card--top-badges-2 .catalog-qty-card-badge-slot {
@@ -2529,6 +2508,36 @@
 
 /* Mobile catalog breathing room */
 @media (max-width: 767px) {
+  .order-mode-tabs {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 0 4px;
+    margin-top: 0;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+
+  .order-mode-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .order-mode-tab {
+    flex: 0 0 auto;
+    min-width: 92px;
+    max-width: 38vw;
+    padding: 9px 10px !important;
+    font-size: 11px !important;
+    line-height: 1.25;
+    border-radius: 12px !important;
+    min-height: 42px;
+    white-space: normal;
+    text-align: center;
+    scroll-snap-align: start;
+  }
+
   .order-page {
     padding-left: 12px;
     padding-right: 12px;

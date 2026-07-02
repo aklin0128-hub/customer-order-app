@@ -2058,30 +2058,40 @@ export default function OrderPage() {
             {newItemCatalogItems.length === 0 ? (
               <div style={{ ...emptyStyle, border: "1px solid #fdba74", background: "#fff7ed", color: "#c2410c" }}>{t.noNewItems}</div>
             ) : (
-              <CatalogVirtualGrid
-                gridKey="newItems"
-                items={newItemCatalogItems}
-                catalogQtyMap={catalogQtyMap}
-                invoicePriceLabelForSku={invoicePriceLabelForSku}
-                inCartLabel={t.inCart}
-                palletLabel={t.pallet}
-                justAddedLabel={t.justAdded}
-                newBadgeLabel={t.newItems}
-                newItemChecker={() => true}
-                promoBadgeLabel={t.newItems}
-                editLabel={t.editProduct}
-                showAdminEdit={showAdminEditLinks}
-                showNewItemListPrice
-                showNewProductBadge
-                showPublishedDate
-                publishedDateLabel={t.publishedDate}
-                listPriceLabel={t.listPrice}
-                lang={lang}
-                canOrderItem={isOrderableItem}
-                orderBlockedMessage={(item) => formatOrderNotAvailableMessage(item.sku || "", item.status, t)}
-                onAdjust={adjustCatalogQty}
-                onUpdateQty={updateCatalogQty}
-              />
+              <div className="order-promo-grid order-new-items-grid">
+                {newItemCatalogItems.map((item) => {
+                  const sku = item.sku?.toUpperCase() || "";
+                  const qty = catalogQtyMap[sku] || "";
+                  return (
+                    <CatalogQtyCard
+                      key={item.sku}
+                      item={item}
+                      qty={qty}
+                      palletLabel={t.pallet}
+                      justAddedLabel={t.justAdded}
+                      inCartLabel={t.inCart}
+                      promoBadgeLabel={t.newItems}
+                      editLabel={t.editProduct}
+                      showAdminEdit={showAdminEditLinks}
+                      showNewItemListPrice
+                      showNewProductBadge
+                      showPublishedDate
+                      publishedDateLabel={t.publishedDate}
+                      listPriceLabel={t.listPrice}
+                      lang={lang}
+                      disabled={!isOrderableItem(item)}
+                      unavailableNote={
+                        !isOrderableItem(item)
+                          ? formatOrderNotAvailableMessage(item.sku || "", item.status, t)
+                          : undefined
+                      }
+                      invoicePrice={invoicePriceLabelForSku(sku)}
+                      onAdjust={adjustCatalogQty}
+                      onUpdateQty={updateCatalogQty}
+                    />
+                  );
+                })}
+              </div>
             )}
           </section>
         ) : mode === "promotion" ? (
