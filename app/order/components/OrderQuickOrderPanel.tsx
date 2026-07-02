@@ -1,24 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
-  formatOrderNotAvailableMessage,
   getDisplayStatus,
   isNewItem,
   isOrderableItem,
 } from "../catalogUtils";
 import { getComingSoonBadgeLabel, isComingSoonNewItem, isNewItemOrderingBlocked } from "@/lib/comingSoonBadge";
 import { copy } from "../orderCopy";
-import { qtyButtonStyle, stepButtonStyle, stepInputStyle } from "../orderStyles";
+import { stepButtonStyle, stepInputStyle } from "../orderStyles";
 import type { CartItem, CatalogItem, Lang } from "../types";
 import { ProductImage } from "./ProductImage";
 
-const MATCH_PREVIEW = 8;
-const MATCH_EXPANDED = 30;
+const MATCH_PREVIEW_COMPACT = 5;
+const MATCH_PREVIEW_DESKTOP = 8;
+const MATCH_EXPANDED_COMPACT = 18;
+const MATCH_EXPANDED_DESKTOP = 30;
 
 export function OrderQuickOrderPanel({
   lang,
+  compact = false,
   normalizedQuery,
   matchedItems,
   selectedItem,
@@ -28,15 +30,14 @@ export function OrderQuickOrderPanel({
   frequentItems,
   showAvailableOnly,
   onShowAvailableOnlyChange,
-  showAdminEditLinks,
   invoicePriceLabelForSku,
-  productMeta,
   onApplyQuickQty,
   onAdjustQty,
   onUpdateQty,
   onAddSkuToCart,
 }: {
   lang: Lang;
+  compact?: boolean;
   normalizedQuery: string;
   matchedItems: CatalogItem[];
   selectedItem: CatalogItem | null;
@@ -46,9 +47,7 @@ export function OrderQuickOrderPanel({
   frequentItems: CatalogItem[];
   showAvailableOnly: boolean;
   onShowAvailableOnlyChange: (value: boolean) => void;
-  showAdminEditLinks: boolean;
   invoicePriceLabelForSku: (sku: string) => string | undefined;
-  productMeta: (item: CatalogItem) => ReactNode;
   onApplyQuickQty: (qty: string) => void;
   onAdjustQty: (sku: string, delta: number) => void;
   onUpdateQty: (sku: string, value: string) => void;
@@ -60,15 +59,49 @@ export function OrderQuickOrderPanel({
 
   const focusItem = selectedItem;
   const focusSku = focusItem?.sku?.toUpperCase() || "";
-  const focusInCart = focusSku ? Number(catalogQtyMap[focusSku] || 0) : 0;
-  const focusCanOrder = focusItem ? isOrderableItem(focusItem) : false;
-  const focusComingSoon = focusItem ? isComingSoonNewItem(focusItem) : false;
-  const focusCanAdd = focusCanOrder && !isNewItemOrderingBlocked(focusItem);
+  const focusCanAdd = focusItem ? isOrderableItem(focusItem) && !isNewItemOrderingBlocked(focusItem) : false;
+
+  const matchPreview = compact ? MATCH_PREVIEW_COMPACT : MATCH_PREVIEW_DESKTOP;
+  const matchExpanded = compact ? MATCH_EXPANDED_COMPACT : MATCH_EXPANDED_DESKTOP;
+  const quickQtyButtons = compact ? ["1", "2", "5", "10"] : ["1", "2", "3", "5", "10", "20"];
 
   const visibleMatches = useMemo(() => {
-    const limit = showAllMatches ? MATCH_EXPANDED : MATCH_PREVIEW;
+    const limit = showAllMatches ? matchExpanded : matchPreview;
     return matchedItems.slice(0, limit);
-  }, [matchedItems, showAllMatches]);
+  }, [matchedItems, showAllMatches, matchExpanded, matchPreview]);
+
+  const quickPicks = useMemo(() => {
+    const seen = new Set<string>();
+    const picks: Array<{ sku: string; qty: string; onClick: () => void; className: string }> = [];
+
+    for (const item of recentItems.slice(0, compact ? 8 : 12)) {
+      const sku = item.sku?.toUpperCase() || "";
+      if (!sku || seen.has(sku)) continue;
+      seen.add(sku);
+      picks.push({
+        sku,
+        qty: item.qty || "1",
+        onClick: () => onAddSkuToCart({ sku: item.sku } as CatalogItem, item.qty || "1"),
+        className: "order-quick-recent-chip",
+      });
+    }
+
+    for (const item of frequentItems) {
+      const sku = item.sku?.toUpperCase() || "";
+      if (!sku || seen.has(sku)) continue;
+      seen.add(sku);
+      const inCart = Number(catalogQtyMap[sku] || 0);
+      picks.push({
+        sku,
+        qty: inCart > 0 ? String(inCart) : "1",
+        onClick: () => onAdjustQty(item.sku, 1),
+        className: "order-quick-frequent-chip",
+      });
+      if (picks.length >= (compact ? 14 : 18)) break;
+    }
+
+    return picks;
+  }, [recentItems, frequentItems, catalogQtyMap, compact, onAddSkuToCart, onAdjustQty]);
 
   useEffect(() => {
     setShowAllMatches(false);
@@ -78,7 +111,57 @@ export function OrderQuickOrderPanel({
     activeMatchRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [focusItem?.sku]);
 
-  const quickQtyButtons = ["1", "2", "3", "4", "5", "10", "15", "20"];
+  const renderExpandedControls = (item: CatalogItem) => {
+    const sku = item.sku?.toUpperCase() || "";
+    const canAdd = isOrderableItem(item) && !isNewItemOrderingBlocked(item);
+
+    return (
+      <div className="order-quick-match-expanded">
+        <div className="order-quick-focus-stepper">
+          <button
+            type="button"
+            onClick={() => onAdjustQty(item.sku, -1)}
+            disabled={!canAdd}
+            style={stepButtonStyle}
+            aria-label="-"
+          >
+            −
+          </button>
+          <input
+            value={catalogQtyMap[sku] || ""}
+            onChange={(e) => onUpdateQty(item.sku, e.target.value)}
+            placeholder="0"
+            inputMode="numeric"
+            disabled={!canAdd}
+            style={stepInputStyle}
+            aria-label={t.qty}
+          />
+          <button
+            type="button"
+            onClick={() => onAdjustQty(item.sku, 1)}
+            disabled={!canAdd}
+            style={stepButtonStyle}
+            aria-label="+"
+          >
+            +
+          </button>
+        </div>
+        <div className="order-quick-qty-grid order-quick-qty-grid--compact">
+          {quickQtyButtons.map((qty) => (
+            <button
+              key={qty}
+              type="button"
+              onClick={() => onApplyQuickQty(qty)}
+              disabled={!canAdd}
+              className="order-quick-qty-chip"
+            >
+              {qty}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   const renderMatchRow = (item: CatalogItem, index: number) => {
     const sku = item.sku?.toUpperCase() || "";
@@ -87,88 +170,105 @@ export function OrderQuickOrderPanel({
     const canOrder = isOrderableItem(item);
     const status = getDisplayStatus(item.status);
     const invoicePrice = invoicePriceLabelForSku(sku);
-    const isNew = isNewItem(item);
     const comingSoon = isComingSoonNewItem(item);
     const canAdd = canOrder && !isNewItemOrderingBlocked(item);
 
     return (
       <div key={item.sku} className={`order-quick-match-wrap${isActive ? " is-active" : ""}`}>
-        <button
-          ref={isActive ? activeMatchRef : undefined}
-          type="button"
-          className={`order-quick-match${isActive ? " is-active" : ""}${inCart ? " is-in-cart" : ""}`}
-          onClick={() => onSelectItem(item)}
-        >
-          <ProductImage sku={item.sku} alt={item.name || item.sku} size={44} imageUrl={item.imageUrl} />
-          <div className="order-quick-match-text">
-            <div className="order-quick-match-sku">
-              {item.sku}
-              {item.brand ? ` · ${item.brand}` : ""}
-              {isNew ? <span className="order-quick-match-new">{t.newItems}</span> : null}
-              {comingSoon ? (
-                <span className="order-quick-match-coming-soon">{getComingSoonBadgeLabel(lang)}</span>
-              ) : null}
+        <div className="order-quick-match-row">
+          <button
+            ref={isActive ? activeMatchRef : undefined}
+            type="button"
+            className={`order-quick-match${isActive ? " is-active" : ""}${inCart ? " is-in-cart" : ""}`}
+            onClick={() => onSelectItem(item)}
+          >
+            <ProductImage
+              sku={item.sku}
+              alt={item.name || item.sku}
+              size={compact ? 36 : 44}
+              imageUrl={item.imageUrl}
+            />
+            <div className="order-quick-match-text">
+              <div className="order-quick-match-sku">
+                {item.sku}
+                {item.brand ? ` · ${item.brand}` : ""}
+                {isNewItem(item) ? <span className="order-quick-match-new">{t.newItems}</span> : null}
+                {comingSoon ? (
+                  <span className="order-quick-match-coming-soon">{getComingSoonBadgeLabel(lang)}</span>
+                ) : null}
+              </div>
+              <div className="order-quick-match-name">{item.name || "—"}</div>
+              {!compact && invoicePrice ? <div className="order-quick-match-price">{invoicePrice}</div> : null}
+              {status && !canOrder ? <div className="order-quick-match-status">{status}</div> : null}
             </div>
-            <div className="order-quick-match-name">{item.name || "—"}</div>
-            {invoicePrice ? <div className="order-quick-match-price">{invoicePrice}</div> : null}
-            {status && !canOrder ? (
-              <div className="order-quick-match-status">{status}</div>
-            ) : null}
-          </div>
-          <div className="order-quick-match-side">
-            {inCart ? <span className="order-quick-match-cart">{catalogQtyMap[sku]}</span> : null}
-          </div>
-        </button>
-        <button
-          type="button"
-          className="order-quick-match-add"
-          disabled={!canAdd}
-          title={t.addOneCase}
-          aria-label={`${t.addOneCase} ${sku}`}
-          onClick={() => onAdjustQty(item.sku, 1)}
-        >
-          +1
-        </button>
+            <div className="order-quick-match-side">
+              {inCart ? <span className="order-quick-match-cart">{catalogQtyMap[sku]}</span> : null}
+            </div>
+          </button>
+          <button
+            type="button"
+            className="order-quick-match-add"
+            disabled={!canAdd}
+            title={t.addOneCase}
+            aria-label={`${t.addOneCase} ${sku}`}
+            onClick={() => onAdjustQty(item.sku, 1)}
+          >
+            +1
+          </button>
+        </div>
+        {isActive && focusItem?.sku === item.sku ? renderExpandedControls(item) : null}
       </div>
     );
   };
 
-  const renderSkuChip = (
-    sku: string,
-    qty: string,
-    onClick: () => void,
-    className: string
-  ) => (
-    <button key={`${className}-${sku}`} type="button" className={className} onClick={onClick}>
-      <span className="order-quick-recent-chip-sku">{sku}</span>
-      <span className="order-quick-recent-chip-qty">+{qty}</span>
-    </button>
-  );
-
   return (
-    <section className="order-quick-panel order-shop-card">
-      <div className="order-quick-panel-head">
-        <h2 className="order-quick-panel-title">{t.addItems}</h2>
-        <p className="order-quick-panel-hint">{t.searchModeHint}</p>
-        <p className="order-quick-panel-kbd">{t.quickOrderKeyboardHint}</p>
-      </div>
+    <section className={`order-quick-panel order-shop-card${compact ? " order-quick-panel--compact" : ""}`}>
+      {!compact ? (
+        <>
+          <p className="order-quick-panel-kbd">{t.quickOrderKeyboardHint}</p>
+          <label className="order-quick-filter">
+            <input
+              type="checkbox"
+              checked={showAvailableOnly}
+              onChange={(e) => onShowAvailableOnlyChange(e.target.checked)}
+            />
+            {t.availableOnly}
+          </label>
+        </>
+      ) : null}
 
-      <label className="order-quick-filter">
-        <input
-          type="checkbox"
-          checked={showAvailableOnly}
-          onChange={(e) => onShowAvailableOnlyChange(e.target.checked)}
-        />
-        {t.availableOnly}
-      </label>
-
-      {normalizedQuery && matchedItems.length > 0 ? (
-        <div className="order-quick-matches order-quick-matches--first">
-          <div className="order-quick-matches-title">
-            {t.quickOrderMatches.replace("{count}", String(matchedItems.length))}
+      {!normalizedQuery ? (
+        quickPicks.length > 0 ? (
+          <div className="order-quick-picks">
+            <div className="order-quick-recent-label">{compact ? t.quickOrderPicks : t.quickOrderFrequent}</div>
+            <div className="order-quick-recent-track">
+              {quickPicks.map((pick) => (
+                <button
+                  key={`${pick.className}-${pick.sku}`}
+                  type="button"
+                  className={pick.className}
+                  onClick={pick.onClick}
+                >
+                  <span className="order-quick-recent-chip-sku">{pick.sku}</span>
+                  <span className="order-quick-recent-chip-qty">+{pick.qty}</span>
+                </button>
+              ))}
+            </div>
           </div>
+        ) : compact ? null : (
+          <div className="order-quick-empty-focus">{t.quickOrderEmptyHint}</div>
+        )
+      ) : matchedItems.length === 0 ? (
+        <div className="order-quick-no-match">{t.noMatches}</div>
+      ) : (
+        <div className="order-quick-matches order-quick-matches--first">
+          {!compact ? (
+            <div className="order-quick-matches-title">
+              {t.quickOrderMatches.replace("{count}", String(matchedItems.length))}
+            </div>
+          ) : null}
           <div className="order-quick-match-list">{visibleMatches.map(renderMatchRow)}</div>
-          {matchedItems.length > MATCH_PREVIEW ? (
+          {matchedItems.length > matchPreview ? (
             <button
               type="button"
               className="order-quick-match-more"
@@ -176,159 +276,11 @@ export function OrderQuickOrderPanel({
             >
               {showAllMatches
                 ? t.quickOrderShowLess
-                : t.quickOrderShowMore.replace("{count}", String(matchedItems.length - MATCH_PREVIEW))}
+                : t.quickOrderShowMore.replace("{count}", String(matchedItems.length - matchPreview))}
             </button>
           ) : null}
         </div>
-      ) : null}
-
-      {normalizedQuery && matchedItems.length === 0 ? (
-        <div className="order-quick-no-match">{t.noMatches}</div>
-      ) : null}
-
-      {focusItem ? (
-        <article className={`order-quick-focus${focusInCart > 0 ? " is-in-cart" : ""}`}>
-          <div className="order-quick-focus-top">
-            <ProductImage
-              sku={focusItem.sku}
-              alt={focusItem.name || focusItem.sku}
-              size={64}
-              imageUrl={focusItem.imageUrl}
-            />
-            <div className="order-quick-focus-meta">
-              <div className="order-quick-focus-sku">
-                {focusItem.sku}
-                {focusItem.brand ? <span> · {focusItem.brand}</span> : null}
-                {isNewItem(focusItem) ? (
-                  <span className="order-quick-match-new order-quick-match-new--focus">{t.newItems}</span>
-                ) : null}
-                {focusComingSoon ? (
-                  <span className="order-quick-match-coming-soon order-quick-match-coming-soon--focus">
-                    {getComingSoonBadgeLabel(lang)}
-                  </span>
-                ) : null}
-              </div>
-              <div className="order-quick-focus-name">{focusItem.name || "—"}</div>
-              {productMeta(focusItem)}
-              {invoicePriceLabelForSku(focusItem.sku) ? (
-                <div className="order-quick-focus-price">{invoicePriceLabelForSku(focusItem.sku)}</div>
-              ) : null}
-              {!focusCanOrder ? (
-                <div className="order-quick-focus-blocked">
-                  {formatOrderNotAvailableMessage(focusItem.sku || "", focusItem.status, t)}
-                </div>
-              ) : focusComingSoon ? (
-                <div className="order-quick-focus-blocked">{getComingSoonBadgeLabel(lang)}</div>
-              ) : null}
-              {focusInCart > 0 ? (
-                <div className="order-quick-focus-in-cart">
-                  {t.inCart}: {focusInCart} {t.cases}
-                </div>
-              ) : null}
-            </div>
-            {showAdminEditLinks ? (
-              <a
-                href={`/admin/products?sku=${encodeURIComponent(focusItem.sku)}`}
-                className="order-quick-focus-edit"
-              >
-                {t.editProduct}
-              </a>
-            ) : null}
-          </div>
-
-          <div className="order-quick-focus-actions">
-            <div className="order-quick-focus-stepper">
-              <button
-                type="button"
-                onClick={() => onAdjustQty(focusItem.sku, -1)}
-                disabled={!focusCanAdd}
-                style={stepButtonStyle}
-                aria-label="-"
-              >
-                −
-              </button>
-              <input
-                value={catalogQtyMap[focusSku] || ""}
-                onChange={(e) => onUpdateQty(focusItem.sku, e.target.value)}
-                placeholder="0"
-                inputMode="numeric"
-                disabled={!focusCanAdd}
-                style={stepInputStyle}
-                aria-label={t.qty}
-              />
-              <button
-                type="button"
-                onClick={() => onAdjustQty(focusItem.sku, 1)}
-                disabled={!focusCanAdd}
-                style={stepButtonStyle}
-                aria-label="+"
-              >
-                +
-              </button>
-            </div>
-            <button
-              type="button"
-              className="order-quick-focus-add-one"
-              disabled={!focusCanAdd}
-              onClick={() => onAdjustQty(focusItem.sku, 1)}
-            >
-              {t.addOneCase}
-            </button>
-          </div>
-
-          <div className="order-quick-qty-grid">
-            {quickQtyButtons.map((qty) => (
-              <button
-                key={qty}
-                type="button"
-                onClick={() => onApplyQuickQty(qty)}
-                style={qtyButtonStyle}
-                disabled={!focusCanAdd}
-              >
-                {qty}
-              </button>
-            ))}
-          </div>
-        </article>
-      ) : normalizedQuery ? (
-        <div className="order-quick-empty-focus">{t.quickOrderPickSku}</div>
-      ) : null}
-
-      {!normalizedQuery ? (
-        <>
-          {recentItems.length > 0 ? (
-            <div className="order-quick-recent">
-              <div className="order-quick-recent-label">{t.recent}</div>
-              <div className="order-quick-recent-track">
-                {recentItems.slice(0, 14).map((item) => {
-                  const sku = item.sku?.toUpperCase() || "";
-                  return renderSkuChip(sku, item.qty || "1", () => onAddSkuToCart({ sku: item.sku } as CatalogItem, item.qty || "1"), "order-quick-recent-chip");
-                })}
-              </div>
-            </div>
-          ) : null}
-
-          {frequentItems.length > 0 ? (
-            <div className="order-quick-recent order-quick-frequent">
-              <div className="order-quick-recent-label">{t.quickOrderFrequent}</div>
-              <div className="order-quick-recent-track">
-                {frequentItems.map((item) => {
-                  const sku = item.sku?.toUpperCase() || "";
-                  const inCart = Number(catalogQtyMap[sku] || 0);
-                  return renderSkuChip(
-                    sku,
-                    inCart > 0 ? String(inCart) : "1",
-                    () => onAdjustQty(item.sku, 1),
-                    "order-quick-frequent-chip"
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-
-          <div className="order-quick-empty-focus">{t.quickOrderEmptyHint}</div>
-        </>
-      ) : null}
+      )}
     </section>
   );
 }

@@ -22,6 +22,7 @@ import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
 import { buildClearanceUpsellLines } from "./salesFlow";
 import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog } from "./catalogState";
+import { isNewItemOrderingBlocked } from "@/lib/comingSoonBadge";
 import { compareCatalogByNewestImport, compareCatalogForDisplay } from "@/lib/catalogNewItems";
 import {
   formatBrandLabel,
@@ -112,6 +113,8 @@ export default function OrderPage() {
   const autoLoadedRef = useRef(false);
   const clearanceFetchedRef = useRef(false);
   const transientMsgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const addSkuToCartRef = useRef<(sku: string, qty?: string) => void>(() => {});
+  const qtyInputRef = useRef("");
   const draftSnapshotRef = useRef({
     accountNo: "",
     storeName: "",
@@ -132,6 +135,7 @@ export default function OrderPage() {
   const [note, setNote] = useState("");
   const [skuInput, setSkuInput] = useState("");
   const [qtyInput, setQtyInput] = useState("");
+  qtyInputRef.current = qtyInput;
   const [cart, setCart] = useState<CartItem[]>([]);
   const [catalogQtyMap, setCatalogQtyMap] = useState<Record<string, string>>({});
   /** Session-only clearance cart — independent from catalogQtyMap. Not saved in drafts. */
@@ -1036,23 +1040,6 @@ export default function OrderPage() {
     setSelectedItem(matchedItems.length > 0 ? matchedItems[0] : null);
   }, [normalizedSkuInput, matchedItems, showAvailableOnly]);
 
-  const handleBarcodeScan = useCallback(
-    (raw: string) => {
-      const term = catalogSearchQueryFromScan(raw);
-      if (!term) return;
-      setBarcodeScannerOpen(false);
-      if (mode === "catalog") {
-        setCatalogSearch(term);
-        return;
-      }
-      if (mode === "search") {
-        setSkuInput(term);
-        requestAnimationFrame(() => skuInputRef.current?.focus());
-      }
-    },
-    [mode]
-  );
-
   const renderMobileScanButton = () => (
     <button
       type="button"
@@ -1101,6 +1088,35 @@ export default function OrderPage() {
     setSelectedItem(null);
     // Do not auto-focus SKU input; prevents page from jumping.
   };
+  addSkuToCartRef.current = addSkuToCart;
+
+  const handleBarcodeScan = useCallback(
+    (raw: string) => {
+      const term = catalogSearchQueryFromScan(raw);
+      if (!term) return;
+      setBarcodeScannerOpen(false);
+      if (mode === "catalog") {
+        setCatalogSearch(term);
+        return;
+      }
+      if (mode === "search") {
+        const scannedItem = findCatalogItemByScanCode(raw.trim());
+        if (
+          scannedItem?.sku &&
+          isOrderableItem(scannedItem) &&
+          !isNewItemOrderingBlocked(scannedItem)
+        ) {
+          const qty = qtyInputRef.current.trim() || "1";
+          addSkuToCartRef.current(scannedItem.sku, qty);
+          showTransientToast(`${scannedItem.sku} +${qty}`);
+          return;
+        }
+        setSkuInput(term);
+        requestAnimationFrame(() => skuInputRef.current?.focus());
+      }
+    },
+    [mode, showTransientToast]
+  );
 
   const addItem = () => {
     const typedSku = skuInput.trim().toUpperCase();
@@ -1711,74 +1727,70 @@ export default function OrderPage() {
       ) : null}
 
       {mode === "search" ? (
-        <>
-          <div className="order-shop-search-row">
-            <label className="order-shop-search-field">
-              <span className="order-shop-search-icon" aria-hidden>
-                <svg viewBox="0 0 24 24" width="18" height="18" focusable="false">
-                  <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="2.2" />
-                  <path d="M20 20l-3.5-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
-                </svg>
-              </span>
-              <input
-                ref={skuInputRef}
-                value={skuInput}
-                onChange={(e) => setSkuInput(e.target.value.toUpperCase())}
-                onKeyDown={(e) => {
-                  if (
-                    handleSearchQtyKeyDown(
-                      e,
-                      resolveQuickSearchTargetItem(skuInput, {
-                        selected: selectedItem,
-                        matched: matchedItems,
-                      })
-                    )
-                  ) {
-                    return;
-                  }
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addItem();
-                    return;
-                  }
-                  if (e.key === "ArrowDown") {
-                    e.preventDefault();
-                    cycleQuickOrderMatch(1);
-                    return;
-                  }
-                  if (e.key === "ArrowUp") {
-                    e.preventDefault();
-                    cycleQuickOrderMatch(-1);
-                  }
-                }}
-                placeholder={t.searchPlaceholder}
-                autoCapitalize="characters"
-                className="order-shop-search-input"
-                aria-label={t.skuItem}
-              />
-            </label>
-            {renderMobileScanButton()}
-          </div>
-          <div className="order-shop-quick-row">
+        <div className="order-shop-search-row order-shop-quick-composer">
+          <label className="order-shop-search-field">
+            <span className="order-shop-search-icon" aria-hidden>
+              <svg viewBox="0 0 24 24" width="18" height="18" focusable="false">
+                <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="2.2" />
+                <path d="M20 20l-3.5-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+              </svg>
+            </span>
             <input
-              value={qtyInput}
-              onChange={(e) => setQtyInput(e.target.value.replace(/[^0-9]/g, ""))}
+              ref={skuInputRef}
+              value={skuInput}
+              onChange={(e) => setSkuInput(e.target.value.toUpperCase())}
               onKeyDown={(e) => {
+                if (
+                  handleSearchQtyKeyDown(
+                    e,
+                    resolveQuickSearchTargetItem(skuInput, {
+                      selected: selectedItem,
+                      matched: matchedItems,
+                    })
+                  )
+                ) {
+                  return;
+                }
                 if (e.key === "Enter") {
                   e.preventDefault();
                   addItem();
+                  return;
+                }
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  cycleQuickOrderMatch(1);
+                  return;
+                }
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  cycleQuickOrderMatch(-1);
                 }
               }}
-              placeholder="1"
-              inputMode="numeric"
-              className="order-shop-qty-input"
-              aria-label={t.qty}
+              placeholder={t.searchPlaceholder}
+              autoCapitalize="characters"
+              className="order-shop-search-input"
+              aria-label={t.skuItem}
             />
-            <button type="button" className="order-shop-add-btn" onClick={addItem}>
-              {t.addItem}
-            </button>
-          </div>
-        </>
+          </label>
+          {renderMobileScanButton()}
+          <input
+            value={qtyInput}
+            onChange={(e) => setQtyInput(e.target.value.replace(/[^0-9]/g, ""))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addItem();
+              }
+            }}
+            placeholder="1"
+            inputMode="numeric"
+            className="order-shop-qty-input order-shop-qty-input--inline"
+            aria-label={t.qty}
+          />
+          <button type="button" className="order-shop-add-btn order-shop-add-btn--inline" onClick={addItem}>
+            +
+          </button>
+        </div>
       ) : null}
 
       {renderMobileModeTags()}
@@ -2075,6 +2087,7 @@ export default function OrderPage() {
         {mode === "search" ? (
           <OrderQuickOrderPanel
             lang={lang}
+            compact={isMobileViewport}
             normalizedQuery={normalizedSkuInput}
             matchedItems={matchedItems}
             selectedItem={selectedItem}
@@ -2087,9 +2100,7 @@ export default function OrderPage() {
             frequentItems={frequentCatalogItems}
             showAvailableOnly={showAvailableOnly}
             onShowAvailableOnlyChange={setShowAvailableOnly}
-            showAdminEditLinks={showAdminEditLinks}
             invoicePriceLabelForSku={invoicePriceLabelForSku}
-            productMeta={renderProductMeta}
             onApplyQuickQty={applyQuickQtyToSelected}
             onAdjustQty={adjustCatalogQty}
             onUpdateQty={updateCatalogQty}
