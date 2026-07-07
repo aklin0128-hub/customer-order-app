@@ -10,6 +10,7 @@ import {
 } from "../catalogGridLayout";
 import { catalogVirtualScrollStyle } from "../orderStyles";
 import type { CatalogItem, Lang } from "../types";
+import { isProductOrderingBlocked } from "@/lib/productAvailability";
 import { CatalogQtyCard } from "./CatalogQtyCard";
 
 function readScrollContainerWidth(el: HTMLElement | null) {
@@ -202,7 +203,7 @@ export function CatalogVirtualGrid({
                     : newItemChecker?.(item)
                       ? newBadgeLabel
                       : undefined;
-                const canOrder = canOrderItem?.(item) ?? true;
+                const canOrder = (canOrderItem?.(item) ?? true) && !isProductOrderingBlocked(item);
                 return (
                   <CatalogQtyCard
                     key={item.sku}

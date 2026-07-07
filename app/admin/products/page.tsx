@@ -51,6 +51,7 @@ type Product = {
   newItemListPrice?: string;
   newItemOutOfStock?: boolean;
   newItemComingSoon?: boolean;
+  outOfStock?: boolean;
   source?: string;
 };
 
@@ -138,6 +139,7 @@ export default function AdminProductsPage() {
   const [newItemListPrice, setNewItemListPrice] = useState("");
   const [newItemOutOfStock, setNewItemOutOfStock] = useState(false);
   const [newItemComingSoon, setNewItemComingSoon] = useState(false);
+  const [outOfStock, setOutOfStock] = useState(false);
 
   const showcaseStorageLabel = useMemo(
     () => resolveNewItemStorageLabel({ categories, category: categories[0] }),
@@ -282,6 +284,7 @@ export default function AdminProductsPage() {
     setNewItemListPrice(p.newItemListPrice || "");
     setNewItemOutOfStock(readNewItemOutOfStockForAdmin(p));
     setNewItemComingSoon(readNewItemComingSoonForAdmin(p));
+    setOutOfStock(Boolean(p.outOfStock));
     setFormDirty(false);
     setAutoSaveStatus("");
     notify(`Editing ${p.sku}`);
@@ -382,6 +385,7 @@ export default function AdminProductsPage() {
     setNewItemListPrice("");
     setNewItemOutOfStock(false);
     setNewItemComingSoon(false);
+    setOutOfStock(false);
     setFormDirty(false);
     setAutoSaveStatus("");
     setMsg("");
@@ -425,6 +429,7 @@ export default function AdminProductsPage() {
           newItemListPrice: newItemListPrice || undefined,
           newItemOutOfStock: isNew ? newItemOutOfStock : false,
           newItemComingSoon: isNew ? newItemComingSoon : false,
+          outOfStock,
         }),
       });
       const data = await readApiJson(res);
@@ -469,7 +474,7 @@ export default function AdminProductsPage() {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, newItemOutOfStock, newItemComingSoon, newItemDescription, newItemDescriptionPdfUrl, newPublishedDate, newItemListPrice]);
+  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, outOfStock, newItemOutOfStock, newItemComingSoon, newItemDescription, newItemDescriptionPdfUrl, newPublishedDate, newItemListPrice]);
 
   const uploadNewItemPdf = async (file: File | null) => {
     const finalSku = sku.trim().toUpperCase();
@@ -809,6 +814,32 @@ export default function AdminProductsPage() {
                   ))}
                 </select>
               </div>
+              <label
+                style={{
+                  gridColumn: "1 / -1",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  border: "1px solid #fecaca",
+                  borderRadius: 12,
+                  padding: 12,
+                  background: outOfStock ? "#fef2f2" : "#fff",
+                  color: "#991b1b",
+                  fontSize: 13,
+                  fontWeight: 900,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={outOfStock}
+                  onChange={(e) => {
+                    setOutOfStock(e.target.checked);
+                    markDirty();
+                  }}
+                />
+                Out of stock — show stamp on catalog / weekly picks / clearance and block ordering
+              </label>
               <div style={{ gridColumn: "1 / -1" }}>
                 <label style={labelStyle}>Category</label>
                 <div
@@ -1020,7 +1051,7 @@ export default function AdminProductsPage() {
                         markDirty();
                       }}
                     />
-                    Out of stock — show stamp on /new/ and order New items
+                    Out of stock — show stamp on /new/ and New items tab (in addition to general flag above)
                   </label>
                   <label
                     style={{

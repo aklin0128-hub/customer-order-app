@@ -23,7 +23,7 @@ import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
 import { buildClearanceUpsellLines } from "./salesFlow";
 import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog } from "./catalogState";
-import { isNewItemOrderingBlocked } from "@/lib/comingSoonBadge";
+import { isProductOrderingBlocked } from "@/lib/productAvailability";
 import { compareCatalogByNewestImport, compareCatalogForDisplay } from "@/lib/catalogNewItems";
 import {
   formatBrandLabel,
@@ -195,6 +195,11 @@ export default function OrderPage() {
   const categoryAllActive = categoryFilters.length === 0;
 
   const t = copy[lang];
+
+  const passesAvailableFilter = useCallback(
+    (item?: CatalogItem | null) => Boolean(item) && isOrderableItem(item) && !isProductOrderingBlocked(item),
+    []
+  );
 
   const showTransientToast = useCallback((message: string, ms = 4000) => {
     if (transientMsgTimerRef.current) clearTimeout(transientMsgTimerRef.current);
@@ -586,7 +591,7 @@ export default function OrderPage() {
     return catalog
       .map((item) => ({ item, score: scoreCatalogSearchQuery(item, q) }))
       .filter((x) => x.score >= 0)
-      .filter((x) => (showAvailableOnly ? isOrderableItem(x.item) : true))
+      .filter((x) => (showAvailableOnly ? passesAvailableFilter(x.item) : true))
       .sort((a, b) => {
         const aNormal = isOrderableItem(a.item);
         const bNormal = isOrderableItem(b.item);
@@ -600,8 +605,8 @@ export default function OrderPage() {
 
   const catalogBrowseBase = useMemo(() => {
     if (!showAvailableOnly) return catalog;
-    return catalog.filter((item) => isOrderableItem(item));
-  }, [catalogVersion, showAvailableOnly]);
+    return catalog.filter((item) => passesAvailableFilter(item));
+  }, [catalogVersion, showAvailableOnly, passesAvailableFilter]);
 
   const brandSplit = useMemo(
     () => splitBrandFilters(catalogBrowseBase),
@@ -684,7 +689,7 @@ export default function OrderPage() {
       invoiceFrequentSkus
         .map((sku) => getCatalogItemBySku(sku))
         .filter((item): item is CatalogItem => Boolean(item))
-        .filter((item) => (showAvailableOnly ? isOrderableItem(item) : true))
+        .filter((item) => (showAvailableOnly ? passesAvailableFilter(item) : true))
         .slice(0, 14),
     [invoiceFrequentSkus, showAvailableOnly, catalogVersion]
   );
@@ -773,6 +778,10 @@ export default function OrderPage() {
     }
     if (!isOrderableItem(catalogItem)) {
       alert(formatOrderNotAvailableMessage(cleanSku, catalogItem.status, t));
+      return true;
+    }
+    if (isProductOrderingBlocked(catalogItem)) {
+      alert(`${cleanSku}: ${t.orderNotAvailable}`);
       return true;
     }
     return false;
@@ -1033,7 +1042,7 @@ export default function OrderPage() {
     const exactMatch =
       catalog.find((item) => item.sku?.toUpperCase() === normalizedSkuInput) ||
       findCatalogItemByScanCode(normalizedSkuInput);
-    if (exactMatch && (!showAvailableOnly || isOrderableItem(exactMatch))) {
+    if (exactMatch && (!showAvailableOnly || passesAvailableFilter(exactMatch))) {
       setSelectedItem(exactMatch);
       return;
     }
@@ -1105,7 +1114,7 @@ export default function OrderPage() {
         if (
           scannedItem?.sku &&
           isOrderableItem(scannedItem) &&
-          !isNewItemOrderingBlocked(scannedItem)
+          !isProductOrderingBlocked(scannedItem)
         ) {
           const qty = qtyInputRef.current.trim() || "1";
           addSkuToCartRef.current(scannedItem.sku, qty);

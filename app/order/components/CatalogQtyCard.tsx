@@ -7,9 +7,8 @@ import { NewProductBadge } from "@/app/components/NewProductBadge";
 import { OutOfStockStamp } from "@/app/components/OutOfStockStamp";
 import {
   isComingSoonNewItem,
-  isNewItemOrderingBlocked,
-  isNewItemOutOfStockStamp,
 } from "@/lib/comingSoonBadge";
+import { isProductOrderingBlocked, isProductOutOfStockStamp } from "@/lib/productAvailability";
 import { resolveNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import { getDisplayStatus, getStatusBadgeStyle, isJustAddedItem, isOrderableItem } from "../catalogUtils";
 import type { CatalogItem, Lang } from "../types";
@@ -132,9 +131,9 @@ export function CatalogQtyCard({
       : "";
   const alignedPriceLayout = Boolean(showNewItemListPrice);
   const comingSoon = alignedPriceLayout && isComingSoonNewItem(item);
-  const outOfStock = alignedPriceLayout && isNewItemOutOfStockStamp(item);
+  const outOfStock = isProductOutOfStockStamp(item);
   const stamped = comingSoon || outOfStock;
-  const orderingBlocked = alignedPriceLayout && isNewItemOrderingBlocked(item);
+  const orderingBlocked = isProductOrderingBlocked(item);
   const showNewItemExtras = Boolean(showNewProductBadge || showNewItemListPrice);
   const storageLabel = showNewItemExtras ? resolveNewItemStorageLabel(item) : undefined;
   const showJustAdded = Boolean(justAddedLabel && !showNewProductBadge && (uniformNewPill || isJustAddedItem(item)));
