@@ -34,6 +34,8 @@ export type CatalogItem = {
   /** Admin: show Coming Soon tag on /new/ and order New items (not orderable yet) */
   newItemOutOfStock?: boolean;
   newItemComingSoon?: boolean;
+  /** Admin flag: show OUT OF STOCK stamp and block ordering on all order tabs. */
+  outOfStock?: boolean;
 };
 
 export type PromoPriceTier = {

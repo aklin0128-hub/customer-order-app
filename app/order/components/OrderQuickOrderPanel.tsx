@@ -7,7 +7,8 @@ import {
   isNewItem,
   isOrderableItem,
 } from "../catalogUtils";
-import { getComingSoonBadgeLabel, isComingSoonNewItem, isNewItemOrderingBlocked } from "@/lib/comingSoonBadge";
+import { getComingSoonBadgeLabel, isComingSoonNewItem } from "@/lib/comingSoonBadge";
+import { isProductOrderingBlocked } from "@/lib/productAvailability";
 import { copy } from "../orderCopy";
 import { stepButtonStyle, stepInputStyle } from "../orderStyles";
 import type { CartItem, CatalogItem, Lang } from "../types";
@@ -81,7 +82,7 @@ export function OrderQuickOrderPanel({
 
   const renderExpandedControls = (item: CatalogItem) => {
     const sku = item.sku?.toUpperCase() || "";
-    const canAdd = isOrderableItem(item) && !isNewItemOrderingBlocked(item);
+    const canAdd = isOrderableItem(item) && !isProductOrderingBlocked(item);
 
     return (
       <div className="order-quick-match-expanded">
@@ -139,7 +140,7 @@ export function OrderQuickOrderPanel({
     const status = getDisplayStatus(item.status);
     const invoicePrice = invoicePriceLabelForSku(sku);
     const comingSoon = isComingSoonNewItem(item);
-    const canAdd = canOrder && !isNewItemOrderingBlocked(item);
+    const canAdd = canOrder && !isProductOrderingBlocked(item);
 
     return (
       <div key={item.sku} className={`order-quick-match-wrap${isActive ? " is-active" : ""}`}>

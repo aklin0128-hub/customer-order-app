@@ -41,6 +41,7 @@ type Product = {
   newItemListPrice?: string;
   newItemOutOfStock?: boolean;
   newItemComingSoon?: boolean;
+  outOfStock?: boolean;
   source?: string;
   updatedAt?: string;
 };
@@ -121,6 +122,7 @@ export async function POST(req: Request) {
     const justAdded = Boolean(body?.justAdded);
     const newItemOutOfStock = Boolean(body?.newItemOutOfStock);
     const newItemComingSoon = Boolean(body?.newItemComingSoon);
+    const outOfStock = Boolean(body?.outOfStock);
     const newItemDescription = String(body?.newItemDescription || "").trim();
     const newItemDescriptionPdfUrl = String(body?.newItemDescriptionPdfUrl || "").trim();
     const publishedInput =
@@ -187,6 +189,7 @@ export async function POST(req: Request) {
       justAdded,
       newItemOutOfStock: isNew ? newItemOutOfStock : false,
       newItemComingSoon: isNew ? newItemComingSoon : false,
+      outOfStock,
       newSince,
       newPublishedDate,
       newItemListPrice,

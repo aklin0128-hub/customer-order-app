@@ -22,6 +22,7 @@ export type MergedCatalogProduct = {
   newItemListPrice?: string;
   newItemOutOfStock?: boolean;
   newItemComingSoon?: boolean;
+  outOfStock?: boolean;
   name_k?: string;
   [key: string]: unknown;
 };
