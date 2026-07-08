@@ -56,6 +56,7 @@ import {
 import {
   buildCatalogQtyMapFromDraft,
   cartItemsFromQtyMap,
+  cloudDraftHasMoreItems,
   countDraftItems,
   mergeOrderDrafts,
   normalizeOrderDraft,
@@ -445,6 +446,14 @@ export default function OrderPage() {
         if (countDraftItems(merged) > 0) {
           showTransientToast(t.loadedDraft);
         }
+
+        try {
+          await fetch("/api/save-draft", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...merged, allowClear: false }),
+          });
+        } catch {}
       }
 
       try {
@@ -506,10 +515,29 @@ export default function OrderPage() {
     localStorage.setItem(`draft_${accountNo}`, JSON.stringify(draft));
 
     const timer = setTimeout(async () => {
+      const applyServerDraftIfRicher = (serverDraft: OrderDraftPayload) => {
+        const current = normalizeOrderDraft(accountNo, {
+          storeName,
+          phone,
+          orderEmail,
+          note,
+          cart,
+          catalogQtyMap,
+        });
+        if (!cloudDraftHasMoreItems(current, serverDraft)) return;
+
+        setPhone(serverDraft.phone || "");
+        setNote(serverDraft.note || "");
+        const map = buildCatalogQtyMapFromDraft(serverDraft);
+        setCatalogQtyMap(map);
+        setCart(cartItemsFromQtyMap(map));
+        localStorage.setItem(`draft_${accountNo}`, JSON.stringify(serverDraft));
+      };
+
       try {
         const saveBody = {
           ...draft,
-          allowClear: countDraftItems(draft) === 0,
+          allowClear: false,
         };
         const res = await fetch("/api/save-draft", {
           method: "POST",
@@ -517,13 +545,23 @@ export default function OrderPage() {
           body: JSON.stringify(saveBody),
         });
         if (!res.ok) throw new Error("save failed");
+        const data = await res.json();
+        if (data?.draft) {
+          applyServerDraftIfRicher(normalizeOrderDraft(accountNo, data.draft));
+        }
       } catch {
         try {
-          await fetch("/api/save-draft", {
+          const res = await fetch("/api/save-draft", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...draft, allowClear: countDraftItems(draft) === 0 }),
+            body: JSON.stringify({ ...draft, allowClear: false }),
           });
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.draft) {
+              applyServerDraftIfRicher(normalizeOrderDraft(accountNo, data.draft));
+            }
+          }
         } catch {
           /* localStorage backup already written above */
         }
@@ -563,7 +601,7 @@ export default function OrderPage() {
       if (typeof navigator.sendBeacon === "function") {
         const body = JSON.stringify({
           ...payload,
-          allowClear: countDraftItems(payload) === 0,
+          allowClear: false,
         });
         navigator.sendBeacon("/api/save-draft", new Blob([body], { type: "application/json" }));
       }

@@ -6,6 +6,7 @@ import {
   countDraftItems,
   mergeCatalogQtyMaps,
   mergeOrderDrafts,
+  resolveCloudDraftSave,
 } from "@/lib/orderDraft";
 
 test("mergeOrderDrafts keeps cloud cart when local empty draft is newer", () => {
@@ -95,6 +96,55 @@ test("mergeCatalogQtyMaps unions lines and prefers newer side on conflicts", () 
     "00200": "1",
     "00300": "3",
   });
+});
+
+test("resolveCloudDraftSave unions incoming with existing cloud draft", () => {
+  const incoming = {
+    accountNo: "FL111",
+    catalogQtyMap: { "00300": "3" },
+    updatedAt: "2026-05-20T12:00:00.000Z",
+  };
+  const existing = {
+    accountNo: "FL111",
+    catalogQtyMap: { "00100": "2" },
+    updatedAt: "2026-05-20T11:00:00.000Z",
+  };
+
+  const resolved = resolveCloudDraftSave(incoming, existing, false);
+  assert.notEqual(resolved, "delete");
+  assert.equal(countDraftItems(resolved), 2);
+});
+
+test("resolveCloudDraftSave keeps cloud cart when autosave is empty", () => {
+  const incoming = {
+    accountNo: "FL111",
+    catalogQtyMap: {},
+    updatedAt: "2026-05-20T12:00:00.000Z",
+  };
+  const existing = {
+    accountNo: "FL111",
+    catalogQtyMap: { "00100": "2" },
+    updatedAt: "2026-05-20T11:00:00.000Z",
+  };
+
+  const resolved = resolveCloudDraftSave(incoming, existing, false);
+  assert.notEqual(resolved, "delete");
+  assert.equal(buildCatalogQtyMapFromDraft(resolved)["00100"], "2");
+});
+
+test("resolveCloudDraftSave deletes only on explicit clear", () => {
+  const incoming = {
+    accountNo: "FL111",
+    catalogQtyMap: {},
+    updatedAt: "2026-05-20T12:00:00.000Z",
+  };
+  const existing = {
+    accountNo: "FL111",
+    catalogQtyMap: { "00100": "2" },
+    updatedAt: "2026-05-20T11:00:00.000Z",
+  };
+
+  assert.equal(resolveCloudDraftSave(incoming, existing, true), "delete");
 });
 
 test("buildCatalogQtyMapFromDraft uses cart lines when catalogQtyMap is empty", () => {

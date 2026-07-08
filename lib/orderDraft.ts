@@ -110,6 +110,29 @@ export function mergeOrderDrafts(
   });
 }
 
+/** Cloud save — union with existing draft unless the user explicitly clears. */
+export function resolveCloudDraftSave(
+  incoming: OrderDraftPayload,
+  existing: OrderDraftPayload | null | undefined,
+  allowClear: boolean
+): "delete" | OrderDraftPayload {
+  if (allowClear && countDraftItems(incoming) === 0) {
+    return "delete";
+  }
+
+  const merged = mergeOrderDrafts(incoming, existing ?? null);
+  if (merged) return merged;
+
+  return incoming;
+}
+
+export function cloudDraftHasMoreItems(
+  current: OrderDraftPayload | null | undefined,
+  server: OrderDraftPayload | null | undefined
+) {
+  return countDraftItems(server) > countDraftItems(current);
+}
+
 export function normalizeOrderDraft(
   accountNo: string,
   raw: Partial<OrderDraftPayload>

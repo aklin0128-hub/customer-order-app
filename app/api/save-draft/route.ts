@@ -1,7 +1,6 @@
 import {
-  countDraftItems,
-  draftTimestamp,
   normalizeOrderDraft,
+  resolveCloudDraftSave,
   type OrderDraftPayload,
 } from "@/lib/orderDraft";
 import { NextResponse } from "next/server";
@@ -29,45 +28,26 @@ export async function POST(req: Request) {
     });
 
     const existing = await redis.get<OrderDraftPayload>(`draft:${accountNo}`);
-    let draft = incoming;
+    const resolved = resolveCloudDraftSave(incoming, existing, allowClear);
 
-    // Ignore stale empty autosaves (e.g. before draft load). User deletes send a newer updatedAt.
-    const incomingIsStaleEmpty =
-      countDraftItems(incoming) === 0 &&
-      Boolean(existing && countDraftItems(existing) > 0) &&
-      draftTimestamp(incoming) <= draftTimestamp(existing);
-
-    if (existing && !allowClear && incomingIsStaleEmpty) {
-      draft = normalizeOrderDraft(accountNo, {
-        ...existing,
-        phone: incoming.phone,
-        note: incoming.note,
-        orderEmail: incoming.orderEmail,
-        storeName: incoming.storeName || existing.storeName,
-        updatedAt: existing.updatedAt,
+    if (resolved === "delete") {
+      await redis.del(`draft:${accountNo}`);
+      const { unindexDraftAccount } = await import("@/lib/redisIndexes");
+      await unindexDraftAccount(accountNo);
+      return NextResponse.json({
+        success: true,
+        message: "Cloud draft cleared.",
+        draft: incoming,
       });
     }
 
-    if (allowClear || (countDraftItems(incoming) === 0 && !incomingIsStaleEmpty)) {
-      if (countDraftItems(incoming) === 0) {
-        await redis.del(`draft:${accountNo}`);
-        const { unindexDraftAccount } = await import("@/lib/redisIndexes");
-        await unindexDraftAccount(accountNo);
-        return NextResponse.json({
-          success: true,
-          message: "Cloud draft cleared.",
-          draft: incoming,
-        });
-      }
-    }
-
-    await redis.set(`draft:${accountNo}`, draft);
+    await redis.set(`draft:${accountNo}`, resolved);
     await indexDraftAccount(accountNo);
 
     return NextResponse.json({
       success: true,
       message: "Cloud draft saved.",
-      draft,
+      draft: resolved,
     });
   } catch (error: any) {
     return NextResponse.json(
