@@ -52,7 +52,35 @@ export function draftTimestamp(draft: OrderDraftPayload | null | undefined) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-/** Prefer the draft that actually has cart lines; otherwise use the newer save. */
+/** Combine SKU qty maps — union all lines; same SKU uses the newer draft's qty. */
+export function mergeCatalogQtyMaps(
+  localMap: Record<string, string>,
+  cloudMap: Record<string, string>,
+  localTime: number,
+  cloudTime: number
+): Record<string, string> {
+  const merged: Record<string, string> = {};
+  const skus = new Set([...Object.keys(localMap), ...Object.keys(cloudMap)]);
+
+  for (const sku of skus) {
+    const localQty = String(localMap[sku] || "").trim();
+    const cloudQty = String(cloudMap[sku] || "").trim();
+    const localHas = Number(localQty) > 0;
+    const cloudHas = Number(cloudQty) > 0;
+
+    if (localHas && cloudHas) {
+      merged[sku] = localTime >= cloudTime ? localQty : cloudQty;
+    } else if (localHas) {
+      merged[sku] = localQty;
+    } else if (cloudHas) {
+      merged[sku] = cloudQty;
+    }
+  }
+
+  return merged;
+}
+
+/** Merge local + cloud drafts — keep all SKUs from both sides (cross-device carts combine). */
 export function mergeOrderDrafts(
   local: OrderDraftPayload | null | undefined,
   cloud: OrderDraftPayload | null | undefined
@@ -61,27 +89,25 @@ export function mergeOrderDrafts(
   if (!local) return cloud ? { ...cloud } : null;
   if (!cloud) return { ...local };
 
-  const localItems = countDraftItems(local);
-  const cloudItems = countDraftItems(cloud);
+  const localMap = buildCatalogQtyMapFromDraft(local);
+  const cloudMap = buildCatalogQtyMapFromDraft(cloud);
   const localTime = draftTimestamp(local);
   const cloudTime = draftTimestamp(cloud);
+  const newer = localTime >= cloudTime ? local : cloud;
+  const older = newer === local ? cloud : local;
+  const mergedMap = mergeCatalogQtyMaps(localMap, cloudMap, localTime, cloudTime);
+  const accountNo = String(newer.accountNo || older.accountNo || "").trim().toUpperCase();
+  const latestTime = Math.max(localTime, cloudTime);
 
-  if (localItems === 0 && cloudItems > 0) {
-    return localTime >= cloudTime ? { ...local } : { ...cloud };
-  }
-  if (cloudItems === 0 && localItems > 0) {
-    return cloudTime >= localTime ? { ...cloud } : { ...local };
-  }
-
-  const winner = cloudTime > localTime ? cloud : localTime > cloudTime ? local : cloudItems >= localItems ? cloud : local;
-  const loser = winner === cloud ? local : cloud;
-
-  return {
-    ...winner,
-    phone: winner.phone || loser.phone || "",
-    note: winner.note || loser.note || "",
-    orderEmail: winner.orderEmail || loser.orderEmail || "",
-  };
+  return normalizeOrderDraft(accountNo, {
+    storeName: newer.storeName || older.storeName,
+    phone: newer.phone || older.phone,
+    note: newer.note || older.note,
+    orderEmail: newer.orderEmail || older.orderEmail,
+    catalogQtyMap: mergedMap,
+    cart: cartItemsFromQtyMap(mergedMap),
+    updatedAt: latestTime > 0 ? new Date(latestTime).toISOString() : new Date().toISOString(),
+  });
 }
 
 export function normalizeOrderDraft(
