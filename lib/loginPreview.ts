@@ -1,5 +1,5 @@
 import { isNewItem } from "@/app/order/catalogUtils";
-import { compareCatalogByNewestImport, parseNewPublishedDate } from "@/lib/catalogNewItems";
+import { compareCatalogByNewestImport, parseNewItemComingDate, parseNewPublishedDate } from "@/lib/catalogNewItems";
 import { formatNewItemListPriceDisplay, normalizeNewItemListPrice } from "@/lib/newItemListPrice";
 import { resolveNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import { getMergedCatalogProducts } from "@/lib/catalogMerge";
@@ -30,6 +30,7 @@ export type LoginPreviewCard = {
   newItemDescriptionPdfUrl?: string;
   newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
   newPublishedDate?: string;
+  newItemComingDate?: string;
   /** /new/ showcase only */
   newItemListPrice?: string;
   newItemOutOfStock?: boolean;
@@ -87,6 +88,7 @@ function catalogToCard(item: Record<string, unknown>): LoginPreviewCard {
     newItemDescriptionPdfUrl: String(item.newItemDescriptionPdfUrl || "").trim() || undefined,
     newItemStorageLabel: resolveNewItemStorageLabel(item),
     newPublishedDate: parseNewPublishedDate(item.newPublishedDate),
+    newItemComingDate: parseNewItemComingDate(item.newItemComingDate),
     newItemListPrice: formatNewItemListPriceDisplay(
       normalizeNewItemListPrice(item.newItemListPrice)
     ) || undefined,

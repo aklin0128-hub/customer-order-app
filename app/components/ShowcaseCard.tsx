@@ -9,7 +9,7 @@ import { OutOfStockStamp } from "@/app/components/OutOfStockStamp";
 import { ProductImage } from "@/app/order/components/ProductImage";
 import { getJustAddedLabel, justAddedBadgeStyle } from "@/lib/justAddedBadge";
 import { isComingSoonNewItem, isNewItemOutOfStockStamp } from "@/lib/comingSoonBadge";
-import { formatNewItemPublishedDate } from "@/lib/catalogNewItems";
+import { formatNewItemComingDate, formatNewItemPublishedDate } from "@/lib/catalogNewItems";
 import { formatNewItemListPriceDisplay } from "@/lib/newItemListPrice";
 import { formatShowcasePromoDisplay, type Lang } from "@/lib/showcasePromoFormat";
 import type { LoginPreviewCard } from "@/lib/loginPreview";
@@ -26,6 +26,13 @@ const publishedDateLabel: Record<Lang, string> = {
   zh: "上架",
   ko: "게시",
   vi: "Đăng",
+};
+
+const comingDateLabel: Record<Lang, string> = {
+  en: "Coming",
+  zh: "到货",
+  ko: "입고 예정",
+  vi: "Dự kiến có",
 };
 
 export function ShowcaseCard({
@@ -62,6 +69,10 @@ export function ShowcaseCard({
   const publishedDateText =
     showNewDetails && item.newPublishedDate
       ? formatNewItemPublishedDate(item.newPublishedDate, lang)
+      : null;
+  const comingDateText =
+    showNewDetails && item.newItemComingDate
+      ? formatNewItemComingDate(item.newItemComingDate, lang)
       : null;
   const listPriceText =
     showNewDetails && item.newItemListPrice
@@ -120,6 +131,11 @@ export function ShowcaseCard({
             {item.name || "—"}
           </div>
           {item.size ? <div className="showcase-card-size">{item.size}</div> : null}
+          {comingDateText ? (
+            <div className="showcase-card-coming-date">
+              {comingDateLabel[lang]}: {comingDateText}
+            </div>
+          ) : null}
           {publishedDateText ? (
             <div className="showcase-card-published">
               {publishedDateLabel[lang]}: {publishedDateText}

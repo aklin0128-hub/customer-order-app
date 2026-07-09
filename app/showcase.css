@@ -68,7 +68,8 @@
   color: #6b7280;
 }
 
-.showcase-card-published {
+.showcase-card-published,
+.showcase-card-coming-date {
   font-size: 10px;
   font-weight: 700;
   color: #2563eb;

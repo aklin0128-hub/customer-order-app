@@ -263,7 +263,8 @@
   line-height: 1.35;
 }
 
-.new-card .showcase-card-published {
+.new-card .showcase-card-published,
+.new-card .showcase-card-coming-date {
   font-size: 11px;
   margin-top: 2px;
 }

@@ -16,6 +16,7 @@ export type MergedCatalogProduct = {
   importedAt?: string;
   newSince?: string;
   newPublishedDate?: string;
+  newItemComingDate?: string;
   newItemDescription?: string;
   newItemDescriptionPdfUrl?: string;
   newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";

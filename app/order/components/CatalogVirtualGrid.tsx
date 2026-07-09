@@ -36,6 +36,8 @@ export function CatalogVirtualGrid({
   addedDateLabel,
   showPublishedDate,
   publishedDateLabel,
+  showComingDate,
+  comingDateLabel,
   lang,
   showAdminEdit,
   showNewItemListPrice,
@@ -65,6 +67,8 @@ export function CatalogVirtualGrid({
   addedDateLabel?: string;
   showPublishedDate?: boolean;
   publishedDateLabel?: string;
+  showComingDate?: boolean;
+  comingDateLabel?: string;
   lang?: Lang;
   showAdminEdit?: boolean;
   showNewItemListPrice?: boolean;
@@ -221,6 +225,8 @@ export function CatalogVirtualGrid({
                     addedDateLabel={addedDateLabel}
                     showPublishedDate={showPublishedDate}
                     publishedDateLabel={publishedDateLabel}
+                    showComingDate={showComingDate}
+                    comingDateLabel={comingDateLabel}
                     lang={lang}
                     showAdminEdit={showAdminEdit}
                     showNewItemListPrice={showNewItemListPrice}

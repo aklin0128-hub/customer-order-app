@@ -7,7 +7,7 @@ import {
   resolveNewItemStorageLabel,
 } from "@/lib/newItemStorageLabel";
 import { mapLegacyCategoryToMain } from "@/lib/catalogMainCategories";
-import { parseNewPublishedDate } from "@/lib/catalogNewItems";
+import { parseNewPublishedDate, parseNewItemComingDate } from "@/lib/catalogNewItems";
 import { normalizeNewItemListPrice } from "@/lib/newItemListPrice";
 import { bustServerDataCache, SERVER_CACHE } from "@/lib/serverDataCache";
 import { redis } from "@/lib/redis";
@@ -35,6 +35,7 @@ type Product = {
   importedAt?: string;
   newSince?: string;
   newPublishedDate?: string;
+  newItemComingDate?: string;
   newItemDescription?: string;
   newItemDescriptionPdfUrl?: string;
   newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
@@ -129,6 +130,10 @@ export async function POST(req: Request) {
       body?.newPublishedDate !== undefined
         ? String(body.newPublishedDate || "").trim()
         : "";
+    const comingDateInput =
+      body?.newItemComingDate !== undefined
+        ? String(body.newItemComingDate || "").trim()
+        : "";
     const listPriceInput =
       body?.newItemListPrice !== undefined ? String(body.newItemListPrice || "").trim() : "";
 
@@ -156,6 +161,13 @@ export async function POST(req: Request) {
           : undefined
         : existing.newPublishedDate;
 
+    const newItemComingDate =
+      body?.newItemComingDate !== undefined
+        ? comingDateInput
+          ? parseNewItemComingDate(comingDateInput)
+          : undefined
+        : existing.newItemComingDate;
+
     const newItemListPrice =
       body?.newItemListPrice !== undefined
         ? normalizeNewItemListPrice(listPriceInput)
@@ -164,6 +176,13 @@ export async function POST(req: Request) {
     if (publishedInput && !newPublishedDate) {
       return NextResponse.json(
         { error: "Invalid published date. Use YYYY-MM-DD." },
+        { status: 400 }
+      );
+    }
+
+    if (comingDateInput && !newItemComingDate) {
+      return NextResponse.json(
+        { error: "Invalid coming date. Use YYYY-MM-DD." },
         { status: 400 }
       );
     }
@@ -192,6 +211,7 @@ export async function POST(req: Request) {
       outOfStock,
       newSince,
       newPublishedDate,
+      newItemComingDate: isNew ? newItemComingDate : undefined,
       newItemListPrice,
       newItemDescription: newItemDescription || undefined,
       newItemDescriptionPdfUrl: newItemDescriptionPdfUrl || undefined,

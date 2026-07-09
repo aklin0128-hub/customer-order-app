@@ -1,6 +1,6 @@
 "use client";
 
-import { formatCatalogAddedDateForItem, formatNewItemPublishedDate } from "@/lib/catalogNewItems";
+import { formatCatalogAddedDateForItem, formatNewItemComingDate, formatNewItemPublishedDate } from "@/lib/catalogNewItems";
 import { formatNewItemListPriceDisplay } from "@/lib/newItemListPrice";
 import { ComingSoonStamp } from "@/app/components/ComingSoonStamp";
 import { NewProductBadge } from "@/app/components/NewProductBadge";
@@ -60,6 +60,8 @@ export function CatalogQtyCard({
   addedDateLabel,
   showPublishedDate,
   publishedDateLabel,
+  showComingDate,
+  comingDateLabel,
   lang = "en",
   /** New-items tab: every card uses the red JUST ADDED pill (pin order still uses justAdded flag). */
   uniformNewPill,
@@ -100,6 +102,8 @@ export function CatalogQtyCard({
   addedDateLabel?: string;
   showPublishedDate?: boolean;
   publishedDateLabel?: string;
+  showComingDate?: boolean;
+  comingDateLabel?: string;
   lang?: Lang;
   uniformNewPill?: boolean;
   showNewItemListPrice?: boolean;
@@ -111,6 +115,10 @@ export function CatalogQtyCard({
   const publishedDateText =
     showPublishedDate && publishedDateLabel && item.newPublishedDate
       ? formatNewItemPublishedDate(item.newPublishedDate, lang)
+      : null;
+  const comingDateText =
+    showComingDate && comingDateLabel && item.newItemComingDate
+      ? formatNewItemComingDate(item.newItemComingDate, lang)
       : null;
   const hasQty = Number(qty) > 0;
   const qtyNum = Number(qty) || 0;
@@ -189,6 +197,11 @@ export function CatalogQtyCard({
       {item.palletSize && palletLabel ? (
         <div className="catalog-qty-card-pallet">
           {palletLabel}: {item.palletSize}
+        </div>
+      ) : null}
+      {comingDateText ? (
+        <div className="catalog-coming-date">
+          {comingDateLabel}: {comingDateText}
         </div>
       ) : null}
       {publishedDateText ? (

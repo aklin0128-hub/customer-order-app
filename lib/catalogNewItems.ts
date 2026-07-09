@@ -50,6 +50,17 @@ export function formatNewItemPublishedDate(value: string | undefined, lang?: str
   });
 }
 
+/** Admin-set expected arrival date (YYYY-MM-DD) for coming-soon new items. */
+export const parseNewItemComingDate = parseNewPublishedDate;
+
+export function parseNewItemComingDateMs(value?: string | null) {
+  return parseNewPublishedDateMs(value);
+}
+
+export function formatNewItemComingDate(value: string | undefined, lang?: string) {
+  return formatNewItemPublishedDate(value, lang);
+}
+
 export type CatalogNewFields = {
   sku?: string;
   /** Admin only: show in customer “New items” tab/list */
@@ -62,6 +73,8 @@ export type CatalogNewFields = {
   newSince?: string;
   /** Admin-set publish date (YYYY-MM-DD) for /new/ display and sort */
   newPublishedDate?: string;
+  /** Admin-set expected arrival (YYYY-MM-DD) for coming-soon new items */
+  newItemComingDate?: string;
   name?: string;
   size?: string;
   name_k?: string;

@@ -2191,6 +2191,8 @@ export default function OrderPage() {
                       showNewProductBadge
                       showPublishedDate
                       publishedDateLabel={t.publishedDate}
+                      showComingDate
+                      comingDateLabel={t.comingDate}
                       listPriceLabel={t.listPrice}
                       lang={lang}
                       disabled={!isOrderableItem(item)}

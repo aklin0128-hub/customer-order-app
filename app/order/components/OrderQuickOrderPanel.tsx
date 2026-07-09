@@ -7,6 +7,7 @@ import {
   isNewItem,
   isOrderableItem,
 } from "../catalogUtils";
+import { formatNewItemComingDate } from "@/lib/catalogNewItems";
 import { getComingSoonBadgeLabel, isComingSoonNewItem } from "@/lib/comingSoonBadge";
 import { isProductOrderingBlocked } from "@/lib/productAvailability";
 import { copy } from "../orderCopy";
@@ -140,6 +141,9 @@ export function OrderQuickOrderPanel({
     const status = getDisplayStatus(item.status);
     const invoicePrice = invoicePriceLabelForSku(sku);
     const comingSoon = isComingSoonNewItem(item);
+    const comingDateText = item.newItemComingDate
+      ? formatNewItemComingDate(item.newItemComingDate, lang)
+      : null;
     const canAdd = canOrder && !isProductOrderingBlocked(item);
 
     return (
@@ -167,6 +171,11 @@ export function OrderQuickOrderPanel({
                 ) : null}
               </div>
               <div className="order-quick-match-name">{item.name || "—"}</div>
+              {comingDateText ? (
+                <div className="order-quick-match-coming-date">
+                  {t.comingDate}: {comingDateText}
+                </div>
+              ) : null}
               {!compact && invoicePrice ? <div className="order-quick-match-price">{invoicePrice}</div> : null}
               {status && !canOrder ? <div className="order-quick-match-status">{status}</div> : null}
             </div>

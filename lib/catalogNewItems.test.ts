@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   compareCatalogByNewestImport,
   compareCatalogForDisplay,
+  formatNewItemComingDate,
   getNewItemAddedAtMs,
   parseNewPublishedDate,
 } from "./catalogNewItems";
@@ -27,6 +28,10 @@ test("getNewItemAddedAtMs prefers newSince over importedAt", () => {
     }),
     Date.parse("2026-03-01T00:00:00.000Z")
   );
+});
+
+test("formatNewItemComingDate formats YYYY-MM-DD", () => {
+  assert.equal(formatNewItemComingDate("2026-07-15", "en")?.includes("2026"), true);
 });
 
 test("parseNewPublishedDate rejects invalid values", () => {

@@ -45,6 +45,7 @@ type Product = {
   justAdded?: boolean;
   importedAt?: string;
   newPublishedDate?: string;
+  newItemComingDate?: string;
   newItemDescription?: string;
   newItemDescriptionPdfUrl?: string;
   newItemStorageLabel?: "DRY" | "FROZEN" | "FRESH";
@@ -136,6 +137,7 @@ export default function AdminProductsPage() {
   const [newItemDescription, setNewItemDescription] = useState("");
   const [newItemDescriptionPdfUrl, setNewItemDescriptionPdfUrl] = useState("");
   const [newPublishedDate, setNewPublishedDate] = useState("");
+  const [newItemComingDate, setNewItemComingDate] = useState("");
   const [newItemListPrice, setNewItemListPrice] = useState("");
   const [newItemOutOfStock, setNewItemOutOfStock] = useState(false);
   const [newItemComingSoon, setNewItemComingSoon] = useState(false);
@@ -281,6 +283,7 @@ export default function AdminProductsPage() {
     setNewItemDescription(p.newItemDescription || "");
     setNewItemDescriptionPdfUrl(p.newItemDescriptionPdfUrl || "");
     setNewPublishedDate(p.newPublishedDate || "");
+    setNewItemComingDate(p.newItemComingDate || "");
     setNewItemListPrice(p.newItemListPrice || "");
     setNewItemOutOfStock(readNewItemOutOfStockForAdmin(p));
     setNewItemComingSoon(readNewItemComingSoonForAdmin(p));
@@ -382,6 +385,7 @@ export default function AdminProductsPage() {
     setNewItemDescription("");
     setNewItemDescriptionPdfUrl("");
     setNewPublishedDate("");
+    setNewItemComingDate("");
     setNewItemListPrice("");
     setNewItemOutOfStock(false);
     setNewItemComingSoon(false);
@@ -426,6 +430,7 @@ export default function AdminProductsPage() {
           newItemDescription,
           newItemDescriptionPdfUrl,
           newPublishedDate: newPublishedDate || undefined,
+          newItemComingDate: newItemComingDate || undefined,
           newItemListPrice: newItemListPrice || undefined,
           newItemOutOfStock: isNew ? newItemOutOfStock : false,
           newItemComingSoon: isNew ? newItemComingSoon : false,
@@ -474,7 +479,7 @@ export default function AdminProductsPage() {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, outOfStock, newItemOutOfStock, newItemComingSoon, newItemDescription, newItemDescriptionPdfUrl, newPublishedDate, newItemListPrice]);
+  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, outOfStock, newItemOutOfStock, newItemComingSoon, newItemDescription, newItemDescriptionPdfUrl, newPublishedDate, newItemComingDate, newItemListPrice]);
 
   const uploadNewItemPdf = async (file: File | null) => {
     const finalSku = sku.trim().toUpperCase();
@@ -907,6 +912,7 @@ export default function AdminProductsPage() {
                     if (!next) {
                       setNewItemOutOfStock(false);
                       setNewItemComingSoon(false);
+                      setNewItemComingDate("");
                     }
                     if (next) {
                       requestAnimationFrame(() => {
@@ -1079,6 +1085,16 @@ export default function AdminProductsPage() {
                     />
                     Coming soon — show stamp on /new/ and order New items (not orderable yet)
                   </label>
+                  <label style={{ ...labelStyle, marginTop: 12 }}>Coming date</label>
+                  <input
+                    type="date"
+                    value={newItemComingDate}
+                    onChange={(e) => updateText(setNewItemComingDate, e.target.value)}
+                    style={inputStyle}
+                  />
+                  <p style={{ fontSize: 11, color: "#64748b", margin: "6px 0 0" }}>
+                    Expected arrival — shown on /new/ and New items when set (especially with Coming soon).
+                  </p>
                   <label style={{ ...labelStyle, marginTop: 12 }}>Published date</label>
                   <input
                     type="date"

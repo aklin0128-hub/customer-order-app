@@ -23,6 +23,8 @@ export type CatalogItem = {
   newSince?: string;
   /** Admin-set publish date (YYYY-MM-DD) for /new/ display and sort */
   newPublishedDate?: string;
+  /** Admin-set expected arrival (YYYY-MM-DD) for coming-soon new items */
+  newItemComingDate?: string;
   /** Short blurb for /new/ showcase modal */
   newItemDescription?: string;
   /** PDF served via /api/blob (Admin upload) */
