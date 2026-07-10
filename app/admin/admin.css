@@ -1133,6 +1133,14 @@
     top: auto;
   }
 
+  .admin-split--edit-focus .admin-catalog-form-sticky {
+    order: -1;
+  }
+
+  .admin-split--edit-focus .admin-split-list {
+    max-height: min(28vh, 220px);
+  }
+
   .admin-form-grid-2,
   .admin-form-grid-3 {
     grid-template-columns: 1fr;
