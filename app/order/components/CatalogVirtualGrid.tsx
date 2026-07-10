@@ -155,10 +155,12 @@ export function CatalogVirtualGrid({
     observeRows();
     const mutationObserver = new MutationObserver(observeRows);
     mutationObserver.observe(root, { childList: true, subtree: true });
+    root.addEventListener("load", remeasure, true);
 
     return () => {
       resizeObserver.disconnect();
       mutationObserver.disconnect();
+      root.removeEventListener("load", remeasure, true);
     };
   }, [items.length, columnCount, gridKey, rowVirtualizer]);
 

@@ -8,10 +8,10 @@ export const CATALOG_MIN_COLUMNS = 2;
 export const CATALOG_ROW_HEIGHT_PX = 360;
 
 export function catalogRowEstimatePx(columnCount: number): number {
-  if (columnCount <= 2) return 210;
-  if (columnCount <= 3) return 248;
-  if (columnCount <= 4) return 272;
-  if (columnCount <= 6) return 300;
+  if (columnCount <= 2) return 300;
+  if (columnCount <= 3) return 290;
+  if (columnCount <= 4) return 310;
+  if (columnCount <= 6) return 320;
   return CATALOG_ROW_HEIGHT_PX;
 }
 

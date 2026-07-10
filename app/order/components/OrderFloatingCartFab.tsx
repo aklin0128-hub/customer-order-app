@@ -19,10 +19,15 @@ function getFabSize() {
   return window.innerWidth >= 768 ? 68 : 64;
 }
 
+function bottomReservePx() {
+  if (typeof window === "undefined") return 8;
+  return window.innerWidth >= 768 ? 8 : 72;
+}
+
 function clampPosition(pos: Position, size = getFabSize()): Position {
   const margin = 8;
   const maxX = Math.max(margin, window.innerWidth - size - margin);
-  const maxY = Math.max(margin, window.innerHeight - size - margin);
+  const maxY = Math.max(margin, window.innerHeight - size - bottomReservePx());
   return {
     x: Math.min(Math.max(margin, pos.x), maxX),
     y: Math.min(Math.max(margin, pos.y), maxY),
@@ -31,7 +36,7 @@ function clampPosition(pos: Position, size = getFabSize()): Position {
 
 function defaultPosition(): Position {
   const size = getFabSize();
-  const marginY = window.innerWidth >= 768 ? 24 : 16;
+  const marginY = window.innerWidth >= 768 ? 24 : bottomReservePx();
   const marginX =
     window.innerWidth >= 768 ? Math.max(24, (window.innerWidth - 1040) / 2 + 24) : 14;
   return clampPosition(
