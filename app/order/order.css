@@ -1497,7 +1497,7 @@
 .catalog-qty-card {
   align-self: stretch;
   height: auto;
-  min-height: 0;
+  min-height: auto;
   box-sizing: border-box;
   overflow: visible;
 }
@@ -1557,6 +1557,7 @@
   align-items: stretch;
   isolation: isolate;
   box-sizing: border-box;
+  grid-auto-rows: minmax(min-content, auto);
 }
 
 .order-catalog-virtual-row[data-index] {
@@ -1658,6 +1659,7 @@
   align-items: center;
   min-height: 0;
   padding: 0;
+  flex-shrink: 0;
 }
 
 .catalog-card-image-wrap img {
@@ -2792,7 +2794,20 @@
   .catalog-qty-card {
     padding: 6px !important;
     gap: 4px !important;
-    min-height: 228px;
+    min-height: 248px;
+  }
+
+  .catalog-card-image-wrap {
+    height: 68px;
+    min-height: 68px;
+    max-height: 68px;
+  }
+
+  .catalog-card-image-wrap img {
+    max-height: 64px !important;
+    max-width: 100%;
+    width: auto !important;
+    height: auto !important;
   }
 
   .catalog-qty-card-edit {
@@ -2824,11 +2839,6 @@
 
   .catalog-qty-card-pallet {
     display: none;
-  }
-
-  .catalog-card-image-wrap img {
-    max-height: 64px;
-    width: auto;
   }
 
   .catalog-qty-card-stepper button {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { measureElement, useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -123,8 +123,8 @@ export function CatalogVirtualGrid({
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowEstimate,
     gap: rowGap,
-    overscan: 2,
-    measureElement: (el) => el.getBoundingClientRect().height,
+    overscan: 3,
+    measureElement,
   });
 
   useEffect(() => {
@@ -137,7 +137,11 @@ export function CatalogVirtualGrid({
       rowVirtualizer.measure();
       window.requestAnimationFrame(() => rowVirtualizer.measure());
     });
-    return () => window.cancelAnimationFrame(t1);
+    const delayed = [120, 400, 900].map((ms) => window.setTimeout(() => rowVirtualizer.measure(), ms));
+    return () => {
+      window.cancelAnimationFrame(t1);
+      delayed.forEach((id) => window.clearTimeout(id));
+    };
   }, [items.length, columnCount, gridKey, width, rowEstimate, rowVirtualizer]);
 
   useLayoutEffect(() => {
@@ -149,6 +153,7 @@ export function CatalogVirtualGrid({
     const observeRows = () => {
       resizeObserver.disconnect();
       root.querySelectorAll(".order-catalog-virtual-row").forEach((row) => resizeObserver.observe(row));
+      root.querySelectorAll(".catalog-qty-card").forEach((card) => resizeObserver.observe(card));
       remeasure();
     };
 
