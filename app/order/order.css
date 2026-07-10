@@ -1537,10 +1537,6 @@
   box-sizing: border-box;
 }
 
-.order-catalog-virtual-scroll {
-  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-}
-
 .order-catalog-virtual-row[data-index] {
   z-index: 1;
 }
@@ -2825,7 +2821,6 @@
 
   .order-catalog-virtual-scroll {
     max-height: calc(100dvh - 200px);
-    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
   }
 
   .catalog-qty-card-stepper {
@@ -3311,7 +3306,6 @@
 
 .order-page--mobile-shop .order-catalog-virtual-scroll {
   max-height: calc(100dvh - 156px);
-  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
 }
 
 .order-sticky-catalog-chips--in-filters {
