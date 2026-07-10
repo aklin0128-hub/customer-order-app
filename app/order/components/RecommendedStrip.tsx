@@ -1,30 +1,9 @@
 "use client";
 
-import type { CSSProperties } from "react";
-
 import { getCatalogItemBySku, isOrderableItem } from "../catalogUtils";
 import { copy } from "../orderCopy";
 import type { CatalogItem, Lang } from "../types";
 import { ProductImage } from "./ProductImage";
-
-const stripStyle: CSSProperties = {
-  display: "flex",
-  gap: 10,
-  overflowX: "auto",
-  paddingBottom: 6,
-  WebkitOverflowScrolling: "touch",
-};
-
-const cardStyle: CSSProperties = {
-  flex: "0 0 176px",
-  border: "1px solid #bfdbfe",
-  background: "#eff6ff",
-  borderRadius: 12,
-  padding: 10,
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-};
 
 export function RecommendedStrip({
   lang,
@@ -41,16 +20,16 @@ export function RecommendedStrip({
   if (items.length === 0) return null;
 
   return (
-    <div style={{ marginBottom: hideTitle ? 4 : 12, marginTop: hideTitle ? 6 : 0 }}>
+    <div className={`order-recommended-strip${hideTitle ? " order-recommended-strip--embedded" : ""}`}>
       {hideTitle ? null : (
-        <div style={{ fontSize: 13, fontWeight: 900, color: "#1d4ed8", marginBottom: 8 }}>{t.recommendedStripTitle}</div>
+        <div className="order-recommended-strip-title">{t.recommendedStripTitle}</div>
       )}
-      <div style={stripStyle}>
+      <div className="order-recommended-strip-scroll">
         {items.map((item) => {
           const catalogItem = getCatalogItemBySku(item.sku) || item;
           const canOrder = isOrderableItem(catalogItem);
           return (
-            <div key={item.sku} style={{ ...cardStyle, opacity: canOrder ? 1 : 0.72 }}>
+            <div key={item.sku} className="order-recommended-strip-card" style={{ opacity: canOrder ? 1 : 0.72 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", textAlign: "center" }}>
                 <ProductImage sku={item.sku} alt={item.sku} size={72} imageUrl={catalogItem.imageUrl} />
                 <div style={{ minWidth: 0, width: "100%" }}>
