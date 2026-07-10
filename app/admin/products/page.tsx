@@ -109,7 +109,7 @@ function formatImportedAtLabel(value?: string) {
 }
 
 export default function AdminProductsPage() {
-  const { authed, adminHeaders } = useAdminAuth();
+  const { authed, ready, password, adminHeaders } = useAdminAuth();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
@@ -120,6 +120,7 @@ export default function AdminProductsPage() {
   const [bulkNewFlag, setBulkNewFlag] = useState<"keep" | "yes" | "no">("keep");
   const [bulkJustAddedFlag, setBulkJustAddedFlag] = useState<"keep" | "yes" | "no">("keep");
   const [initialSkuFromQuery, setInitialSkuFromQuery] = useState("");
+  const [editFocusFromLink, setEditFocusFromLink] = useState(false);
 
   const [sku, setSku] = useState("");
   const [name, setName] = useState("");
@@ -160,6 +161,7 @@ export default function AdminProductsPage() {
   const [formDirty, setFormDirty] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState("");
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const formPanelRef = useRef<HTMLDivElement>(null);
 
   const notify = (text: string, tone: "success" | "error" = "success") => {
     setMsg(text);
@@ -203,9 +205,10 @@ export default function AdminProductsPage() {
   };
 
   useEffect(() => {
-    if (authed) loadProducts();
+    if (!ready || !authed || !password) return;
+    loadProducts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed]);
+  }, [ready, authed, password]);
 
   useEffect(() => {
     const fromUrl = new URLSearchParams(window.location.search).get("sku");
@@ -263,7 +266,13 @@ export default function AdminProductsPage() {
       .slice(0, 200);
   }, [products, search, listFilter]);
 
-  const selectProduct = (p: Product) => {
+  const scrollFormIntoView = () => {
+    requestAnimationFrame(() => {
+      formPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
+  const selectProduct = (p: Product, options?: { scrollToForm?: boolean; fromLink?: boolean }) => {
     setSku(p.sku || "");
     setName(p.name || "");
     setBrand(p.brand || "");
@@ -290,7 +299,9 @@ export default function AdminProductsPage() {
     setOutOfStock(Boolean(p.outOfStock));
     setFormDirty(false);
     setAutoSaveStatus("");
+    setEditFocusFromLink(Boolean(options?.fromLink));
     notify(`Editing ${p.sku}`);
+    if (options?.scrollToForm) scrollFormIntoView();
   };
 
   const selectedProducts = products.filter((p) =>
@@ -362,11 +373,17 @@ export default function AdminProductsPage() {
   useEffect(() => {
     if (!initialSkuFromQuery || products.length === 0) return;
     const match = products.find((p) => p.sku?.toUpperCase() === initialSkuFromQuery);
-    if (!match) return;
-    selectProduct(match);
+    if (!match) {
+      if (productsLoaded) {
+        notify(`SKU ${initialSkuFromQuery} not found.`, "error");
+        setInitialSkuFromQuery("");
+      }
+      return;
+    }
+    selectProduct(match, { scrollToForm: true, fromLink: true });
     setInitialSkuFromQuery("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialSkuFromQuery, products]);
+  }, [initialSkuFromQuery, products, productsLoaded]);
 
   const clearForm = () => {
     setSku("");
@@ -392,6 +409,7 @@ export default function AdminProductsPage() {
     setOutOfStock(false);
     setFormDirty(false);
     setAutoSaveStatus("");
+    setEditFocusFromLink(false);
     setMsg("");
   };
 
@@ -670,7 +688,10 @@ export default function AdminProductsPage() {
         </details>
       </Panel>
 
-      <div style={splitLayout} className="admin-split">
+      <div
+        style={splitLayout}
+        className={`admin-split${editFocusFromLink ? " admin-split--edit-focus" : ""}`}
+      >
         <Panel title={`SKU list (${filteredProducts.length}${search ? "" : ", search for more"})`}>
           <input
             value={search}
@@ -757,7 +778,7 @@ export default function AdminProductsPage() {
           )}
         </Panel>
 
-        <div style={splitForm} className="admin-catalog-form-sticky">
+        <div ref={formPanelRef} style={splitForm} className="admin-catalog-form-sticky">
           <Panel title={sku ? `Edit ${sku}` : "SKU details"}>
             <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 8, fontWeight: 700 }}>
               Build {ADMIN_PRODUCTS_BUILD_TAG}

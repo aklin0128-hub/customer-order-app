@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { formatCatalogAddedDateForItem, formatNewItemComingDate, formatNewItemPublishedDate } from "@/lib/catalogNewItems";
 import { formatNewItemListPriceDisplay } from "@/lib/newItemListPrice";
 import { ComingSoonStamp } from "@/app/components/ComingSoonStamp";
@@ -285,25 +286,14 @@ export function CatalogQtyCard({
       }}
     >
       {showAdminEdit ? (
-        <a
+        <Link
           href={`/admin/products?sku=${encodeURIComponent(item.sku)}`}
-          style={{
-            position: "absolute",
-            top: 8,
-            right: 8,
-            zIndex: 3,
-            border: "1px solid #bfdbfe",
-            borderRadius: 999,
-            background: "#eff6ff",
-            color: "#2563eb",
-            padding: "3px 8px",
-            fontSize: 10,
-            fontWeight: 900,
-            textDecoration: "none",
-          }}
+          className="catalog-qty-card-edit"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
         >
           {editLabel}
-        </a>
+        </Link>
       ) : null}
 
       {alignedPriceLayout && badgeRow ? (

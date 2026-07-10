@@ -235,7 +235,16 @@ export default function OrderPage() {
   );
 
   useEffect(() => {
-    setShowAdminEditLinks(Boolean(sessionStorage.getItem("admin_password")));
+    const syncAdminEdit = () => {
+      setShowAdminEditLinks(Boolean(sessionStorage.getItem("admin_password")));
+    };
+    syncAdminEdit();
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") syncAdminEdit();
+    };
+    window.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", syncAdminEdit);
 
     const loadCatalog = async () => {
       try {
@@ -248,6 +257,10 @@ export default function OrderPage() {
       } catch {}
     };
     loadCatalog();
+    return () => {
+      window.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", syncAdminEdit);
+    };
   }, []);
 
   useEffect(() => {

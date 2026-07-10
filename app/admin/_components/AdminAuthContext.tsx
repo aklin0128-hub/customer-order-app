@@ -34,12 +34,27 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const saved = sessionStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      setPassword(saved);
-      setAuthed(true);
-    }
+    const syncFromStorage = () => {
+      const saved = sessionStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        setPassword(saved);
+        setAuthed(true);
+      }
+    };
+
+    syncFromStorage();
     setReady(true);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") syncFromStorage();
+    };
+    window.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", syncFromStorage);
+
+    return () => {
+      window.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", syncFromStorage);
+    };
   }, []);
 
   const login = useCallback(async (inputPassword: string) => {
