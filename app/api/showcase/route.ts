@@ -3,7 +3,7 @@ import { getShowcaseData } from "@/lib/loginPreview";
 
 export const dynamic = "force-dynamic";
 
-/** Full public showcase (no login). Same data as /new/. */
+/** Full public showcase (no login). Same data as /new/ and /promo/. */
 export async function GET() {
   try {
     const data = await getShowcaseData();

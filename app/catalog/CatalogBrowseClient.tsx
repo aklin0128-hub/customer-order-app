@@ -25,6 +25,7 @@ const copy = {
     searchPlaceholder: "Search SKU, name, brand, UPC…",
     signIn: "Sign in to order",
     newItems: "New items",
+    promotions: "Promotions",
     showing: "Showing",
     of: "of",
     skus: "SKUs",
@@ -44,6 +45,7 @@ const copy = {
     searchPlaceholder: "搜索 SKU、品名、品牌、条码…",
     signIn: "登录下单",
     newItems: "新品",
+    promotions: "促销",
     showing: "显示",
     of: "/",
     skus: "个 SKU",
@@ -63,6 +65,7 @@ const copy = {
     searchPlaceholder: "SKU, 품명, 브랜드, 바코드 검색…",
     signIn: "로그인 후 주문",
     newItems: "신상품",
+    promotions: "프로모션",
     showing: "표시",
     of: "/",
     skus: "개 SKU",
@@ -82,6 +85,7 @@ const copy = {
     searchPlaceholder: "Tìm SKU, tên, thương hiệu, mã vạch…",
     signIn: "Đăng nhập để đặt",
     newItems: "Hàng mới",
+    promotions: "Khuyến mãi",
     showing: "Hiển thị",
     of: "/",
     skus: "SKU",
@@ -196,6 +200,9 @@ export default function CatalogBrowseClient() {
             </Link>
             <Link href="/new" className="catalog-link-btn">
               {t.newItems}
+            </Link>
+            <Link href="/promo" className="catalog-link-btn">
+              {t.promotions}
             </Link>
           </div>
         </div>
