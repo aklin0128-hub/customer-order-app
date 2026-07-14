@@ -376,7 +376,7 @@ export default function AdminPromotionsPage() {
     <AdminPage
       active="promotions"
       title="Promotions"
-      subtitle="Click a row to edit · Active promos sync to /new/ and customer Promotions tab."
+      subtitle="Click a row to edit · Active promos sync to /promo/, /new/, and customer Promotions tab."
       actions={
         <>
           <BtnSecondary

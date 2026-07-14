@@ -5,7 +5,7 @@
   background:
     radial-gradient(ellipse 90% 45% at 50% -5%, rgba(37, 99, 235, 0.14), transparent),
     linear-gradient(180deg, #f8fafc 0%, #eef2ff 40%, #f8fafc 100%);
-  padding: max(12px, env(safe-area-inset-top)) clamp(12px, 2.5vw, 40px) 88px;
+  padding: max(12px, env(safe-area-inset-top)) clamp(12px, 2.5vw, 40px) 140px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   box-sizing: border-box;
 }
@@ -321,6 +321,28 @@
   margin: 0 0 8px;
 }
 
+.new-page--promo {
+  background:
+    radial-gradient(ellipse 90% 45% at 50% -5%, rgba(20, 184, 166, 0.16), transparent),
+    linear-gradient(180deg, #f8fafc 0%, #f0fdfa 40%, #f8fafc 100%);
+}
+
+.new-page--promo .new-logo {
+  background: linear-gradient(135deg, #14b8a6 0%, #0f766e 100%);
+  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.28);
+}
+
+.new-page--promo .new-lang-btn.is-active {
+  background: #0f766e;
+}
+
+.new-section-count {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f766e;
+}
+
 .new-footer {
   position: fixed;
   left: 0;
@@ -335,11 +357,33 @@
   z-index: 20;
 }
 
+.new-footer-links {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: min(100%, 320px);
+}
+
+.new-secondary-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
 .new-sign-in-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: min(100%, 320px);
+  width: 100%;
   padding: 12px 20px;
   border-radius: 14px;
   background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
@@ -349,6 +393,11 @@
   text-decoration: none;
   box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.new-page--promo .new-sign-in-btn {
+  background: linear-gradient(135deg, #14b8a6 0%, #0f766e 100%);
+  box-shadow: 0 8px 20px rgba(15, 118, 110, 0.35);
 }
 
 .new-sign-in-btn:active {
@@ -363,6 +412,20 @@
 
   .new-sign-in-btn:hover {
     box-shadow: 0 10px 24px rgba(37, 99, 235, 0.4);
+  }
+
+  .new-page--promo .new-sign-in-btn:hover {
+    box-shadow: 0 10px 24px rgba(15, 118, 110, 0.42);
+  }
+
+  .new-secondary-link:hover {
+    border-color: #9ca3af;
+    background: #f9fafb;
+  }
+
+  .new-page--promo .new-card:hover {
+    border-color: #99f6e4;
+    box-shadow: 0 4px 14px rgba(15, 118, 110, 0.12);
   }
 }
 
