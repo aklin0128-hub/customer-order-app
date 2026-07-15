@@ -864,7 +864,7 @@ export default function AdminProductsPage() {
                     markDirty();
                   }}
                 />
-                Out of stock — show stamp on catalog / weekly picks / clearance and block ordering
+                Out of stock — show stamp on catalog / weekly picks / Near Date Sale and block ordering
               </label>
               <div style={{ gridColumn: "1 / -1" }}>
                 <label style={labelStyle}>Category</label>
