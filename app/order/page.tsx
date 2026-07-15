@@ -56,7 +56,6 @@ import {
 import {
   buildCatalogQtyMapFromDraft,
   cartItemsFromQtyMap,
-  cloudDraftHasMoreItems,
   countDraftItems,
   mergeOrderDrafts,
   normalizeOrderDraft,
@@ -528,51 +527,44 @@ export default function OrderPage() {
     localStorage.setItem(`draft_${accountNo}`, JSON.stringify(draft));
 
     const timer = setTimeout(async () => {
-      const applyServerDraftIfRicher = (serverDraft: OrderDraftPayload) => {
-        const current = normalizeOrderDraft(accountNo, {
-          storeName,
-          phone,
-          orderEmail,
-          note,
-          cart,
-          catalogQtyMap,
-        });
-        if (!cloudDraftHasMoreItems(current, serverDraft)) return;
-
-        setPhone(serverDraft.phone || "");
-        setNote(serverDraft.note || "");
-        const map = buildCatalogQtyMapFromDraft(serverDraft);
-        setCatalogQtyMap(map);
-        setCart(cartItemsFromQtyMap(map));
-        localStorage.setItem(`draft_${accountNo}`, JSON.stringify(serverDraft));
+      // After the draft has loaded, an empty cart means the user cleared/removed
+      // the last lines — allow cloud delete so removals stick.
+      const allowClear = countDraftItems(draft) === 0;
+      const saveBody = {
+        ...draft,
+        allowClear,
       };
 
       try {
-        const saveBody = {
-          ...draft,
-          allowClear: false,
-        };
         const res = await fetch("/api/save-draft", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(saveBody),
         });
         if (!res.ok) throw new Error("save failed");
+        // Do not re-apply the server draft into React state. Union-merge used to
+        // revive deleted SKUs ~1–2s after remove; local state is already correct.
         const data = await res.json();
         if (data?.draft) {
-          applyServerDraftIfRicher(normalizeOrderDraft(accountNo, data.draft));
+          localStorage.setItem(
+            `draft_${accountNo}`,
+            JSON.stringify(normalizeOrderDraft(accountNo, data.draft))
+          );
         }
       } catch {
         try {
           const res = await fetch("/api/save-draft", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...draft, allowClear: false }),
+            body: JSON.stringify(saveBody),
           });
           if (res.ok) {
             const data = await res.json();
             if (data?.draft) {
-              applyServerDraftIfRicher(normalizeOrderDraft(accountNo, data.draft));
+              localStorage.setItem(
+                `draft_${accountNo}`,
+                JSON.stringify(normalizeOrderDraft(accountNo, data.draft))
+              );
             }
           }
         } catch {
@@ -614,7 +606,7 @@ export default function OrderPage() {
       if (typeof navigator.sendBeacon === "function") {
         const body = JSON.stringify({
           ...payload,
-          allowClear: false,
+          allowClear: countDraftItems(payload) === 0,
         });
         navigator.sendBeacon("/api/save-draft", new Blob([body], { type: "application/json" }));
       }
