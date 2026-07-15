@@ -1043,13 +1043,9 @@ export default function OrderPage() {
   };
 
   const removeSkuFromOrder = (sku: string, nhItems?: boolean) => {
-    if (nhItems === true) setQtyForSku(sku, "", "clearance");
-    else if (nhItems === false) setQtyForSku(sku, "", "normal");
-    else {
-      let next = applyQtySet(qtyMaps, sku, "", "normal");
-      next = applyQtySet(next, sku, "", "clearance");
-      applyQtyState(next);
-    }
+    // Catalog lines omit nhItems (undefined). Only clear the matching pool so
+    // removing a catalog row does not wipe an independent clearance line.
+    setQtyForSku(sku, "", nhItems === true ? "clearance" : "normal");
   };
 
   const adjustCartLineQty = (sku: string, delta: number, nhItems?: boolean) => {
@@ -1062,18 +1058,44 @@ export default function OrderPage() {
   };
 
   const addAllClearanceOneCase = () => {
+    let next = qtyMaps;
     for (const item of clearanceItems) {
       if (item.remainingQty === 0) continue;
       const sku = item.sku?.toUpperCase();
       if (!sku) continue;
       const catalogItem = getCatalogItemBySku(sku) || item;
       if (!isOrderableItem(catalogItem)) continue;
-      adjustQtyForSku(sku, 1, "clearance");
+      if (getClearanceQty(next, sku) <= 0 && blockAddForSku(sku)) continue;
+
+      const current = getClearanceQty(next, sku);
+      let appliedDelta = 1;
+      const clearanceRemaining = getClearanceRemainingForSku(sku);
+      if (clearanceRemaining !== null && current + 1 > clearanceRemaining) {
+        appliedDelta = clearanceRemaining - current;
+        if (appliedDelta <= 0) continue;
+      }
+      next = applyQtyDelta(next, sku, appliedDelta, "clearance");
     }
+    applyQtyState(next);
   };
 
   const addAllMissingClearanceUpsell = () => {
-    for (const line of clearanceUpsellLines) adjustQtyForSku(line.sku, 1, "clearance");
+    let next = qtyMaps;
+    for (const line of clearanceUpsellLines) {
+      const sku = String(line.sku || "").trim().toUpperCase();
+      if (!sku) continue;
+      if (getClearanceQty(next, sku) <= 0 && blockAddForSku(sku)) continue;
+
+      const current = getClearanceQty(next, sku);
+      let appliedDelta = 1;
+      const clearanceRemaining = getClearanceRemainingForSku(sku);
+      if (clearanceRemaining !== null && current + 1 > clearanceRemaining) {
+        appliedDelta = clearanceRemaining - current;
+        if (appliedDelta <= 0) continue;
+      }
+      next = applyQtyDelta(next, sku, appliedDelta, "clearance");
+    }
+    applyQtyState(next);
   };
 
   useEffect(() => {
