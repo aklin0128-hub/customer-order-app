@@ -150,7 +150,7 @@ export async function POST(req: Request) {
         `Ref: ${finalOrderRef}`,
         `Items: ${cleanedItems.length}`,
         ...(clearanceLineCount > 0
-          ? [`Clearance (${CLEARANCE_ORDER_EMAIL_TAG}): ${clearanceLineCount}`, ``]
+          ? [`Near Date Sale (${CLEARANCE_ORDER_EMAIL_TAG}): ${clearanceLineCount}`, ``]
           : []),
         ...cleanedItems.map((item) => formatOrderLine(item)),
       ].join("\n"),
