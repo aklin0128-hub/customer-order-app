@@ -155,11 +155,14 @@ export function parseStatusEtaAoa(aoa: unknown[][]): StatusEtaProduct[] {
     const availableInvRaw = cellAt(row, cols.availableInv);
     const hasAvailableCell =
       typeof availableInvRaw === "number" || safeString(availableInvRaw) !== "";
-    const availableInv = rawPid
-      ? parseSignedNumber(availableInvRaw)
-      : hasAvailableCell
-        ? parseSignedNumber(availableInvRaw)
-        : lastAvailableInv;
+    let availableInv: number | null;
+    if (rawPid) {
+      availableInv = parseSignedNumber(availableInvRaw);
+    } else if (hasAvailableCell) {
+      availableInv = parseSignedNumber(availableInvRaw);
+    } else {
+      availableInv = lastAvailableInv;
+    }
 
     const portEta = cols.portEta >= 0 ? parseInventoryDate(cellAt(row, cols.portEta)) : null;
     const inboundQty = cols.inboundQty >= 0 ? parseSignedNumber(cellAt(row, cols.inboundQty)) : null;
