@@ -184,6 +184,30 @@
   line-height: 1.4;
 }
 
+.exp-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 12px;
+  flex-wrap: wrap;
+}
+
+.exp-tab {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.exp-tab.is-active {
+  border-color: #0d9488;
+  background: #0d9488;
+  color: #fff;
+}
+
 .exp-table-wrap {
   overflow: auto;
   max-height: min(520px, 65vh);
