@@ -62,3 +62,25 @@ test("parseStatusEtaAoa accepts Stauts typo header", () => {
   assert.equal(products[0]!.status, "NORMAL");
   assert.equal(products[0]!.availableInv, 10);
 });
+
+test("Aval. INV carries across blank continuation rows (merged-cell style)", () => {
+  const products = parseStatusEtaAoa([
+    ["PID", "Description", "Stauts", "Aval. INV", "Port ETA", "Inbound QTY"],
+    ["06622T", "ORGANIC COCONUT MILK", "NORMAL", "287", "07/29/26", "176"],
+    ["", "", "", "", "08/02/26", "160"],
+    ["", "", "", "", "08/16/26", "264"],
+  ]);
+  assert.equal(products.length, 1);
+  assert.equal(products[0]!.availableInv, 287);
+  assert.equal(products[0]!.inbound.length, 3);
+});
+
+test("Aval. INV carries when PID repeats but inv cell is blank", () => {
+  const products = parseStatusEtaAoa([
+    ["PID", "Description", "Status", "Aval. INV", "Port ETA", "Inbound QTY"],
+    ["06907T", "COCONUT MILK", "NORMAL", "-245", "07/16/26", "150"],
+    ["06907T", "COCONUT MILK", "NORMAL", "", "07/29/26", "200"],
+  ]);
+  assert.equal(products[0]!.availableInv, -245);
+  assert.equal(products[0]!.inbound.length, 2);
+});

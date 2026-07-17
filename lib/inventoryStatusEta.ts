@@ -155,28 +155,43 @@ export function parseStatusEtaAoa(aoa: unknown[][]): StatusEtaProduct[] {
     const availableInvRaw = cellAt(row, cols.availableInv);
     const hasAvailableCell =
       typeof availableInvRaw === "number" || safeString(availableInvRaw) !== "";
+    const parsedAvailableInv = hasAvailableCell ? parseSignedNumber(availableInvRaw) : null;
+
+    // Merged Aval. INV cells are often blank on continuation rows (and sometimes
+    // when PID is repeated). Carry forward within the same PID block.
     let availableInv: number | null;
-    if (rawPid) {
-      availableInv = parseSignedNumber(availableInvRaw);
-    } else if (hasAvailableCell) {
-      availableInv = parseSignedNumber(availableInvRaw);
-    } else {
+    if (parsedAvailableInv != null) {
+      availableInv = parsedAvailableInv;
+    } else if (!rawPid || pid === lastPid) {
       availableInv = lastAvailableInv;
+    } else {
+      availableInv = null;
     }
 
     const portEta = cols.portEta >= 0 ? parseInventoryDate(cellAt(row, cols.portEta)) : null;
     const inboundQty = cols.inboundQty >= 0 ? parseSignedNumber(cellAt(row, cols.inboundQty)) : null;
 
     // Skip completely empty continuation noise
-    if (!rawPid && !portEta && inboundQty == null && !safeString(cellAt(row, cols.description))) {
+    if (
+      !rawPid &&
+      !portEta &&
+      inboundQty == null &&
+      !safeString(cellAt(row, cols.description)) &&
+      parsedAvailableInv == null
+    ) {
       continue;
     }
 
-    if (rawPid) {
+    if (rawPid && pid !== lastPid) {
       lastPid = pid;
       lastDescription = description;
       lastStatus = status;
       lastAvailableInv = availableInv;
+    } else {
+      if (description) lastDescription = description;
+      if (status) lastStatus = status;
+      if (availableInv != null) lastAvailableInv = availableInv;
+      if (rawPid) lastPid = pid;
     }
 
     flats.push({
@@ -204,7 +219,8 @@ export function parseStatusEtaAoa(aoa: unknown[][]): StatusEtaProduct[] {
     } else {
       if (row.description && !product.description) product.description = row.description;
       if (row.status && !product.status) product.status = row.status;
-      if (row.availableInv != null && product.availableInv == null) {
+      // Prefer first non-null Aval. INV for the PID (merged cell value).
+      if (product.availableInv == null && row.availableInv != null) {
         product.availableInv = row.availableInv;
       }
     }

@@ -14,6 +14,30 @@ function cellFieldValue(cell: XLSX.CellObject | undefined): unknown {
   return cell.v ?? "";
 }
 
+/** Fill every cell in a merge range with the top-left value (Aval. INV / PID etc.). */
+function expandMergedCells(sheet: XLSX.WorkSheet, aoa: unknown[][]) {
+  const merges = sheet["!merges"];
+  if (!merges?.length) return;
+
+  for (const merge of merges) {
+    const start = merge.s;
+    const end = merge.e;
+    const master =
+      aoa[start.r]?.[start.c] ??
+      cellFieldValue(sheet[XLSX.utils.encode_cell({ r: start.r, c: start.c })]);
+    if (master === "" || master == null) continue;
+
+    for (let r = start.r; r <= end.r; r++) {
+      if (!aoa[r]) aoa[r] = [];
+      for (let c = start.c; c <= end.c; c++) {
+        const current = aoa[r]![c];
+        const empty = current === undefined || current === null || current === "";
+        if (empty) aoa[r]![c] = master;
+      }
+    }
+  }
+}
+
 function sheetToAoa(sheet: XLSX.WorkSheet): unknown[][] {
   const ref = sheet["!ref"];
   if (!ref) return [];
@@ -27,6 +51,7 @@ function sheetToAoa(sheet: XLSX.WorkSheet): unknown[][] {
     }
     aoa.push(row);
   }
+  expandMergedCells(sheet, aoa);
   return aoa;
 }
 
