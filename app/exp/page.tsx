@@ -16,38 +16,38 @@ import {
 import { ExpSkuAutocomplete } from "./ExpSkuAutocomplete";
 import { useExpAuth } from "./useExpAuth";
 
-type InventoryMeta = {
+type StatusEtaMeta = {
   uploadedAt: string;
   rowCount: number;
   skuCount: number;
   fileName?: string;
 };
 
-type InventoryLot = {
-  sku: string;
-  description?: string;
-  qtyUm?: string;
-  status?: string;
-  receivedDate?: string;
-  expireDate?: string;
-  onHandQty?: number;
-  location?: string;
-  licensePlate?: string;
+type StatusEtaInbound = {
+  portEta: string | null;
+  inboundQty: number | null;
 };
 
-type SkuLookupResult = {
-  sku: string;
+type StatusEtaProduct = {
+  pid: string;
+  description: string;
+  status: string;
+  availableInv: number | null;
+  inbound: StatusEtaInbound[];
+};
+
+type StatusEtaLookup = {
+  pid: string;
   found: boolean;
-  lots: InventoryLot[];
-  earliestExpireDate: string | null;
-  latestExpireDate: string | null;
-  totalOnHandQty: number;
+  product: StatusEtaProduct | null;
 };
 
-function formatInventoryDate(iso?: string) {
+type ResultTab = "exp" | "eta";
+
+function formatInventoryDate(iso?: string | null) {
   if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "—";
   const [y, m, d] = iso.split("-");
-  return `${Number(m)}/${Number(d)}/${y}`;
+  return `${Number(m)}/${Number(d)}/${String(y).slice(-2)}`;
 }
 
 function formatUploadedAt(iso?: string) {
@@ -63,15 +63,19 @@ function formatUploadedAt(iso?: string) {
   });
 }
 
+function formatInv(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return value.toLocaleString();
+}
+
 export default function ExpLookupPage() {
   const { ready, authed, error, loading, login, logout, expHeaders } = useExpAuth();
   const [passwordInput, setPasswordInput] = useState("");
 
-  const [meta, setMeta] = useState<InventoryMeta | null>(null);
+  const [meta, setMeta] = useState<StatusEtaMeta | null>(null);
   const [sku, setSku] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [onlyFuture, setOnlyFuture] = useState(false);
-  const [lookup, setLookup] = useState<SkuLookupResult | null>(null);
+  const [lookup, setLookup] = useState<StatusEtaLookup | null>(null);
+  const [tab, setTab] = useState<ResultTab>("exp");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
@@ -82,7 +86,7 @@ export default function ExpLookupPage() {
   };
 
   const loadMeta = useCallback(async () => {
-    const res = await fetch("/api/exp/inventory", { cache: "no-store", headers: expHeaders() });
+    const res = await fetch("/api/exp/status-eta", { cache: "no-store", headers: expHeaders() });
     const data = await res.json();
     if (!res.ok) throw new Error(data?.error || "Failed to load inventory.");
     setMeta(data.meta || null);
@@ -98,12 +102,10 @@ export default function ExpLookupPage() {
 
       setBusy(true);
       setLookup(null);
+      setTab("exp");
       try {
         const params = new URLSearchParams({ sku: q });
-        if (statusFilter) params.set("status", statusFilter);
-        if (onlyFuture) params.set("onlyFuture", "1");
-
-        const res = await fetch(`/api/exp/inventory?${params}`, {
+        const res = await fetch(`/api/exp/status-eta?${params}`, {
           cache: "no-store",
           headers: expHeaders(),
         });
@@ -111,12 +113,9 @@ export default function ExpLookupPage() {
         if (!res.ok) throw new Error(data?.error || "Lookup failed.");
 
         setLookup({
-          sku: data.sku,
+          pid: data.pid,
           found: Boolean(data.found),
-          lots: Array.isArray(data.lots) ? data.lots : [],
-          earliestExpireDate: data.earliestExpireDate || null,
-          latestExpireDate: data.latestExpireDate || null,
-          totalOnHandQty: Number(data.totalOnHandQty) || 0,
+          product: data.product || null,
         });
 
         if (typeof window !== "undefined") {
@@ -130,7 +129,7 @@ export default function ExpLookupPage() {
         setBusy(false);
       }
     },
-    [sku, statusFilter, onlyFuture, expHeaders]
+    [sku, expHeaders]
   );
 
   useEffect(() => {
@@ -154,7 +153,7 @@ export default function ExpLookupPage() {
       <main style={loginPage}>
         <section style={loginCard}>
           <div className="exp-login-logo">EXP</div>
-          <h1 style={loginTitle}>Inventory expiry</h1>
+          <h1 style={loginTitle}>Inventory status</h1>
           <p style={loginSubtitle}>
             Rheebros internal lookup — enter the team password shared by your manager. Read-only; does not
             change inventory data.
@@ -190,15 +189,21 @@ export default function ExpLookupPage() {
     );
   }
 
+  const product = lookup?.product;
+  const earliestEta = product?.inbound
+    .map((x) => x.portEta)
+    .filter(Boolean)
+    .sort()[0];
+
   return (
     <div className="exp-page">
       <header className="exp-header">
         <div className="exp-header-inner">
           <div>
-            <h1>Inventory expiry lookup</h1>
+            <h1>Inventory status &amp; ETA</h1>
             <p>
-              Check received and expiration dates by SKU. Data is updated when admin uploads the weekly By
-              Item file — you cannot upload here.
+              Look up PID status / available inventory and inbound Port ETA. Data updates when admin uploads
+              the status+ETA spreadsheet.
             </p>
           </div>
           <button type="button" className="exp-logout" onClick={logout}>
@@ -214,45 +219,26 @@ export default function ExpLookupPage() {
             <div className="exp-stat-value">{meta ? formatUploadedAt(meta.uploadedAt) : "—"}</div>
           </div>
           <div className="exp-stat">
-            <div className="exp-stat-label">Lots in file</div>
+            <div className="exp-stat-label">Rows in file</div>
             <div className="exp-stat-value">{meta?.rowCount?.toLocaleString() ?? "—"}</div>
           </div>
           <div className="exp-stat">
-            <div className="exp-stat-label">Unique SKUs</div>
+            <div className="exp-stat-label">Unique PIDs</div>
             <div className="exp-stat-value">{meta?.skuCount?.toLocaleString() ?? "—"}</div>
           </div>
         </div>
 
         <section className="exp-card">
-          <h2>Look up SKU</h2>
+          <h2>Look up SKU / PID</h2>
           <label className="exp-label">SKU or product name</label>
           <ExpSkuAutocomplete
             value={sku}
             onChange={setSku}
             onPick={(row) => void searchSku(row.sku)}
-            placeholder="e.g. 10480K or BULDAK"
+            placeholder="e.g. 06622T or COCONUT"
             disabled={busy || !meta}
             onEnter={() => void searchSku()}
           />
-
-          <div className="exp-filters">
-            <div>
-              <label className="exp-label">Status</label>
-              <select
-                className="exp-select"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="">All statuses</option>
-                <option value="Available">Available</option>
-                <option value="Damaged">Damaged</option>
-              </select>
-            </div>
-            <label className="exp-check">
-              <input type="checkbox" checked={onlyFuture} onChange={(e) => setOnlyFuture(e.target.checked)} />
-              Only future expirations
-            </label>
-          </div>
 
           <button
             type="button"
@@ -265,61 +251,101 @@ export default function ExpLookupPage() {
 
           {!meta ? (
             <p className="exp-note" style={{ color: "#b45309" }}>
-              No inventory file loaded yet. Ask admin to upload the weekly report.
+              No status/ETA file loaded yet. Ask admin to upload the spreadsheet (PID, Description, Status,
+              Aval. INV, Port ETA, Inbound QTY).
             </p>
           ) : (
             <p className="exp-note">
-              Share a direct link: add <code>?sku=10480K</code> to the URL after searching once.
+              After search, switch between <strong>EXP status</strong> and <strong>ETA status</strong>. Share a
+              link with <code>?sku=06622T</code>.
             </p>
           )}
         </section>
 
         {lookup ? (
           <section className="exp-card">
-            {lookup.found ? (
+            {lookup.found && product ? (
               <>
                 <p className="exp-result-title">
-                  {lookup.sku} · earliest {formatInventoryDate(lookup.earliestExpireDate || undefined)} ·{" "}
-                  {lookup.lots.length} lot{lookup.lots.length === 1 ? "" : "s"} · on hand{" "}
-                  {lookup.totalOnHandQty.toLocaleString()}
+                  {product.pid} · {product.status || "—"} · Aval. INV {formatInv(product.availableInv)}
+                  {earliestEta ? ` · next ETA ${formatInventoryDate(earliestEta)}` : ""}
                 </p>
+
+                <div className="exp-tabs" role="tablist" aria-label="Result view">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === "exp"}
+                    className={`exp-tab${tab === "exp" ? " is-active" : ""}`}
+                    onClick={() => setTab("exp")}
+                  >
+                    EXP status
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === "eta"}
+                    className={`exp-tab${tab === "eta" ? " is-active" : ""}`}
+                    onClick={() => setTab("eta")}
+                  >
+                    ETA status
+                  </button>
+                </div>
+
                 <div className="exp-table-wrap">
                   <table className="exp-table">
                     <thead>
                       <tr>
-                        <th>SKU</th>
-                        <th>Status</th>
-                        <th>Received</th>
-                        <th>Expires</th>
-                        <th>On hand</th>
-                        <th>Location</th>
-                        <th>LPN</th>
-                        <th>UM</th>
+                        <th>PID</th>
                         <th>Description</th>
+                        <th>Status</th>
+                        <th>Aval. INV</th>
+                        <th>Port ETA</th>
+                        <th>Inbound QTY</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {lookup.lots.map((lot, i) => (
-                        <tr key={`${lot.sku}-${i}`}>
-                          <td style={{ fontWeight: 800 }}>{lot.sku}</td>
-                          <td>{lot.status || "—"}</td>
-                          <td>{formatInventoryDate(lot.receivedDate)}</td>
-                          <td style={{ fontWeight: 700 }}>{formatInventoryDate(lot.expireDate)}</td>
-                          <td>{lot.onHandQty ?? "—"}</td>
-                          <td>{lot.location || "—"}</td>
-                          <td>{lot.licensePlate || "—"}</td>
-                          <td>{lot.qtyUm || "—"}</td>
-                          <td>{lot.description || "—"}</td>
+                      {tab === "exp" ? (
+                        <tr>
+                          <td style={{ fontWeight: 800 }}>{product.pid}</td>
+                          <td>{product.description || "—"}</td>
+                          <td>{product.status || "—"}</td>
+                          <td style={{ fontWeight: 700 }}>{formatInv(product.availableInv)}</td>
+                          <td>{formatInventoryDate(earliestEta)}</td>
+                          <td>
+                            {product.inbound.length
+                              ? formatInv(
+                                  product.inbound.reduce((sum, lot) => sum + (lot.inboundQty || 0), 0)
+                                )
+                              : "—"}
+                          </td>
                         </tr>
-                      ))}
+                      ) : product.inbound.length > 0 ? (
+                        product.inbound.map((lot, i) => (
+                          <tr key={`${product.pid}-eta-${i}`}>
+                            <td style={{ fontWeight: 800 }}>{product.pid}</td>
+                            <td>{product.description || "—"}</td>
+                            <td>{product.status || "—"}</td>
+                            <td>{formatInv(product.availableInv)}</td>
+                            <td style={{ fontWeight: 700 }}>{formatInventoryDate(lot.portEta)}</td>
+                            <td style={{ fontWeight: 700 }}>{formatInv(lot.inboundQty)}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={6} style={{ textAlign: "center", color: "#6b7280" }}>
+                            No inbound ETA rows for this PID.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
               </>
             ) : (
               <div className="exp-empty">
-                <strong>No lots for {lookup.sku}</strong>
-                <p style={{ margin: "8px 0 0" }}>Try catalog SKU (e.g. 10480K) or inventory format (10480).</p>
+                <strong>No rows for {lookup.pid}</strong>
+                <p style={{ margin: "8px 0 0" }}>Try the PID from the spreadsheet (e.g. 06622T).</p>
               </div>
             )}
           </section>
