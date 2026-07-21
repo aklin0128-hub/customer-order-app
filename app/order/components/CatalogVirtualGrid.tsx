@@ -196,8 +196,9 @@ export function CatalogVirtualGrid({
                 transform: `translateY(${vr.start}px)`,
                 display: "grid",
                 gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
-                alignItems: "stretch",
+                alignItems: "start",
                 columnGap: rowGap,
+                rowGap: 0,
               }}
             >
               {rowItems.map((item) => {
