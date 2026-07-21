@@ -132,7 +132,6 @@ export default function AdminProductsPage() {
   const [newPublishedDate, setNewPublishedDate] = useState("");
   const [newItemComingDate, setNewItemComingDate] = useState("");
   const [newItemListPrice, setNewItemListPrice] = useState("");
-  const [newItemOutOfStock, setNewItemOutOfStock] = useState(false);
   const [newItemComingSoon, setNewItemComingSoon] = useState(false);
   const [outOfStock, setOutOfStock] = useState(false);
 
@@ -278,9 +277,8 @@ export default function AdminProductsPage() {
     setNewPublishedDate(p.newPublishedDate || "");
     setNewItemComingDate(p.newItemComingDate || "");
     setNewItemListPrice(p.newItemListPrice || "");
-    setNewItemOutOfStock(readNewItemOutOfStockForAdmin(p));
     setNewItemComingSoon(readNewItemComingSoonForAdmin(p));
-    setOutOfStock(Boolean(p.outOfStock));
+    setOutOfStock(Boolean(p.outOfStock) || readNewItemOutOfStockForAdmin(p));
     setFormDirty(false);
     setAutoSaveStatus("");
     setEditFocusFromLink(Boolean(options?.fromLink));
@@ -388,7 +386,6 @@ export default function AdminProductsPage() {
     setNewPublishedDate("");
     setNewItemComingDate("");
     setNewItemListPrice("");
-    setNewItemOutOfStock(false);
     setNewItemComingSoon(false);
     setOutOfStock(false);
     setFormDirty(false);
@@ -434,7 +431,7 @@ export default function AdminProductsPage() {
           newPublishedDate: newPublishedDate || undefined,
           newItemComingDate: newItemComingDate || undefined,
           newItemListPrice: newItemListPrice || undefined,
-          newItemOutOfStock: isNew ? newItemOutOfStock : false,
+          newItemOutOfStock: isNew ? outOfStock : false,
           newItemComingSoon: isNew ? newItemComingSoon : false,
           outOfStock,
         }),
@@ -481,7 +478,7 @@ export default function AdminProductsPage() {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, outOfStock, newItemOutOfStock, newItemComingSoon, newItemDescription, newItemDescriptionPdfUrl, newPublishedDate, newItemComingDate, newItemListPrice]);
+  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, outOfStock, newItemComingSoon, newItemDescription, newItemDescriptionPdfUrl, newPublishedDate, newItemComingDate, newItemListPrice]);
 
   const uploadNewItemPdf = async (file: File | null) => {
     const finalSku = sku.trim().toUpperCase();
@@ -842,7 +839,6 @@ export default function AdminProductsPage() {
                       setIsNew(next);
                       markDirty();
                       if (!next) {
-                        setNewItemOutOfStock(false);
                         setNewItemComingSoon(false);
                         setNewItemComingDate("");
                       }
@@ -991,17 +987,6 @@ export default function AdminProductsPage() {
                     </div>
 
                     <div className="admin-check-row">
-                      <label style={{ color: newItemOutOfStock ? "#991b1b" : undefined }}>
-                        <input
-                          type="checkbox"
-                          checked={newItemOutOfStock}
-                          onChange={(e) => {
-                            setNewItemOutOfStock(e.target.checked);
-                            markDirty();
-                          }}
-                        />
-                        Out of stock
-                      </label>
                       <label style={{ color: newItemComingSoon ? "#9a3412" : undefined }}>
                         <input
                           type="checkbox"
