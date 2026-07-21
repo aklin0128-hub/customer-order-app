@@ -48,3 +48,12 @@ test("filterCatalogBrowseItems matches sku and upc digits", () => {
   assert.deepEqual(filterCatalogBrowseItems(items, "00002D").map((item) => item.sku), ["00002D"]);
   assert.deepEqual(filterCatalogBrowseItems(items, "81652000020").map((item) => item.sku), ["00002D"]);
 });
+
+test("filterCatalogBrowseItems matches brand plus partial name", () => {
+  const items = [
+    { sku: "08444K", brand: "SAMYANG", name: "CARBONARA BULDAK RAMEN (BIG BOWL)" },
+    { sku: "00002D", brand: "OTHER", name: "RICE" },
+  ];
+  const hits = filterCatalogBrowseItems(items, "samyang carbo");
+  assert.deepEqual(hits.map((item) => item.sku), ["08444K"]);
+});

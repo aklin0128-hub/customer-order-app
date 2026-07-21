@@ -1,6 +1,7 @@
 import { catalog } from "./catalogState";
 
 import { isCatalogNewItem, isJustAddedItem as isJustAddedCatalogItem } from "@/lib/catalogNewItems";
+import { scoreCatalogTextSearch } from "@/lib/catalogTextSearch";
 import { isOrderableCatalogStatus } from "@/lib/orderableCatalog";
 import { formatMoneyPrice, formatPromoTierPricesLine, getApplicablePromoTier } from "@/lib/promoFormat";
 import type { PromoPriceTier } from "@/lib/promotions";
@@ -321,75 +322,15 @@ function catalogSearchTokens(value: string) {
     .filter(Boolean);
 }
 
-/** Drop spaces and punctuation so `o tube`, `o!tube`, and `otube` match the same text. */
-function catalogSearchCompact(value?: string | null) {
-  return catalogSearchTokens(value || "").join("");
-}
-
-function catalogNameHasWordStartingWith(name: string, q: string) {
-  return catalogSearchTokens(name).some((token) => token.startsWith(q));
-}
-
-function catalogTokensMatchInOrder(haystackTokens: string[], needleTokens: string[]) {
-  if (needleTokens.length === 0) return false;
-  let index = 0;
-  for (const needle of needleTokens) {
-    while (index < haystackTokens.length && !haystackTokens[index].startsWith(needle)) {
-      index += 1;
-    }
-    if (index >= haystackTokens.length) return false;
-    index += 1;
-  }
-  return true;
-}
-
 export function scoreCatalogSearchQuery(item: CatalogItem, query: string) {
   const raw = query.trim();
   if (!raw) return -1;
 
-  const q = raw.toUpperCase();
-  const qCompact = catalogSearchCompact(raw);
-  const qTokens = catalogSearchTokens(raw);
+  // UPC / barcode scan matches beat plain text ranks.
+  if (catalogItemMatchesScanCode(item, raw)) return 850;
+  if (catalogItemScanCodeStartsWith(item, raw)) return 800;
 
-  const sku = item.sku?.toUpperCase() || "";
-  const name = item.name?.toUpperCase() || "";
-  const brand = item.brand?.toUpperCase() || "";
-  const barcode = item.barcode?.toUpperCase() || "";
-  const upc = item.upc?.toUpperCase() || "";
-  const size = item.size?.toUpperCase() || "";
-
-  const skuCompact = catalogSearchCompact(item.sku);
-  const nameCompact = catalogSearchCompact(item.name);
-  const brandCompact = catalogSearchCompact(item.brand);
-  const sizeCompact = catalogSearchCompact(item.size);
-  const nameTokens = catalogSearchTokens(name);
-  const brandTokens = catalogSearchTokens(brand);
-
-  if (sku === q || (qCompact && skuCompact === qCompact)) return 1000;
-  if (sku.startsWith(q) || (qCompact && skuCompact.startsWith(qCompact))) return 900;
-  if (catalogItemMatchesScanCode(item, raw) || barcode === q || upc === q) return 850;
-  if (catalogItemScanCodeStartsWith(item, raw) || barcode.startsWith(q) || upc.startsWith(q)) return 800;
-  if (sku.includes(q) || (qCompact.length >= 2 && skuCompact.includes(qCompact))) return 700;
-
-  if (qCompact.length >= 2 && nameCompact.startsWith(qCompact)) return 580;
-  if (qCompact.length >= 2 && brandCompact.startsWith(qCompact)) return 570;
-  if (qCompact.length >= 2 && nameCompact.includes(qCompact)) return 560;
-  if (qTokens.length >= 2 && catalogTokensMatchInOrder(nameTokens, qTokens)) return 540;
-  if (qCompact.length >= 2 && brandCompact.includes(qCompact)) return 530;
-
-  if (brand.startsWith(q) || (qCompact.length === 1 && brandCompact.startsWith(qCompact))) return 600;
-  if (catalogNameHasWordStartingWith(name, qTokens[0] || q)) return 550;
-  if (q.length >= 2 && name.startsWith(q)) return 520;
-  if (q.length >= 2 && brand.includes(q)) return 480;
-  if (q.length >= 2 && (name.includes(q) || size.includes(q) || sizeCompact.includes(qCompact))) return 450;
-  if (qTokens.length >= 2 && catalogTokensMatchInOrder(brandTokens, qTokens)) return 440;
-
-  if (q.length >= 1 && /[^\x00-\x7F]/.test(q)) {
-    if (name.includes(q) || brand.includes(q)) return 400;
-  }
-
-  if (q.length >= 3 && (barcode.includes(q) || upc.includes(q))) return 200;
-  return -1;
+  return scoreCatalogTextSearch(item, raw);
 }
 
 export function generateOrderRef(accountNo: string) {
