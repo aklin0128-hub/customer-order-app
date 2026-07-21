@@ -101,6 +101,7 @@ export default function ExpLookupPage() {
   const [onlyFuture, setOnlyFuture] = useState(false);
   const [expLookup, setExpLookup] = useState<ExpLookupResult | null>(null);
   const [etaLookup, setEtaLookup] = useState<EtaLookupResult | null>(null);
+  const [onhandInventory, setOnhandInventory] = useState<number | null>(null);
   const [tab, setTab] = useState<ResultTab>("exp");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -148,6 +149,7 @@ export default function ExpLookupPage() {
       setBusy(true);
       setExpLookup(null);
       setEtaLookup(null);
+      setOnhandInventory(null);
       setTab("exp");
       try {
         const expParams = new URLSearchParams({ sku: q });
@@ -177,6 +179,11 @@ export default function ExpLookupPage() {
           totalOnHandQty: Number(expData.totalOnHandQty) || 0,
         });
 
+        let nextOnhand: number | null =
+          typeof expData.onhandInventory === "number" && Number.isFinite(expData.onhandInventory)
+            ? expData.onhandInventory
+            : null;
+
         try {
           const etaData = await etaRes.json();
           if (etaRes.ok) {
@@ -185,6 +192,13 @@ export default function ExpLookupPage() {
               found: Boolean(etaData.found),
               product: etaData.product || null,
             });
+            if (
+              nextOnhand == null &&
+              typeof etaData.onhandInventory === "number" &&
+              Number.isFinite(etaData.onhandInventory)
+            ) {
+              nextOnhand = etaData.onhandInventory;
+            }
           } else {
             setEtaLookup(null);
           }
@@ -192,6 +206,7 @@ export default function ExpLookupPage() {
           setEtaLookup(null);
         }
 
+        setOnhandInventory(nextOnhand);
         if (typeof window !== "undefined") {
           const url = new URL(window.location.href);
           url.searchParams.set("sku", q);
@@ -372,6 +387,14 @@ export default function ExpLookupPage() {
 
         {searched ? (
           <section className="exp-card">
+            <div className="exp-onhand">
+              <span className="exp-onhand-label">Onhand inventory</span>
+              <strong className="exp-onhand-value">
+                {onhandInventory != null ? onhandInventory.toLocaleString() : "—"}
+              </strong>
+              <span className="exp-onhand-hint">from today_update INV</span>
+            </div>
+
             <div className="exp-tabs" role="tablist" aria-label="Result view">
               <button
                 type="button"

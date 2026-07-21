@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { resolveOnhandInventory } from "@/lib/catalogOnhand";
 import { requireExp } from "@/lib/expAuth";
 import {
   lookupStatusEtaProduct,
@@ -29,10 +30,14 @@ export async function GET(req: Request) {
     }
 
     if (sku.trim()) {
-      const result = lookupStatusEtaProduct(products, sku);
+      const [result, onhand] = await Promise.all([
+        Promise.resolve(lookupStatusEtaProduct(products, sku)),
+        resolveOnhandInventory(sku),
+      ]);
       return NextResponse.json({
         success: true,
         meta,
+        onhandInventory: onhand.onhandInventory,
         ...result,
       });
     }

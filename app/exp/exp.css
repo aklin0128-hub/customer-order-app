@@ -191,6 +191,39 @@
   flex-wrap: wrap;
 }
 
+.exp-onhand {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.exp-onhand-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: #065f46;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.exp-onhand-value {
+  font-size: 1.35rem;
+  font-weight: 950;
+  color: #047857;
+  letter-spacing: -0.02em;
+}
+
+.exp-onhand-hint {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+}
+
 .exp-tab {
   border: 1px solid #cbd5e1;
   background: #f8fafc;
