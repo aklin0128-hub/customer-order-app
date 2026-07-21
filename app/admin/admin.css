@@ -1141,6 +1141,23 @@
     max-height: min(28vh, 220px);
   }
 
+  .admin-products-list-col,
+  .admin-products-form-col {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .admin-products-list-col > section {
+    display: block;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .admin-products-list-col .admin-products-virtual-list {
+    max-height: min(42vh, 360px);
+  }
+
   .admin-form-grid-2,
   .admin-form-grid-3 {
     grid-template-columns: 1fr;
@@ -1177,6 +1194,7 @@
     position: sticky;
     top: 72px;
     align-self: start;
+    height: calc(100vh - 88px);
     max-height: calc(100vh - 88px);
     min-height: 0;
   }
@@ -1190,6 +1208,7 @@
   .admin-products-list-col > section {
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
     min-height: 0;
     max-height: 100%;
     overflow: hidden;
@@ -1208,6 +1227,8 @@
     padding-bottom: 4px;
   }
 
+  /* Beat .admin-catalog-form-sticky .admin-form-actions-sticky { position: relative } */
+  .admin-products-form-col.admin-catalog-form-sticky .admin-form-actions-sticky,
   .admin-products-form-col .admin-form-actions-sticky {
     position: sticky;
     bottom: 0;

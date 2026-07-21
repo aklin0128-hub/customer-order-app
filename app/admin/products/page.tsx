@@ -1022,7 +1022,6 @@ export default function AdminProductsPage() {
             {sku.trim() ? (
               <details
                 key={sku}
-                defaultOpen={isNew}
                 id="admin-new-item-showcase"
                 className="admin-new-showcase-panel"
                 style={{
