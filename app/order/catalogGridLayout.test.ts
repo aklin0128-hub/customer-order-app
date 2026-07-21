@@ -9,8 +9,8 @@ import {
 } from "./catalogGridLayout";
 
 test("catalog rows use a fixed vertical gap", () => {
-  assert.equal(CATALOG_ROW_GAP_PX, 15);
-  assert.equal(catalogRowGapPx(), 15);
+  assert.equal(CATALOG_ROW_GAP_PX, 20);
+  assert.equal(catalogRowGapPx(), 20);
   assert.equal(catalogColGapPx(), 4);
 });
 
