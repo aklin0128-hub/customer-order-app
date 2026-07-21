@@ -25,6 +25,8 @@ import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog } from "./catalogState";
 import { isProductOrderingBlocked } from "@/lib/productAvailability";
 import { compareCatalogByNewestImport, compareCatalogForDisplay } from "@/lib/catalogNewItems";
+import { clearCustomerSession, readCustomerSession, updateCustomerOrderEmail } from "@/lib/customerSession";
+import { hasSavedAdminPassword } from "@/app/admin/_components/useAdminAuth";
 import {
   formatBrandLabel,
   formatClearanceDetails,
@@ -56,7 +58,6 @@ import {
 import {
   buildCatalogQtyMapFromDraft,
   cartItemsFromQtyMap,
-  cloudDraftHasMoreItems,
   countDraftItems,
   mergeOrderDrafts,
   normalizeOrderDraft,
@@ -236,7 +237,7 @@ export default function OrderPage() {
 
   useEffect(() => {
     const syncAdminEdit = () => {
-      setShowAdminEditLinks(Boolean(sessionStorage.getItem("admin_password")));
+      setShowAdminEditLinks(hasSavedAdminPassword());
     };
     syncAdminEdit();
 
@@ -391,19 +392,16 @@ export default function OrderPage() {
   }, [accountNo]);
 
   useEffect(() => {
-    const loggedIn = sessionStorage.getItem("customer_logged_in");
-    const savedAccount = sessionStorage.getItem("customer_account_no");
-    const savedStore = sessionStorage.getItem("customer_store_name");
+    const session = readCustomerSession();
 
-    if (loggedIn !== "true" || !savedAccount) {
+    if (!session?.accountNo) {
       router.replace("/");
       return;
     }
 
-    setAccountNo(savedAccount);
-    setStoreName(savedStore || "");
-    const savedOrderEmail = sessionStorage.getItem("customer_order_email");
-    setOrderEmail(resolveCustomerOrderEmail(savedOrderEmail || ""));
+    setAccountNo(session.accountNo);
+    setStoreName(session.storeName || "");
+    setOrderEmail(resolveCustomerOrderEmail(session.orderEmail || ""));
     setReady(true);
   }, [router]);
 
@@ -479,7 +477,7 @@ export default function OrderPage() {
           if (profileData?.orderEmail) {
             const resolved = resolveCustomerOrderEmail(profileData.orderEmail);
             setOrderEmail(resolved);
-            sessionStorage.setItem("customer_order_email", resolved);
+            updateCustomerOrderEmail(resolved);
           }
           if (profileData?.invoicePricing) {
             setInvoicePricingEnabled(true);
@@ -528,51 +526,44 @@ export default function OrderPage() {
     localStorage.setItem(`draft_${accountNo}`, JSON.stringify(draft));
 
     const timer = setTimeout(async () => {
-      const applyServerDraftIfRicher = (serverDraft: OrderDraftPayload) => {
-        const current = normalizeOrderDraft(accountNo, {
-          storeName,
-          phone,
-          orderEmail,
-          note,
-          cart,
-          catalogQtyMap,
-        });
-        if (!cloudDraftHasMoreItems(current, serverDraft)) return;
-
-        setPhone(serverDraft.phone || "");
-        setNote(serverDraft.note || "");
-        const map = buildCatalogQtyMapFromDraft(serverDraft);
-        setCatalogQtyMap(map);
-        setCart(cartItemsFromQtyMap(map));
-        localStorage.setItem(`draft_${accountNo}`, JSON.stringify(serverDraft));
+      // After the draft has loaded, an empty cart means the user cleared/removed
+      // the last lines — allow cloud delete so removals stick.
+      const allowClear = countDraftItems(draft) === 0;
+      const saveBody = {
+        ...draft,
+        allowClear,
       };
 
       try {
-        const saveBody = {
-          ...draft,
-          allowClear: false,
-        };
         const res = await fetch("/api/save-draft", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(saveBody),
         });
         if (!res.ok) throw new Error("save failed");
+        // Do not re-apply the server draft into React state. Union-merge used to
+        // revive deleted SKUs ~1–2s after remove; local state is already correct.
         const data = await res.json();
         if (data?.draft) {
-          applyServerDraftIfRicher(normalizeOrderDraft(accountNo, data.draft));
+          localStorage.setItem(
+            `draft_${accountNo}`,
+            JSON.stringify(normalizeOrderDraft(accountNo, data.draft))
+          );
         }
       } catch {
         try {
           const res = await fetch("/api/save-draft", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...draft, allowClear: false }),
+            body: JSON.stringify(saveBody),
           });
           if (res.ok) {
             const data = await res.json();
             if (data?.draft) {
-              applyServerDraftIfRicher(normalizeOrderDraft(accountNo, data.draft));
+              localStorage.setItem(
+                `draft_${accountNo}`,
+                JSON.stringify(normalizeOrderDraft(accountNo, data.draft))
+              );
             }
           }
         } catch {
@@ -614,7 +605,7 @@ export default function OrderPage() {
       if (typeof navigator.sendBeacon === "function") {
         const body = JSON.stringify({
           ...payload,
-          allowClear: false,
+          allowClear: countDraftItems(payload) === 0,
         });
         navigator.sendBeacon("/api/save-draft", new Blob([body], { type: "application/json" }));
       }
@@ -1051,13 +1042,9 @@ export default function OrderPage() {
   };
 
   const removeSkuFromOrder = (sku: string, nhItems?: boolean) => {
-    if (nhItems === true) setQtyForSku(sku, "", "clearance");
-    else if (nhItems === false) setQtyForSku(sku, "", "normal");
-    else {
-      let next = applyQtySet(qtyMaps, sku, "", "normal");
-      next = applyQtySet(next, sku, "", "clearance");
-      applyQtyState(next);
-    }
+    // Catalog lines omit nhItems (undefined). Only clear the matching pool so
+    // removing a catalog row does not wipe an independent clearance line.
+    setQtyForSku(sku, "", nhItems === true ? "clearance" : "normal");
   };
 
   const adjustCartLineQty = (sku: string, delta: number, nhItems?: boolean) => {
@@ -1070,18 +1057,44 @@ export default function OrderPage() {
   };
 
   const addAllClearanceOneCase = () => {
+    let next = qtyMaps;
     for (const item of clearanceItems) {
       if (item.remainingQty === 0) continue;
       const sku = item.sku?.toUpperCase();
       if (!sku) continue;
       const catalogItem = getCatalogItemBySku(sku) || item;
       if (!isOrderableItem(catalogItem)) continue;
-      adjustQtyForSku(sku, 1, "clearance");
+      if (getClearanceQty(next, sku) <= 0 && blockAddForSku(sku)) continue;
+
+      const current = getClearanceQty(next, sku);
+      let appliedDelta = 1;
+      const clearanceRemaining = getClearanceRemainingForSku(sku);
+      if (clearanceRemaining !== null && current + 1 > clearanceRemaining) {
+        appliedDelta = clearanceRemaining - current;
+        if (appliedDelta <= 0) continue;
+      }
+      next = applyQtyDelta(next, sku, appliedDelta, "clearance");
     }
+    applyQtyState(next);
   };
 
   const addAllMissingClearanceUpsell = () => {
-    for (const line of clearanceUpsellLines) adjustQtyForSku(line.sku, 1, "clearance");
+    let next = qtyMaps;
+    for (const line of clearanceUpsellLines) {
+      const sku = String(line.sku || "").trim().toUpperCase();
+      if (!sku) continue;
+      if (getClearanceQty(next, sku) <= 0 && blockAddForSku(sku)) continue;
+
+      const current = getClearanceQty(next, sku);
+      let appliedDelta = 1;
+      const clearanceRemaining = getClearanceRemainingForSku(sku);
+      if (clearanceRemaining !== null && current + 1 > clearanceRemaining) {
+        appliedDelta = clearanceRemaining - current;
+        if (appliedDelta <= 0) continue;
+      }
+      next = applyQtyDelta(next, sku, appliedDelta, "clearance");
+    }
+    applyQtyState(next);
   };
 
   useEffect(() => {
@@ -1428,10 +1441,7 @@ export default function OrderPage() {
   };
 
   const logout = () => {
-    sessionStorage.removeItem("customer_logged_in");
-    sessionStorage.removeItem("customer_account_no");
-    sessionStorage.removeItem("customer_store_name");
-    sessionStorage.removeItem("customer_order_email");
+    clearCustomerSession();
     router.replace("/");
   };
 
@@ -2360,29 +2370,48 @@ export default function OrderPage() {
               </details>
             ) : null}
 
-            <CatalogVirtualGrid
-              gridKey="catalog"
-              items={orderableCatalogItems}
-              catalogQtyMap={catalogQtyMap}
-              invoicePriceLabelForSku={invoicePriceLabelForSku}
-              inCartLabel={t.inCart}
-              palletLabel={t.pallet}
-              justAddedLabel={t.justAdded}
-              promoBadgeLabel={t.promoBadge}
-              weeklyPickSkus={promoSkuSet}
-              showNewProductBadge
-              newProductBadgeChecker={isNewItem}
-              editLabel={t.editProduct}
-              showAdminEdit={showAdminEditLinks}
-              canOrderItem={isOrderableItem}
-              orderBlockedMessage={(item) => formatOrderNotAvailableMessage(item.sku || "", item.status, t)}
-              onAdjust={adjustCatalogQty}
-              onUpdateQty={updateCatalogQty}
-            />
-
             {orderableCatalogItems.length === 0 ? (
               <div style={{ ...emptyStyle, marginTop: 10 }}>{catalogShowSelectedOnly ? t.noItems : t.noMatches}</div>
-            ) : null}
+            ) : (
+              <div className="order-catalog-css-grid">
+                {orderableCatalogItems.map((item) => {
+                  const sku = item.sku?.toUpperCase() || "";
+                  const qty = catalogQtyMap[sku] || "";
+                  const isWeekly = promoSkuSet.has(sku);
+                  const showItemNewBadge = isNewItem(item);
+                  const promoNote = showItemNewBadge
+                    ? undefined
+                    : isWeekly
+                      ? t.promoBadge
+                      : undefined;
+                  const canOrder = isOrderableItem(item) && !isProductOrderingBlocked(item);
+                  return (
+                    <CatalogQtyCard
+                      key={item.sku}
+                      item={item}
+                      qty={qty}
+                      promoNote={promoNote}
+                      inCartLabel={t.inCart}
+                      promoBadgeLabel={t.promoBadge}
+                      highlight={Boolean(isWeekly)}
+                      editLabel={t.editProduct}
+                      palletLabel={t.pallet}
+                      justAddedLabel={t.justAdded}
+                      lang={lang}
+                      showAdminEdit={showAdminEditLinks}
+                      showNewProductBadge={showItemNewBadge}
+                      disabled={!canOrder}
+                      unavailableNote={
+                        !canOrder ? formatOrderNotAvailableMessage(item.sku || "", item.status, t) : undefined
+                      }
+                      invoicePrice={invoicePriceLabelForSku(sku)}
+                      onAdjust={adjustCatalogQty}
+                      onUpdateQty={updateCatalogQty}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </section>
         )}
 

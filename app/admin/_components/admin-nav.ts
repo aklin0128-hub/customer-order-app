@@ -32,10 +32,10 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
     items: [
       { id: "products", label: "Products", href: "/admin/products", hint: "SKU settings", icon: "📦" },
       { id: "promotions", label: "Promotions", href: "/admin/promotions", hint: "Featured sales", icon: "🏷️" },
-      { id: "clearance", label: "Clearance", href: "/admin/clearance", hint: "Sell as is", icon: "⏳" },
+      { id: "clearance", label: "Near Date Sale", href: "/admin/clearance", hint: "Sell as is", icon: "⏳" },
       {
         id: "inventory",
-        label: "Inventory expiry",
+        label: "Inventory & ETA",
         href: "/admin/inventory",
         hint: "Weekly CSV/XLSX · SKU dates",
         icon: "📅",

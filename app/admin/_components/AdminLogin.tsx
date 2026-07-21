@@ -19,6 +19,8 @@ export function AdminLogin({
   subtitle,
   password,
   onPasswordChange,
+  rememberMe,
+  onRememberMeChange,
   error,
   loading,
   onSubmit,
@@ -27,6 +29,8 @@ export function AdminLogin({
   subtitle: string;
   password: string;
   onPasswordChange: (v: string) => void;
+  rememberMe: boolean;
+  onRememberMeChange: (v: boolean) => void;
   error: string;
   loading: boolean;
   onSubmit: () => void;
@@ -47,7 +51,29 @@ export function AdminLogin({
           placeholder="Enter password"
           style={inputStyle}
           autoFocus
+          autoComplete="current-password"
         />
+
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginTop: 12,
+            fontSize: 13,
+            fontWeight: 700,
+            color: "#374151",
+            cursor: "pointer",
+            userSelect: "none",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(e) => onRememberMeChange(e.target.checked)}
+          />
+          Remember me on this device
+        </label>
 
         {error ? <div style={alertError}>{error}</div> : null}
 
