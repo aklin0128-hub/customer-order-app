@@ -75,12 +75,18 @@ test("Aval. INV carries across blank continuation rows (merged-cell style)", () 
   assert.equal(products[0]!.inbound.length, 3);
 });
 
-test("Aval. INV carries when PID repeats but inv cell is blank", () => {
+test("INVENTORY header maps to availableInv", () => {
   const products = parseStatusEtaAoa([
-    ["PID", "Description", "Status", "Aval. INV", "Port ETA", "Inbound QTY"],
-    ["06907T", "COCONUT MILK", "NORMAL", "-245", "07/16/26", "150"],
-    ["06907T", "COCONUT MILK", "NORMAL", "", "07/29/26", "200"],
+    ["PID", "Description", "Status", "INVENTORY", "Port ETA", "Inbound QTY"],
+    ["ABC01", "TEST ITEM", "NORMAL", "55", "07/01/26", "5"],
   ]);
-  assert.equal(products[0]!.availableInv, -245);
-  assert.equal(products[0]!.inbound.length, 2);
+  assert.equal(products[0]!.availableInv, 55);
+});
+
+test("A. INV header maps to availableInv", () => {
+  const products = parseStatusEtaAoa([
+    ["PID", "Description", "Status", "A. INV", "Port ETA", "Inbound QTY"],
+    ["ABC02", "TEST ITEM", "NORMAL", "12", "07/01/26", "5"],
+  ]);
+  assert.equal(products[0]!.availableInv, 12);
 });

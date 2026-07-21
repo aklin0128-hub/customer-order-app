@@ -95,6 +95,7 @@ export default function ExpLookupPage() {
 
   const [expMeta, setExpMeta] = useState<InventoryMeta | null>(null);
   const [etaMeta, setEtaMeta] = useState<InventoryMeta | null>(null);
+  const [etaInvCount, setEtaInvCount] = useState<number | null>(null);
   const [sku, setSku] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [onlyFuture, setOnlyFuture] = useState(false);
@@ -122,10 +123,16 @@ export default function ExpLookupPage() {
 
     try {
       const etaData = await etaRes.json();
-      if (etaRes.ok) setEtaMeta(etaData.meta || null);
-      else setEtaMeta(null);
+      if (etaRes.ok) {
+        setEtaMeta(etaData.meta || null);
+        setEtaInvCount(typeof etaData.availableInvCount === "number" ? etaData.availableInvCount : null);
+      } else {
+        setEtaMeta(null);
+        setEtaInvCount(null);
+      }
     } catch {
       setEtaMeta(null);
+      setEtaInvCount(null);
     }
     setMetaReady(true);
   }, [expHeaders]);
@@ -301,6 +308,12 @@ export default function ExpLookupPage() {
               {etaMeta ? etaMeta.skuCount.toLocaleString() : "—"}
             </div>
           </div>
+          <div className="exp-stat">
+            <div className="exp-stat-label">INVENTORY filled</div>
+            <div className="exp-stat-value">
+              {etaMeta && etaInvCount != null ? etaInvCount.toLocaleString() : "—"}
+            </div>
+          </div>
         </div>
 
         <section className="exp-card">
@@ -435,8 +448,8 @@ export default function ExpLookupPage() {
             ) : etaLookup?.found && etaProduct ? (
               <>
                 <p className="exp-result-title">
-                  {etaProduct.pid} · {etaProduct.status || "—"} · Aval. INV{" "}
-                  {formatInv(etaProduct.availableInv)} · {etaProduct.inbound.length} inbound row
+                  {etaProduct.pid} · {etaProduct.status || "—"} · INVENTORY{" "}
+                  <strong>{formatInv(etaProduct.availableInv)}</strong> · {etaProduct.inbound.length} inbound row
                   {etaProduct.inbound.length === 1 ? "" : "s"}
                 </p>
                 <div className="exp-table-wrap">
@@ -446,7 +459,7 @@ export default function ExpLookupPage() {
                         <th>PID</th>
                         <th>Description</th>
                         <th>Status</th>
-                        <th>Aval. INV</th>
+                        <th>INVENTORY</th>
                         <th>Port ETA</th>
                         <th>Inbound QTY</th>
                       </tr>

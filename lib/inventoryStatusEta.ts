@@ -75,7 +75,16 @@ export function findStatusEtaHeaderRowIndex(aoa: unknown[][]): number {
         c.includes("AVAILINV") ||
         c.includes("AVAILABLEINV") ||
         c === "AVALINV" ||
-        (c.includes("AVAL") && c.includes("INV")),
+        c === "INVENTORY" ||
+        c === "INV" ||
+        c === "AINV" ||
+        c === "AVLINV" ||
+        c === "AVBLINV" ||
+        c === "OHINV" ||
+        (c.includes("AVAL") && c.includes("INV")) ||
+        (c.includes("AVAIL") && c.includes("INV")) ||
+        (c === "AVAILABLE" || c === "AVBL" || c === "AVL") ||
+        (c.endsWith("INV") && !c.includes("INBOUND") && !c.includes("QTY") && c.length <= 12),
     ]);
     if (pidIdx >= 0 && (etaIdx >= 0 || invIdx >= 0)) return r;
   }
@@ -104,8 +113,18 @@ function mapHeaders(headers: string[]) {
         c.includes("AVAILINV") ||
         c.includes("AVAILABLEINV") ||
         c.includes("ONHAND") ||
+        c === "INVENTORY" ||
+        c === "INV" ||
+        c === "AINV" ||
+        c === "AVLINV" ||
+        c === "AVBLINV" ||
+        c === "OHINV" ||
+        c === "AVAILABLE" ||
+        c === "AVBL" ||
+        c === "AVL" ||
         (c.includes("AVAL") && c.includes("INV")) ||
-        (c.includes("AVAIL") && c.includes("INV")),
+        (c.includes("AVAIL") && c.includes("INV")) ||
+        (c.endsWith("INV") && !c.includes("INBOUND") && !c.includes("QTY") && c.length <= 12),
     ]),
     portEta: resolveColumn(headers, [
       (c) => c.includes("PORTETA") || (c.includes("PORT") && c.includes("ETA")) || c === "ETA",

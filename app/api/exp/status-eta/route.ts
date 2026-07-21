@@ -42,6 +42,7 @@ export async function GET(req: Request) {
       meta,
       skuCount: meta?.skuCount ?? products.length,
       rowCount: meta?.rowCount ?? 0,
+      availableInvCount: products.filter((p) => p.availableInv != null).length,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to load status/ETA inventory.";

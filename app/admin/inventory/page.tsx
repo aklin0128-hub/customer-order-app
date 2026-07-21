@@ -72,6 +72,7 @@ export default function AdminInventoryPage() {
 
   const [meta, setMeta] = useState<InventoryMeta | null>(null);
   const [statusEtaMeta, setStatusEtaMeta] = useState<InventoryMeta | null>(null);
+  const [statusEtaAvailableInvCount, setStatusEtaAvailableInvCount] = useState<number | null>(null);
   const [loadedRows, setLoadedRows] = useState(0);
   const [file, setFile] = useState<File | null>(null);
   const [statusEtaFile, setStatusEtaFile] = useState<File | null>(null);
@@ -105,7 +106,12 @@ export default function AdminInventoryPage() {
         headers: adminHeaders(),
       });
       const etaData = await etaRes.json();
-      if (etaRes.ok) setStatusEtaMeta(etaData.meta || null);
+      if (etaRes.ok) {
+        setStatusEtaMeta(etaData.meta || null);
+        setStatusEtaAvailableInvCount(
+          typeof etaData.availableInvCount === "number" ? etaData.availableInvCount : null
+        );
+      }
     } catch {
       /* optional second dataset */
     }
@@ -306,6 +312,12 @@ export default function AdminInventoryPage() {
             above. Last upload:{" "}
             <strong>{statusEtaMeta ? formatUploadedAt(statusEtaMeta.uploadedAt) : "None"}</strong>
             {statusEtaMeta ? ` · ${statusEtaMeta.skuCount} PIDs` : ""}.
+            {statusEtaMeta && statusEtaAvailableInvCount === 0 ? (
+              <span style={{ display: "block", marginTop: 8, color: "#b45309", fontWeight: 700 }}>
+                INVENTORY / Aval. INV is empty — re-upload Excel. Column can be named Aval. INV or INVENTORY
+                (merged cells OK).
+              </span>
+            ) : null}
           </p>
           <label style={labelStyle}>CSV or Excel file</label>
           <input
