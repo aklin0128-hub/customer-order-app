@@ -95,7 +95,6 @@ export default function ExpLookupPage() {
 
   const [expMeta, setExpMeta] = useState<InventoryMeta | null>(null);
   const [etaMeta, setEtaMeta] = useState<InventoryMeta | null>(null);
-  const [etaInvCount, setEtaInvCount] = useState<number | null>(null);
   const [sku, setSku] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [onlyFuture, setOnlyFuture] = useState(false);
@@ -126,14 +125,11 @@ export default function ExpLookupPage() {
       const etaData = await etaRes.json();
       if (etaRes.ok) {
         setEtaMeta(etaData.meta || null);
-        setEtaInvCount(typeof etaData.availableInvCount === "number" ? etaData.availableInvCount : null);
       } else {
         setEtaMeta(null);
-        setEtaInvCount(null);
       }
     } catch {
       setEtaMeta(null);
-      setEtaInvCount(null);
     }
     setMetaReady(true);
   }, [expHeaders]);
@@ -323,12 +319,6 @@ export default function ExpLookupPage() {
               {etaMeta ? etaMeta.skuCount.toLocaleString() : "—"}
             </div>
           </div>
-          <div className="exp-stat">
-            <div className="exp-stat-label">INVENTORY filled</div>
-            <div className="exp-stat-value">
-              {etaMeta && etaInvCount != null ? etaInvCount.toLocaleString() : "—"}
-            </div>
-          </div>
         </div>
 
         <section className="exp-card">
@@ -471,8 +461,7 @@ export default function ExpLookupPage() {
             ) : etaLookup?.found && etaProduct ? (
               <>
                 <p className="exp-result-title">
-                  {etaProduct.pid} · {etaProduct.status || "—"} · INVENTORY{" "}
-                  <strong>{formatInv(etaProduct.availableInv)}</strong> · {etaProduct.inbound.length} inbound row
+                  {etaProduct.pid} · {etaProduct.status || "—"} · {etaProduct.inbound.length} inbound row
                   {etaProduct.inbound.length === 1 ? "" : "s"}
                 </p>
                 <div className="exp-table-wrap">
@@ -482,7 +471,6 @@ export default function ExpLookupPage() {
                         <th>PID</th>
                         <th>Description</th>
                         <th>Status</th>
-                        <th>INVENTORY</th>
                         <th>Port ETA</th>
                         <th>Inbound QTY</th>
                       </tr>
@@ -494,7 +482,6 @@ export default function ExpLookupPage() {
                             <td style={{ fontWeight: 800 }}>{etaProduct.pid}</td>
                             <td>{etaProduct.description || "—"}</td>
                             <td>{etaProduct.status || "—"}</td>
-                            <td>{formatInv(etaProduct.availableInv)}</td>
                             <td style={{ fontWeight: 700 }}>
                               {formatInventoryDate(lot.portEta, true)}
                             </td>
@@ -506,7 +493,6 @@ export default function ExpLookupPage() {
                           <td style={{ fontWeight: 800 }}>{etaProduct.pid}</td>
                           <td>{etaProduct.description || "—"}</td>
                           <td>{etaProduct.status || "—"}</td>
-                          <td style={{ fontWeight: 700 }}>{formatInv(etaProduct.availableInv)}</td>
                           <td>—</td>
                           <td>—</td>
                         </tr>
