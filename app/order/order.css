@@ -2835,10 +2835,6 @@
     font-size: 11px !important;
   }
 
-  .catalog-qty-card-pallet {
-    display: none;
-  }
-
   .catalog-qty-card-stepper button {
     width: 32px !important;
     height: 32px !important;
