@@ -10,7 +10,7 @@ type Lang = "en" | "zh" | "ko" | "vi";
 const copy = {
   en: {
     title: "Store Ordering",
-    subtitle: "Sign in for promotions, clearance deals, and easy ordering.",
+    subtitle: "Sign in for promotions, Near Date Sale deals, and easy ordering.",
     brandName: "Store Portal",
     accountNumber: "Account number",
     password: "Password",
@@ -25,9 +25,9 @@ const copy = {
     hidePassword: "Hide",
     welcomeBack: "Welcome back",
     lastAccountHint: "Last signed-in account loaded.",
-    footer: "Promotions · Clearance · Draft auto-save · EN / 中文 / 한국어 / Tiếng Việt",
+    footer: "Promotions · Near Date Sale · Draft auto-save · EN / 中文 / 한국어 / Tiếng Việt",
     featPromo: "Promotions",
-    featClearance: "Clearance",
+    featClearance: "Near Date Sale",
     featCatalog: "Catalog order",
     featSearch: "Quick order",
     featDraft: "Save draft",
