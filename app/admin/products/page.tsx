@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AdminPage } from "../_components/AdminPage";
 import { AdminProductsVirtualList } from "../_components/AdminProductsVirtualList";
 import { AdminSkuAutocomplete } from "../_components/AdminSkuAutocomplete";
-import { formGrid, inputStyle, labelStyle, splitForm, splitLayout, splitList } from "../_components/admin-styles";
+import { formGrid, inputStyle, labelStyle, splitLayout } from "../_components/admin-styles";
 import {
   BtnPrimary,
   BtnRow,
@@ -690,8 +690,9 @@ export default function AdminProductsPage() {
 
       <div
         style={splitLayout}
-        className={`admin-split${editFocusFromLink ? " admin-split--edit-focus" : ""}`}
+        className={`admin-split admin-products-workspace${editFocusFromLink ? " admin-split--edit-focus" : ""}`}
       >
+        <div className="admin-products-list-col">
         <Panel title={`SKU list (${filteredProducts.length}${search ? "" : ", search for more"})`}>
           <input
             value={search}
@@ -777,13 +778,10 @@ export default function AdminProductsPage() {
             />
           )}
         </Panel>
+        </div>
 
-        <div ref={formPanelRef} style={splitForm} className="admin-catalog-form-sticky">
+        <div ref={formPanelRef} className="admin-catalog-form-sticky admin-products-form-col">
           <Panel title={sku ? `Edit ${sku}` : "SKU details"}>
-            <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 8, fontWeight: 700 }}>
-              Build {ADMIN_PRODUCTS_BUILD_TAG}
-              {!sku.trim() ? " · 选择左侧 SKU 后可编辑新品介绍" : null}
-            </div>
             {autoSaveStatus ? (
               <div
                 style={{
@@ -802,12 +800,12 @@ export default function AdminProductsPage() {
                 src={previewSrc}
                 alt=""
                 style={{
-                  width: 96,
-                  height: 96,
+                  width: 72,
+                  height: 72,
                   objectFit: "contain",
-                  borderRadius: 12,
+                  borderRadius: 10,
                   border: "1px solid #e5e7eb",
-                  marginBottom: 12,
+                  marginBottom: 10,
                   background: "#fff",
                 }}
               />
@@ -1022,26 +1020,39 @@ export default function AdminProductsPage() {
             </div>
 
             {sku.trim() ? (
-              <div
+              <details
+                key={sku}
+                defaultOpen={isNew}
                 id="admin-new-item-showcase"
                 className="admin-new-showcase-panel"
                 style={{
-                  marginTop: 16,
-                  marginBottom: 16,
-                  border: isNew ? "2px solid #2563eb" : "2px dashed #94a3b8",
+                  marginTop: 12,
+                  marginBottom: 12,
+                  border: isNew ? "2px solid #2563eb" : "1px solid #cbd5e1",
                   borderRadius: 14,
-                  padding: 16,
+                  padding: "10px 14px 14px",
                   background: isNew ? "#eff6ff" : "#f8fafc",
                   scrollMarginTop: 88,
                 }}
               >
-                <div style={{ fontSize: 17, fontWeight: 950, color: isNew ? "#1e40af" : "#334155", marginBottom: 6 }}>
+                <summary
+                  style={{
+                    cursor: "pointer",
+                    fontSize: 15,
+                    fontWeight: 950,
+                    color: isNew ? "#1e40af" : "#334155",
+                    listStyle: "none",
+                  }}
+                >
                   新品介绍 · /new/ 页面
-                </div>
-                <div style={{ fontSize: 13, color: isNew ? "#1d4ed8" : "#64748b", marginBottom: 14, lineHeight: 1.55 }}>
+                  <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 700, color: "#64748b" }}>
+                    {isNew ? "（展开编辑）" : "（先勾选 New items）"}
+                  </span>
+                </summary>
+                <div style={{ fontSize: 12, color: isNew ? "#1d4ed8" : "#64748b", margin: "10px 0 12px", lineHeight: 1.5 }}>
                   {isNew
-                    ? "顾客在 /new/ 新品页可点「查看说明」弹出介绍。可填文字、上传 PDF、设上架日期与标价（仅 /new/ 显示，不影响订货页目录）。DRY / FROZEN / FRESH 标签来自上方 Category。"
-                    : "请先在上方勾选「Show in customer New items」，再填写下方内容。"}
+                    ? "顾客在 /new/ 可点「查看说明」。可填文字、上传 PDF、设上架日期与标价。"
+                    : "请先勾选「Show in customer New items」，再填写下方内容。"}
                 </div>
                 <fieldset disabled={!isNew} style={{ border: "none", margin: 0, padding: 0, opacity: isNew ? 1 : 0.5 }}>
                   <label style={labelStyle}>/new/ list price (optional)</label>
@@ -1193,18 +1204,20 @@ export default function AdminProductsPage() {
                     </div>
                   ) : null}
                 </fieldset>
-              </div>
+              </details>
             ) : null}
 
-            <BtnRow>
-              <BtnPrimary onClick={() => void saveProduct()} disabled={busy || !formDirty}>
-                {busy ? "Saving..." : formDirty ? "Save now" : "Saved automatically"}
-              </BtnPrimary>
-              <BtnSecondary onClick={clearForm}>Clear</BtnSecondary>
-              <BtnSecondary onClick={loadProducts} disabled={busy}>
-                Refresh
-              </BtnSecondary>
-            </BtnRow>
+            <div className="admin-form-actions-sticky">
+              <BtnRow>
+                <BtnPrimary onClick={() => void saveProduct()} disabled={busy || !formDirty}>
+                  {busy ? "Saving..." : formDirty ? "Save now" : "Saved automatically"}
+                </BtnPrimary>
+                <BtnSecondary onClick={clearForm}>Clear</BtnSecondary>
+                <BtnSecondary onClick={loadProducts} disabled={busy}>
+                  Refresh
+                </BtnSecondary>
+              </BtnRow>
+            </div>
 
             <Toast message={msg} tone={msgTone} />
           </Panel>

@@ -1166,6 +1166,62 @@
   padding: 6px;
 }
 
+/* Products page: keep SKU list visible while editing a long form */
+@media (min-width: 901px) {
+  .admin-products-workspace {
+    align-items: start;
+  }
+
+  .admin-products-list-col,
+  .admin-products-form-col {
+    position: sticky;
+    top: 72px;
+    align-self: start;
+    max-height: calc(100vh - 88px);
+    min-height: 0;
+  }
+
+  .admin-products-list-col {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .admin-products-list-col > section {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+  }
+
+  .admin-products-list-col .admin-products-virtual-list {
+    flex: 1 1 auto;
+    max-height: none;
+    min-height: 240px;
+  }
+
+  .admin-products-form-col {
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+
+  .admin-products-form-col .admin-form-actions-sticky {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin: 12px -16px -16px;
+    padding: 12px 16px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, #fff 28%);
+    border-top: 1px solid #e5e7eb;
+    border-radius: 0 0 16px 16px;
+    box-shadow: 0 -6px 16px rgba(15, 23, 42, 0.06);
+  }
+}
+
+
 .admin-products-virtual-row {
   padding-bottom: 8px;
   box-sizing: border-box;
