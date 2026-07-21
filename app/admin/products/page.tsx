@@ -18,7 +18,7 @@ import {
 } from "../_components/admin-utils";
 import { AdminPublicShowcaseHint } from "../_components/AdminPublicShowcaseHint";
 import { useAdminAuth } from "../_components/useAdminAuth";
-import { isJustAddedItem, parseImportedAtMs } from "@/lib/catalogNewItems";
+import { isJustAddedItem } from "@/lib/catalogNewItems";
 import { readNewItemComingSoonForAdmin, readNewItemOutOfStockForAdmin } from "@/lib/comingSoonBadge";
 import { resolveNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import {
@@ -90,8 +90,6 @@ async function readApiJson(res: Response) {
   }
 }
 /** Bump when admin new-item showcase UI changes — visible in Products editor to confirm deploy. */
-const ADMIN_PRODUCTS_BUILD_TAG = "new-desc-v2";
-
 function productImageSrc(sku: string, imageUrl?: string) {
   if (imageUrl) return imageUrl;
   if (sku) return `/product/${sku}.jpg`;
@@ -100,12 +98,6 @@ function productImageSrc(sku: string, imageUrl?: string) {
 
 function isNewProduct(p?: Product | null) {
   return Boolean(p?.isNew);
-}
-
-function formatImportedAtLabel(value?: string) {
-  const ms = parseImportedAtMs(value);
-  if (ms == null) return "—";
-  return new Date(ms).toLocaleString();
 }
 
 export default function AdminProductsPage() {
@@ -171,14 +163,6 @@ export default function AdminProductsPage() {
   const markDirty = () => {
     setFormDirty(true);
     setAutoSaveStatus("Saving...");
-  };
-
-  const toggleProductCategory = (cat: string) => {
-    setCategories((prev) => {
-      if (prev.includes(cat)) return [];
-      return [cat];
-    });
-    markDirty();
   };
 
   const updateText = (setter: (value: string) => void, value: string) => {
@@ -812,12 +796,12 @@ export default function AdminProductsPage() {
             ) : null}
 
             <div style={formGrid}>
-              <div>
+              <div style={{ maxWidth: 132 }}>
                 <label style={labelStyle}>SKU</label>
                 <AdminSkuAutocomplete
                   value={sku}
                   onChange={(v) => updateText(setSku, v)}
-                  placeholder="Type SKU or name…"
+                  placeholder="SKU…"
                 />
               </div>
               <div>
@@ -838,147 +822,81 @@ export default function AdminProductsPage() {
                   ))}
                 </select>
               </div>
-              <label
-                style={{
-                  gridColumn: "1 / -1",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  border: "1px solid #fecaca",
-                  borderRadius: 12,
-                  padding: 12,
-                  background: outOfStock ? "#fef2f2" : "#fff",
-                  color: "#991b1b",
-                  fontSize: 13,
-                  fontWeight: 900,
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={outOfStock}
-                  onChange={(e) => {
-                    setOutOfStock(e.target.checked);
-                    markDirty();
-                  }}
-                />
-                Out of stock — show stamp on catalog / weekly picks / clearance and block ordering
-              </label>
-              <div style={{ gridColumn: "1 / -1" }}>
+              <div>
                 <label style={labelStyle}>Category</label>
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 8,
-                    marginTop: 6,
-                    paddingBottom: 4,
+                <select
+                  value={categories[0] || ""}
+                  onChange={(e) => {
+                    const next = e.target.value.trim();
+                    setCategories(next ? [next] : []);
+                    markDirty();
                   }}
+                  style={inputStyle}
                 >
-                  {categoryOptions.map((cat) => {
-                    const active = categories.includes(cat);
-                    return (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => toggleProductCategory(cat)}
-                        style={{
-                          padding: "8px 12px",
-                          borderRadius: 999,
-                          border: active ? "1px solid #2563eb" : "1px solid #d1d5db",
-                          background: active ? "#eff6ff" : "#ffffff",
-                          color: active ? "#2563eb" : "#374151",
-                          fontSize: 12,
-                          fontWeight: 900,
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {cat}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>
-                  {categories.length > 0
-                    ? `Selected: ${categories[0]}. Pick one of DRY, FROZEN, FRESH, HOUSEWARE. Tap again to clear (AUTO).`
-                    : "No selection = AUTO (use catalog-inferred category). Pick one category."}
-                </div>
+                  <option value="">AUTO</option>
+                  {categoryOptions.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <label
+              <div
                 style={{
                   gridColumn: "1 / -1",
                   display: "flex",
+                  flexWrap: "wrap",
+                  gap: "10px 16px",
                   alignItems: "center",
-                  gap: 10,
-                  border: "1px solid #fed7aa",
-                  borderRadius: 12,
-                  padding: 12,
-                  background: isNew ? "#fff7ed" : "#fff",
-                  color: "#9a3412",
                   fontSize: 13,
-                  fontWeight: 900,
-                  cursor: "pointer",
+                  fontWeight: 800,
+                  color: "#374151",
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={isNew}
-                  onChange={(e) => {
-                    const next = e.target.checked;
-                    setIsNew(next);
-                    markDirty();
-                    if (!next) {
-                      setNewItemOutOfStock(false);
-                      setNewItemComingSoon(false);
-                      setNewItemComingDate("");
-                    }
-                    if (next) {
-                      requestAnimationFrame(() => {
-                        document.getElementById("admin-new-item-showcase")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                      });
-                    }
-                  }}
-                />
-                Show in customer “New items” (you set this — not read from name or Excel)
-                <span style={{ fontWeight: 600, color: "#c2410c" }}>
-                  {" "}
-                  (
-                  <a href="/new/" target="_blank" rel="noopener noreferrer" style={{ color: "#1d4ed8" }}>
-                    /new/
-                  </a>
-                  )
-                </span>
-              </label>
-              <label
-                style={{
-                  gridColumn: "1 / -1",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  border: "1px solid #fca5a5",
-                  borderRadius: 12,
-                  padding: 12,
-                  background: justAdded ? "#fef2f2" : "#fff",
-                  color: "#991b1b",
-                  fontSize: 13,
-                  fontWeight: 900,
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={justAdded}
-                  onChange={(e) => {
-                    setJustAdded(e.target.checked);
-                    markDirty();
-                  }}
-                />
-                JUST ADDED — red badge on customer order
-              </label>
-              <div style={{ gridColumn: "1 / -1", fontSize: 11, color: "#6b7280", marginTop: -4 }}>
-                Catalog import time (reference only):{" "}
-                {formatImportedAtLabel(products.find((p) => p.sku?.toUpperCase() === sku.toUpperCase())?.importedAt)}
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={isNew}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setIsNew(next);
+                      markDirty();
+                      if (!next) {
+                        setNewItemOutOfStock(false);
+                        setNewItemComingSoon(false);
+                        setNewItemComingDate("");
+                      }
+                      if (next) {
+                        requestAnimationFrame(() => {
+                          document.getElementById("admin-new-item-showcase")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                        });
+                      }
+                    }}
+                  />
+                  New items
+                </label>
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={justAdded}
+                    onChange={(e) => {
+                      setJustAdded(e.target.checked);
+                      markDirty();
+                    }}
+                  />
+                  JUST ADDED
+                </label>
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", color: outOfStock ? "#991b1b" : undefined }}>
+                  <input
+                    type="checkbox"
+                    checked={outOfStock}
+                    onChange={(e) => {
+                      setOutOfStock(e.target.checked);
+                      markDirty();
+                    }}
+                  />
+                  Out of stock
+                </label>
               </div>
               <div>
                 <label style={labelStyle}>Size</label>
@@ -1045,15 +963,10 @@ export default function AdminProductsPage() {
                 >
                   新品介绍 · /new/ 页面
                   <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 700, color: "#64748b" }}>
-                    {isNew ? "（展开编辑）" : "（先勾选 New items）"}
+                    {isNew ? "点击展开" : "先勾选 New items"}
                   </span>
                 </summary>
-                <div style={{ fontSize: 12, color: isNew ? "#1d4ed8" : "#64748b", margin: "10px 0 12px", lineHeight: 1.5 }}>
-                  {isNew
-                    ? "顾客在 /new/ 可点「查看说明」。可填文字、上传 PDF、设上架日期与标价。"
-                    : "请先勾选「Show in customer New items」，再填写下方内容。"}
-                </div>
-                <fieldset disabled={!isNew} style={{ border: "none", margin: 0, padding: 0, opacity: isNew ? 1 : 0.5 }}>
+                <fieldset disabled={!isNew} style={{ border: "none", margin: "10px 0 0", padding: 0, opacity: isNew ? 1 : 0.5 }}>
                   <label style={labelStyle}>/new/ list price (optional)</label>
                   <input
                     value={newItemListPrice}
