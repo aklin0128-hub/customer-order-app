@@ -92,6 +92,7 @@ function formatInv(value: number | null | undefined) {
 export default function ExpLookupPage() {
   const { ready, authed, error, loading, login, logout, expHeaders } = useExpAuth();
   const [passwordInput, setPasswordInput] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
 
   const [expMeta, setExpMeta] = useState<InventoryMeta | null>(null);
   const [etaMeta, setEtaMeta] = useState<InventoryMeta | null>(null);
@@ -249,17 +250,39 @@ export default function ExpLookupPage() {
             type="password"
             value={passwordInput}
             onChange={(e) => setPasswordInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && void login(passwordInput)}
+            onKeyDown={(e) => e.key === "Enter" && void login(passwordInput, rememberMe)}
             placeholder="Enter password"
             style={inputStyle}
             autoFocus
+            autoComplete="current-password"
           />
+
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginTop: 12,
+              fontSize: 13,
+              fontWeight: 700,
+              color: "#374151",
+              cursor: "pointer",
+              userSelect: "none",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+            />
+            Remember me on this device
+          </label>
 
           {error ? <div style={alertError}>{error}</div> : null}
 
           <button
             type="button"
-            onClick={() => void login(passwordInput)}
+            onClick={() => void login(passwordInput, rememberMe)}
             disabled={loading}
             style={{ ...btnPrimary, width: "100%", marginTop: 12, background: "#0d9488" }}
           >
