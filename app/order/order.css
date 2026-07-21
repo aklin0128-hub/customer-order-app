@@ -1544,8 +1544,6 @@
   isolation: isolate;
   box-sizing: border-box;
   grid-auto-rows: min-content;
-  /* Fallback if inline paddingBottom is missing */
-  padding-bottom: 20px;
 }
 
 .order-catalog-virtual-row[data-index] {

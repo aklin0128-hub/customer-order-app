@@ -124,8 +124,8 @@ export function CatalogVirtualGrid({
     count: rowCount,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowEstimate,
-    // Spacing comes from paddingBottom on each row so measureElement always includes it.
-    gap: 0,
+    // Fixed gap between measured rows — stays even if a row remeasures short.
+    gap: rowGap,
     overscan: 3,
     measureElement,
   });
@@ -202,8 +202,6 @@ export function CatalogVirtualGrid({
                 alignItems: "start",
                 columnGap: colGap,
                 rowGap: 0,
-                // Fixed space between rows — part of measured height so rows never collide.
-                paddingBottom: rowGap,
                 boxSizing: "border-box",
               }}
             >
