@@ -19,6 +19,7 @@ import {
 import { AdminPublicShowcaseHint } from "../_components/AdminPublicShowcaseHint";
 import { useAdminAuth } from "../_components/useAdminAuth";
 import { isJustAddedItem } from "@/lib/catalogNewItems";
+import { scoreCatalogTextSearch } from "@/lib/catalogTextSearch";
 import { readNewItemComingSoonForAdmin, readNewItemOutOfStockForAdmin } from "@/lib/comingSoonBadge";
 import { resolveNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import {
@@ -236,19 +237,30 @@ export default function AdminProductsPage() {
     if (!q) return list.slice(0, 120);
 
     return list
-      .filter((p) => {
-        return (
-          p.sku?.toUpperCase().includes(q) ||
-          p.name?.toUpperCase().includes(q) ||
-          p.brand?.toUpperCase().includes(q) ||
-          p.category?.toUpperCase().includes(q) ||
-          p.barcode?.toUpperCase().includes(q) ||
-          p.upc?.toUpperCase().includes(q)
+      .map((p) => {
+        const score = scoreCatalogTextSearch(
+          {
+            sku: p.sku,
+            name: p.name,
+            brand: p.brand,
+            barcode: p.barcode,
+            upc: p.upc,
+          },
+          search
         );
+        const categoryHit =
+          score < 0 &&
+          Boolean(
+            p.category?.toUpperCase().includes(q) ||
+              readProductCategories(p).some((c) => c.toUpperCase().includes(q))
+          );
+        return { p, score: categoryHit ? 100 : score };
       })
-      .slice(0, 200);
+      .filter((row) => row.score >= 0)
+      .sort((a, b) => b.score - a.score || a.p.sku.localeCompare(b.p.sku))
+      .slice(0, 200)
+      .map((row) => row.p);
   }, [products, search, listFilter]);
-
   const scrollFormIntoView = () => {
     requestAnimationFrame(() => {
       formPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
