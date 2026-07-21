@@ -2370,29 +2370,48 @@ export default function OrderPage() {
               </details>
             ) : null}
 
-            <CatalogVirtualGrid
-              gridKey="catalog"
-              items={orderableCatalogItems}
-              catalogQtyMap={catalogQtyMap}
-              invoicePriceLabelForSku={invoicePriceLabelForSku}
-              inCartLabel={t.inCart}
-              palletLabel={t.pallet}
-              justAddedLabel={t.justAdded}
-              promoBadgeLabel={t.promoBadge}
-              weeklyPickSkus={promoSkuSet}
-              showNewProductBadge
-              newProductBadgeChecker={isNewItem}
-              editLabel={t.editProduct}
-              showAdminEdit={showAdminEditLinks}
-              canOrderItem={isOrderableItem}
-              orderBlockedMessage={(item) => formatOrderNotAvailableMessage(item.sku || "", item.status, t)}
-              onAdjust={adjustCatalogQty}
-              onUpdateQty={updateCatalogQty}
-            />
-
             {orderableCatalogItems.length === 0 ? (
               <div style={{ ...emptyStyle, marginTop: 10 }}>{catalogShowSelectedOnly ? t.noItems : t.noMatches}</div>
-            ) : null}
+            ) : (
+              <div className="order-catalog-css-grid">
+                {orderableCatalogItems.map((item) => {
+                  const sku = item.sku?.toUpperCase() || "";
+                  const qty = catalogQtyMap[sku] || "";
+                  const isWeekly = promoSkuSet.has(sku);
+                  const showItemNewBadge = isNewItem(item);
+                  const promoNote = showItemNewBadge
+                    ? undefined
+                    : isWeekly
+                      ? t.promoBadge
+                      : undefined;
+                  const canOrder = isOrderableItem(item) && !isProductOrderingBlocked(item);
+                  return (
+                    <CatalogQtyCard
+                      key={item.sku}
+                      item={item}
+                      qty={qty}
+                      promoNote={promoNote}
+                      inCartLabel={t.inCart}
+                      promoBadgeLabel={t.promoBadge}
+                      highlight={Boolean(isWeekly)}
+                      editLabel={t.editProduct}
+                      palletLabel={t.pallet}
+                      justAddedLabel={t.justAdded}
+                      lang={lang}
+                      showAdminEdit={showAdminEditLinks}
+                      showNewProductBadge={showItemNewBadge}
+                      disabled={!canOrder}
+                      unavailableNote={
+                        !canOrder ? formatOrderNotAvailableMessage(item.sku || "", item.status, t) : undefined
+                      }
+                      invoicePrice={invoicePriceLabelForSku(sku)}
+                      onAdjust={adjustCatalogQty}
+                      onUpdateQty={updateCatalogQty}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </section>
         )}
 

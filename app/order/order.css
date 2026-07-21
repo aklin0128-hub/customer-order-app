@@ -1739,7 +1739,17 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 152px), 1fr));
   gap: 4px;
-  align-items: stretch;
+  align-items: start;
+}
+
+/* Catalog order: same flow layout as New items, with fixed row separation. */
+.order-catalog-css-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 152px), 1fr));
+  column-gap: 4px;
+  row-gap: 20px;
+  align-items: start;
+  width: 100%;
 }
 
 .order-promo-hint {
