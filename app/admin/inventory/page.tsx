@@ -251,15 +251,21 @@ export default function AdminInventoryPage() {
   return (
     <AdminPage
       active="inventory"
-      title="Inventory expiry"
-      subtitle="Internal only — upload Friday By Item CSV or Excel. Stores do not see this."
+      title="Inventory expiry & ETA"
+      subtitle="Upload By Item (EXP lots) and status+ETA spreadsheet. Used by internal /exp lookup."
     >
       <StatGrid
         items={[
-          { label: "Last upload", value: meta ? formatUploadedAt(meta.uploadedAt) : "None" },
-          { label: "Lots loaded", value: meta?.rowCount ?? loadedRows },
-          { label: "Unique SKUs", value: meta?.skuCount ?? "—" },
-          { label: "Source file", value: meta?.fileName || "—" },
+          { label: "EXP last upload", value: meta ? formatUploadedAt(meta.uploadedAt) : "None" },
+          { label: "EXP lots / SKUs", value: meta ? `${meta.rowCount} / ${meta.skuCount}` : "—" },
+          {
+            label: "ETA last upload",
+            value: statusEtaMeta ? formatUploadedAt(statusEtaMeta.uploadedAt) : "None",
+          },
+          {
+            label: "ETA PIDs",
+            value: statusEtaMeta?.skuCount ?? "—",
+          },
         ]}
       />
 

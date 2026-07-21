@@ -35,7 +35,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { id: "clearance", label: "Near Date Sale", href: "/admin/clearance", hint: "Sell as is", icon: "⏳" },
       {
         id: "inventory",
-        label: "Inventory expiry",
+        label: "Inventory & ETA",
         href: "/admin/inventory",
         hint: "Weekly CSV/XLSX · SKU dates",
         icon: "📅",

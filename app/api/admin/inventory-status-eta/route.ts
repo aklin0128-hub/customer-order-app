@@ -65,13 +65,22 @@ export async function POST(req: Request) {
     }
 
     const stats = summarizeStatusEtaProducts(products);
+    const withAvailableInv = products.filter((p) => p.availableInv != null).length;
     const csvText = serializeStatusEtaProductsToCsv(products);
     const meta = await saveStatusEtaUpload(csvText, products, stats, fileName);
+
+    const avalNote =
+      stats.skuCount > 0 && withAvailableInv === 0
+        ? " Warning: Aval. INV is empty for all PIDs — re-export Excel (keep merged Aval. INV cells) and upload again."
+        : stats.skuCount > 0 && withAvailableInv < stats.skuCount * 0.2
+          ? ` Warning: Aval. INV filled on only ${withAvailableInv}/${stats.skuCount} PIDs.`
+          : "";
 
     return NextResponse.json({
       success: true,
       meta,
-      message: `Uploaded ${stats.skuCount} SKUs (${stats.rowCount} rows).`,
+      availableInvCount: withAvailableInv,
+      message: `Uploaded ${stats.skuCount} SKUs (${stats.rowCount} rows).${avalNote}`,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Upload failed.";

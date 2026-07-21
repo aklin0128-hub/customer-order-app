@@ -295,6 +295,12 @@ export default function ExpLookupPage() {
             <div className="exp-stat-label">ETA upload</div>
             <div className="exp-stat-value">{etaMeta ? formatUploadedAt(etaMeta.uploadedAt) : "—"}</div>
           </div>
+          <div className="exp-stat">
+            <div className="exp-stat-label">ETA PIDs</div>
+            <div className="exp-stat-value">
+              {etaMeta ? etaMeta.skuCount.toLocaleString() : "—"}
+            </div>
+          </div>
         </div>
 
         <section className="exp-card">
