@@ -25,6 +25,8 @@ import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog } from "./catalogState";
 import { isProductOrderingBlocked } from "@/lib/productAvailability";
 import { compareCatalogByNewestImport, compareCatalogForDisplay } from "@/lib/catalogNewItems";
+import { clearCustomerSession, readCustomerSession, updateCustomerOrderEmail } from "@/lib/customerSession";
+import { hasSavedAdminPassword } from "@/app/admin/_components/useAdminAuth";
 import {
   formatBrandLabel,
   formatClearanceDetails,
@@ -235,7 +237,7 @@ export default function OrderPage() {
 
   useEffect(() => {
     const syncAdminEdit = () => {
-      setShowAdminEditLinks(Boolean(sessionStorage.getItem("admin_password")));
+      setShowAdminEditLinks(hasSavedAdminPassword());
     };
     syncAdminEdit();
 
@@ -390,19 +392,16 @@ export default function OrderPage() {
   }, [accountNo]);
 
   useEffect(() => {
-    const loggedIn = sessionStorage.getItem("customer_logged_in");
-    const savedAccount = sessionStorage.getItem("customer_account_no");
-    const savedStore = sessionStorage.getItem("customer_store_name");
+    const session = readCustomerSession();
 
-    if (loggedIn !== "true" || !savedAccount) {
+    if (!session?.accountNo) {
       router.replace("/");
       return;
     }
 
-    setAccountNo(savedAccount);
-    setStoreName(savedStore || "");
-    const savedOrderEmail = sessionStorage.getItem("customer_order_email");
-    setOrderEmail(resolveCustomerOrderEmail(savedOrderEmail || ""));
+    setAccountNo(session.accountNo);
+    setStoreName(session.storeName || "");
+    setOrderEmail(resolveCustomerOrderEmail(session.orderEmail || ""));
     setReady(true);
   }, [router]);
 
@@ -478,7 +477,7 @@ export default function OrderPage() {
           if (profileData?.orderEmail) {
             const resolved = resolveCustomerOrderEmail(profileData.orderEmail);
             setOrderEmail(resolved);
-            sessionStorage.setItem("customer_order_email", resolved);
+            updateCustomerOrderEmail(resolved);
           }
           if (profileData?.invoicePricing) {
             setInvoicePricingEnabled(true);
@@ -1442,10 +1441,7 @@ export default function OrderPage() {
   };
 
   const logout = () => {
-    sessionStorage.removeItem("customer_logged_in");
-    sessionStorage.removeItem("customer_account_no");
-    sessionStorage.removeItem("customer_store_name");
-    sessionStorage.removeItem("customer_order_email");
+    clearCustomerSession();
     router.replace("/");
   };
 
