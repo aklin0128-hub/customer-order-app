@@ -15,6 +15,9 @@ import {
 } from "../admin/_components/admin-styles";
 import { ExpSkuAutocomplete } from "./ExpSkuAutocomplete";
 import { useExpAuth } from "./useExpAuth";
+import { useExpOffline } from "./useExpOffline";
+import { lookupExpOffline } from "@/lib/expOfflinePack";
+import { clearExpOfflinePack, loadExpOfflinePack } from "./expOfflineStore";
 
 type InventoryMeta = {
   uploadedAt: string;
@@ -91,6 +94,8 @@ function formatInv(value: number | null | undefined) {
 
 export default function ExpLookupPage() {
   const { ready, authed, error, loading, login, logout, expHeaders } = useExpAuth();
+  const { pack, syncing, lastError: offlineError, online, syncOfflinePack, clearOffline } =
+    useExpOffline(authed, expHeaders);
   const [passwordInput, setPasswordInput] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
 
@@ -107,33 +112,78 @@ export default function ExpLookupPage() {
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
   const [metaReady, setMetaReady] = useState(false);
+  const [usedOffline, setUsedOffline] = useState(false);
 
   const notify = (text: string, tone: "success" | "error" = "success") => {
     setMsg(text);
     setMsgTone(tone);
   };
 
-  const loadMeta = useCallback(async () => {
-    const [expRes, etaRes] = await Promise.all([
-      fetch("/api/exp/inventory", { cache: "no-store", headers: expHeaders() }),
-      fetch("/api/exp/status-eta", { cache: "no-store", headers: expHeaders() }),
-    ]);
-    const expData = await expRes.json();
-    if (!expRes.ok) throw new Error(expData?.error || "Failed to load expiry inventory.");
-    setExpMeta(expData.meta || null);
+  const applyOfflineLookup = useCallback(
+    (q: string) => {
+      if (!pack) throw new Error("No offline data on this phone yet. Connect once to sync.");
+      const result = lookupExpOffline(pack, q, {
+        status: statusFilter || undefined,
+        onlyFutureExpiry: onlyFuture,
+      });
+      setExpLookup({
+        sku: result.exp.sku,
+        found: result.exp.found,
+        lots: result.exp.lots,
+        earliestExpireDate: result.exp.earliestExpireDate,
+        latestExpireDate: result.exp.latestExpireDate,
+        totalOnHandQty: result.exp.totalOnHandQty,
+      });
+      setEtaLookup({
+        pid: result.eta.pid,
+        found: result.eta.found,
+        product: result.eta.product,
+      });
+      setOnhandInventory(result.onhandInventory);
+      setUsedOffline(true);
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.searchParams.set("sku", q);
+        window.history.replaceState(null, "", url.pathname + url.search);
+      }
+    },
+    [pack, statusFilter, onlyFuture]
+  );
 
+  const loadMeta = useCallback(async () => {
     try {
-      const etaData = await etaRes.json();
-      if (etaRes.ok) {
-        setEtaMeta(etaData.meta || null);
-      } else {
+      const [expRes, etaRes] = await Promise.all([
+        fetch("/api/exp/inventory", { cache: "no-store", headers: expHeaders() }),
+        fetch("/api/exp/status-eta", { cache: "no-store", headers: expHeaders() }),
+      ]);
+      const expData = await expRes.json();
+      if (!expRes.ok) throw new Error(expData?.error || "Failed to load expiry inventory.");
+      setExpMeta(expData.meta || null);
+
+      try {
+        const etaData = await etaRes.json();
+        if (etaRes.ok) {
+          setEtaMeta(etaData.meta || null);
+        } else {
+          setEtaMeta(null);
+        }
+      } catch {
         setEtaMeta(null);
       }
-    } catch {
-      setEtaMeta(null);
+      setMetaReady(true);
+      void syncOfflinePack();
+    } catch (err: unknown) {
+      const saved = await loadExpOfflinePack();
+      if (saved) {
+        setExpMeta(saved.expMeta);
+        setEtaMeta(saved.etaMeta);
+        setMetaReady(true);
+        notify("Using offline inventory data on this device.", "success");
+        return;
+      }
+      throw err;
     }
-    setMetaReady(true);
-  }, [expHeaders]);
+  }, [expHeaders, syncOfflinePack]);
 
   const searchSku = useCallback(
     async (skuQuery?: string) => {
@@ -148,7 +198,13 @@ export default function ExpLookupPage() {
       setEtaLookup(null);
       setOnhandInventory(null);
       setTab("exp");
+      setUsedOffline(false);
       try {
+        if (!online) {
+          applyOfflineLookup(q);
+          return;
+        }
+
         const expParams = new URLSearchParams({ sku: q });
         if (statusFilter) expParams.set("status", statusFilter);
         if (onlyFuture) expParams.set("onlyFuture", "1");
@@ -210,13 +266,24 @@ export default function ExpLookupPage() {
           window.history.replaceState(null, "", url.pathname + url.search);
         }
       } catch (err: unknown) {
-        notify(err instanceof Error ? err.message : "Lookup failed.", "error");
+        try {
+          applyOfflineLookup(q);
+          notify("Network unavailable — showing offline data.", "success");
+        } catch {
+          notify(err instanceof Error ? err.message : "Lookup failed.", "error");
+        }
       } finally {
         setBusy(false);
       }
     },
-    [sku, statusFilter, onlyFuture, expHeaders]
+    [sku, statusFilter, onlyFuture, expHeaders, online, applyOfflineLookup]
   );
+
+  const handleLogout = useCallback(() => {
+    void clearOffline();
+    void clearExpOfflinePack();
+    logout();
+  }, [clearOffline, logout]);
 
   useEffect(() => {
     if (!authed) return;
@@ -299,7 +366,7 @@ export default function ExpLookupPage() {
 
   const etaProduct = etaLookup?.product;
   const searched = expLookup !== null || etaLookup !== null;
-  const canSearch = Boolean(expMeta || etaMeta);
+  const canSearch = Boolean(expMeta || etaMeta || pack);
 
   return (
     <div className="exp-page">
@@ -309,13 +376,49 @@ export default function ExpLookupPage() {
             <h1>EXP / ETA</h1>
             <p className="exp-header-sub">SKU lookup · expiry & inbound</p>
           </div>
-          <button type="button" className="exp-logout" onClick={logout}>
+          <button type="button" className="exp-logout" onClick={handleLogout}>
             Sign out
           </button>
         </div>
       </header>
 
       <main className="exp-main">
+        <div className={`exp-offline-bar${!online ? " is-offline" : pack ? " is-ready" : ""}`}>
+          <span>
+            {!online
+              ? pack
+                ? "Offline mode — searching saved data on this phone"
+                : "Offline — no saved data yet"
+              : syncing
+                ? "Saving inventory to this phone for offline lookup…"
+                : pack
+                  ? `Offline ready · ${formatUploadedAt(pack.generatedAt)}`
+                  : "Online — open once with Wi‑Fi to enable offline lookup"}
+          </span>
+          {online ? (
+            <button
+              type="button"
+              className="exp-offline-sync"
+              disabled={syncing}
+              onClick={() => void syncOfflinePack().then((ok) => {
+                if (ok) notify("Offline data updated on this phone.");
+              })}
+            >
+              {syncing ? "Syncing…" : pack ? "Update" : "Save offline"}
+            </button>
+          ) : null}
+        </div>
+        {offlineError && online ? (
+          <p className="exp-note" style={{ color: "#b45309", margin: 0 }}>
+            Offline sync: {offlineError}
+          </p>
+        ) : null}
+        {usedOffline ? (
+          <p className="exp-note" style={{ color: "#0f766e", margin: 0 }}>
+            Result from offline data saved on this device.
+          </p>
+        ) : null}
+
         <details className="exp-meta-fold">
           <summary>
             Upload info
@@ -372,6 +475,8 @@ export default function ExpLookupPage() {
             placeholder="e.g. 10480K or samyang carbo"
             disabled={busy || !canSearch}
             onEnter={() => void searchSku()}
+            offlinePack={pack}
+            preferOffline={!online}
           />
 
           <details className="exp-filters-fold">
