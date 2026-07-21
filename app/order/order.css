@@ -1544,6 +1544,8 @@
   isolation: isolate;
   box-sizing: border-box;
   grid-auto-rows: min-content;
+  /* Fallback if inline paddingBottom is missing */
+  padding-bottom: 12px;
 }
 
 .order-catalog-virtual-row[data-index] {
@@ -2235,7 +2237,8 @@
 }
 
 .order-fixed-bar-inner {
-  max-width: 720px;
+  max-width: none;
+  width: 100%;
   margin: 0 auto;
 }
 

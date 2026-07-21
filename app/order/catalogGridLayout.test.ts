@@ -3,13 +3,15 @@ import assert from "node:assert/strict";
 
 import {
   catalogColumnCountForWidth,
-  catalogGridGapPx,
-  CATALOG_GRID_GAP_PX,
+  catalogColGapPx,
+  catalogRowGapPx,
+  CATALOG_ROW_GAP_PX,
 } from "./catalogGridLayout";
 
-test("catalog row gap is half of the previous 8px default", () => {
-  assert.equal(CATALOG_GRID_GAP_PX, 4);
-  assert.equal(catalogGridGapPx(7), 4);
+test("catalog rows use a fixed vertical gap", () => {
+  assert.equal(CATALOG_ROW_GAP_PX, 12);
+  assert.equal(catalogRowGapPx(), 12);
+  assert.equal(catalogColGapPx(), 4);
 });
 
 test("column count scales with container width", () => {
