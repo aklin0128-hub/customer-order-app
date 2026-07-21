@@ -33,6 +33,7 @@ test("mapProductsToCatalogBrowse keeps only orderable statuses by default", () =
     { sku: "A1", status: "NORMAL" },
     { sku: "A2", status: "DISCONTINUED" },
     { sku: "A3", status: "TBD" },
+    { sku: "A4", status: "READYTOORDER" },
   ]);
   assert.deepEqual(
     items.map((item) => item.sku),

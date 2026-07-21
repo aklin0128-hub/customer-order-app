@@ -47,7 +47,12 @@ export function toCatalogBrowseItem(raw: Record<string, unknown>): CatalogBrowse
 }
 
 export function filterAvailableCatalogBrowseItems(items: CatalogBrowseItem[]): CatalogBrowseItem[] {
-  return items.filter((item) => isOrderableCatalogStatus(item.status));
+  return items.filter((item) => {
+    const status = String(item.status || "").trim().toUpperCase();
+    // /catalog browse should not show Ready to Order SKUs.
+    if (status === "READYTOORDER") return false;
+    return isOrderableCatalogStatus(item.status);
+  });
 }
 
 export function mapProductsToCatalogBrowse(
