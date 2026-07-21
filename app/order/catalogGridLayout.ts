@@ -1,7 +1,7 @@
 /** Shared catalog grid sizing for virtual + CSS grids */
 export const CATALOG_COL_GAP_PX = 4;
 /** Fixed vertical space between catalog rows (included in measured row height). */
-export const CATALOG_ROW_GAP_PX = 12;
+export const CATALOG_ROW_GAP_PX = 15;
 /** @deprecated use CATALOG_COL_GAP_PX — kept for older imports */
 export const CATALOG_GRID_GAP_PX = CATALOG_COL_GAP_PX;
 export const CATALOG_MIN_CARD_WIDTH_PX = 152;

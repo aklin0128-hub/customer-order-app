@@ -1545,7 +1545,7 @@
   box-sizing: border-box;
   grid-auto-rows: min-content;
   /* Fallback if inline paddingBottom is missing */
-  padding-bottom: 12px;
+  padding-bottom: 15px;
 }
 
 .order-catalog-virtual-row[data-index] {
