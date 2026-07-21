@@ -1572,15 +1572,15 @@
   top: auto;
   left: auto;
   right: auto;
-  min-height: 26px;
+  min-height: 18px;
   display: flex;
   flex-direction: column;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 3px;
+  gap: 2px;
   flex: 0 0 auto;
   flex-shrink: 0;
-  margin: 0 0 8px;
+  margin: 0 0 4px;
   overflow: visible;
   z-index: 5;
 }
@@ -1664,13 +1664,15 @@
 
 .catalog-item-storage {
   align-self: center;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
   border-radius: 999px;
-  padding: 4px 10px;
+  padding: 2px 6px;
   width: fit-content;
-  line-height: 1.2;
+  line-height: 1.15;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .catalog-item-storage--dry {

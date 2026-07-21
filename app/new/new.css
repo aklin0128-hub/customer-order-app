@@ -187,8 +187,8 @@
 }
 
 .new-card .showcase-card-badge-row {
-  margin-bottom: 8px;
-  gap: 4px;
+  margin-bottom: 4px;
+  gap: 2px;
   flex-direction: row;
   flex-wrap: nowrap;
   align-items: center;
