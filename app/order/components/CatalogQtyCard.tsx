@@ -304,7 +304,7 @@ export function CatalogQtyCard({
 
       <div
         className={`catalog-card-image-wrap${alignedPriceLayout ? " catalog-card-image-wrap--fixed" : ""}${stamped ? " catalog-card-image-wrap--stamped" : ""}${comingSoon && outOfStock ? " catalog-card-image-wrap--dual-stamped" : ""}`}
-        style={{ paddingTop: alignedPriceLayout ? 0 : badgeRow ? 2 : 0 }}
+        style={{ paddingTop: alignedPriceLayout ? 4 : badgeRow ? 2 : 0 }}
       >
         <ProductImage sku={item.sku} alt={item.name || item.sku} size={96} imageUrl={item.imageUrl} />
         {comingSoon ? <ComingSoonStamp lang={lang} /> : null}

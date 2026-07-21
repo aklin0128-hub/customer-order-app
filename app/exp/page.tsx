@@ -120,9 +120,10 @@ export default function ExpLookupPage() {
   };
 
   const applyOfflineLookup = useCallback(
-    (q: string) => {
-      if (!pack) throw new Error("No offline data on this phone yet. Connect once to sync.");
-      const result = lookupExpOffline(pack, q, {
+    async (q: string) => {
+      const data = pack || (await loadExpOfflinePack());
+      if (!data) throw new Error("No offline data on this phone yet. Connect once to sync.");
+      const result = lookupExpOffline(data, q, {
         status: statusFilter || undefined,
         onlyFutureExpiry: onlyFuture,
       });
@@ -201,7 +202,7 @@ export default function ExpLookupPage() {
       setUsedOffline(false);
       try {
         if (!online) {
-          applyOfflineLookup(q);
+          await applyOfflineLookup(q);
           return;
         }
 
@@ -267,7 +268,7 @@ export default function ExpLookupPage() {
         }
       } catch (err: unknown) {
         try {
-          applyOfflineLookup(q);
+          await applyOfflineLookup(q);
           notify("Network unavailable — showing offline data.", "success");
         } catch {
           notify(err instanceof Error ? err.message : "Lookup failed.", "error");
