@@ -283,11 +283,8 @@ export default function ExpLookupPage() {
       <header className="exp-header">
         <div className="exp-header-inner">
           <div>
-            <h1>Inventory expiry &amp; ETA</h1>
-            <p>
-              EXP status uses the weekly By Item expiry file. ETA status uses the inbound Port ETA spreadsheet.
-              Switch tags after searching a SKU.
-            </p>
+            <h1>EXP / ETA</h1>
+            <p className="exp-header-sub">SKU lookup · expiry & inbound</p>
           </div>
           <button type="button" className="exp-logout" onClick={logout}>
             Sign out
@@ -296,61 +293,85 @@ export default function ExpLookupPage() {
       </header>
 
       <main className="exp-main">
-        <div className="exp-stats">
-          <div className="exp-stat">
-            <div className="exp-stat-label">EXP upload</div>
-            <div className="exp-stat-value">{expMeta ? formatUploadedAt(expMeta.uploadedAt) : "—"}</div>
-          </div>
-          <div className="exp-stat">
-            <div className="exp-stat-label">EXP lots / SKUs</div>
-            <div className="exp-stat-value">
-              {expMeta
-                ? `${expMeta.rowCount.toLocaleString()} / ${expMeta.skuCount.toLocaleString()}`
-                : "—"}
+        <details className="exp-meta-fold">
+          <summary>
+            Upload info
+            <span className="exp-meta-fold-hint">
+              {expMeta || etaMeta
+                ? `EXP ${expMeta ? "✓" : "—"} · ETA ${etaMeta ? "✓" : "—"}`
+                : "not loaded"}
+            </span>
+          </summary>
+          <div className="exp-stats">
+            <div className="exp-stat">
+              <div className="exp-stat-label">EXP upload</div>
+              <div className="exp-stat-value">{expMeta ? formatUploadedAt(expMeta.uploadedAt) : "—"}</div>
+            </div>
+            <div className="exp-stat">
+              <div className="exp-stat-label">EXP lots / SKUs</div>
+              <div className="exp-stat-value">
+                {expMeta
+                  ? `${expMeta.rowCount.toLocaleString()} / ${expMeta.skuCount.toLocaleString()}`
+                  : "—"}
+              </div>
+            </div>
+            <div className="exp-stat">
+              <div className="exp-stat-label">ETA upload</div>
+              <div className="exp-stat-value">{etaMeta ? formatUploadedAt(etaMeta.uploadedAt) : "—"}</div>
+            </div>
+            <div className="exp-stat">
+              <div className="exp-stat-label">ETA PIDs</div>
+              <div className="exp-stat-value">
+                {etaMeta ? etaMeta.skuCount.toLocaleString() : "—"}
+              </div>
             </div>
           </div>
-          <div className="exp-stat">
-            <div className="exp-stat-label">ETA upload</div>
-            <div className="exp-stat-value">{etaMeta ? formatUploadedAt(etaMeta.uploadedAt) : "—"}</div>
-          </div>
-          <div className="exp-stat">
-            <div className="exp-stat-label">ETA PIDs</div>
-            <div className="exp-stat-value">
-              {etaMeta ? etaMeta.skuCount.toLocaleString() : "—"}
-            </div>
-          </div>
-        </div>
+          {!expMeta && !etaMeta ? (
+            <p className="exp-note" style={{ color: "#b45309" }}>
+              No inventory files loaded yet. Ask admin to upload By Item (EXP) and/or status+ETA spreadsheet.
+            </p>
+          ) : (
+            <p className="exp-note">
+              EXP = weekly By Item expiry lots. ETA = inbound Port ETA sheet. After search, switch tabs.
+              {!etaMeta ? " ETA file not uploaded yet." : ""}
+              {!expMeta ? " EXP By Item file not uploaded yet." : ""}
+            </p>
+          )}
+        </details>
 
-        <section className="exp-card">
+        <section className="exp-card exp-search-card">
           <h2>Look up SKU</h2>
           <label className="exp-label">SKU or product name</label>
           <ExpSkuAutocomplete
             value={sku}
             onChange={setSku}
             onPick={(row) => void searchSku(row.sku)}
-            placeholder="e.g. 10480K or BULDAK"
+            placeholder="e.g. 10480K or samyang carbo"
             disabled={busy || !canSearch}
             onEnter={() => void searchSku()}
           />
 
-          <div className="exp-filters">
-            <div>
-              <label className="exp-label">EXP status filter</label>
-              <select
-                className="exp-select"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="">All statuses</option>
-                <option value="Available">Available</option>
-                <option value="Damaged">Damaged</option>
-              </select>
+          <details className="exp-filters-fold">
+            <summary>EXP filters</summary>
+            <div className="exp-filters">
+              <div>
+                <label className="exp-label">Status</label>
+                <select
+                  className="exp-select"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <option value="">All statuses</option>
+                  <option value="Available">Available</option>
+                  <option value="Damaged">Damaged</option>
+                </select>
+              </div>
+              <label className="exp-check">
+                <input type="checkbox" checked={onlyFuture} onChange={(e) => setOnlyFuture(e.target.checked)} />
+                Only future expirations
+              </label>
             </div>
-            <label className="exp-check">
-              <input type="checkbox" checked={onlyFuture} onChange={(e) => setOnlyFuture(e.target.checked)} />
-              Only future expirations
-            </label>
-          </div>
+          </details>
 
           <button
             type="button"
@@ -360,29 +381,16 @@ export default function ExpLookupPage() {
           >
             {busy ? "Searching…" : "Search"}
           </button>
-
-          {!expMeta && !etaMeta ? (
-            <p className="exp-note" style={{ color: "#b45309" }}>
-              No inventory files loaded yet. Ask admin to upload By Item (EXP) and/or status+ETA spreadsheet.
-            </p>
-          ) : (
-            <p className="exp-note">
-              After search, switch <strong>EXP status</strong> (expiry lots) and <strong>ETA status</strong>{" "}
-              (inbound). Share a link with <code>?sku=10480K</code>.
-              {!etaMeta ? " ETA file not uploaded yet." : ""}
-              {!expMeta ? " EXP By Item file not uploaded yet." : ""}
-            </p>
-          )}
         </section>
 
         {searched ? (
-          <section className="exp-card">
+          <section className="exp-card exp-results-card">
             <div className="exp-onhand">
               <span className="exp-onhand-label">Onhand inventory</span>
               <strong className="exp-onhand-value">
                 {onhandInventory != null ? onhandInventory.toLocaleString() : "—"}
               </strong>
-              <span className="exp-onhand-hint">from today_update INV</span>
+              <span className="exp-onhand-hint">today_update INV</span>
             </div>
 
             <div className="exp-tabs" role="tablist" aria-label="Result view">
@@ -410,12 +418,11 @@ export default function ExpLookupPage() {
               expLookup?.found ? (
                 <>
                   <p className="exp-result-title">
-                    {expLookup.sku} · earliest{" "}
-                    {formatInventoryDate(expLookup.earliestExpireDate)} · {expLookup.lots.length} lot
-                    {expLookup.lots.length === 1 ? "" : "s"} · on hand{" "}
+                    {expLookup.sku} · earliest {formatInventoryDate(expLookup.earliestExpireDate)} ·{" "}
+                    {expLookup.lots.length} lot{expLookup.lots.length === 1 ? "" : "s"} · lots on hand{" "}
                     {expLookup.totalOnHandQty.toLocaleString()}
                   </p>
-                  <div className="exp-table-wrap">
+                  <div className="exp-table-wrap exp-desktop-only">
                     <table className="exp-table">
                       <thead>
                         <tr>
@@ -447,6 +454,38 @@ export default function ExpLookupPage() {
                       </tbody>
                     </table>
                   </div>
+                  <div className="exp-mobile-cards">
+                    {expLookup.lots.map((lot, i) => (
+                      <article key={`${lot.sku}-m-${i}`} className="exp-lot-card">
+                        <div className="exp-lot-card-top">
+                          <strong>{lot.sku}</strong>
+                          <span>{lot.status || "—"}</span>
+                        </div>
+                        <div className="exp-lot-card-grid">
+                          <div>
+                            <span>Expires</span>
+                            <b>{formatInventoryDate(lot.expireDate)}</b>
+                          </div>
+                          <div>
+                            <span>On hand</span>
+                            <b>{lot.onHandQty ?? "—"}</b>
+                          </div>
+                          <div>
+                            <span>Received</span>
+                            <b>{formatInventoryDate(lot.receivedDate)}</b>
+                          </div>
+                          <div>
+                            <span>Loc / LPN</span>
+                            <b>
+                              {lot.location || "—"}
+                              {lot.licensePlate ? ` · ${lot.licensePlate}` : ""}
+                            </b>
+                          </div>
+                        </div>
+                        {lot.description ? <p className="exp-lot-card-desc">{lot.description}</p> : null}
+                      </article>
+                    ))}
+                  </div>
                 </>
               ) : (
                 <div className="exp-empty">
@@ -464,7 +503,7 @@ export default function ExpLookupPage() {
                   {etaProduct.pid} · {etaProduct.status || "—"} · {etaProduct.inbound.length} inbound row
                   {etaProduct.inbound.length === 1 ? "" : "s"}
                 </p>
-                <div className="exp-table-wrap">
+                <div className="exp-table-wrap exp-desktop-only">
                   <table className="exp-table">
                     <thead>
                       <tr>
@@ -499,6 +538,32 @@ export default function ExpLookupPage() {
                       )}
                     </tbody>
                   </table>
+                </div>
+                <div className="exp-mobile-cards">
+                  {(etaProduct.inbound.length > 0
+                    ? etaProduct.inbound
+                    : [{ portEta: null, inboundQty: null }]
+                  ).map((lot, i) => (
+                    <article key={`${etaProduct.pid}-eta-m-${i}`} className="exp-lot-card">
+                      <div className="exp-lot-card-top">
+                        <strong>{etaProduct.pid}</strong>
+                        <span>{etaProduct.status || "—"}</span>
+                      </div>
+                      <div className="exp-lot-card-grid">
+                        <div>
+                          <span>Port ETA</span>
+                          <b>{formatInventoryDate(lot.portEta, true)}</b>
+                        </div>
+                        <div>
+                          <span>Inbound QTY</span>
+                          <b>{formatInv(lot.inboundQty)}</b>
+                        </div>
+                      </div>
+                      {etaProduct.description ? (
+                        <p className="exp-lot-card-desc">{etaProduct.description}</p>
+                      ) : null}
+                    </article>
+                  ))}
                 </div>
               </>
             ) : (
