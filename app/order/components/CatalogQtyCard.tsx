@@ -189,7 +189,20 @@ export function CatalogQtyCard({
 
   const productInfo = (
     <div className="catalog-qty-card-meta">
-      <div className="catalog-qty-card-sku">{item.sku}</div>
+      <div className="catalog-qty-card-sku-row">
+        <div className="catalog-qty-card-sku">{item.sku}</div>
+        {showAdminEdit ? (
+          <Link
+            href={`/admin/products?sku=${encodeURIComponent(item.sku)}`}
+            className="catalog-qty-card-edit"
+            prefetch={false}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {editLabel}
+          </Link>
+        ) : null}
+      </div>
       <div className="catalog-qty-card-brand">{item.brand || "-"}</div>
       <div className="catalog-qty-card-name" style={catalogNameStyle}>
         {item.name || "-"}
@@ -285,17 +298,6 @@ export function CatalogQtyCard({
         opacity: disabled ? 0.68 : 1,
       }}
     >
-      {showAdminEdit ? (
-        <Link
-          href={`/admin/products?sku=${encodeURIComponent(item.sku)}`}
-          className="catalog-qty-card-edit"
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          {editLabel}
-        </Link>
-      ) : null}
-
       {alignedPriceLayout && badgeRow ? (
         <div className="catalog-qty-card-badge-slot">{badgeRow}</div>
       ) : badgeRow ? (
