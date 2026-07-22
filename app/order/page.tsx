@@ -1293,12 +1293,17 @@ export default function OrderPage() {
     const orderable = valid.filter((item) => {
       const sku = item.sku.toUpperCase();
       const catalogItem = getCatalogItemBySku(sku);
-      if (!catalogItem || !isOrderableItem(catalogItem)) {
-        alert(formatOrderNotAvailableMessage(sku, catalogItem?.status, t));
-        return false;
-      }
-      return true;
+      return Boolean(catalogItem && isOrderableItem(catalogItem));
     });
+    const skipped = valid.length - orderable.length;
+    if (skipped > 0) {
+      const unavailable = getUnavailableSubmitLines(valid);
+      const detail = unavailable
+        .slice(0, 8)
+        .map((item) => formatOrderNotAvailableMessage(item.sku, item.status, t))
+        .join("\n");
+      alert(`${t.unavailableInCartTitle}\n${detail}${unavailable.length > 8 ? "\n…" : ""}`);
+    }
 
     if (orderable.length === 0) return;
 
