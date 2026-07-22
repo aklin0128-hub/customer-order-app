@@ -201,13 +201,17 @@ export function formatOrderNotAvailableMessage(
 ) {
   const cleanSku = String(sku || "").trim().toUpperCase();
   const display = getDisplayStatus(status) || String(status || "").trim().toUpperCase();
+
+  if (cleanSku && display === "NOT FOUND" && t.unavailableMissingSku) {
+    return t.unavailableMissingSku.replace("{sku}", cleanSku);
+  }
   if (cleanSku && display) {
     return t.statusWarning.replace("{sku}", cleanSku).replace("{status}", display);
   }
-  if (cleanSku && t.unavailableMissingSku) {
-    return t.unavailableMissingSku.replace("{sku}", cleanSku);
+  if (cleanSku) {
+    return t.statusWarning.replace("{sku}", cleanSku).replace("{status}", "UNAVAILABLE");
   }
-  return cleanSku ? `${cleanSku}: ${t.orderNotAvailable}` : t.orderNotAvailable;
+  return t.orderNotAvailable;
 }
 
 /** Cart / submit lines that the API will reject (missing catalog row or non-orderable status). */

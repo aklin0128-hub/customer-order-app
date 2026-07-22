@@ -824,7 +824,11 @@ export default function OrderPage() {
       return true;
     }
     if (isProductOrderingBlocked(catalogItem)) {
-      alert(`${cleanSku}: ${t.orderNotAvailable}`);
+      alert(
+        t.statusWarning
+          .replace("{sku}", cleanSku)
+          .replace("{status}", String(catalogItem.status || "UNAVAILABLE").trim().toUpperCase() || "UNAVAILABLE")
+      );
       return true;
     }
     return false;
@@ -2495,6 +2499,13 @@ export default function OrderPage() {
         onAdjustQty={adjustCartLineQty}
         onQtyInput={updateCartLineQty}
         onRemove={removeSkuFromOrder}
+        unavailableItems={unavailableSubmitItems}
+        onRemoveUnavailable={() => {
+          const removed = removeUnavailableFromOrder();
+          if (removed.length > 0) {
+            showTransientToast(t.unavailableRemoved.replace("{count}", String(removed.length)));
+          }
+        }}
         nudge={
           clearanceUpsellLines.length > 0 ? (
             <details className="order-cart-nudge-fold" open={cartItemCount > 0}>

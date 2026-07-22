@@ -104,7 +104,7 @@ export async function POST(req: Request) {
       const skus = notOrderable.map((i) => i.sku).join(", ");
       return NextResponse.json(
         {
-          error: `These items are not available to order (only NORMAL, NORMAL NOBR, TBD, READYTOORDER): ${skus}`,
+          error: `These items are not available to order (only NORMAL / NORMAL_* statuses): ${skus}`,
           code: "UNAVAILABLE_ITEMS",
           unavailableItems: notOrderable,
         },

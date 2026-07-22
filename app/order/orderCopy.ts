@@ -149,7 +149,7 @@ export const copy = {
     unavailableMissingSku: "{sku} was not found in the catalog.",
     unavailableInCartTitle: "Some items can't be ordered",
     unavailableInCartHint:
-      "These SKUs are discontinued or otherwise unavailable. Remove them to place your order — the rest of your cart can still be submitted.",
+      "These SKUs are discontinued, Ready to Order, or otherwise not NORMAL. Remove them to place your order — the rest of your cart can still be submitted.",
     removeUnavailable: "Remove unavailable items",
     removeUnavailableAndSubmit: "Remove them & place order",
     confirmSubmitBlocked: "Remove unavailable items first",
@@ -339,7 +339,7 @@ export const copy = {
     unavailableMissingSku: "{sku} 在目录中找不到。",
     unavailableInCartTitle: "部分商品无法下单",
     unavailableInCartHint:
-      "以下 SKU 已停产（DISCONTINUED）或当前不可订。请先删除它们，其余商品仍可正常提交。",
+      "以下 SKU 为停产（DISCONTINUED）、Ready to Order，或不是 NORMAL 状态，无法下单。请先删除它们，其余商品仍可正常提交。",
     removeUnavailable: "删除无法下单的商品",
     removeUnavailableAndSubmit: "删除后提交订单",
     confirmSubmitBlocked: "请先删除无法下单的商品",
@@ -529,7 +529,7 @@ export const copy = {
     unavailableMissingSku: "{sku} 를 카탈로그에서 찾을 수 없습니다.",
     unavailableInCartTitle: "주문할 수 없는 상품이 있습니다",
     unavailableInCartHint:
-      "단종(DISCONTINUED) 또는 주문 불가 SKU입니다. 삭제 후 나머지 장바구니는 그대로 주문할 수 있습니다.",
+      "단종(DISCONTINUED), Ready to Order, 또는 NORMAL이 아닌 SKU입니다. 삭제 후 나머지 장바구니는 그대로 주문할 수 있습니다.",
     removeUnavailable: "주문 불가 상품 삭제",
     removeUnavailableAndSubmit: "삭제 후 주문하기",
     confirmSubmitBlocked: "먼저 주문 불가 상품을 삭제하세요",
@@ -719,7 +719,7 @@ export const copy = {
     unavailableMissingSku: "Không tìm thấy {sku} trong danh mục.",
     unavailableInCartTitle: "Một số mặt hàng không đặt được",
     unavailableInCartHint:
-      "Các SKU này đã ngừng bán (DISCONTINUED) hoặc không khả dụng. Xóa chúng rồi mới gửi đơn — phần còn lại vẫn đặt được.",
+      "Các SKU này là DISCONTINUED, Ready to Order, hoặc không phải NORMAL — không đặt được. Xóa chúng rồi mới gửi đơn; phần còn lại vẫn đặt được.",
     removeUnavailable: "Xóa mặt hàng không khả dụng",
     removeUnavailableAndSubmit: "Xóa rồi đặt hàng",
     confirmSubmitBlocked: "Hãy xóa mặt hàng không khả dụng trước",

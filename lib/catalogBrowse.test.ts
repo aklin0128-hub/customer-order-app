@@ -28,16 +28,17 @@ test("mapProductsToCatalogBrowse strips non-catalog fields", () => {
   assert.equal("bp" in (items[0] || {}), false);
 });
 
-test("mapProductsToCatalogBrowse keeps only orderable statuses by default", () => {
+test("mapProductsToCatalogBrowse keeps only NORMAL* statuses by default", () => {
   const items = mapProductsToCatalogBrowse([
     { sku: "A1", status: "NORMAL" },
     { sku: "A2", status: "DISCONTINUED" },
     { sku: "A3", status: "TBD" },
     { sku: "A4", status: "READYTOORDER" },
+    { sku: "A5", status: "NORMAL_NOBR" },
   ]);
   assert.deepEqual(
     items.map((item) => item.sku),
-    ["A1", "A3"]
+    ["A1", "A5"]
   );
 });
 
