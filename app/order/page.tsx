@@ -41,6 +41,7 @@ import {
   getDisplayStatus,
   getStatusBadgeStyle,
   formatOrderNotAvailableMessage,
+  getUnavailableSubmitLines,
   findCatalogItemByScanCode,
   catalogSearchQueryFromScan,
   isOrderSearchQtyAdjustKey,
@@ -879,9 +880,7 @@ export default function OrderPage() {
       const catalogItem = getCatalogItemBySku(cleanSku);
 
       if (qty >= 100) warnings.push(t.highQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(qty)));
-      if (catalogItem && !isOrderableItem(catalogItem)) {
-        warnings.push(formatOrderNotAvailableMessage(cleanSku, catalogItem.status, t));
-      }
+      // Unavailable / discontinued SKUs are shown in a dedicated review banner.
 
       if (item.nhItems) {
         const clearanceRemaining = getClearanceRemainingForSku(cleanSku);
@@ -1368,6 +1367,21 @@ export default function OrderPage() {
     return expandOrderSubmitLines(qtyMaps);
   };
 
+  const unavailableSubmitItems = useMemo(
+    () => getUnavailableSubmitLines(expandOrderSubmitLines(qtyMaps)),
+    // catalogVersion refreshes after catalog reload / submit so status changes are picked up
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [qtyMaps, catalogVersion]
+  );
+
+  const removeUnavailableFromOrder = () => {
+    const unavailable = getUnavailableSubmitLines(getCurrentSubmitItems());
+    for (const item of unavailable) {
+      removeSkuFromOrder(item.sku, item.nhItems);
+    }
+    return unavailable;
+  };
+
   const downloadCsv = () => {
     const items = getCurrentSubmitItems();
     if (items.length === 0) {
@@ -1453,24 +1467,28 @@ export default function OrderPage() {
       return;
     }
 
-    for (const item of items) {
-      const catalogItem = getCatalogItemBySku(item.sku);
-      if (catalogItem && !isOrderableItem(catalogItem)) {
-        alert(formatOrderNotAvailableMessage(item.sku, catalogItem.status, t));
-        return;
-      }
-    }
-
+    // Open review even if some SKUs are discontinued — the modal lists them and
+    // offers remove / remove-and-submit so the customer can finish the order.
     setShowReview(true);
   };
 
-  const submitOrder = async () => {
+  const submitOrder = async (itemsOverride?: CartItem[]) => {
     if (submitLockRef.current || submitting) return;
 
-    const items = getCurrentSubmitItems();
+    const items = itemsOverride ?? getCurrentSubmitItems();
 
     if (items.length === 0) {
       alert(t.addAtLeast);
+      return;
+    }
+
+    const unavailable = getUnavailableSubmitLines(items);
+    if (unavailable.length > 0) {
+      const detail = unavailable
+        .map((item) => formatOrderNotAvailableMessage(item.sku, item.status, t))
+        .join("\n");
+      setSubmitMsg(`${t.unavailableInCartTitle}\n${detail}`);
+      setShowReview(true);
       return;
     }
 
@@ -1503,7 +1521,17 @@ export default function OrderPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || t.failedSubmit);
+      if (!res.ok) {
+        if (Array.isArray(data?.unavailableItems) && data.unavailableItems.length > 0) {
+          const detail = data.unavailableItems
+            .map((item: { sku?: string; status?: string }) =>
+              formatOrderNotAvailableMessage(String(item?.sku || ""), item?.status, t)
+            )
+            .join("\n");
+          throw new Error(`${t.unavailableInCartTitle}\n${detail}`);
+        }
+        throw new Error(data?.error || t.failedSubmit);
+      }
 
       setSubmitMsg(`${t.orderSuccess} ${t.ref}: ${ref}`);
       setLastSubmittedRef(ref);
@@ -1536,6 +1564,35 @@ export default function OrderPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const removeUnavailableAndSubmit = () => {
+    const current = getCurrentSubmitItems();
+    const unavailable = getUnavailableSubmitLines(current);
+    if (unavailable.length === 0) {
+      void submitOrder(current);
+      return;
+    }
+
+    const unavailableKey = new Set(
+      unavailable.map((item) => `${item.sku.toUpperCase()}::${item.nhItems ? "nh" : "cat"}`)
+    );
+    const remaining = current.filter(
+      (item) => !unavailableKey.has(`${item.sku.toUpperCase()}::${item.nhItems ? "nh" : "cat"}`)
+    );
+
+    for (const item of unavailable) {
+      removeSkuFromOrder(item.sku, item.nhItems);
+    }
+
+    showTransientToast(t.unavailableRemoved.replace("{count}", String(unavailable.length)));
+
+    if (remaining.length === 0) {
+      setSubmitMsg(t.addAtLeast);
+      return;
+    }
+
+    void submitOrder(remaining);
   };
 
   const renderProductMeta = (item: CatalogItem) => (
@@ -2522,6 +2579,7 @@ export default function OrderPage() {
           lang={lang}
           items={cartDisplayItems}
           warnings={orderReviewWarnings}
+          unavailableItems={unavailableSubmitItems}
           clearanceUpsellLines={clearanceUpsellLines}
           onAddUpsellCase={(sku) => adjustQtyForSku(sku, 1, "clearance")}
           onAddAllClearanceUpsell={addAllMissingClearanceUpsell}
@@ -2545,6 +2603,13 @@ export default function OrderPage() {
           onAdjustQty={adjustCartLineQty}
           onQtyInput={updateCartLineQty}
           onRemove={removeSkuFromOrder}
+          onRemoveUnavailable={() => {
+            const removed = removeUnavailableFromOrder();
+            if (removed.length > 0) {
+              showTransientToast(t.unavailableRemoved.replace("{count}", String(removed.length)));
+            }
+          }}
+          onRemoveUnavailableAndSubmit={removeUnavailableAndSubmit}
           onSubmit={submitOrder}
         />
 
