@@ -194,11 +194,43 @@ export function isNormalItem(item?: CatalogItem | null) {
 }
 
 export function formatOrderNotAvailableMessage(
-  _sku: string,
-  _status: string | undefined,
-  t: { orderNotAvailable: string }
+  sku: string,
+  status: string | undefined,
+  t: { orderNotAvailable: string; statusWarning: string; unavailableMissingSku?: string }
 ) {
-  return t.orderNotAvailable;
+  const cleanSku = String(sku || "").trim().toUpperCase();
+  const display = getDisplayStatus(status) || String(status || "").trim().toUpperCase();
+  if (cleanSku && display) {
+    return t.statusWarning.replace("{sku}", cleanSku).replace("{status}", display);
+  }
+  if (cleanSku && t.unavailableMissingSku) {
+    return t.unavailableMissingSku.replace("{sku}", cleanSku);
+  }
+  return cleanSku ? `${cleanSku}: ${t.orderNotAvailable}` : t.orderNotAvailable;
+}
+
+/** Cart / submit lines that the API will reject (missing catalog row or non-orderable status). */
+export function getUnavailableSubmitLines<T extends { sku: string; nhItems?: boolean; qty?: string }>(
+  items: T[]
+): Array<T & { status: string }> {
+  const out: Array<T & { status: string }> = [];
+  for (const item of items) {
+    const cleanSku = String(item.sku || "").trim().toUpperCase();
+    if (!cleanSku) continue;
+    const catalogItem = getCatalogItemBySku(cleanSku);
+    if (!catalogItem) {
+      out.push({ ...item, sku: cleanSku, status: "NOT FOUND" });
+      continue;
+    }
+    if (!isOrderableItem(catalogItem)) {
+      out.push({
+        ...item,
+        sku: cleanSku,
+        status: getDisplayStatus(catalogItem.status) || String(catalogItem.status || "UNAVAILABLE").toUpperCase(),
+      });
+    }
+  }
+  return out;
 }
 
 export function isNewItem(item?: CatalogItem | null) {
