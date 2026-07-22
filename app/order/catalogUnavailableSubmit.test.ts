@@ -30,7 +30,6 @@ test("getUnavailableSubmitLines flags discontinued, ready-to-order, and missing 
     [
       { sku: "DISC1", status: "DISCONTINUED" },
       { sku: "MISSING", status: "NOT FOUND" },
-      { sku: "TBD1", status: "TBD" },
       { sku: "RTO1", status: "READYTOORDER" },
     ]
   );

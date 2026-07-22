@@ -49,6 +49,7 @@ import {
   resolveQuickSearchTargetItem,
   isNewItem,
   isOrderableItem,
+  isCustomerVisibleCatalogItem,
   scoreCatalogSearchQuery,
 } from "./catalogUtils";
 import { DEFAULT_ORDER_EMAIL, isValidOrderEmail, resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
@@ -634,6 +635,7 @@ export default function OrderPage() {
     return catalog
       .map((item) => ({ item, score: scoreCatalogSearchQuery(item, q) }))
       .filter((x) => x.score >= 0)
+      .filter((x) => isCustomerVisibleCatalogItem(x.item))
       .filter((x) => (showAvailableOnly ? passesAvailableFilter(x.item) : true))
       .sort((a, b) => {
         const aNormal = isOrderableItem(a.item);
@@ -647,8 +649,9 @@ export default function OrderPage() {
   }, [normalizedSkuInput, showAvailableOnly, catalogVersion]);
 
   const catalogBrowseBase = useMemo(() => {
-    if (!showAvailableOnly) return catalog;
-    return catalog.filter((item) => passesAvailableFilter(item));
+    const visible = catalog.filter((item) => isCustomerVisibleCatalogItem(item));
+    if (!showAvailableOnly) return visible;
+    return visible.filter((item) => passesAvailableFilter(item));
   }, [catalogVersion, showAvailableOnly, passesAvailableFilter]);
 
   const brandSplit = useMemo(

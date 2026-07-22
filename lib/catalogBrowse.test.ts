@@ -28,7 +28,7 @@ test("mapProductsToCatalogBrowse strips non-catalog fields", () => {
   assert.equal("bp" in (items[0] || {}), false);
 });
 
-test("mapProductsToCatalogBrowse keeps only NORMAL* statuses by default", () => {
+test("mapProductsToCatalogBrowse keeps NORMAL* and TBD; hides READYTOORDER", () => {
   const items = mapProductsToCatalogBrowse([
     { sku: "A1", status: "NORMAL" },
     { sku: "A2", status: "DISCONTINUED" },
@@ -38,7 +38,7 @@ test("mapProductsToCatalogBrowse keeps only NORMAL* statuses by default", () => 
   ]);
   assert.deepEqual(
     items.map((item) => item.sku),
-    ["A1", "A5"]
+    ["A1", "A3", "A5"]
   );
 });
 

@@ -2,7 +2,7 @@ import { catalog } from "./catalogState";
 
 import { isCatalogNewItem, isJustAddedItem as isJustAddedCatalogItem } from "@/lib/catalogNewItems";
 import { scoreCatalogTextSearch } from "@/lib/catalogTextSearch";
-import { isOrderableCatalogStatus } from "@/lib/orderableCatalog";
+import { isOrderableCatalogStatus, isCustomerVisibleCatalogStatus, isReadyToOrderStatus } from "@/lib/orderableCatalog";
 import { formatMoneyPrice, formatPromoTierPricesLine, getApplicablePromoTier } from "@/lib/promoFormat";
 import type { PromoPriceTier } from "@/lib/promotions";
 
@@ -187,6 +187,15 @@ export function getImageUrl(sku?: string) {
 /** Only these catalog statuses can be added to an order. */
 export function isOrderableItem(item?: CatalogItem | null) {
   return isOrderableCatalogStatus(item?.status);
+}
+
+/** Hide Ready-to-Order SKUs from customer catalog browsing. */
+export function isCustomerVisibleCatalogItem(item?: CatalogItem | null) {
+  return Boolean(item?.sku) && isCustomerVisibleCatalogStatus(item?.status);
+}
+
+export function isReadyToOrderItem(item?: CatalogItem | null) {
+  return isReadyToOrderStatus(item?.status);
 }
 
 /** @deprecated Use isOrderableItem — kept for existing imports. */
