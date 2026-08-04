@@ -1504,19 +1504,25 @@
   border-radius: 10px;
   background: #eff6ff;
   color: #1d4ed8;
-  padding: 6px 12px;
-  font-size: 11px;
-  font-weight: 900;
-  line-height: 1.1;
+  padding: 0;
+  font-size: 0;
+  line-height: 0;
   text-decoration: none;
+  width: 36px;
+  height: 36px;
   min-height: 36px;
-  min-width: 48px;
+  min-width: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 1px 2px rgba(37, 99, 235, 0.12);
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+}
+
+.catalog-qty-card-edit-icon {
+  display: block;
+  flex: 0 0 auto;
 }
 
 .catalog-qty-card-edit:active {
@@ -2827,11 +2833,17 @@
   }
 
   .catalog-qty-card-edit {
+    width: 40px;
+    height: 40px;
     min-height: 40px;
-    min-width: 52px;
-    padding: 8px 12px;
-    font-size: 12px;
+    min-width: 40px;
+    padding: 0;
     border-radius: 11px;
+  }
+
+  .catalog-qty-card-edit-icon {
+    width: 16px;
+    height: 16px;
   }
 
   .catalog-qty-card-sku-row {
