@@ -311,8 +311,16 @@ export async function buildProductSheetPdf(options: {
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
   const built: BuiltRow[] = [];
+  const imageCache = new Map<string, PDFImage | undefined>();
   for (const item of items) {
-    const image = await embedProductImage(pdf, item, origin);
+    const cacheKey = item.sku;
+    let image: PDFImage | undefined;
+    if (imageCache.has(cacheKey)) {
+      image = imageCache.get(cacheKey);
+    } else {
+      image = await embedProductImage(pdf, item, origin);
+      imageCache.set(cacheKey, image);
+    }
     built.push({ ...item, image });
   }
 
