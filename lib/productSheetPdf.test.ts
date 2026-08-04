@@ -1,17 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { splitItemsAcrossTwoPages } from "./productSheetPdf";
+import { pickProductSheetGrid } from "./productSheetPdf";
 
-test("splitItemsAcrossTwoPages splits evenly onto two pages", () => {
-  assert.deepEqual(splitItemsAcrossTwoPages([]), []);
-  assert.deepEqual(splitItemsAcrossTwoPages([1]), [[1]]);
-  assert.deepEqual(splitItemsAcrossTwoPages([1, 2, 3, 4]), [
-    [1, 2],
-    [3, 4],
-  ]);
-  assert.deepEqual(splitItemsAcrossTwoPages([1, 2, 3, 4, 5]), [
-    [1, 2, 3],
-    [4, 5],
-  ]);
+test("pickProductSheetGrid densifies to stay within about 3 pages", () => {
+  assert.deepEqual(pickProductSheetGrid(10), { cols: 4, rows: 3 });
+  assert.deepEqual(pickProductSheetGrid(36), { cols: 4, rows: 3 }); // 12*3
+  assert.deepEqual(pickProductSheetGrid(37), { cols: 4, rows: 4 }); // need 16/page
+  assert.deepEqual(pickProductSheetGrid(48), { cols: 4, rows: 4 });
+  assert.deepEqual(pickProductSheetGrid(49), { cols: 5, rows: 4 }); // need 20/page
+  assert.deepEqual(pickProductSheetGrid(60), { cols: 5, rows: 4 });
+  assert.deepEqual(pickProductSheetGrid(61), { cols: 5, rows: 5 }); // need 25/page
 });

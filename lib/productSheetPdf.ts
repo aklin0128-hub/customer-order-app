@@ -5,17 +5,16 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFP
 
 import type { ProductSheet, ProductSheetResolvedItem } from "@/lib/productSheet";
 
-/** US Letter — list layout split across two pages. */
+/** US Letter — compact image card grid (catalog-style), aim for ≤3 pages. */
 const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
-const MARGIN_X = 28;
-const MARGIN_Y = 24;
-const HEADER_H = 52;
-const TARGET_PAGES = 2;
-const THUMB = 36;
-const ROW_GAP = 4;
-const MIN_ROW_H = 40;
-const MAX_ROW_H = 56;
+const MARGIN_X = 22;
+const MARGIN_Y = 20;
+const HEADER_H = 48;
+const GAP_X = 6;
+const GAP_Y = 8;
+const CARD_PAD = 5;
+const MAX_PAGES_TARGET = 3;
 
 const COLOR = {
   text: rgb(0.07, 0.09, 0.15),
@@ -26,16 +25,33 @@ const COLOR = {
   note: rgb(0.45, 0.35, 0.2),
   meta: rgb(0.35, 0.4, 0.48),
   border: rgb(0.9, 0.91, 0.93),
-  zebra: rgb(0.97, 0.98, 0.99),
-  pageBg: rgb(1, 1, 1),
+  pageBg: rgb(0.97, 0.98, 0.99),
   imageBg: rgb(0.96, 0.97, 0.98),
-  headerLine: rgb(0.85, 0.87, 0.9),
-  colHeader: rgb(0.42, 0.45, 0.49),
+  white: rgb(1, 1, 1),
 };
 
-type BuiltRow = ProductSheetResolvedItem & {
+type BuiltCard = ProductSheetResolvedItem & {
   image?: PDFImage;
 };
+
+export type ProductSheetPdfGrid = { cols: number; rows: number };
+
+/** Pick denser grids as item count grows so sheets usually stay within 3 pages. */
+export function pickProductSheetGrid(itemCount: number): ProductSheetPdfGrid {
+  const n = Math.max(0, itemCount);
+  const options: ProductSheetPdfGrid[] = [
+    { cols: 4, rows: 3 }, // 12 / page
+    { cols: 4, rows: 4 }, // 16 / page
+    { cols: 5, rows: 4 }, // 20 / page
+    { cols: 5, rows: 5 }, // 25 / page
+  ];
+  for (const opt of options) {
+    const perPage = opt.cols * opt.rows;
+    if (perPage <= 0) continue;
+    if (Math.ceil(n / perPage) <= MAX_PAGES_TARGET) return opt;
+  }
+  return options[options.length - 1]!;
+}
 
 async function tryReadLocalProductImage(sku: string): Promise<Uint8Array | null> {
   const segments = ["public", "product", `${String(sku || "").trim()}.jpg`];
@@ -102,7 +118,33 @@ function truncateToWidth(font: PDFFont, text: string, size: number, maxWidth: nu
   return `${line}…`;
 }
 
-function drawTextAt(
+function wrapLines(font: PDFFont, text: string, size: number, maxWidth: number, maxLines: number) {
+  const words = String(text || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!words.length) return [];
+
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (font.widthOfTextAtSize(next, size) <= maxWidth) {
+      current = next;
+      continue;
+    }
+    if (current) lines.push(current);
+    current = word;
+    if (lines.length >= maxLines) break;
+  }
+  if (current && lines.length < maxLines) lines.push(current);
+  if (lines.length === maxLines) {
+    lines[maxLines - 1] = truncateToWidth(font, lines[maxLines - 1] || "", size, maxWidth);
+  }
+  return lines.map((line) => truncateToWidth(font, line, size, maxWidth));
+}
+
+function drawTextLine(
   page: PDFPage,
   font: PDFFont,
   text: string,
@@ -113,23 +155,29 @@ function drawTextAt(
   maxWidth: number
 ) {
   const line = truncateToWidth(font, text, size, maxWidth);
-  if (!line) return;
+  if (!line) return 0;
   page.drawText(line, { x, y, size, font, color });
+  return size + 1.5;
 }
 
-/** Split the list evenly across up to two PDF pages. */
-export function splitItemsAcrossTwoPages<T>(items: T[]): T[][] {
-  if (!items.length) return [];
-  if (items.length === 1) return [items];
-  const mid = Math.ceil(items.length / 2);
-  return [items.slice(0, mid), items.slice(mid)];
+function cardWidth(cols: number) {
+  return (PAGE_WIDTH - MARGIN_X * 2 - GAP_X * (cols - 1)) / cols;
 }
 
-function rowHeightForCount(countOnPage: number) {
-  const usable = PAGE_HEIGHT - HEADER_H - MARGIN_Y - 18;
-  if (countOnPage <= 0) return MAX_ROW_H;
-  const raw = (usable - ROW_GAP * Math.max(0, countOnPage - 1)) / countOnPage;
-  return Math.max(MIN_ROW_H, Math.min(MAX_ROW_H, raw));
+function cardHeight(rows: number) {
+  const contentTop = PAGE_HEIGHT - HEADER_H;
+  return (contentTop - MARGIN_Y - GAP_Y * (rows - 1)) / rows;
+}
+
+function imageSizeForCard(w: number, h: number) {
+  // Keep image dominant but compact enough for denser grids.
+  return Math.min(w - CARD_PAD * 2, h * 0.52, colsAwareImageCap(w));
+}
+
+function colsAwareImageCap(cardW: number) {
+  if (cardW < 110) return 58;
+  if (cardW < 130) return 68;
+  return 78;
 }
 
 function drawHeader(
@@ -149,7 +197,7 @@ function drawHeader(
     color: COLOR.pageBg,
   });
 
-  drawTextAt(page, bold, sheet.title || "Product sheet", MARGIN_X, PAGE_HEIGHT - 28, 14, COLOR.text, 420);
+  drawTextLine(page, bold, sheet.title || "Product sheet", MARGIN_X, PAGE_HEIGHT - 26, 13, COLOR.text, 400);
 
   const metaParts = [
     sheet.customerLabel ? `For: ${sheet.customerLabel}` : "",
@@ -158,142 +206,110 @@ function drawHeader(
     `${itemCount} items`,
     new Date().toISOString().slice(0, 10),
   ].filter(Boolean);
-  drawTextAt(page, font, metaParts.join("  ·  "), MARGIN_X, PAGE_HEIGHT - 44, 8, COLOR.meta, PAGE_WIDTH - MARGIN_X * 2 - 60);
-
-  drawTextAt(
+  drawTextLine(
     page,
     font,
-    `Page ${pageIndex + 1} / ${pageCount}`,
-    PAGE_WIDTH - MARGIN_X - 56,
-    PAGE_HEIGHT - 28,
-    8,
+    metaParts.join("  ·  "),
+    MARGIN_X,
+    PAGE_HEIGHT - 40,
+    7.5,
     COLOR.meta,
-    56
+    PAGE_WIDTH - MARGIN_X * 2 - 50
   );
 
-  page.drawLine({
-    start: { x: MARGIN_X, y: PAGE_HEIGHT - HEADER_H + 4 },
-    end: { x: PAGE_WIDTH - MARGIN_X, y: PAGE_HEIGHT - HEADER_H + 4 },
-    thickness: 1,
-    color: COLOR.headerLine,
-  });
+  drawTextLine(
+    page,
+    font,
+    `${pageIndex + 1}/${pageCount}`,
+    PAGE_WIDTH - MARGIN_X - 36,
+    PAGE_HEIGHT - 26,
+    8,
+    COLOR.meta,
+    40
+  );
 }
 
-function drawColumnHeaders(page: PDFPage, font: PDFFont, y: number) {
-  const cols = columnLayout();
-  drawTextAt(page, font, "#", cols.rank.x, y, 7, COLOR.colHeader, cols.rank.w);
-  drawTextAt(page, font, "Item #", cols.sku.x, y, 7, COLOR.colHeader, cols.sku.w);
-  drawTextAt(page, font, "Brand / Name", cols.name.x, y, 7, COLOR.colHeader, cols.name.w);
-  drawTextAt(page, font, "Size", cols.size.x, y, 7, COLOR.colHeader, cols.size.w);
-  drawTextAt(page, font, "Price", cols.price.x, y, 7, COLOR.colHeader, cols.price.w);
-}
-
-function columnLayout() {
-  const contentW = PAGE_WIDTH - MARGIN_X * 2;
-  const thumbCol = THUMB + 10;
-  const rankW = 22;
-  const skuW = 72;
-  const sizeW = 70;
-  const priceW = 54;
-  const nameW = contentW - thumbCol - rankW - skuW - sizeW - priceW - 16;
-  let x = MARGIN_X + thumbCol;
-  const rank = { x, w: rankW };
-  x += rankW + 4;
-  const sku = { x, w: skuW };
-  x += skuW + 6;
-  const name = { x, w: nameW };
-  x += nameW + 6;
-  const size = { x, w: sizeW };
-  x += sizeW + 4;
-  const price = { x, w: priceW };
-  return { rank, sku, name, size, price, thumbX: MARGIN_X };
-}
-
-function drawListRow(
+function drawCard(
   page: PDFPage,
   font: PDFFont,
   bold: PDFFont,
-  row: BuiltRow,
-  index: number,
-  yBottom: number,
-  rowH: number,
-  zebra: boolean
+  card: BuiltCard,
+  x: number,
+  y: number,
+  w: number,
+  h: number
 ) {
-  const cols = columnLayout();
-  const yTop = yBottom + rowH;
-
-  if (zebra) {
-    page.drawRectangle({
-      x: MARGIN_X - 2,
-      y: yBottom,
-      width: PAGE_WIDTH - MARGIN_X * 2 + 4,
-      height: rowH,
-      color: COLOR.zebra,
-    });
-  }
-
-  // Thumbnail
-  const thumbY = yBottom + (rowH - THUMB) / 2;
   page.drawRectangle({
-    x: cols.thumbX,
-    y: thumbY,
-    width: THUMB,
-    height: THUMB,
-    color: COLOR.imageBg,
+    x,
+    y,
+    width: w,
+    height: h,
     borderColor: COLOR.border,
-    borderWidth: 0.5,
+    borderWidth: 0.75,
+    color: COLOR.white,
   });
-  if (row.image) {
-    const dims = row.image.scale(1);
-    const scale = Math.min(THUMB / dims.width, THUMB / dims.height) * 0.9;
+
+  const textWidth = w - CARD_PAD * 2;
+  const imageBox = imageSizeForCard(w, h);
+  const imageX = x + (w - imageBox) / 2;
+  const imageY = y + h - CARD_PAD - imageBox;
+
+  page.drawRectangle({
+    x: imageX,
+    y: imageY,
+    width: imageBox,
+    height: imageBox,
+    color: COLOR.imageBg,
+  });
+
+  if (card.image) {
+    const dims = card.image.scale(1);
+    const scale = Math.min(imageBox / dims.width, imageBox / dims.height) * 0.92;
     const iw = dims.width * scale;
     const ih = dims.height * scale;
-    page.drawImage(row.image, {
-      x: cols.thumbX + (THUMB - iw) / 2,
-      y: thumbY + (THUMB - ih) / 2,
+    page.drawImage(card.image, {
+      x: imageX + (imageBox - iw) / 2,
+      y: imageY + (imageBox - ih) / 2,
       width: iw,
       height: ih,
     });
   }
 
-  const textMid = yBottom + rowH / 2 - 3;
-  const textTop = yBottom + rowH / 2 + 6;
-  const textBot = yBottom + rowH / 2 - 10;
+  let textY = imageY - 9;
+  const minY = y + CARD_PAD;
+  const skuSize = w < 115 ? 8.5 : 9.5;
+  const brandSize = w < 115 ? 7 : 7.5;
+  const nameSize = w < 115 ? 7 : 7.5;
 
-  drawTextAt(page, font, String(index + 1), cols.rank.x, textMid, 8, COLOR.meta, cols.rank.w);
-  drawTextAt(page, bold, row.sku, cols.sku.x, textMid, 9, COLOR.text, cols.sku.w);
+  textY -= drawTextLine(page, bold, card.sku, x + CARD_PAD, textY, skuSize, COLOR.text, textWidth);
+  if (textY < minY) return;
 
-  if (row.brand) {
-    drawTextAt(page, bold, row.brand, cols.name.x, textTop, 8, COLOR.brand, cols.name.w);
-    drawTextAt(page, font, row.name || "", cols.name.x, textBot, 8, COLOR.name, cols.name.w);
-  } else {
-    drawTextAt(page, font, row.name || "", cols.name.x, textMid, 8, COLOR.name, cols.name.w);
+  if (card.brand) {
+    textY -= drawTextLine(page, bold, card.brand, x + CARD_PAD, textY, brandSize, COLOR.brand, textWidth);
+    if (textY < minY) return;
   }
 
-  drawTextAt(page, font, row.size || "", cols.size.x, textMid, 8, COLOR.size, cols.size.w);
-  drawTextAt(page, bold, row.priceLabel || "", cols.price.x, textMid, 9, COLOR.price, cols.price.w);
-
-  if (row.note) {
-    drawTextAt(
-      page,
-      font,
-      row.note,
-      cols.name.x,
-      yBottom + 4,
-      6,
-      COLOR.note,
-      cols.name.w + cols.size.w
-    );
+  if (card.name) {
+    const nameLines = wrapLines(font, card.name, nameSize, textWidth, w < 115 ? 1 : 2);
+    for (const line of nameLines) {
+      textY -= drawTextLine(page, font, line, x + CARD_PAD, textY, nameSize, COLOR.name, textWidth);
+      if (textY < minY) return;
+    }
   }
 
-  page.drawLine({
-    start: { x: MARGIN_X, y: yBottom },
-    end: { x: PAGE_WIDTH - MARGIN_X, y: yBottom },
-    thickness: 0.5,
-    color: COLOR.border,
-  });
+  if (card.size) {
+    textY -= drawTextLine(page, font, card.size, x + CARD_PAD, textY, 7, COLOR.size, textWidth);
+    if (textY < minY) return;
+  }
 
-  return yTop;
+  if (card.priceLabel) {
+    textY -= drawTextLine(page, bold, card.priceLabel, x + CARD_PAD, textY, 8.5, COLOR.price, textWidth);
+    if (textY < minY) return;
+  }
+
+  if (card.note) {
+    drawTextLine(page, font, card.note, x + CARD_PAD, Math.max(minY, textY - 1), 6, COLOR.note, textWidth);
+  }
 }
 
 export async function buildProductSheetPdf(options: {
@@ -310,53 +326,39 @@ export async function buildProductSheetPdf(options: {
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
-  const built: BuiltRow[] = [];
+  const built: BuiltCard[] = [];
   const imageCache = new Map<string, PDFImage | undefined>();
   for (const item of items) {
-    const cacheKey = item.sku;
     let image: PDFImage | undefined;
-    if (imageCache.has(cacheKey)) {
-      image = imageCache.get(cacheKey);
+    if (imageCache.has(item.sku)) {
+      image = imageCache.get(item.sku);
     } else {
       image = await embedProductImage(pdf, item, origin);
-      imageCache.set(cacheKey, image);
+      imageCache.set(item.sku, image);
     }
     built.push({ ...item, image });
   }
 
-  // Prefer exactly two list pages; spill only if rows would be too short to read.
-  let pages = splitItemsAcrossTwoPages(built);
-  const densest = Math.max(...pages.map((p) => p.length), 1);
-  if (rowHeightForCount(densest) < MIN_ROW_H - 0.1) {
-    // Too many items for 2 readable pages — fall back to as many pages as needed at MIN_ROW_H.
-    const usable = PAGE_HEIGHT - HEADER_H - MARGIN_Y - 18;
-    const perPage = Math.max(1, Math.floor((usable + ROW_GAP) / (MIN_ROW_H + ROW_GAP)));
-    pages = [];
-    for (let i = 0; i < built.length; i += perPage) {
-      pages.push(built.slice(i, i + perPage));
-    }
-  } else if (pages.length > TARGET_PAGES) {
-    pages = pages.slice(0, TARGET_PAGES);
-  }
+  const grid = pickProductSheetGrid(built.length);
+  const perPage = grid.cols * grid.rows;
+  const pageCount = Math.max(1, Math.ceil(built.length / perPage));
+  const contentTop = PAGE_HEIGHT - HEADER_H;
+  const w = cardWidth(grid.cols);
+  const h = cardHeight(grid.rows);
 
-  const pageCount = pages.length;
-
-  pages.forEach((slice, pageIndex) => {
+  for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
     const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     drawHeader(page, font, bold, sheet, pageIndex, pageCount, built.length);
 
-    const rowH = rowHeightForCount(slice.length);
-    let y = PAGE_HEIGHT - HEADER_H - 2;
-    drawColumnHeaders(page, font, y - 10);
-    y -= 16;
-
-    slice.forEach((row, idx) => {
-      const globalIndex = pages.slice(0, pageIndex).reduce((n, p) => n + p.length, 0) + idx;
-      y -= rowH;
-      drawListRow(page, font, bold, row, globalIndex, y, rowH, idx % 2 === 1);
-      y -= ROW_GAP;
+    const slice = built.slice(pageIndex * perPage, pageIndex * perPage + perPage);
+    slice.forEach((card, idx) => {
+      const col = idx % grid.cols;
+      const row = Math.floor(idx / grid.cols);
+      const x = MARGIN_X + col * (w + GAP_X);
+      const y = contentTop - (row + 1) * h - row * GAP_Y;
+      drawCard(page, font, bold, card, x, y, w, h);
     });
-  });
+  }
 
   return pdf.save();
 }
