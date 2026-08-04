@@ -17,7 +17,10 @@ type BuiltCard = ProductSheetResolvedItem & {
 };
 
 async function tryReadLocalProductImage(sku: string): Promise<Uint8Array | null> {
-  const file = path.join(process.cwd(), "public", "product", `${sku}.jpg`);
+  // Avoid a static path.join(..., `${sku}.jpg`) pattern so Turbopack does not
+  // file-trace every file under public/product into the serverless bundle.
+  const segments = ["public", "product", `${String(sku || "").trim()}.jpg`];
+  const file = [process.cwd(), ...segments].join(path.sep);
   try {
     return new Uint8Array(await readFile(file));
   } catch {
