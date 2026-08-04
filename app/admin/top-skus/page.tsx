@@ -8,6 +8,7 @@ import { FieldLabel, inputStyle } from "../_components/admin-sales-ui";
 import { panel, panelTitle } from "../_components/admin-styles";
 import { BtnPrimary, BtnSecondary, Panel, StatGrid, Toast } from "../_components/admin-utils";
 import { useAdminAuth } from "../_components/useAdminAuth";
+import { writeProductSheetImport } from "@/lib/productSheetImport";
 
 type TopSkuRow = {
   rank: number;
@@ -145,6 +146,22 @@ export default function AdminTopSkusPage() {
     URL.revokeObjectURL(url);
   };
 
+  const sendToProductSheet = () => {
+    if (!data?.rows.length) return;
+    writeProductSheetImport({
+      source: "top-skus",
+      days,
+      limit,
+      items: data.rows.map((row) => ({
+        sku: row.sku,
+        name: row.name,
+        brand: row.brand,
+      })),
+      createdAt: new Date().toISOString(),
+    });
+    router.push("/admin/product-sheet?import=top-skus");
+  };
+
   return (
     <AdminPage
       active="topSkus"
@@ -182,6 +199,9 @@ export default function AdminTopSkusPage() {
             <BtnSecondary onClick={downloadCsv} disabled={!data?.rows.length}>
               Export CSV
             </BtnSecondary>
+            <BtnSecondary onClick={sendToProductSheet} disabled={!data?.rows.length || busy}>
+              Send to Product Sheet
+            </BtnSecondary>
             <Link
               href={`/admin/price-compare?section=buyers${days ? `&days=${days}` : ""}`}
               className="admin-btn admin-btn--secondary"
@@ -193,7 +213,8 @@ export default function AdminTopSkusPage() {
         </div>
         <p style={{ margin: "12px 0 0", fontSize: 12, color: "#6b7280", lineHeight: 1.45 }}>
           Totals combine invoice imports and submitted orders. Use <strong>Buyers</strong> to open the full account list in{" "}
-          <Link href="/admin/price-compare?section=buyers">Price Compare</Link>.
+          <Link href="/admin/price-compare?section=buyers">Price Compare</Link>.{" "}
+          <strong>Send to Product Sheet</strong> opens a new sheet with these ranked SKUs for PDF.
         </p>
       </section>
 
