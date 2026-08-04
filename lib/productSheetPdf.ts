@@ -5,12 +5,32 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFP
 
 import type { ProductSheet, ProductSheetResolvedItem } from "@/lib/productSheet";
 
+/** US Letter — catalog-like grid: image-forward cards similar to order CatalogQtyCard. */
 const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
-const MARGIN = 36;
-const COLS = 3;
-const ROWS = 4;
-const GAP = 10;
+const MARGIN_X = 28;
+const MARGIN_Y = 28;
+const HEADER_H = 56;
+const COLS = 4;
+const ROWS = 3;
+const GAP_X = 8;
+const GAP_Y = 12;
+const CARD_PAD = 8;
+const IMAGE_SIZE = 100;
+
+const COLOR = {
+  text: rgb(0.07, 0.09, 0.15),
+  brand: rgb(0.22, 0.26, 0.32),
+  name: rgb(0.29, 0.33, 0.39),
+  size: rgb(0.42, 0.45, 0.49),
+  price: rgb(0.06, 0.46, 0.43),
+  note: rgb(0.45, 0.35, 0.2),
+  meta: rgb(0.35, 0.4, 0.48),
+  border: rgb(0.9, 0.91, 0.93),
+  pageBg: rgb(0.97, 0.98, 0.99),
+  imageBg: rgb(0.96, 0.97, 0.98),
+  white: rgb(1, 1, 1),
+};
 
 type BuiltCard = ProductSheetResolvedItem & {
   image?: PDFImage;
@@ -73,36 +93,72 @@ async function embedProductImage(
   }
 }
 
-function drawText(
+function truncateToWidth(font: PDFFont, text: string, size: number, maxWidth: number) {
+  let line = String(text || "");
+  if (!line) return "";
+  if (font.widthOfTextAtSize(line, size) <= maxWidth) return line;
+  while (line.length > 1 && font.widthOfTextAtSize(`${line}…`, size) > maxWidth) {
+    line = line.slice(0, -1);
+  }
+  return `${line}…`;
+}
+
+function wrapLines(font: PDFFont, text: string, size: number, maxWidth: number, maxLines: number) {
+  const words = String(text || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!words.length) return [];
+
+  const lines: string[] = [];
+  let current = "";
+
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (font.widthOfTextAtSize(next, size) <= maxWidth) {
+      current = next;
+      continue;
+    }
+    if (current) lines.push(current);
+    current = word;
+    if (lines.length >= maxLines) break;
+  }
+  if (current && lines.length < maxLines) lines.push(current);
+
+  if (lines.length === maxLines) {
+    const used = lines.join(" ").length;
+    const leftover = String(text || "").trim().slice(used).trim();
+    if (leftover || (words.length && lines.join(" ") !== words.join(" "))) {
+      lines[maxLines - 1] = truncateToWidth(font, lines[maxLines - 1] || "", size, maxWidth);
+    }
+  }
+
+  return lines.map((line) => truncateToWidth(font, line, size, maxWidth));
+}
+
+function drawTextLine(
   page: PDFPage,
   font: PDFFont,
   text: string,
   x: number,
   y: number,
   size: number,
-  color = rgb(0.12, 0.14, 0.18),
-  maxWidth?: number
+  color: ReturnType<typeof rgb>,
+  maxWidth: number
 ) {
-  const value = String(text || "");
-  if (!value) return 0;
-  let line = value;
-  if (maxWidth) {
-    while (line.length > 1 && font.widthOfTextAtSize(line, size) > maxWidth) {
-      line = `${line.slice(0, -2)}…`;
-    }
-  }
+  const line = truncateToWidth(font, text, size, maxWidth);
+  if (!line) return 0;
   page.drawText(line, { x, y, size, font, color });
-  return font.heightAtSize(size);
+  return size + 2;
 }
 
 function cardWidth() {
-  const usable = PAGE_WIDTH - MARGIN * 2 - GAP * (COLS - 1);
-  return usable / COLS;
+  return (PAGE_WIDTH - MARGIN_X * 2 - GAP_X * (COLS - 1)) / COLS;
 }
 
-function cardHeight(headerBottom: number) {
-  const usable = headerBottom - MARGIN - GAP * (ROWS - 1);
-  return usable / ROWS;
+function cardHeight() {
+  const contentTop = PAGE_HEIGHT - HEADER_H;
+  return (contentTop - MARGIN_Y - GAP_Y * (ROWS - 1)) / ROWS;
 }
 
 function drawHeader(
@@ -113,36 +169,44 @@ function drawHeader(
   pageIndex: number,
   pageCount: number
 ) {
+  page.drawRectangle({
+    x: 0,
+    y: 0,
+    width: PAGE_WIDTH,
+    height: PAGE_HEIGHT,
+    color: COLOR.pageBg,
+  });
+
   const title = sheet.title || "Product sheet";
-  drawText(page, bold, title, MARGIN, PAGE_HEIGHT - 40, 18, rgb(0.08, 0.1, 0.14));
+  drawTextLine(page, bold, title, MARGIN_X, PAGE_HEIGHT - 30, 14, COLOR.text, PAGE_WIDTH - MARGIN_X * 2 - 80);
 
   const metaParts = [
     sheet.customerLabel ? `For: ${sheet.customerLabel}` : "",
     sheet.accountNo ? `Acct ${sheet.accountNo}` : "",
+    sheet.note || "",
     new Date().toISOString().slice(0, 10),
   ].filter(Boolean);
-  drawText(page, font, metaParts.join("  ·  "), MARGIN, PAGE_HEIGHT - 58, 10, rgb(0.35, 0.4, 0.48));
-
-  if (sheet.note) {
-    drawText(page, font, sheet.note, MARGIN, PAGE_HEIGHT - 74, 9, rgb(0.4, 0.45, 0.52), PAGE_WIDTH - MARGIN * 2 - 80);
-  }
-
-  drawText(
+  drawTextLine(
     page,
     font,
-    `Page ${pageIndex + 1} / ${pageCount}`,
-    PAGE_WIDTH - MARGIN - 70,
-    PAGE_HEIGHT - 40,
-    9,
-    rgb(0.45, 0.5, 0.56)
+    metaParts.join("  ·  "),
+    MARGIN_X,
+    PAGE_HEIGHT - 46,
+    8,
+    COLOR.meta,
+    PAGE_WIDTH - MARGIN_X * 2 - 80
   );
 
-  page.drawLine({
-    start: { x: MARGIN, y: PAGE_HEIGHT - 88 },
-    end: { x: PAGE_WIDTH - MARGIN, y: PAGE_HEIGHT - 88 },
-    thickness: 1,
-    color: rgb(0.85, 0.87, 0.9),
-  });
+  drawTextLine(
+    page,
+    font,
+    `${pageIndex + 1}/${pageCount}`,
+    PAGE_WIDTH - MARGIN_X - 36,
+    PAGE_HEIGHT - 30,
+    8,
+    COLOR.meta,
+    40
+  );
 }
 
 function drawCard(
@@ -155,57 +219,76 @@ function drawCard(
   w: number,
   h: number
 ) {
+  // Soft card chrome like catalog order cards
   page.drawRectangle({
     x,
     y,
     width: w,
     height: h,
-    borderColor: rgb(0.86, 0.88, 0.9),
+    borderColor: COLOR.border,
     borderWidth: 1,
-    color: rgb(1, 1, 1),
+    color: COLOR.white,
   });
 
-  const pad = 8;
-  const imageBox = Math.min(72, h - 58, w - pad * 2);
+  const textWidth = w - CARD_PAD * 2;
+  const imageBox = Math.min(IMAGE_SIZE, w - CARD_PAD * 2, h * 0.48);
+
+  // Image area (catalog: large centered product photo)
+  const imageX = x + (w - imageBox) / 2;
+  const imageY = y + h - CARD_PAD - imageBox;
+  page.drawRectangle({
+    x: imageX,
+    y: imageY,
+    width: imageBox,
+    height: imageBox,
+    color: COLOR.imageBg,
+  });
+
   if (card.image) {
     const dims = card.image.scale(1);
-    const scale = Math.min(imageBox / dims.width, imageBox / dims.height);
+    const scale = Math.min(imageBox / dims.width, imageBox / dims.height) * 0.92;
     const iw = dims.width * scale;
     const ih = dims.height * scale;
     page.drawImage(card.image, {
-      x: x + (w - iw) / 2,
-      y: y + h - pad - ih,
+      x: imageX + (imageBox - iw) / 2,
+      y: imageY + (imageBox - ih) / 2,
       width: iw,
       height: ih,
     });
-  } else {
-    page.drawRectangle({
-      x: x + (w - imageBox) / 2,
-      y: y + h - pad - imageBox,
-      width: imageBox,
-      height: imageBox,
-      color: rgb(0.94, 0.95, 0.96),
-    });
   }
 
-  let textY = y + h - pad - imageBox - 14;
-  drawText(page, bold, card.sku, x + pad, textY, 10, rgb(0.1, 0.12, 0.16), w - pad * 2);
-  textY -= 12;
+  // Typography hierarchy mirrors CatalogQtyCard: SKU → brand → name → size → price
+  let textY = imageY - 12;
+  const minY = y + CARD_PAD;
+
+  textY -= drawTextLine(page, bold, card.sku, x + CARD_PAD, textY, 11, COLOR.text, textWidth);
+  if (textY < minY) return;
+
   if (card.brand) {
-    drawText(page, font, card.brand, x + pad, textY, 8, rgb(0.4, 0.45, 0.5), w - pad * 2);
-    textY -= 11;
+    textY -= drawTextLine(page, bold, card.brand, x + CARD_PAD, textY, 9, COLOR.brand, textWidth);
+    if (textY < minY) return;
   }
+
   if (card.name) {
-    drawText(page, font, card.name, x + pad, textY, 8, rgb(0.2, 0.22, 0.26), w - pad * 2);
-    textY -= 11;
+    const nameLines = wrapLines(font, card.name, 8.5, textWidth, 2);
+    for (const line of nameLines) {
+      textY -= drawTextLine(page, font, line, x + CARD_PAD, textY, 8.5, COLOR.name, textWidth);
+      if (textY < minY) return;
+    }
   }
-  const detail = [card.size, card.priceLabel].filter(Boolean).join("  ·  ");
-  if (detail) {
-    drawText(page, bold, detail, x + pad, textY, 8, rgb(0.12, 0.35, 0.28), w - pad * 2);
-    textY -= 11;
+
+  if (card.size) {
+    textY -= drawTextLine(page, font, card.size, x + CARD_PAD, textY, 8, COLOR.size, textWidth);
+    if (textY < minY) return;
   }
+
+  if (card.priceLabel) {
+    textY -= drawTextLine(page, bold, card.priceLabel, x + CARD_PAD, textY, 10, COLOR.price, textWidth);
+    if (textY < minY) return;
+  }
+
   if (card.note) {
-    drawText(page, font, card.note, x + pad, Math.max(y + 8, textY), 7, rgb(0.45, 0.35, 0.2), w - pad * 2);
+    drawTextLine(page, font, card.note, x + CARD_PAD, Math.max(minY, textY - 2), 7, COLOR.note, textWidth);
   }
 }
 
@@ -231,9 +314,9 @@ export async function buildProductSheetPdf(options: {
 
   const perPage = COLS * ROWS;
   const pageCount = Math.max(1, Math.ceil(built.length / perPage));
-  const headerBottom = PAGE_HEIGHT - 100;
+  const contentTop = PAGE_HEIGHT - HEADER_H;
   const w = cardWidth();
-  const h = cardHeight(headerBottom);
+  const h = cardHeight();
 
   for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
     const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
@@ -243,8 +326,8 @@ export async function buildProductSheetPdf(options: {
     slice.forEach((card, idx) => {
       const col = idx % COLS;
       const row = Math.floor(idx / COLS);
-      const x = MARGIN + col * (w + GAP);
-      const y = headerBottom - (row + 1) * h - row * GAP;
+      const x = MARGIN_X + col * (w + GAP_X);
+      const y = contentTop - (row + 1) * h - row * GAP_Y;
       drawCard(page, font, bold, card, x, y, w, h);
     });
   }
