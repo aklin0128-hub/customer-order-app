@@ -63,6 +63,13 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         icon: "📋",
       },
       { id: "topSkus", label: "Top SKUs", href: "/admin/top-skus", hint: "Sales ranking", icon: "📊" },
+      {
+        id: "productSheet",
+        label: "Product Sheet",
+        href: "/admin/product-sheet",
+        hint: "Custom picks → PDF",
+        icon: "🗒",
+      },
     ],
   },
 ];
