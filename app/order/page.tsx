@@ -153,7 +153,7 @@ export default function OrderPage() {
   const [lastSubmittedItems, setLastSubmittedItems] = useState<CartItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [autoLoaded, setAutoLoaded] = useState(false);
-  const [showAvailableOnly, setShowAvailableOnly] = useState(false);
+  const [showAvailableOnly, setShowAvailableOnly] = useState(true);
   const [showCustomerInfo, setShowCustomerInfo] = useState(false);
   const [invoicePricingEnabled, setInvoicePricingEnabled] = useState(false);
   const [invoicePriceEntries, setInvoicePriceEntries] = useState<
