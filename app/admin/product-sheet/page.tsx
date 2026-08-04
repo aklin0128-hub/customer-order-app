@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AdminAccountAutocomplete } from "../_components/AdminAccountAutocomplete";
 import { AdminPage } from "../_components/AdminPage";
 import { AdminSkuAutocomplete } from "../_components/AdminSkuAutocomplete";
@@ -17,6 +18,11 @@ import {
   Toast,
 } from "../_components/admin-utils";
 import { useAdminAuth } from "../_components/useAdminAuth";
+import {
+  mergeSheetItemsWithImport,
+  readProductSheetImport,
+  type ProductSheetImportItem,
+} from "@/lib/productSheetImport";
 
 type SheetItem = { sku: string; note?: string; name?: string; brand?: string; imageUrl?: string };
 
@@ -43,7 +49,13 @@ function emptySheet(): Omit<ProductSheet, "id" | "createdAt" | "updatedAt"> & { 
   };
 }
 
+function topSkusTitle(days: string, limit: string) {
+  const range = days ? `last ${days}d` : "all history";
+  return `Top ${limit} SKUs (${range})`;
+}
+
 export default function AdminProductSheetPage() {
+  const router = useRouter();
   const { authed, adminHeaders } = useAdminAuth();
   const [sheets, setSheets] = useState<ProductSheet[]>([]);
   const [form, setForm] = useState(emptySheet());
@@ -54,11 +66,49 @@ export default function AdminProductSheetPage() {
   const [msg, setMsg] = useState("");
   const [msgTone, setMsgTone] = useState<"success" | "error">("success");
   const [search, setSearch] = useState("");
+  const [topDays, setTopDays] = useState("90");
+  const [topLimit, setTopLimit] = useState("50");
+  const [importConsumed, setImportConsumed] = useState(false);
 
   const notify = (text: string, tone: "success" | "error" = "success") => {
     setMsg(text);
     setMsgTone(tone);
   };
+
+  const applyImportItems = useCallback(
+    (incoming: ProductSheetImportItem[], meta?: { days?: string; limit?: string }) => {
+      setForm((prev) => {
+        const merged = mergeSheetItemsWithImport(prev.items, incoming);
+        if (merged.added === 0) return prev;
+        return {
+          ...prev,
+          note:
+            prev.note ||
+            (meta?.days !== undefined
+              ? `Imported from Top SKUs${meta.days ? ` · ${meta.days}d` : " · all history"}`
+              : prev.note),
+          items: merged.items as SheetItem[],
+        };
+      });
+
+      const preview = mergeSheetItemsWithImport(form.items, incoming);
+      if (preview.added === 0) {
+        notify(
+          preview.skipped > 0
+            ? `No new SKUs added (${preview.skipped} already on sheet).`
+            : "No SKUs to import.",
+          "error"
+        );
+      } else {
+        notify(
+          `Imported ${preview.added} SKU${preview.added === 1 ? "" : "s"}${
+            preview.skipped ? ` · skipped ${preview.skipped} duplicates` : ""
+          }.`
+        );
+      }
+    },
+    [form.items]
+  );
 
   const loadSheets = useCallback(async () => {
     if (!authed) return;
@@ -148,6 +198,72 @@ export default function AdminProductSheetPage() {
   };
 
   const startNew = () => setForm(emptySheet());
+
+  const startNewFromImport = (incoming: ProductSheetImportItem[], days: string, limit: string) => {
+    const merged = mergeSheetItemsWithImport([], incoming);
+    setForm({
+      ...emptySheet(),
+      title: topSkusTitle(days, limit),
+      note: `Imported from Top SKUs${days ? ` · ${days}d` : " · all history"}`,
+      items: merged.items as SheetItem[],
+    });
+    notify(`Imported ${merged.added} Top SKU${merged.added === 1 ? "" : "s"}.`);
+  };
+
+  const importTopSkus = async (mode: "append" | "replace" = "append") => {
+    setBusy(true);
+    try {
+      const params = new URLSearchParams();
+      if (topDays) params.set("days", topDays);
+      if (topLimit) params.set("limit", topLimit);
+      const res = await fetch(`/api/admin/top-skus?${params.toString()}`, {
+        cache: "no-store",
+        headers: adminHeaders(),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to load Top SKUs.");
+      const rows = Array.isArray(data.rows) ? data.rows : [];
+      if (!rows.length) throw new Error("No Top SKUs for this period.");
+
+      const incoming: ProductSheetImportItem[] = rows.map(
+        (row: { sku: string; name?: string; brand?: string }) => ({
+          sku: row.sku,
+          name: row.name,
+          brand: row.brand,
+        })
+      );
+
+      if (mode === "replace" || form.items.length === 0) {
+        startNewFromImport(incoming, topDays, topLimit);
+      } else {
+        applyImportItems(incoming, { days: topDays, limit: topLimit });
+      }
+    } catch (error: unknown) {
+      notify(error instanceof Error ? error.message : "Import failed.", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!authed || importConsumed) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("import") !== "top-skus") {
+      setImportConsumed(true);
+      return;
+    }
+    const payload = readProductSheetImport();
+    setImportConsumed(true);
+    if (!payload?.items?.length) {
+      notify("No Top SKUs import found. Use Top SKUs → Send to Product Sheet.", "error");
+      router.replace("/admin/product-sheet");
+      return;
+    }
+    if (payload.days) setTopDays(payload.days);
+    if (payload.limit) setTopLimit(payload.limit);
+    startNewFromImport(payload.items, payload.days || "", payload.limit || "50");
+    router.replace("/admin/product-sheet");
+  }, [authed, importConsumed, router]);
 
   const payload = () => ({
     id: form.id,
@@ -383,6 +499,52 @@ export default function AdminProductSheetPage() {
               />
               Show catalog BP price on PDF
             </label>
+
+            <div
+              style={{
+                marginTop: 18,
+                padding: 12,
+                border: "1px solid #dbeafe",
+                background: "#f8fbff",
+                borderRadius: 10,
+                display: "grid",
+                gap: 10,
+              }}
+            >
+              <div style={{ fontWeight: 800, fontSize: 13, color: "#1e3a8a" }}>Import from Top SKUs</div>
+              <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+                <label>
+                  <FieldLabel>Date range</FieldLabel>
+                  <select value={topDays} onChange={(e) => setTopDays(e.target.value)} style={inputStyle}>
+                    <option value="30">Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="180">Last 180 days</option>
+                    <option value="365">Last 365 days</option>
+                    <option value="">All history</option>
+                  </select>
+                </label>
+                <label>
+                  <FieldLabel>Top N</FieldLabel>
+                  <select value={topLimit} onChange={(e) => setTopLimit(e.target.value)} style={inputStyle}>
+                    <option value="50">50 SKUs</option>
+                    <option value="100">100 SKUs</option>
+                    <option value="200">200 SKUs</option>
+                    <option value="500">500 SKUs</option>
+                  </select>
+                </label>
+              </div>
+              <BtnRow>
+                <BtnSecondary onClick={() => void importTopSkus("replace")} disabled={busy}>
+                  Replace with Top SKUs
+                </BtnSecondary>
+                <BtnSecondary onClick={() => void importTopSkus("append")} disabled={busy}>
+                  Append Top SKUs
+                </BtnSecondary>
+              </BtnRow>
+              <div style={{ fontSize: 12, color: "#64748b" }}>
+                Or open Top SKUs and click <strong>Send to Product Sheet</strong>.
+              </div>
+            </div>
 
             <div style={{ marginTop: 18 }}>
               <FieldLabel>Add product</FieldLabel>
