@@ -35,6 +35,9 @@ type TopSkusData = {
     orderAccountCount: number;
     days: number | null;
     limit: number;
+    region?: string;
+    regionLabel?: string;
+    regionAccountCount?: number | null;
   };
 };
 
@@ -61,6 +64,7 @@ export default function AdminTopSkusPage() {
 
   const [days, setDays] = useState("");
   const [limit, setLimit] = useState("100");
+  const [region, setRegion] = useState("multi");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [data, setData] = useState<TopSkusData | null>(null);
@@ -72,6 +76,7 @@ export default function AdminTopSkusPage() {
       const params = new URLSearchParams();
       if (days) params.set("days", days);
       if (limit) params.set("limit", limit);
+      if (region) params.set("region", region);
 
       const res = await fetch(`/api/admin/top-skus?${params.toString()}`, {
         cache: "no-store",
@@ -86,7 +91,7 @@ export default function AdminTopSkusPage() {
     } finally {
       setBusy(false);
     }
-  }, [adminHeaders, days, limit]);
+  }, [adminHeaders, days, limit, region]);
 
   useEffect(() => {
     if (authed) void loadRanking();
@@ -97,6 +102,8 @@ export default function AdminTopSkusPage() {
     const params = new URLSearchParams(window.location.search);
     const daysParam = params.get("days");
     if (daysParam !== null && daysParam !== days) setDays(daysParam);
+    const regionParam = params.get("region") || params.get("area");
+    if (regionParam && regionParam !== region) setRegion(regionParam);
 
     const skuFromUrl = params.get("sku")?.trim().toUpperCase();
     if (skuFromUrl) {
@@ -141,7 +148,7 @@ export default function AdminTopSkusPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `top-skus${days ? `-${days}d` : ""}.csv`;
+    a.download = `top-skus${region && region !== "multi" && region !== "all" ? `-${region}` : ""}${days ? `-${days}d` : ""}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -166,13 +173,23 @@ export default function AdminTopSkusPage() {
     <AdminPage
       active="topSkus"
       title="Top SKUs"
-      subtitle="Sales ranking by SKU. Open buyer breakdown in Price Compare."
+      subtitle="Sales ranking by SKU and area. Open buyer breakdown in Price Compare."
     >
       {msg ? <Toast tone="error" message={msg} /> : null}
 
       <section style={panel}>
         <h2 style={panelTitle}>Filters</h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
+          <div>
+            <FieldLabel>Area</FieldLabel>
+            <select value={region} onChange={(e) => setRegion(e.target.value)} style={inputStyle}>
+              <option value="multi">All / Multi-city</option>
+              <option value="miami">Miami</option>
+              <option value="orlando">Orlando</option>
+              <option value="jacksonville">Jacksonville (Jax)</option>
+              <option value="melbourne">Melbourne</option>
+            </select>
+          </div>
           <div>
             <FieldLabel>Date range</FieldLabel>
             <select value={days} onChange={(e) => setDays(e.target.value)} style={inputStyle}>
@@ -212,24 +229,28 @@ export default function AdminTopSkusPage() {
           </div>
         </div>
         <p style={{ margin: "12px 0 0", fontSize: 12, color: "#6b7280", lineHeight: 1.45 }}>
-          Totals combine invoice imports and submitted orders. Use <strong>Buyers</strong> to open the full account list in{" "}
-          <Link href="/admin/price-compare?section=buyers">Price Compare</Link>.{" "}
-          <strong>Send to Product Sheet</strong> opens a new sheet with these ranked SKUs for PDF.
+          Area uses each customer&apos;s city region from Admin → Customers.{" "}
+          <strong>All / Multi-city</strong> includes every account. City filters only count sales for stores
+          assigned to that area.
         </p>
       </section>
 
       {data ? (
         <StatGrid
           items={[
+            { label: "Area", value: data.summary.regionLabel || region },
             { label: "SKUs with sales", value: data.summary.skuCount },
             { label: "Total cases", value: data.summary.totalQty },
-            { label: "From invoices", value: data.summary.invoiceQty },
-            { label: "From orders", value: data.summary.orderQty },
+            {
+              label: "Region accounts",
+              value:
+                data.summary.regionAccountCount == null ? "All" : data.summary.regionAccountCount,
+            },
           ]}
         />
       ) : null}
 
-      <Panel title={`Ranking${data ? ` (${data.rows.length})` : ""}`}>
+      <Panel title={`Ranking${data ? ` · ${data.summary.regionLabel || region} (${data.rows.length})` : ""}`}>
         {busy && !data ? (
           <p style={{ margin: 0, fontSize: 13, color: "#2563eb", fontWeight: 800 }}>Loading ranking…</p>
         ) : data?.rows.length ? (

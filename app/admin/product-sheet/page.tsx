@@ -49,9 +49,15 @@ function emptySheet(): Omit<ProductSheet, "id" | "createdAt" | "updatedAt"> & { 
   };
 }
 
-function topSkusTitle(days: string, limit: string) {
+function topSkusTitle(days: string, limit: string, region?: string) {
   const range = days ? `last ${days}d` : "all history";
-  return `Top ${limit} SKUs (${range})`;
+  const area =
+    !region || region === "multi" || region === "all"
+      ? "Multi-city"
+      : region === "jacksonville"
+        ? "Jax"
+        : region.charAt(0).toUpperCase() + region.slice(1);
+  return `Top ${limit} SKUs · ${area} (${range})`;
 }
 
 export default function AdminProductSheetPage() {
@@ -68,6 +74,7 @@ export default function AdminProductSheetPage() {
   const [search, setSearch] = useState("");
   const [topDays, setTopDays] = useState("90");
   const [topLimit, setTopLimit] = useState("50");
+  const [topRegion, setTopRegion] = useState("multi");
   const [importConsumed, setImportConsumed] = useState(false);
   const [catalogBySku, setCatalogBySku] = useState<Map<string, { name?: string; brand?: string }>>(
     () => new Map()
@@ -269,8 +276,8 @@ export default function AdminProductSheetPage() {
     const merged = mergeSheetItemsWithImport([], incoming);
     setForm({
       ...emptySheet(),
-      title: topSkusTitle(days, limit),
-      note: `Imported from Top SKUs${days ? ` · ${days}d` : " · all history"}`,
+      title: topSkusTitle(days, limit, topRegion),
+      note: `Imported from Top SKUs · ${topRegion || "multi"}${days ? ` · ${days}d` : " · all history"}`,
       items: merged.items as SheetItem[],
     });
     notify(`Imported ${merged.added} Top SKU${merged.added === 1 ? "" : "s"}.`);
@@ -282,6 +289,7 @@ export default function AdminProductSheetPage() {
       const params = new URLSearchParams();
       if (topDays) params.set("days", topDays);
       if (topLimit) params.set("limit", topLimit);
+      if (topRegion) params.set("region", topRegion);
       const res = await fetch(`/api/admin/top-skus?${params.toString()}`, {
         cache: "no-store",
         headers: adminHeaders(),
@@ -289,7 +297,7 @@ export default function AdminProductSheetPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to load Top SKUs.");
       const rows = Array.isArray(data.rows) ? data.rows : [];
-      if (!rows.length) throw new Error("No Top SKUs for this period.");
+      if (!rows.length) throw new Error("No Top SKUs for this area / period.");
 
       const incoming: ProductSheetImportItem[] = rows.map(
         (row: { sku: string; name?: string; brand?: string }) => ({
@@ -579,6 +587,16 @@ export default function AdminProductSheetPage() {
             >
               <div style={{ fontWeight: 800, fontSize: 13, color: "#1e3a8a" }}>Import from Top SKUs</div>
               <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
+                <label>
+                  <FieldLabel>Area</FieldLabel>
+                  <select value={topRegion} onChange={(e) => setTopRegion(e.target.value)} style={inputStyle}>
+                    <option value="multi">All / Multi-city</option>
+                    <option value="miami">Miami</option>
+                    <option value="orlando">Orlando</option>
+                    <option value="jacksonville">Jacksonville (Jax)</option>
+                    <option value="melbourne">Melbourne</option>
+                  </select>
+                </label>
                 <label>
                   <FieldLabel>Date range</FieldLabel>
                   <select value={topDays} onChange={(e) => setTopDays(e.target.value)} style={inputStyle}>
