@@ -64,19 +64,18 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       },
       { id: "topSkus", label: "Top SKUs", href: "/admin/top-skus", hint: "Sales ranking", icon: "📊" },
       {
-<<<<<<< HEAD
         id: "invoiceCompare",
         label: "Invoice Compare",
         href: "/comp",
         hint: "Same account price matrix",
         icon: "↔️",
-=======
+      },
+      {
         id: "productSheet",
         label: "Product Sheet",
         href: "/admin/product-sheet",
         hint: "Custom picks → PDF",
         icon: "🗒",
->>>>>>> origin/cursor/product-sheet-pdf-0823
       },
     ],
   },

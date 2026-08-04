@@ -36,11 +36,8 @@ export type AdminNav =
   | "inventory"
   | "priceCompare"
   | "weeklySales"
-<<<<<<< HEAD
-  | "invoiceCompare";
-=======
+  | "invoiceCompare"
   | "productSheet";
->>>>>>> origin/cursor/product-sheet-pdf-0823
 
 function NavLinks({ active, onNavigate }: { active: AdminNav; onNavigate?: () => void }) {
   return (
