@@ -69,11 +69,53 @@ export default function AdminProductSheetPage() {
   const [topDays, setTopDays] = useState("90");
   const [topLimit, setTopLimit] = useState("50");
   const [importConsumed, setImportConsumed] = useState(false);
+  const [catalogBySku, setCatalogBySku] = useState<Map<string, { name?: string; brand?: string }>>(
+    () => new Map()
+  );
 
   const notify = (text: string, tone: "success" | "error" = "success") => {
     setMsg(text);
     setMsgTone(tone);
   };
+
+  const ensureCatalog = useCallback(async () => {
+    if (catalogBySku.size > 0) return catalogBySku;
+    try {
+      const res = await fetch("/api/catalog", { cache: "force-cache" });
+      const data = await res.json();
+      if (!res.ok) return catalogBySku;
+      const map = new Map<string, { name?: string; brand?: string }>();
+      for (const product of data.products || []) {
+        const sku = String(product?.sku || "")
+          .trim()
+          .toUpperCase();
+        if (!sku) continue;
+        map.set(sku, {
+          name: product.name ? String(product.name) : undefined,
+          brand: product.brand ? String(product.brand) : undefined,
+        });
+      }
+      setCatalogBySku(map);
+      return map;
+    } catch {
+      return catalogBySku;
+    }
+  }, [catalogBySku]);
+
+  const withCatalogFields = useCallback(
+    (items: SheetItem[], map: Map<string, { name?: string; brand?: string }>) =>
+      items.map((item) => {
+        const hit = map.get(item.sku.toUpperCase());
+        if (!hit) return item;
+        return {
+          ...item,
+          name: item.name || hit.name,
+          brand: item.brand || hit.brand,
+          imageUrl: item.imageUrl || `/product/${item.sku}.jpg`,
+        };
+      }),
+    []
+  );
 
   const applyImportItems = useCallback(
     (incoming: ProductSheetImportItem[], meta?: { days?: string; limit?: string }) => {
@@ -182,7 +224,28 @@ export default function AdminProductSheetPage() {
     setForm((prev) => ({ ...prev, items: prev.items.filter((item) => item.sku !== sku) }));
   };
 
-  const selectSheet = (sheet: ProductSheet) => {
+  const sortItems = async (by: "sku" | "name") => {
+    const map = by === "name" ? await ensureCatalog() : catalogBySku;
+    setForm((prev) => {
+      if (prev.items.length < 2) return prev;
+      const hydrated = withCatalogFields(prev.items, map);
+      const items = [...hydrated].sort((a, b) => {
+        if (by === "sku") {
+          return a.sku.localeCompare(b.sku, undefined, { numeric: true, sensitivity: "base" });
+        }
+        const an = String(a.name || "").trim() || a.sku;
+        const bn = String(b.name || "").trim() || b.sku;
+        const byName = an.localeCompare(bn, undefined, { sensitivity: "base" });
+        if (byName !== 0) return byName;
+        return a.sku.localeCompare(b.sku, undefined, { numeric: true, sensitivity: "base" });
+      });
+      return { ...prev, items };
+    });
+    notify(by === "sku" ? "Sorted by item number (SKU)." : "Sorted by name.");
+  };
+
+  const selectSheet = async (sheet: ProductSheet) => {
+    const map = await ensureCatalog();
     setForm({
       id: sheet.id,
       title: sheet.title,
@@ -190,10 +253,13 @@ export default function AdminProductSheetPage() {
       accountNo: sheet.accountNo || "",
       note: sheet.note || "",
       showPrice: Boolean(sheet.showPrice),
-      items: sheet.items.map((item) => ({
-        ...item,
-        imageUrl: item.imageUrl || `/product/${item.sku}.jpg`,
-      })),
+      items: withCatalogFields(
+        sheet.items.map((item) => ({
+          ...item,
+          imageUrl: item.imageUrl || `/product/${item.sku}.jpg`,
+        })),
+        map
+      ),
     });
   };
 
@@ -411,7 +477,7 @@ export default function AdminProductSheetPage() {
                   <button
                     key={sheet.id}
                     type="button"
-                    onClick={() => selectSheet(sheet)}
+                    onClick={() => void selectSheet(sheet)}
                     style={{
                       textAlign: "left",
                       border: active ? "1px solid #0f766e" : "1px solid #e5e7eb",
@@ -571,6 +637,29 @@ export default function AdminProductSheetPage() {
             </div>
 
             <div style={{ marginTop: 16, display: "grid", gap: 8 }}>
+              {form.items.length > 0 ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 8,
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "#374151" }}>
+                    Product list ({form.items.length})
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <BtnSecondary onClick={() => void sortItems("sku")} disabled={busy || form.items.length < 2}>
+                      Sort by item #
+                    </BtnSecondary>
+                    <BtnSecondary onClick={() => void sortItems("name")} disabled={busy || form.items.length < 2}>
+                      Sort by name
+                    </BtnSecondary>
+                  </div>
+                </div>
+              ) : null}
               {form.items.length === 0 ? (
                 <EmptyState title="Add products in the order you want them on the PDF." />
               ) : null}
