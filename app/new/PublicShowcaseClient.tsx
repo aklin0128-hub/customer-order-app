@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { ShowcaseCard } from "@/app/components/ShowcaseCard";
+import { readCustomerSession } from "@/lib/customerSession";
 import type { ShowcaseData } from "@/lib/loginPreview";
+import { queuePendingOrderSku } from "@/lib/pendingOrderIntent";
 
 import "../showcase.css";
 import "../components/out-of-stock-stamp.css";
@@ -90,7 +93,7 @@ const langLabels: Record<Lang, string> = {
 
 function readLang(): Lang {
   if (typeof window === "undefined") return "en";
-  const saved = localStorage.getItem(LANG_KEY);
+  const saved = localStorage.getItem(LANG_KEY) || localStorage.getItem("lang");
   if (saved === "zh" || saved === "ko" || saved === "vi" || saved === "en") return saved;
   return "en";
 }
@@ -102,6 +105,7 @@ export default function PublicShowcaseClient({
   data: ShowcaseData;
   variant?: ShowcaseVariant;
 }) {
+  const router = useRouter();
   const promoOnly = variant === "promo";
   const [lang, setLang] = useState<Lang>("en");
   const [tab, setTab] = useState<Tab>(promoOnly ? "promo" : "new");
@@ -112,6 +116,7 @@ export default function PublicShowcaseClient({
 
   useEffect(() => {
     localStorage.setItem(LANG_KEY, lang);
+    localStorage.setItem("lang", lang);
   }, [lang]);
 
   useEffect(() => {
@@ -131,6 +136,16 @@ export default function PublicShowcaseClient({
   const isEmpty = promoOnly
     ? data.promotionTotal === 0
     : data.promotionTotal === 0 && data.newItemTotal === 0;
+
+  const queueSkuForOrder = (sku: string) => {
+    const mode = activeTab === "promo" ? "promotion" : "newItems";
+    queuePendingOrderSku(sku, { qty: "1", mode });
+    if (readCustomerSession()?.accountNo) {
+      router.push("/order");
+      return;
+    }
+    router.push("/");
+  };
 
   const langButtons = useMemo(
     () =>
@@ -224,6 +239,8 @@ export default function PublicShowcaseClient({
                       showNewDetails={activeTab === "new"}
                       showListPrice={false}
                       className="new-card"
+                      orderActionDisabled={Boolean(item.newItemOutOfStock || item.newItemComingSoon)}
+                      onOrderAction={() => queueSkuForOrder(item.sku)}
                     />
                   </div>
                 ))}

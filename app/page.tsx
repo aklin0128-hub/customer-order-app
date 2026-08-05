@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -34,6 +35,8 @@ const copy = {
     featCatalog: "Catalog order",
     featSearch: "Quick order",
     featDraft: "Save draft",
+    browseNew: "Browse new items",
+    browsePromo: "Browse promotions",
   },
   zh: {
     title: "门店订货",
@@ -59,6 +62,8 @@ const copy = {
     featCatalog: "目录订货",
     featSearch: "快速下单",
     featDraft: "保存草稿",
+    browseNew: "浏览新品",
+    browsePromo: "浏览促销",
   },
   ko: {
     title: "매장 주문",
@@ -84,6 +89,8 @@ const copy = {
     featCatalog: "카탈로그 주문",
     featSearch: "빠른 주문",
     featDraft: "임시 저장",
+    browseNew: "신상품 보기",
+    browsePromo: "프로모션 보기",
   },
   vi: {
     title: "Đặt hàng cửa hàng",
@@ -109,6 +116,8 @@ const copy = {
     featCatalog: "Đặt theo danh mục",
     featSearch: "Đặt nhanh",
     featDraft: "Lưu nháp",
+    browseNew: "Xem hàng mới",
+    browsePromo: "Xem khuyến mãi",
   },
 };
 
@@ -170,6 +179,7 @@ export default function LoginPage() {
   const changeLang = (next: Lang) => {
     setLang(next);
     localStorage.setItem("lang", next);
+    localStorage.setItem("showcase_lang", next);
   };
 
   const handleLogin = async () => {
@@ -362,6 +372,15 @@ export default function LoginPage() {
                 {loading ? t.signingIn : t.signIn}
               </button>
             </form>
+
+            <div className="login-browse-links">
+              <Link href="/new" className="login-browse-link">
+                {t.browseNew}
+              </Link>
+              <Link href="/promo" className="login-browse-link">
+                {t.browsePromo}
+              </Link>
+            </div>
         </section>
       </div>
 

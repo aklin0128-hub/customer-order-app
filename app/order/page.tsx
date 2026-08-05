@@ -20,7 +20,8 @@ import { RecommendedStrip } from "./components/RecommendedStrip";
 import { OrderInput } from "./components/OrderInput";
 import { OrderReviewModal } from "./components/OrderReviewModal";
 import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
-import { buildClearanceUpsellLines } from "./salesFlow";
+import { buildClearanceUpsellLines, buildWeeklyUpsellLines, pickPostSubmitSuggestions } from "./salesFlow";
+import { consumePendingOrderIntent } from "@/lib/pendingOrderIntent";
 import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog } from "./catalogState";
 import { isProductOrderingBlocked } from "@/lib/productAvailability";
@@ -982,6 +983,61 @@ export default function OrderPage() {
     applyQtyState(applyQtySet(qtyMaps, cleanSku, cleanQty, source));
   };
 
+  // Apply SKUs queued from /new or /promo after sign-in.
+  useEffect(() => {
+    if (!ready || !accountNo || !autoLoaded) return;
+    const intent = consumePendingOrderIntent();
+    if (!intent?.skus?.length) return;
+
+    if (
+      intent.mode === "promotion" ||
+      intent.mode === "newItems" ||
+      intent.mode === "catalog" ||
+      intent.mode === "search" ||
+      intent.mode === "clearance"
+    ) {
+      setMode(intent.mode);
+      try {
+        localStorage.setItem("order_mode", intent.mode);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    let maps = {
+      catalog: { ...catalogQtyMap },
+      clearance: { ...clearanceQtyMap },
+    };
+    let added = 0;
+    for (const line of intent.skus) {
+      const sku = String(line.sku || "").trim().toUpperCase();
+      const qty = String(line.qty || "1").replace(/[^0-9]/g, "") || "1";
+      if (!sku) continue;
+      const item = getCatalogItemBySku(sku);
+      if (!item || !isOrderableItem(item) || isProductOrderingBlocked(item)) continue;
+      const next = Number(maps.catalog[sku] || 0) + (Number(qty) || 1);
+      maps = applyQtySet(maps, sku, String(next), "normal");
+      syncDeviceContribution(sku, next);
+      added += 1;
+    }
+
+    if (added > 0) {
+      applyQtyState(maps);
+      showTransientToast(
+        lang === "zh"
+          ? `已加入 ${added} 个浏览商品到购物车`
+          : lang === "ko"
+            ? `둘러본 상품 ${added}개를 카트에 담았습니다`
+            : lang === "vi"
+              ? `Đã thêm ${added} SP xem trước vào giỏ`
+              : `Added ${added} browsed item${added === 1 ? "" : "s"} to cart`
+      );
+      setShowCart(true);
+    }
+    // Run once after draft load; qty maps captured from that render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, accountNo, autoLoaded]);
+
   const getPromoRemainingForSku = (cleanSku: string) => {
     const promo = promotionItems.find((p) => p.sku?.toUpperCase() === cleanSku);
     if (!promo) return null;
@@ -1098,13 +1154,23 @@ export default function OrderPage() {
   }, [qtyMaps, newItemCount]);
 
   const recommendedStripItems = useMemo(() => {
-    if (mode !== "catalog" || catalogShowRecommendedOnly) return [];
+    if (catalogShowRecommendedOnly) return [];
     return catalogBrowseBase
       .filter((item) => recommendedSkuSet.has((item.sku || "").toUpperCase()))
       .filter((item) => !isNewItem(item))
       .filter((item) => Number(catalogQtyMap[(item.sku || "").toUpperCase()] || 0) <= 0)
+      .filter((item) => isOrderableItem(item) && !isProductOrderingBlocked(item))
       .slice(0, 8);
-  }, [mode, catalogBrowseBase, recommendedSkuSet, catalogQtyMap, catalogShowRecommendedOnly]);
+  }, [catalogBrowseBase, recommendedSkuSet, catalogQtyMap, catalogShowRecommendedOnly]);
+
+  const postSubmitSuggestLines = useMemo(() => {
+    if (!lastSubmittedRef || lastSubmittedItems.length === 0) return [];
+    const submitted = new Set(
+      lastSubmittedItems.map((item) => String(item.sku || "").trim().toUpperCase()).filter(Boolean)
+    );
+    const picks = pickPostSubmitSuggestions(promotionItems, submitted, 4);
+    return buildWeeklyUpsellLines(lang, picks, submitted, copy[lang]).slice(0, 4);
+  }, [lastSubmittedRef, lastSubmittedItems, promotionItems, lang]);
 
   const scrollToCart = () => {
     setShowCart(true);
@@ -2442,6 +2508,13 @@ export default function OrderPage() {
           </section>
         ) : mode === "promotion" ? (
           <section className="order-shop-card order-shop-card--promo">
+            {recommendedStripItems.length > 0 ? (
+              <RecommendedStrip
+                lang={lang}
+                items={recommendedStripItems}
+                onAddOne={(sku) => adjustCatalogQty(sku, 1)}
+              />
+            ) : null}
             {promotionsLoading ? (
               <div style={{ ...emptyStyle, border: "1px solid #5eead4", background: "#f0fdfa", color: "#0f766e" }}>{t.loadingPromotions}</div>
             ) : promotionItems.length === 0 ? (
@@ -2564,17 +2637,11 @@ export default function OrderPage() {
         ) : (
           <section className="order-shop-card order-shop-card--listing">
             {recommendedStripItems.length > 0 ? (
-              <details className="order-details-fold">
-                <summary>
-                  {t.recommendedStripTitle} ({recommendedStripItems.length})
-                </summary>
-                <RecommendedStrip
-                  lang={lang}
-                  items={recommendedStripItems}
-                  onAddOne={(sku) => adjustCatalogQty(sku, 1)}
-                  hideTitle
-                />
-              </details>
+              <RecommendedStrip
+                lang={lang}
+                items={recommendedStripItems}
+                onAddOne={(sku) => adjustCatalogQty(sku, 1)}
+              />
             ) : null}
 
             {orderableCatalogItems.length === 0 ? (
@@ -2779,6 +2846,33 @@ export default function OrderPage() {
           lang={lang}
           orderRef={lastSubmittedRef}
           items={lastSubmittedItems}
+          suggestLines={postSubmitSuggestLines}
+          onAddSuggestCase={(sku) => {
+            adjustCatalogQty(sku, 1);
+            showTransientToast(`+1 ${sku}`);
+          }}
+          onAddAllSuggest={() => {
+            for (const line of postSubmitSuggestLines) {
+              adjustCatalogQty(line.sku, 1);
+            }
+            if (postSubmitSuggestLines.length > 0) {
+              showTransientToast(
+                lang === "zh"
+                  ? `已加入 ${postSubmitSuggestLines.length} 个促销商品`
+                  : `Added ${postSubmitSuggestLines.length} promo item${postSubmitSuggestLines.length === 1 ? "" : "s"}`
+              );
+            }
+          }}
+          onBrowseWeeklyPicks={() => {
+            setLastSubmittedRef("");
+            setLastSubmittedItems([]);
+            setMode("promotion");
+            try {
+              localStorage.setItem("order_mode", "promotion");
+            } catch {
+              /* ignore */
+            }
+          }}
         />
     </main>
   );

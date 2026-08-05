@@ -35,6 +35,13 @@ const comingDateLabel: Record<Lang, string> = {
   vi: "Dự kiến có",
 };
 
+const orderActionLabels: Record<Lang, string> = {
+  en: "Order 1 case",
+  zh: "订 1 箱",
+  ko: "1박스 주문",
+  vi: "Đặt 1 thùng",
+};
+
 export function ShowcaseCard({
   item,
   lang,
@@ -43,6 +50,8 @@ export function ShowcaseCard({
   showNewDetails,
   showListPrice = true,
   imageSize,
+  onOrderAction,
+  orderActionDisabled = false,
 }: {
   item: LoginPreviewCard;
   lang: Lang;
@@ -53,6 +62,9 @@ export function ShowcaseCard({
   /** Public /new hides list prices; order New items tab keeps them. */
   showListPrice?: boolean;
   imageSize?: number;
+  /** Public showcase: queue SKU for cart after sign-in. */
+  onOrderAction?: () => void;
+  orderActionDisabled?: boolean;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
@@ -175,6 +187,17 @@ export function ShowcaseCard({
             aria-haspopup="dialog"
           >
             {detailsLabel[lang]}
+          </button>
+        ) : null}
+
+        {onOrderAction ? (
+          <button
+            type="button"
+            className="showcase-card-order-btn"
+            onClick={onOrderAction}
+            disabled={orderActionDisabled || outOfStock}
+          >
+            {orderActionLabels[lang]}
           </button>
         ) : null}
       </div>
