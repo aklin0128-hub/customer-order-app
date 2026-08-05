@@ -110,20 +110,33 @@ export function mergeOrderDrafts(
   });
 }
 
-/** Cloud save — union with existing draft unless the user explicitly clears. */
+/**
+ * Cloud save — last-write-wins for non-empty carts so item removals stick.
+ * Empty autosave without allowClear keeps the existing cloud draft (guards
+ * accidental wipe before load / beacon races). Explicit clear deletes.
+ */
 export function resolveCloudDraftSave(
   incoming: OrderDraftPayload,
   existing: OrderDraftPayload | null | undefined,
   allowClear: boolean
 ): "delete" | OrderDraftPayload {
-  if (allowClear && countDraftItems(incoming) === 0) {
-    return "delete";
+  const incomingCount = countDraftItems(incoming);
+
+  if (incomingCount === 0) {
+    if (allowClear) return "delete";
+    return existing ? { ...existing } : incoming;
   }
 
-  const merged = mergeOrderDrafts(incoming, existing ?? null);
-  if (merged) return merged;
+  if (!existing || countDraftItems(existing) === 0) {
+    return incoming;
+  }
 
-  return incoming;
+  // Newer (or equal) client snapshot replaces cloud — do not union missing SKUs back.
+  if (draftTimestamp(incoming) >= draftTimestamp(existing)) {
+    return incoming;
+  }
+
+  return { ...existing };
 }
 
 export function cloudDraftHasMoreItems(
