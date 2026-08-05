@@ -9,7 +9,7 @@ import {
   resolveCloudDraftSave,
 } from "@/lib/orderDraft";
 
-test("mergeOrderDrafts keeps cloud cart when local empty draft is newer", () => {
+test("mergeOrderDrafts keeps local clear when empty draft is newer", () => {
   const local = {
     accountNo: "FL111",
     cart: [],
@@ -24,8 +24,7 @@ test("mergeOrderDrafts keeps cloud cart when local empty draft is newer", () => 
   };
 
   const merged = mergeOrderDrafts(local, cloud);
-  assert.equal(countDraftItems(merged), 1);
-  assert.equal(buildCatalogQtyMapFromDraft(merged)["01199K"], "1");
+  assert.equal(countDraftItems(merged), 0);
 });
 
 test("mergeOrderDrafts keeps cloud cart when local empty draft is older", () => {
@@ -46,25 +45,20 @@ test("mergeOrderDrafts keeps cloud cart when local empty draft is older", () => 
   assert.equal(countDraftItems(merged), 1);
 });
 
-test("mergeOrderDrafts unions distinct SKUs from local and cloud", () => {
+test("mergeOrderDrafts does not revive SKUs removed on the newer draft", () => {
   const local = {
     accountNo: "FL111",
-    catalogQtyMap: { "00100": "2", "00200": "1" },
-    updatedAt: "2026-05-20T10:00:00.000Z",
+    catalogQtyMap: { "00300": "3" },
+    updatedAt: "2026-05-20T12:00:00.000Z",
   };
   const cloud = {
     accountNo: "FL111",
-    catalogQtyMap: { "00300": "3" },
+    catalogQtyMap: { "00100": "2", "00300": "1" },
     updatedAt: "2026-05-20T11:00:00.000Z",
   };
 
   const merged = mergeOrderDrafts(local, cloud);
-  assert.equal(countDraftItems(merged), 3);
-  assert.deepEqual(buildCatalogQtyMapFromDraft(merged), {
-    "00100": "2",
-    "00200": "1",
-    "00300": "3",
-  });
+  assert.deepEqual(buildCatalogQtyMapFromDraft(merged), { "00300": "3" });
 });
 
 test("mergeOrderDrafts uses newer qty when the same SKU exists on both sides", () => {
@@ -83,7 +77,7 @@ test("mergeOrderDrafts uses newer qty when the same SKU exists on both sides", (
   assert.equal(buildCatalogQtyMapFromDraft(merged)["00100"], "5");
 });
 
-test("mergeCatalogQtyMaps unions lines and prefers newer side on conflicts", () => {
+test("mergeCatalogQtyMaps keeps only the newer side cart", () => {
   const merged = mergeCatalogQtyMaps(
     { "00100": "5", "00200": "1" },
     { "00100": "2", "00300": "3" },
@@ -94,7 +88,6 @@ test("mergeCatalogQtyMaps unions lines and prefers newer side on conflicts", () 
   assert.deepEqual(merged, {
     "00100": "5",
     "00200": "1",
-    "00300": "3",
   });
 });
 

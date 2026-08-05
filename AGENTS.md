@@ -21,10 +21,11 @@ deployed incomplete branches and wiped earlier fixes.
 2. Start from `origin/cursor/deploy-product-sheet-0823` (checkout + pull that branch).
 3. Merge or cherry-pick the finished feature into that deploy branch.
 4. Confirm the deploy branch still contains known production fixes (examples):
-   - Catalog Edit is a **pencil icon**, not the text “Edit”
-   - Catalog Order defaults to **Show available items only**
-   - `/new` hides list prices and has **no** footer Promotions button
-   - `/comp` password login works
+  - Catalog Edit is a **pencil icon**, not the text “Edit”
+  - Catalog Order defaults to **Show available items only**
+  - `/new` hides list prices and has **no** footer Promotions button
+  - `/comp` password login works
+  - Cart draft merge is **last-write-wins** (deleted lines must not revive on load)
 5. Only then run `vercel deploy --prod` from the deploy branch.
 6. Deploy **only** when the user explicitly says `deploy`.
 

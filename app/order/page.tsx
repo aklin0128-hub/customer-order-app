@@ -461,10 +461,15 @@ export default function OrderPage() {
         }
 
         try {
+          // If the newer draft cleared the cart, allowClear must delete Redis
+          // so Active Carts / later imports cannot resurrect removed lines.
           await fetch("/api/save-draft", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...merged, allowClear: false }),
+            body: JSON.stringify({
+              ...merged,
+              allowClear: countDraftItems(merged) === 0,
+            }),
           });
         } catch {}
       }
@@ -543,31 +548,15 @@ export default function OrderPage() {
           body: JSON.stringify(saveBody),
         });
         if (!res.ok) throw new Error("save failed");
-        // Do not re-apply the server draft into React state. Union-merge used to
-        // revive deleted SKUs ~1–2s after remove; local state is already correct.
-        const data = await res.json();
-        if (data?.draft) {
-          localStorage.setItem(
-            `draft_${accountNo}`,
-            JSON.stringify(normalizeOrderDraft(accountNo, data.draft))
-          );
-        }
+        // Do not re-apply the server draft into React state or localStorage.
+        // An older cloud snapshot in the response can revive deleted SKUs.
       } catch {
         try {
-          const res = await fetch("/api/save-draft", {
+          await fetch("/api/save-draft", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(saveBody),
           });
-          if (res.ok) {
-            const data = await res.json();
-            if (data?.draft) {
-              localStorage.setItem(
-                `draft_${accountNo}`,
-                JSON.stringify(normalizeOrderDraft(accountNo, data.draft))
-              );
-            }
-          }
         } catch {
           /* localStorage backup already written above */
         }
