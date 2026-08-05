@@ -61,6 +61,9 @@ import {
   buildCatalogQtyMapFromDraft,
   cartItemsFromQtyMap,
   countDraftItems,
+  deviceQtyForSharedTotal,
+  ensureDeviceCarts,
+  getOrCreateOrderDeviceId,
   mergeOrderDrafts,
   normalizeOrderDraft,
   type OrderDraftPayload,
@@ -129,6 +132,11 @@ export default function OrderPage() {
     cart: [] as CartItem[],
     catalogQtyMap: {} as Record<string, string>,
   });
+  const deviceIdRef = useRef("");
+  const cloudDraftRef = useRef<OrderDraftPayload | null>(null);
+  const deviceQtyMapRef = useRef<Record<string, string>>({});
+  const cartDirtyRef = useRef(false);
+  const lastCloudUpdatedAtRef = useRef("");
 
   const [lang, setLang] = useState<Lang>("en");
   const [mode, setMode] = useState<OrderMode>("promotion");
@@ -376,6 +384,12 @@ export default function OrderPage() {
   }, [autoLoaded]);
 
   useEffect(() => {
+    if (!deviceIdRef.current) {
+      deviceIdRef.current = getOrCreateOrderDeviceId();
+    }
+  }, []);
+
+  useEffect(() => {
     draftSnapshotRef.current = {
       accountNo,
       storeName,
@@ -424,18 +438,31 @@ export default function OrderPage() {
   useEffect(() => {
     if (!ready || !accountNo || autoLoaded) return;
 
-    const applyDraft = (draft: OrderDraftPayload) => {
-      setPhone(draft.phone || "");
-      setNote(draft.note || "");
-      const map = buildCatalogQtyMapFromDraft(draft);
+    const applySharedDraft = (draft: OrderDraftPayload, opts?: { keepClearance?: boolean }) => {
+      const normalized = ensureDeviceCarts(draft) || normalizeOrderDraft(accountNo, draft);
+      const deviceId = deviceIdRef.current || getOrCreateOrderDeviceId();
+      deviceIdRef.current = deviceId;
+      cloudDraftRef.current = normalized;
+      deviceQtyMapRef.current = {
+        ...(normalized.deviceCarts?.[deviceId]?.catalogQtyMap || {}),
+      };
+      lastCloudUpdatedAtRef.current = String(normalized.updatedAt || "");
+      cartDirtyRef.current = false;
+      setPhone(normalized.phone || "");
+      setNote(normalized.note || "");
+      const map = buildCatalogQtyMapFromDraft(normalized);
       setCatalogQtyMap(map);
-      setClearanceQtyMap({});
+      if (!opts?.keepClearance) setClearanceQtyMap({});
       setCart(cartItemsFromQtyMap(map));
+      localStorage.setItem(`draft_${accountNo}`, JSON.stringify(normalized));
     };
 
     const loadDrafts = async () => {
       let localParsed: OrderDraftPayload | null = null;
       let cloudParsed: OrderDraftPayload | null = null;
+      if (!deviceIdRef.current) {
+        deviceIdRef.current = getOrCreateOrderDeviceId();
+      }
 
       const localDraft = localStorage.getItem(`draft_${accountNo}`);
       if (localDraft) {
@@ -454,20 +481,19 @@ export default function OrderPage() {
 
       const merged = mergeOrderDrafts(localParsed, cloudParsed);
       if (merged) {
-        applyDraft(merged);
-        localStorage.setItem(`draft_${accountNo}`, JSON.stringify(merged));
+        applySharedDraft(merged);
         if (countDraftItems(merged) > 0) {
           showTransientToast(t.loadedDraft);
         }
 
         try {
-          // If the newer draft cleared the cart, allowClear must delete Redis
-          // so Active Carts / later imports cannot resurrect removed lines.
           await fetch("/api/save-draft", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               ...merged,
+              deviceId: deviceIdRef.current,
+              deviceQtyMap: deviceQtyMapRef.current,
               allowClear: countDraftItems(merged) === 0,
             }),
           });
@@ -521,6 +547,8 @@ export default function OrderPage() {
   useEffect(() => {
     if (!ready || !accountNo || !autoLoaded) return;
 
+    const deviceId = deviceIdRef.current || getOrCreateOrderDeviceId();
+    deviceIdRef.current = deviceId;
     const draft = normalizeOrderDraft(accountNo, {
       storeName,
       phone,
@@ -528,16 +556,25 @@ export default function OrderPage() {
       note,
       cart,
       catalogQtyMap,
+      deviceCarts: {
+        ...(cloudDraftRef.current?.deviceCarts || {}),
+        [deviceId]: {
+          catalogQtyMap: deviceQtyMapRef.current,
+          updatedAt: new Date().toISOString(),
+        },
+      },
+      removedSkus: cloudDraftRef.current?.removedSkus,
       updatedAt: new Date().toISOString(),
     });
     localStorage.setItem(`draft_${accountNo}`, JSON.stringify(draft));
 
     const timer = setTimeout(async () => {
-      // After the draft has loaded, an empty cart means the user cleared/removed
-      // the last lines — allow cloud delete so removals stick.
       const allowClear = countDraftItems(draft) === 0;
       const saveBody = {
         ...draft,
+        deviceId,
+        deviceQtyMap: deviceQtyMapRef.current,
+        removedSkus: cloudDraftRef.current?.removedSkus,
         allowClear,
       };
 
@@ -548,8 +585,30 @@ export default function OrderPage() {
           body: JSON.stringify(saveBody),
         });
         if (!res.ok) throw new Error("save failed");
-        // Do not re-apply the server draft into React state or localStorage.
-        // An older cloud snapshot in the response can revive deleted SKUs.
+        const data = await res.json();
+        if (data?.draft) {
+          const normalized = ensureDeviceCarts(data.draft) || normalizeOrderDraft(accountNo, data.draft);
+          cloudDraftRef.current = normalized;
+          deviceQtyMapRef.current = {
+            ...(normalized.deviceCarts?.[deviceId]?.catalogQtyMap || {}),
+          };
+          lastCloudUpdatedAtRef.current = String(normalized.updatedAt || "");
+          cartDirtyRef.current = false;
+          localStorage.setItem(`draft_${accountNo}`, JSON.stringify(normalized));
+          const shared = buildCatalogQtyMapFromDraft(normalized);
+          setCatalogQtyMap((prev) => {
+            const same =
+              Object.keys(prev).length === Object.keys(shared).length &&
+              Object.entries(shared).every(([sku, qty]) => prev[sku] === qty);
+            return same ? prev : shared;
+          });
+          setCart((prev) => {
+            const clearance = Object.fromEntries(
+              prev.filter((item) => item.nhItems).map((item) => [item.sku.toUpperCase(), item.qty])
+            );
+            return buildCartDisplayItems({ catalog: shared, clearance });
+          });
+        }
       } catch {
         try {
           await fetch("/api/save-draft", {
@@ -585,9 +644,18 @@ export default function OrderPage() {
 
       const snapshot = draftSnapshotRef.current;
       if (!snapshot.accountNo) return;
+      const deviceId = deviceIdRef.current || getOrCreateOrderDeviceId();
 
       const payload = normalizeOrderDraft(snapshot.accountNo, {
         ...snapshot,
+        deviceCarts: {
+          ...(cloudDraftRef.current?.deviceCarts || {}),
+          [deviceId]: {
+            catalogQtyMap: deviceQtyMapRef.current,
+            updatedAt: new Date().toISOString(),
+          },
+        },
+        removedSkus: cloudDraftRef.current?.removedSkus,
         updatedAt: new Date().toISOString(),
       });
 
@@ -596,6 +664,9 @@ export default function OrderPage() {
       if (typeof navigator.sendBeacon === "function") {
         const body = JSON.stringify({
           ...payload,
+          deviceId,
+          deviceQtyMap: deviceQtyMapRef.current,
+          removedSkus: cloudDraftRef.current?.removedSkus,
           allowClear: countDraftItems(payload) === 0,
         });
         navigator.sendBeacon("/api/save-draft", new Blob([body], { type: "application/json" }));
@@ -614,6 +685,59 @@ export default function OrderPage() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [ready, accountNo]);
+
+  // Pull the shared cart so the other person's adds show up without refresh.
+  useEffect(() => {
+    if (!ready || !accountNo || !autoLoaded) return;
+
+    const pullSharedCart = async () => {
+      if (cartDirtyRef.current) return;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      try {
+        const res = await fetch(`/api/load-draft?accountNo=${encodeURIComponent(accountNo)}`, {
+          method: "GET",
+          cache: "no-store",
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.draft) return;
+        const normalized = ensureDeviceCarts(data.draft) || normalizeOrderDraft(accountNo, data.draft);
+        const updatedAt = String(normalized.updatedAt || "");
+        if (!updatedAt || updatedAt === lastCloudUpdatedAtRef.current) return;
+        if (cartDirtyRef.current) return;
+
+        const deviceId = deviceIdRef.current || getOrCreateOrderDeviceId();
+        cloudDraftRef.current = normalized;
+        deviceQtyMapRef.current = {
+          ...(normalized.deviceCarts?.[deviceId]?.catalogQtyMap || {}),
+        };
+        lastCloudUpdatedAtRef.current = updatedAt;
+        const shared = buildCatalogQtyMapFromDraft(normalized);
+        setCatalogQtyMap(shared);
+        setCart((prev) => {
+          // Keep clearance lines; replace catalog portion via buildCartDisplayItems.
+          const clearance = Object.fromEntries(
+            prev
+              .filter((item) => item.nhItems)
+              .map((item) => [item.sku.toUpperCase(), item.qty])
+          );
+          return buildCartDisplayItems({ catalog: shared, clearance });
+        });
+        localStorage.setItem(`draft_${accountNo}`, JSON.stringify(normalized));
+      } catch {
+        /* ignore poll errors */
+      }
+    };
+
+    const timer = setInterval(pullSharedCart, 4000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") pullSharedCart();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [ready, accountNo, autoLoaded]);
 
   const normalizedSkuInput = useMemo(() => skuInput.trim().toUpperCase(), [skuInput]);
 
@@ -832,12 +956,27 @@ export default function OrderPage() {
     setCart(buildCartDisplayItems(next));
   };
 
+  const syncDeviceContribution = (sku: string, desiredTotal: number) => {
+    const deviceId = deviceIdRef.current || getOrCreateOrderDeviceId();
+    deviceIdRef.current = deviceId;
+    const myQty = deviceQtyForSharedTotal(cloudDraftRef.current, deviceId, sku, desiredTotal);
+    const nextDevice = { ...deviceQtyMapRef.current };
+    if (myQty > 0) nextDevice[sku] = String(myQty);
+    else delete nextDevice[sku];
+    deviceQtyMapRef.current = nextDevice;
+    cartDirtyRef.current = true;
+  };
+
   const setQtyForSku = (sku: string, value: string, source: "clearance" | "normal" = "normal") => {
     const cleanSku = sku.trim().toUpperCase();
     const cleanQty = String(value || "").replace(/[^0-9]/g, "");
 
     if (cleanQty && Number(cleanQty) > 0 && blockAddForSku(cleanSku)) {
       return;
+    }
+
+    if (source === "normal") {
+      syncDeviceContribution(cleanSku, Number(cleanQty) || 0);
     }
 
     applyQtyState(applyQtySet(qtyMaps, cleanSku, cleanQty, source));
@@ -1032,6 +1171,10 @@ export default function OrderPage() {
     }
 
     if (!appliedDelta) return;
+
+    if (source === "normal") {
+      syncDeviceContribution(cleanSku, next);
+    }
 
     applyQtyState(applyQtyDelta(qtyMaps, cleanSku, appliedDelta, source));
   };
@@ -1333,6 +1476,10 @@ export default function OrderPage() {
     setSkuInput("");
     setQtyInput("");
     setSelectedItem(null);
+    deviceQtyMapRef.current = {};
+    cloudDraftRef.current = null;
+    cartDirtyRef.current = false;
+    lastCloudUpdatedAtRef.current = "";
     showTransientToast(t.cleared);
     localStorage.removeItem(`draft_${accountNo}`);
 
@@ -1348,6 +1495,8 @@ export default function OrderPage() {
           note: note.trim(),
           cart: [],
           catalogQtyMap: {},
+          deviceId: deviceIdRef.current || getOrCreateOrderDeviceId(),
+          deviceQtyMap: {},
           allowClear: true,
         }),
       });

@@ -25,7 +25,7 @@ deployed incomplete branches and wiped earlier fixes.
   - Catalog Order defaults to **Show available items only**
   - `/new` hides list prices and has **no** footer Promotions button
   - `/comp` password login works
-  - Cart draft merge is **last-write-wins** (deleted lines must not revive on load)
+  - Shared cart is **per-device contributions summed** (A rice+noodle, B rice+wine → rice×2 noodle×1 wine×1); deletions use tombstones
 5. Only then run `vercel deploy --prod` from the deploy branch.
 6. Deploy **only** when the user explicitly says `deploy`.
 

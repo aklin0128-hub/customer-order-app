@@ -2,92 +2,129 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  aggregateDeviceCarts,
   buildCatalogQtyMapFromDraft,
   countDraftItems,
-  mergeCatalogQtyMaps,
+  deviceQtyForSharedTotal,
   mergeOrderDrafts,
   resolveCloudDraftSave,
+  resolveCollaborativeCloudSave,
 } from "@/lib/orderDraft";
 
-test("mergeOrderDrafts keeps local clear when empty draft is newer", () => {
+test("collaborative aggregate sums the same SKU across devices", () => {
+  const aggregate = aggregateDeviceCarts({
+    deviceCarts: {
+      A: { catalogQtyMap: { RICE: "1", NOODLE: "1" }, updatedAt: "2026-08-05T01:00:00.000Z" },
+      B: { catalogQtyMap: { RICE: "1", WINE: "1" }, updatedAt: "2026-08-05T01:01:00.000Z" },
+    },
+  });
+
+  assert.deepEqual(aggregate, {
+    RICE: "2",
+    NOODLE: "1",
+    WINE: "1",
+  });
+});
+
+test("deviceQtyForSharedTotal only stores this device's share", () => {
+  const draft = {
+    accountNo: "FL111",
+    deviceCarts: {
+      A: { catalogQtyMap: { RICE: "1" }, updatedAt: "2026-08-05T01:00:00.000Z" },
+      B: { catalogQtyMap: { RICE: "1" }, updatedAt: "2026-08-05T01:01:00.000Z" },
+    },
+  };
+
+  assert.equal(deviceQtyForSharedTotal(draft, "A", "RICE", 2), 1);
+  assert.equal(deviceQtyForSharedTotal(draft, "A", "RICE", 3), 2);
+  assert.equal(deviceQtyForSharedTotal(draft, "A", "RICE", 1), 0);
+});
+
+test("resolveCollaborativeCloudSave merges two device carts by sum", () => {
+  const existing = {
+    accountNo: "FL111",
+    deviceCarts: {
+      A: { catalogQtyMap: { RICE: "1", NOODLE: "1" }, updatedAt: "2026-08-05T01:00:00.000Z" },
+    },
+    catalogQtyMap: { RICE: "1", NOODLE: "1" },
+    updatedAt: "2026-08-05T01:00:00.000Z",
+  };
+
+  const resolved = resolveCollaborativeCloudSave({
+    incoming: {
+      accountNo: "FL111",
+      catalogQtyMap: { RICE: "2", NOODLE: "1", WINE: "1" },
+      updatedAt: "2026-08-05T01:02:00.000Z",
+    },
+    existing,
+    allowClear: false,
+    deviceId: "B",
+    deviceQtyMap: { RICE: "1", WINE: "1" },
+  });
+
+  assert.notEqual(resolved, "delete");
+  assert.deepEqual(buildCatalogQtyMapFromDraft(resolved), {
+    RICE: "2",
+    NOODLE: "1",
+    WINE: "1",
+  });
+});
+
+test("resolveCollaborativeCloudSave tombstones removed SKUs for all devices", () => {
+  const existing = {
+    accountNo: "FL111",
+    deviceCarts: {
+      A: { catalogQtyMap: { RICE: "1", NOODLE: "1" }, updatedAt: "2026-08-05T01:00:00.000Z" },
+      B: { catalogQtyMap: { RICE: "1", WINE: "1" }, updatedAt: "2026-08-05T01:01:00.000Z" },
+    },
+    catalogQtyMap: { RICE: "2", NOODLE: "1", WINE: "1" },
+    updatedAt: "2026-08-05T01:01:00.000Z",
+  };
+
+  const resolved = resolveCollaborativeCloudSave({
+    incoming: {
+      accountNo: "FL111",
+      catalogQtyMap: { RICE: "2", WINE: "1" },
+      updatedAt: "2026-08-05T01:03:00.000Z",
+    },
+    existing,
+    allowClear: false,
+    deviceId: "A",
+    deviceQtyMap: { RICE: "1" },
+  });
+
+  assert.notEqual(resolved, "delete");
+  assert.deepEqual(buildCatalogQtyMapFromDraft(resolved), {
+    RICE: "2",
+    WINE: "1",
+  });
+  assert.ok(resolved.removedSkus?.NOODLE);
+});
+
+test("mergeOrderDrafts keeps both device slices so reload does not double-count", () => {
   const local = {
     accountNo: "FL111",
-    cart: [],
-    catalogQtyMap: {},
-    updatedAt: "2026-05-20T12:00:00.000Z",
+    deviceCarts: {
+      A: { catalogQtyMap: { RICE: "1", NOODLE: "1" }, updatedAt: "2026-08-05T01:00:00.000Z" },
+    },
+    catalogQtyMap: { RICE: "1", NOODLE: "1" },
+    updatedAt: "2026-08-05T01:00:00.000Z",
   };
   const cloud = {
     accountNo: "FL111",
-    cart: [{ sku: "01199K", qty: "1" }],
-    catalogQtyMap: { "01199K": "1" },
-    updatedAt: "2026-05-20T11:00:00.000Z",
+    deviceCarts: {
+      A: { catalogQtyMap: { RICE: "1", NOODLE: "1" }, updatedAt: "2026-08-05T01:00:00.000Z" },
+      B: { catalogQtyMap: { RICE: "1", WINE: "1" }, updatedAt: "2026-08-05T01:01:00.000Z" },
+    },
+    catalogQtyMap: { RICE: "2", NOODLE: "1", WINE: "1" },
+    updatedAt: "2026-08-05T01:01:00.000Z",
   };
 
   const merged = mergeOrderDrafts(local, cloud);
-  assert.equal(countDraftItems(merged), 0);
-});
-
-test("mergeOrderDrafts keeps cloud cart when local empty draft is older", () => {
-  const local = {
-    accountNo: "FL111",
-    cart: [],
-    catalogQtyMap: {},
-    updatedAt: "2026-05-20T10:00:00.000Z",
-  };
-  const cloud = {
-    accountNo: "FL111",
-    cart: [{ sku: "01199K", qty: "1" }],
-    catalogQtyMap: { "01199K": "1" },
-    updatedAt: "2026-05-20T11:00:00.000Z",
-  };
-
-  const merged = mergeOrderDrafts(local, cloud);
-  assert.equal(countDraftItems(merged), 1);
-});
-
-test("mergeOrderDrafts does not revive SKUs removed on the newer draft", () => {
-  const local = {
-    accountNo: "FL111",
-    catalogQtyMap: { "00300": "3" },
-    updatedAt: "2026-05-20T12:00:00.000Z",
-  };
-  const cloud = {
-    accountNo: "FL111",
-    catalogQtyMap: { "00100": "2", "00300": "1" },
-    updatedAt: "2026-05-20T11:00:00.000Z",
-  };
-
-  const merged = mergeOrderDrafts(local, cloud);
-  assert.deepEqual(buildCatalogQtyMapFromDraft(merged), { "00300": "3" });
-});
-
-test("mergeOrderDrafts uses newer qty when the same SKU exists on both sides", () => {
-  const local = {
-    accountNo: "FL111",
-    catalogQtyMap: { "00100": "5" },
-    updatedAt: "2026-05-20T12:00:00.000Z",
-  };
-  const cloud = {
-    accountNo: "FL111",
-    catalogQtyMap: { "00100": "2" },
-    updatedAt: "2026-05-20T11:00:00.000Z",
-  };
-
-  const merged = mergeOrderDrafts(local, cloud);
-  assert.equal(buildCatalogQtyMapFromDraft(merged)["00100"], "5");
-});
-
-test("mergeCatalogQtyMaps keeps only the newer side cart", () => {
-  const merged = mergeCatalogQtyMaps(
-    { "00100": "5", "00200": "1" },
-    { "00100": "2", "00300": "3" },
-    Date.parse("2026-05-20T12:00:00.000Z"),
-    Date.parse("2026-05-20T11:00:00.000Z")
-  );
-
-  assert.deepEqual(merged, {
-    "00100": "5",
-    "00200": "1",
+  assert.deepEqual(buildCatalogQtyMapFromDraft(merged), {
+    RICE: "2",
+    NOODLE: "1",
+    WINE: "1",
   });
 });
 
@@ -106,40 +143,6 @@ test("resolveCloudDraftSave replaces cloud with newer non-empty incoming (remova
   const resolved = resolveCloudDraftSave(incoming, existing, false);
   assert.notEqual(resolved, "delete");
   assert.deepEqual(buildCatalogQtyMapFromDraft(resolved), { "00300": "3" });
-});
-
-test("resolveCloudDraftSave keeps newer cloud when incoming is older", () => {
-  const incoming = {
-    accountNo: "FL111",
-    catalogQtyMap: { "00300": "3" },
-    updatedAt: "2026-05-20T10:00:00.000Z",
-  };
-  const existing = {
-    accountNo: "FL111",
-    catalogQtyMap: { "00100": "2" },
-    updatedAt: "2026-05-20T11:00:00.000Z",
-  };
-
-  const resolved = resolveCloudDraftSave(incoming, existing, false);
-  assert.notEqual(resolved, "delete");
-  assert.deepEqual(buildCatalogQtyMapFromDraft(resolved), { "00100": "2" });
-});
-
-test("resolveCloudDraftSave keeps cloud cart when autosave is empty", () => {
-  const incoming = {
-    accountNo: "FL111",
-    catalogQtyMap: {},
-    updatedAt: "2026-05-20T12:00:00.000Z",
-  };
-  const existing = {
-    accountNo: "FL111",
-    catalogQtyMap: { "00100": "2" },
-    updatedAt: "2026-05-20T11:00:00.000Z",
-  };
-
-  const resolved = resolveCloudDraftSave(incoming, existing, false);
-  assert.notEqual(resolved, "delete");
-  assert.equal(buildCatalogQtyMapFromDraft(resolved)["00100"], "2");
 });
 
 test("resolveCloudDraftSave deletes only on explicit clear", () => {
