@@ -21,7 +21,6 @@ import { OrderInput } from "./components/OrderInput";
 import { OrderReviewModal } from "./components/OrderReviewModal";
 import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
 import { buildClearanceUpsellLines, buildWeeklyUpsellLines, pickPostSubmitSuggestions } from "./salesFlow";
-import { consumePendingOrderIntent } from "@/lib/pendingOrderIntent";
 import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog } from "./catalogState";
 import { isProductOrderingBlocked } from "@/lib/productAvailability";
@@ -176,6 +175,7 @@ export default function OrderPage() {
   const [showCart, setShowCart] = useState(false);
   const [catalogShowSelectedOnly, setCatalogShowSelectedOnly] = useState(false);
   const [catalogShowRecommendedOnly, setCatalogShowRecommendedOnly] = useState(false);
+  const [suggestedStripHidden, setSuggestedStripHidden] = useState(false);
   const [catalogFiltersOpen, setCatalogFiltersOpen] = useState(false);
   const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false);
   const [recentItems, setRecentItems] = useState<CartItem[]>([]);
@@ -983,60 +983,31 @@ export default function OrderPage() {
     applyQtyState(applyQtySet(qtyMaps, cleanSku, cleanQty, source));
   };
 
-  // Apply SKUs queued from /new or /promo after sign-in.
   useEffect(() => {
-    if (!ready || !accountNo || !autoLoaded) return;
-    const intent = consumePendingOrderIntent();
-    if (!intent?.skus?.length) return;
-
-    if (
-      intent.mode === "promotion" ||
-      intent.mode === "newItems" ||
-      intent.mode === "catalog" ||
-      intent.mode === "search" ||
-      intent.mode === "clearance"
-    ) {
-      setMode(intent.mode);
-      try {
-        localStorage.setItem("order_mode", intent.mode);
-      } catch {
-        /* ignore */
-      }
+    try {
+      setSuggestedStripHidden(localStorage.getItem("order_hide_suggested_strip") === "1");
+    } catch {
+      setSuggestedStripHidden(false);
     }
+  }, []);
 
-    let maps = {
-      catalog: { ...catalogQtyMap },
-      clearance: { ...clearanceQtyMap },
-    };
-    let added = 0;
-    for (const line of intent.skus) {
-      const sku = String(line.sku || "").trim().toUpperCase();
-      const qty = String(line.qty || "1").replace(/[^0-9]/g, "") || "1";
-      if (!sku) continue;
-      const item = getCatalogItemBySku(sku);
-      if (!item || !isOrderableItem(item) || isProductOrderingBlocked(item)) continue;
-      const next = Number(maps.catalog[sku] || 0) + (Number(qty) || 1);
-      maps = applyQtySet(maps, sku, String(next), "normal");
-      syncDeviceContribution(sku, next);
-      added += 1;
+  const hideSuggestedStrip = () => {
+    setSuggestedStripHidden(true);
+    try {
+      localStorage.setItem("order_hide_suggested_strip", "1");
+    } catch {
+      /* ignore */
     }
+  };
 
-    if (added > 0) {
-      applyQtyState(maps);
-      showTransientToast(
-        lang === "zh"
-          ? `已加入 ${added} 个浏览商品到购物车`
-          : lang === "ko"
-            ? `둘러본 상품 ${added}개를 카트에 담았습니다`
-            : lang === "vi"
-              ? `Đã thêm ${added} SP xem trước vào giỏ`
-              : `Added ${added} browsed item${added === 1 ? "" : "s"} to cart`
-      );
-      setShowCart(true);
+  const showSuggestedStrip = () => {
+    setSuggestedStripHidden(false);
+    try {
+      localStorage.removeItem("order_hide_suggested_strip");
+    } catch {
+      /* ignore */
     }
-    // Run once after draft load; qty maps captured from that render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, accountNo, autoLoaded]);
+  };
 
   const getPromoRemainingForSku = (cleanSku: string) => {
     const promo = promotionItems.find((p) => p.sku?.toUpperCase() === cleanSku);
@@ -2509,11 +2480,18 @@ export default function OrderPage() {
         ) : mode === "promotion" ? (
           <section className="order-shop-card order-shop-card--promo">
             {recommendedStripItems.length > 0 ? (
-              <RecommendedStrip
-                lang={lang}
-                items={recommendedStripItems}
-                onAddOne={(sku) => adjustCatalogQty(sku, 1)}
-              />
+              suggestedStripHidden ? (
+                <button type="button" className="order-recommended-strip-show" onClick={showSuggestedStrip}>
+                  {t.showSuggested}
+                </button>
+              ) : (
+                <RecommendedStrip
+                  lang={lang}
+                  items={recommendedStripItems}
+                  onAddOne={(sku) => adjustCatalogQty(sku, 1)}
+                  onHide={hideSuggestedStrip}
+                />
+              )
             ) : null}
             {promotionsLoading ? (
               <div style={{ ...emptyStyle, border: "1px solid #5eead4", background: "#f0fdfa", color: "#0f766e" }}>{t.loadingPromotions}</div>
@@ -2637,11 +2615,18 @@ export default function OrderPage() {
         ) : (
           <section className="order-shop-card order-shop-card--listing">
             {recommendedStripItems.length > 0 ? (
-              <RecommendedStrip
-                lang={lang}
-                items={recommendedStripItems}
-                onAddOne={(sku) => adjustCatalogQty(sku, 1)}
-              />
+              suggestedStripHidden ? (
+                <button type="button" className="order-recommended-strip-show" onClick={showSuggestedStrip}>
+                  {t.showSuggested}
+                </button>
+              ) : (
+                <RecommendedStrip
+                  lang={lang}
+                  items={recommendedStripItems}
+                  onAddOne={(sku) => adjustCatalogQty(sku, 1)}
+                  onHide={hideSuggestedStrip}
+                />
+              )
             ) : null}
 
             {orderableCatalogItems.length === 0 ? (

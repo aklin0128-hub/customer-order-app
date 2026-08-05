@@ -216,36 +216,6 @@
   transform: scale(0.99);
 }
 
-.showcase-card-order-btn {
-  margin-top: 8px;
-  width: 100%;
-  border: 1px solid #0f766e;
-  background: #0f766e;
-  color: #fff;
-  border-radius: 10px;
-  padding: 9px 10px;
-  font-size: 12px;
-  font-weight: 900;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.showcase-card-order-btn:hover:not(:disabled) {
-  background: #0d9488;
-  border-color: #0d9488;
-}
-
-.showcase-card-order-btn:active:not(:disabled) {
-  transform: scale(0.99);
-}
-
-.showcase-card-order-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  background: #9ca3af;
-  border-color: #9ca3af;
-}
-
 .showcase-modal-backdrop {
   position: fixed;
   inset: 0;

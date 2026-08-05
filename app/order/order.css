@@ -839,11 +839,35 @@
   padding-top: 4px;
 }
 
+.order-recommended-strip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
 .order-recommended-strip-title {
   font-size: 13px;
   font-weight: 900;
   color: #1d4ed8;
-  margin-bottom: 8px;
+}
+
+.order-recommended-strip-hide,
+.order-recommended-strip-show {
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.order-recommended-strip-show {
+  margin: 0 0 10px;
 }
 
 .order-recommended-strip-scroll {
