@@ -25,6 +25,8 @@ import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog } from "./catalogState";
 import { isProductOrderingBlocked } from "@/lib/productAvailability";
 import { compareCatalogByNewestImport, compareCatalogForDisplay } from "@/lib/catalogNewItems";
+import { clearCustomerSession, readCustomerSession, updateCustomerOrderEmail } from "@/lib/customerSession";
+import { hasSavedAdminPassword } from "@/app/admin/_components/useAdminAuth";
 import {
   formatBrandLabel,
   formatClearanceDetails,
@@ -39,6 +41,7 @@ import {
   getDisplayStatus,
   getStatusBadgeStyle,
   formatOrderNotAvailableMessage,
+  getUnavailableSubmitLines,
   findCatalogItemByScanCode,
   catalogSearchQueryFromScan,
   isOrderSearchQtyAdjustKey,
@@ -46,6 +49,7 @@ import {
   resolveQuickSearchTargetItem,
   isNewItem,
   isOrderableItem,
+  isCustomerVisibleCatalogItem,
   scoreCatalogSearchQuery,
 } from "./catalogUtils";
 import { DEFAULT_ORDER_EMAIL, isValidOrderEmail, resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
@@ -56,8 +60,10 @@ import {
 import {
   buildCatalogQtyMapFromDraft,
   cartItemsFromQtyMap,
-  cloudDraftHasMoreItems,
   countDraftItems,
+  deviceQtyForSharedTotal,
+  ensureDeviceCarts,
+  getOrCreateOrderDeviceId,
   mergeOrderDrafts,
   normalizeOrderDraft,
   type OrderDraftPayload,
@@ -126,6 +132,11 @@ export default function OrderPage() {
     cart: [] as CartItem[],
     catalogQtyMap: {} as Record<string, string>,
   });
+  const deviceIdRef = useRef("");
+  const cloudDraftRef = useRef<OrderDraftPayload | null>(null);
+  const deviceQtyMapRef = useRef<Record<string, string>>({});
+  const cartDirtyRef = useRef(false);
+  const lastCloudUpdatedAtRef = useRef("");
 
   const [lang, setLang] = useState<Lang>("en");
   const [mode, setMode] = useState<OrderMode>("promotion");
@@ -153,7 +164,7 @@ export default function OrderPage() {
   const [lastSubmittedItems, setLastSubmittedItems] = useState<CartItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [autoLoaded, setAutoLoaded] = useState(false);
-  const [showAvailableOnly, setShowAvailableOnly] = useState(false);
+  const [showAvailableOnly, setShowAvailableOnly] = useState(true);
   const [showCustomerInfo, setShowCustomerInfo] = useState(false);
   const [invoicePricingEnabled, setInvoicePricingEnabled] = useState(false);
   const [invoicePriceEntries, setInvoicePriceEntries] = useState<
@@ -236,7 +247,7 @@ export default function OrderPage() {
 
   useEffect(() => {
     const syncAdminEdit = () => {
-      setShowAdminEditLinks(Boolean(sessionStorage.getItem("admin_password")));
+      setShowAdminEditLinks(hasSavedAdminPassword());
     };
     syncAdminEdit();
 
@@ -373,6 +384,12 @@ export default function OrderPage() {
   }, [autoLoaded]);
 
   useEffect(() => {
+    if (!deviceIdRef.current) {
+      deviceIdRef.current = getOrCreateOrderDeviceId();
+    }
+  }, []);
+
+  useEffect(() => {
     draftSnapshotRef.current = {
       accountNo,
       storeName,
@@ -391,19 +408,16 @@ export default function OrderPage() {
   }, [accountNo]);
 
   useEffect(() => {
-    const loggedIn = sessionStorage.getItem("customer_logged_in");
-    const savedAccount = sessionStorage.getItem("customer_account_no");
-    const savedStore = sessionStorage.getItem("customer_store_name");
+    const session = readCustomerSession();
 
-    if (loggedIn !== "true" || !savedAccount) {
+    if (!session?.accountNo) {
       router.replace("/");
       return;
     }
 
-    setAccountNo(savedAccount);
-    setStoreName(savedStore || "");
-    const savedOrderEmail = sessionStorage.getItem("customer_order_email");
-    setOrderEmail(resolveCustomerOrderEmail(savedOrderEmail || ""));
+    setAccountNo(session.accountNo);
+    setStoreName(session.storeName || "");
+    setOrderEmail(resolveCustomerOrderEmail(session.orderEmail || ""));
     setReady(true);
   }, [router]);
 
@@ -424,18 +438,31 @@ export default function OrderPage() {
   useEffect(() => {
     if (!ready || !accountNo || autoLoaded) return;
 
-    const applyDraft = (draft: OrderDraftPayload) => {
-      setPhone(draft.phone || "");
-      setNote(draft.note || "");
-      const map = buildCatalogQtyMapFromDraft(draft);
+    const applySharedDraft = (draft: OrderDraftPayload, opts?: { keepClearance?: boolean }) => {
+      const normalized = ensureDeviceCarts(draft) || normalizeOrderDraft(accountNo, draft);
+      const deviceId = deviceIdRef.current || getOrCreateOrderDeviceId();
+      deviceIdRef.current = deviceId;
+      cloudDraftRef.current = normalized;
+      deviceQtyMapRef.current = {
+        ...(normalized.deviceCarts?.[deviceId]?.catalogQtyMap || {}),
+      };
+      lastCloudUpdatedAtRef.current = String(normalized.updatedAt || "");
+      cartDirtyRef.current = false;
+      setPhone(normalized.phone || "");
+      setNote(normalized.note || "");
+      const map = buildCatalogQtyMapFromDraft(normalized);
       setCatalogQtyMap(map);
-      setClearanceQtyMap({});
+      if (!opts?.keepClearance) setClearanceQtyMap({});
       setCart(cartItemsFromQtyMap(map));
+      localStorage.setItem(`draft_${accountNo}`, JSON.stringify(normalized));
     };
 
     const loadDrafts = async () => {
       let localParsed: OrderDraftPayload | null = null;
       let cloudParsed: OrderDraftPayload | null = null;
+      if (!deviceIdRef.current) {
+        deviceIdRef.current = getOrCreateOrderDeviceId();
+      }
 
       const localDraft = localStorage.getItem(`draft_${accountNo}`);
       if (localDraft) {
@@ -454,8 +481,7 @@ export default function OrderPage() {
 
       const merged = mergeOrderDrafts(localParsed, cloudParsed);
       if (merged) {
-        applyDraft(merged);
-        localStorage.setItem(`draft_${accountNo}`, JSON.stringify(merged));
+        applySharedDraft(merged);
         if (countDraftItems(merged) > 0) {
           showTransientToast(t.loadedDraft);
         }
@@ -464,7 +490,12 @@ export default function OrderPage() {
           await fetch("/api/save-draft", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...merged, allowClear: false }),
+            body: JSON.stringify({
+              ...merged,
+              deviceId: deviceIdRef.current,
+              deviceQtyMap: deviceQtyMapRef.current,
+              allowClear: countDraftItems(merged) === 0,
+            }),
           });
         } catch {}
       }
@@ -479,7 +510,7 @@ export default function OrderPage() {
           if (profileData?.orderEmail) {
             const resolved = resolveCustomerOrderEmail(profileData.orderEmail);
             setOrderEmail(resolved);
-            sessionStorage.setItem("customer_order_email", resolved);
+            updateCustomerOrderEmail(resolved);
           }
           if (profileData?.invoicePricing) {
             setInvoicePricingEnabled(true);
@@ -516,6 +547,8 @@ export default function OrderPage() {
   useEffect(() => {
     if (!ready || !accountNo || !autoLoaded) return;
 
+    const deviceId = deviceIdRef.current || getOrCreateOrderDeviceId();
+    deviceIdRef.current = deviceId;
     const draft = normalizeOrderDraft(accountNo, {
       storeName,
       phone,
@@ -523,35 +556,29 @@ export default function OrderPage() {
       note,
       cart,
       catalogQtyMap,
+      deviceCarts: {
+        ...(cloudDraftRef.current?.deviceCarts || {}),
+        [deviceId]: {
+          catalogQtyMap: deviceQtyMapRef.current,
+          updatedAt: new Date().toISOString(),
+        },
+      },
+      removedSkus: cloudDraftRef.current?.removedSkus,
       updatedAt: new Date().toISOString(),
     });
     localStorage.setItem(`draft_${accountNo}`, JSON.stringify(draft));
 
     const timer = setTimeout(async () => {
-      const applyServerDraftIfRicher = (serverDraft: OrderDraftPayload) => {
-        const current = normalizeOrderDraft(accountNo, {
-          storeName,
-          phone,
-          orderEmail,
-          note,
-          cart,
-          catalogQtyMap,
-        });
-        if (!cloudDraftHasMoreItems(current, serverDraft)) return;
-
-        setPhone(serverDraft.phone || "");
-        setNote(serverDraft.note || "");
-        const map = buildCatalogQtyMapFromDraft(serverDraft);
-        setCatalogQtyMap(map);
-        setCart(cartItemsFromQtyMap(map));
-        localStorage.setItem(`draft_${accountNo}`, JSON.stringify(serverDraft));
+      const allowClear = countDraftItems(draft) === 0;
+      const saveBody = {
+        ...draft,
+        deviceId,
+        deviceQtyMap: deviceQtyMapRef.current,
+        removedSkus: cloudDraftRef.current?.removedSkus,
+        allowClear,
       };
 
       try {
-        const saveBody = {
-          ...draft,
-          allowClear: false,
-        };
         const res = await fetch("/api/save-draft", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -560,21 +587,35 @@ export default function OrderPage() {
         if (!res.ok) throw new Error("save failed");
         const data = await res.json();
         if (data?.draft) {
-          applyServerDraftIfRicher(normalizeOrderDraft(accountNo, data.draft));
+          const normalized = ensureDeviceCarts(data.draft) || normalizeOrderDraft(accountNo, data.draft);
+          cloudDraftRef.current = normalized;
+          deviceQtyMapRef.current = {
+            ...(normalized.deviceCarts?.[deviceId]?.catalogQtyMap || {}),
+          };
+          lastCloudUpdatedAtRef.current = String(normalized.updatedAt || "");
+          cartDirtyRef.current = false;
+          localStorage.setItem(`draft_${accountNo}`, JSON.stringify(normalized));
+          const shared = buildCatalogQtyMapFromDraft(normalized);
+          setCatalogQtyMap((prev) => {
+            const same =
+              Object.keys(prev).length === Object.keys(shared).length &&
+              Object.entries(shared).every(([sku, qty]) => prev[sku] === qty);
+            return same ? prev : shared;
+          });
+          setCart((prev) => {
+            const clearance = Object.fromEntries(
+              prev.filter((item) => item.nhItems).map((item) => [item.sku.toUpperCase(), item.qty])
+            );
+            return buildCartDisplayItems({ catalog: shared, clearance });
+          });
         }
       } catch {
         try {
-          const res = await fetch("/api/save-draft", {
+          await fetch("/api/save-draft", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...draft, allowClear: false }),
+            body: JSON.stringify(saveBody),
           });
-          if (res.ok) {
-            const data = await res.json();
-            if (data?.draft) {
-              applyServerDraftIfRicher(normalizeOrderDraft(accountNo, data.draft));
-            }
-          }
         } catch {
           /* localStorage backup already written above */
         }
@@ -603,9 +644,18 @@ export default function OrderPage() {
 
       const snapshot = draftSnapshotRef.current;
       if (!snapshot.accountNo) return;
+      const deviceId = deviceIdRef.current || getOrCreateOrderDeviceId();
 
       const payload = normalizeOrderDraft(snapshot.accountNo, {
         ...snapshot,
+        deviceCarts: {
+          ...(cloudDraftRef.current?.deviceCarts || {}),
+          [deviceId]: {
+            catalogQtyMap: deviceQtyMapRef.current,
+            updatedAt: new Date().toISOString(),
+          },
+        },
+        removedSkus: cloudDraftRef.current?.removedSkus,
         updatedAt: new Date().toISOString(),
       });
 
@@ -614,7 +664,10 @@ export default function OrderPage() {
       if (typeof navigator.sendBeacon === "function") {
         const body = JSON.stringify({
           ...payload,
-          allowClear: false,
+          deviceId,
+          deviceQtyMap: deviceQtyMapRef.current,
+          removedSkus: cloudDraftRef.current?.removedSkus,
+          allowClear: countDraftItems(payload) === 0,
         });
         navigator.sendBeacon("/api/save-draft", new Blob([body], { type: "application/json" }));
       }
@@ -633,6 +686,59 @@ export default function OrderPage() {
     };
   }, [ready, accountNo]);
 
+  // Pull the shared cart so the other person's adds show up without refresh.
+  useEffect(() => {
+    if (!ready || !accountNo || !autoLoaded) return;
+
+    const pullSharedCart = async () => {
+      if (cartDirtyRef.current) return;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      try {
+        const res = await fetch(`/api/load-draft?accountNo=${encodeURIComponent(accountNo)}`, {
+          method: "GET",
+          cache: "no-store",
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.draft) return;
+        const normalized = ensureDeviceCarts(data.draft) || normalizeOrderDraft(accountNo, data.draft);
+        const updatedAt = String(normalized.updatedAt || "");
+        if (!updatedAt || updatedAt === lastCloudUpdatedAtRef.current) return;
+        if (cartDirtyRef.current) return;
+
+        const deviceId = deviceIdRef.current || getOrCreateOrderDeviceId();
+        cloudDraftRef.current = normalized;
+        deviceQtyMapRef.current = {
+          ...(normalized.deviceCarts?.[deviceId]?.catalogQtyMap || {}),
+        };
+        lastCloudUpdatedAtRef.current = updatedAt;
+        const shared = buildCatalogQtyMapFromDraft(normalized);
+        setCatalogQtyMap(shared);
+        setCart((prev) => {
+          // Keep clearance lines; replace catalog portion via buildCartDisplayItems.
+          const clearance = Object.fromEntries(
+            prev
+              .filter((item) => item.nhItems)
+              .map((item) => [item.sku.toUpperCase(), item.qty])
+          );
+          return buildCartDisplayItems({ catalog: shared, clearance });
+        });
+        localStorage.setItem(`draft_${accountNo}`, JSON.stringify(normalized));
+      } catch {
+        /* ignore poll errors */
+      }
+    };
+
+    const timer = setInterval(pullSharedCart, 4000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") pullSharedCart();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [ready, accountNo, autoLoaded]);
+
   const normalizedSkuInput = useMemo(() => skuInput.trim().toUpperCase(), [skuInput]);
 
   const matchedItems = useMemo(() => {
@@ -642,6 +748,7 @@ export default function OrderPage() {
     return catalog
       .map((item) => ({ item, score: scoreCatalogSearchQuery(item, q) }))
       .filter((x) => x.score >= 0)
+      .filter((x) => isCustomerVisibleCatalogItem(x.item))
       .filter((x) => (showAvailableOnly ? passesAvailableFilter(x.item) : true))
       .sort((a, b) => {
         const aNormal = isOrderableItem(a.item);
@@ -655,8 +762,9 @@ export default function OrderPage() {
   }, [normalizedSkuInput, showAvailableOnly, catalogVersion]);
 
   const catalogBrowseBase = useMemo(() => {
-    if (!showAvailableOnly) return catalog;
-    return catalog.filter((item) => passesAvailableFilter(item));
+    const visible = catalog.filter((item) => isCustomerVisibleCatalogItem(item));
+    if (!showAvailableOnly) return visible;
+    return visible.filter((item) => passesAvailableFilter(item));
   }, [catalogVersion, showAvailableOnly, passesAvailableFilter]);
 
   const brandSplit = useMemo(
@@ -832,7 +940,11 @@ export default function OrderPage() {
       return true;
     }
     if (isProductOrderingBlocked(catalogItem)) {
-      alert(`${cleanSku}: ${t.orderNotAvailable}`);
+      alert(
+        t.statusWarning
+          .replace("{sku}", cleanSku)
+          .replace("{status}", String(catalogItem.status || "UNAVAILABLE").trim().toUpperCase() || "UNAVAILABLE")
+      );
       return true;
     }
     return false;
@@ -844,12 +956,27 @@ export default function OrderPage() {
     setCart(buildCartDisplayItems(next));
   };
 
+  const syncDeviceContribution = (sku: string, desiredTotal: number) => {
+    const deviceId = deviceIdRef.current || getOrCreateOrderDeviceId();
+    deviceIdRef.current = deviceId;
+    const myQty = deviceQtyForSharedTotal(cloudDraftRef.current, deviceId, sku, desiredTotal);
+    const nextDevice = { ...deviceQtyMapRef.current };
+    if (myQty > 0) nextDevice[sku] = String(myQty);
+    else delete nextDevice[sku];
+    deviceQtyMapRef.current = nextDevice;
+    cartDirtyRef.current = true;
+  };
+
   const setQtyForSku = (sku: string, value: string, source: "clearance" | "normal" = "normal") => {
     const cleanSku = sku.trim().toUpperCase();
     const cleanQty = String(value || "").replace(/[^0-9]/g, "");
 
     if (cleanQty && Number(cleanQty) > 0 && blockAddForSku(cleanSku)) {
       return;
+    }
+
+    if (source === "normal") {
+      syncDeviceContribution(cleanSku, Number(cleanQty) || 0);
     }
 
     applyQtyState(applyQtySet(qtyMaps, cleanSku, cleanQty, source));
@@ -888,9 +1015,7 @@ export default function OrderPage() {
       const catalogItem = getCatalogItemBySku(cleanSku);
 
       if (qty >= 100) warnings.push(t.highQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(qty)));
-      if (catalogItem && !isOrderableItem(catalogItem)) {
-        warnings.push(formatOrderNotAvailableMessage(cleanSku, catalogItem.status, t));
-      }
+      // Unavailable / discontinued SKUs are shown in a dedicated review banner.
 
       if (item.nhItems) {
         const clearanceRemaining = getClearanceRemainingForSku(cleanSku);
@@ -1047,17 +1172,17 @@ export default function OrderPage() {
 
     if (!appliedDelta) return;
 
+    if (source === "normal") {
+      syncDeviceContribution(cleanSku, next);
+    }
+
     applyQtyState(applyQtyDelta(qtyMaps, cleanSku, appliedDelta, source));
   };
 
   const removeSkuFromOrder = (sku: string, nhItems?: boolean) => {
-    if (nhItems === true) setQtyForSku(sku, "", "clearance");
-    else if (nhItems === false) setQtyForSku(sku, "", "normal");
-    else {
-      let next = applyQtySet(qtyMaps, sku, "", "normal");
-      next = applyQtySet(next, sku, "", "clearance");
-      applyQtyState(next);
-    }
+    // Catalog lines omit nhItems (undefined). Only clear the matching pool so
+    // removing a catalog row does not wipe an independent clearance line.
+    setQtyForSku(sku, "", nhItems === true ? "clearance" : "normal");
   };
 
   const adjustCartLineQty = (sku: string, delta: number, nhItems?: boolean) => {
@@ -1070,18 +1195,44 @@ export default function OrderPage() {
   };
 
   const addAllClearanceOneCase = () => {
+    let next = qtyMaps;
     for (const item of clearanceItems) {
       if (item.remainingQty === 0) continue;
       const sku = item.sku?.toUpperCase();
       if (!sku) continue;
       const catalogItem = getCatalogItemBySku(sku) || item;
       if (!isOrderableItem(catalogItem)) continue;
-      adjustQtyForSku(sku, 1, "clearance");
+      if (getClearanceQty(next, sku) <= 0 && blockAddForSku(sku)) continue;
+
+      const current = getClearanceQty(next, sku);
+      let appliedDelta = 1;
+      const clearanceRemaining = getClearanceRemainingForSku(sku);
+      if (clearanceRemaining !== null && current + 1 > clearanceRemaining) {
+        appliedDelta = clearanceRemaining - current;
+        if (appliedDelta <= 0) continue;
+      }
+      next = applyQtyDelta(next, sku, appliedDelta, "clearance");
     }
+    applyQtyState(next);
   };
 
   const addAllMissingClearanceUpsell = () => {
-    for (const line of clearanceUpsellLines) adjustQtyForSku(line.sku, 1, "clearance");
+    let next = qtyMaps;
+    for (const line of clearanceUpsellLines) {
+      const sku = String(line.sku || "").trim().toUpperCase();
+      if (!sku) continue;
+      if (getClearanceQty(next, sku) <= 0 && blockAddForSku(sku)) continue;
+
+      const current = getClearanceQty(next, sku);
+      let appliedDelta = 1;
+      const clearanceRemaining = getClearanceRemainingForSku(sku);
+      if (clearanceRemaining !== null && current + 1 > clearanceRemaining) {
+        appliedDelta = clearanceRemaining - current;
+        if (appliedDelta <= 0) continue;
+      }
+      next = applyQtyDelta(next, sku, appliedDelta, "clearance");
+    }
+    applyQtyState(next);
   };
 
   useEffect(() => {
@@ -1277,12 +1428,17 @@ export default function OrderPage() {
     const orderable = valid.filter((item) => {
       const sku = item.sku.toUpperCase();
       const catalogItem = getCatalogItemBySku(sku);
-      if (!catalogItem || !isOrderableItem(catalogItem)) {
-        alert(formatOrderNotAvailableMessage(sku, catalogItem?.status, t));
-        return false;
-      }
-      return true;
+      return Boolean(catalogItem && isOrderableItem(catalogItem));
     });
+    const skipped = valid.length - orderable.length;
+    if (skipped > 0) {
+      const unavailable = getUnavailableSubmitLines(valid);
+      const detail = unavailable
+        .slice(0, 8)
+        .map((item) => formatOrderNotAvailableMessage(item.sku, item.status, t))
+        .join("\n");
+      alert(`${t.unavailableInCartTitle}\n${detail}${unavailable.length > 8 ? "\n…" : ""}`);
+    }
 
     if (orderable.length === 0) return;
 
@@ -1320,6 +1476,10 @@ export default function OrderPage() {
     setSkuInput("");
     setQtyInput("");
     setSelectedItem(null);
+    deviceQtyMapRef.current = {};
+    cloudDraftRef.current = null;
+    cartDirtyRef.current = false;
+    lastCloudUpdatedAtRef.current = "";
     showTransientToast(t.cleared);
     localStorage.removeItem(`draft_${accountNo}`);
 
@@ -1335,6 +1495,8 @@ export default function OrderPage() {
           note: note.trim(),
           cart: [],
           catalogQtyMap: {},
+          deviceId: deviceIdRef.current || getOrCreateOrderDeviceId(),
+          deviceQtyMap: {},
           allowClear: true,
         }),
       });
@@ -1353,6 +1515,21 @@ export default function OrderPage() {
 
   const getCurrentSubmitItems = () => {
     return expandOrderSubmitLines(qtyMaps);
+  };
+
+  const unavailableSubmitItems = useMemo(
+    () => getUnavailableSubmitLines(expandOrderSubmitLines(qtyMaps)),
+    // catalogVersion refreshes after catalog reload / submit so status changes are picked up
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [qtyMaps, catalogVersion]
+  );
+
+  const removeUnavailableFromOrder = () => {
+    const unavailable = getUnavailableSubmitLines(getCurrentSubmitItems());
+    for (const item of unavailable) {
+      removeSkuFromOrder(item.sku, item.nhItems);
+    }
+    return unavailable;
   };
 
   const downloadCsv = () => {
@@ -1428,10 +1605,7 @@ export default function OrderPage() {
   };
 
   const logout = () => {
-    sessionStorage.removeItem("customer_logged_in");
-    sessionStorage.removeItem("customer_account_no");
-    sessionStorage.removeItem("customer_store_name");
-    sessionStorage.removeItem("customer_order_email");
+    clearCustomerSession();
     router.replace("/");
   };
 
@@ -1443,24 +1617,28 @@ export default function OrderPage() {
       return;
     }
 
-    for (const item of items) {
-      const catalogItem = getCatalogItemBySku(item.sku);
-      if (catalogItem && !isOrderableItem(catalogItem)) {
-        alert(formatOrderNotAvailableMessage(item.sku, catalogItem.status, t));
-        return;
-      }
-    }
-
+    // Open review even if some SKUs are discontinued — the modal lists them and
+    // offers remove / remove-and-submit so the customer can finish the order.
     setShowReview(true);
   };
 
-  const submitOrder = async () => {
+  const submitOrder = async (itemsOverride?: CartItem[]) => {
     if (submitLockRef.current || submitting) return;
 
-    const items = getCurrentSubmitItems();
+    const items = itemsOverride ?? getCurrentSubmitItems();
 
     if (items.length === 0) {
       alert(t.addAtLeast);
+      return;
+    }
+
+    const unavailable = getUnavailableSubmitLines(items);
+    if (unavailable.length > 0) {
+      const detail = unavailable
+        .map((item) => formatOrderNotAvailableMessage(item.sku, item.status, t))
+        .join("\n");
+      setSubmitMsg(`${t.unavailableInCartTitle}\n${detail}`);
+      setShowReview(true);
       return;
     }
 
@@ -1493,7 +1671,17 @@ export default function OrderPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || t.failedSubmit);
+      if (!res.ok) {
+        if (Array.isArray(data?.unavailableItems) && data.unavailableItems.length > 0) {
+          const detail = data.unavailableItems
+            .map((item: { sku?: string; status?: string }) =>
+              formatOrderNotAvailableMessage(String(item?.sku || ""), item?.status, t)
+            )
+            .join("\n");
+          throw new Error(`${t.unavailableInCartTitle}\n${detail}`);
+        }
+        throw new Error(data?.error || t.failedSubmit);
+      }
 
       setSubmitMsg(`${t.orderSuccess} ${t.ref}: ${ref}`);
       setLastSubmittedRef(ref);
@@ -1526,6 +1714,35 @@ export default function OrderPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const removeUnavailableAndSubmit = () => {
+    const current = getCurrentSubmitItems();
+    const unavailable = getUnavailableSubmitLines(current);
+    if (unavailable.length === 0) {
+      void submitOrder(current);
+      return;
+    }
+
+    const unavailableKey = new Set(
+      unavailable.map((item) => `${item.sku.toUpperCase()}::${item.nhItems ? "nh" : "cat"}`)
+    );
+    const remaining = current.filter(
+      (item) => !unavailableKey.has(`${item.sku.toUpperCase()}::${item.nhItems ? "nh" : "cat"}`)
+    );
+
+    for (const item of unavailable) {
+      removeSkuFromOrder(item.sku, item.nhItems);
+    }
+
+    showTransientToast(t.unavailableRemoved.replace("{count}", String(unavailable.length)));
+
+    if (remaining.length === 0) {
+      setSubmitMsg(t.addAtLeast);
+      return;
+    }
+
+    void submitOrder(remaining);
   };
 
   const renderProductMeta = (item: CatalogItem) => (
@@ -2360,29 +2577,48 @@ export default function OrderPage() {
               </details>
             ) : null}
 
-            <CatalogVirtualGrid
-              gridKey="catalog"
-              items={orderableCatalogItems}
-              catalogQtyMap={catalogQtyMap}
-              invoicePriceLabelForSku={invoicePriceLabelForSku}
-              inCartLabel={t.inCart}
-              palletLabel={t.pallet}
-              justAddedLabel={t.justAdded}
-              promoBadgeLabel={t.promoBadge}
-              weeklyPickSkus={promoSkuSet}
-              showNewProductBadge
-              newProductBadgeChecker={isNewItem}
-              editLabel={t.editProduct}
-              showAdminEdit={showAdminEditLinks}
-              canOrderItem={isOrderableItem}
-              orderBlockedMessage={(item) => formatOrderNotAvailableMessage(item.sku || "", item.status, t)}
-              onAdjust={adjustCatalogQty}
-              onUpdateQty={updateCatalogQty}
-            />
-
             {orderableCatalogItems.length === 0 ? (
               <div style={{ ...emptyStyle, marginTop: 10 }}>{catalogShowSelectedOnly ? t.noItems : t.noMatches}</div>
-            ) : null}
+            ) : (
+              <div className="order-catalog-css-grid">
+                {orderableCatalogItems.map((item) => {
+                  const sku = item.sku?.toUpperCase() || "";
+                  const qty = catalogQtyMap[sku] || "";
+                  const isWeekly = promoSkuSet.has(sku);
+                  const showItemNewBadge = isNewItem(item);
+                  const promoNote = showItemNewBadge
+                    ? undefined
+                    : isWeekly
+                      ? t.promoBadge
+                      : undefined;
+                  const canOrder = isOrderableItem(item) && !isProductOrderingBlocked(item);
+                  return (
+                    <CatalogQtyCard
+                      key={item.sku}
+                      item={item}
+                      qty={qty}
+                      promoNote={promoNote}
+                      inCartLabel={t.inCart}
+                      promoBadgeLabel={t.promoBadge}
+                      highlight={Boolean(isWeekly)}
+                      editLabel={t.editProduct}
+                      palletLabel={t.pallet}
+                      justAddedLabel={t.justAdded}
+                      lang={lang}
+                      showAdminEdit={showAdminEditLinks}
+                      showNewProductBadge={showItemNewBadge}
+                      disabled={!canOrder}
+                      unavailableNote={
+                        !canOrder ? formatOrderNotAvailableMessage(item.sku || "", item.status, t) : undefined
+                      }
+                      invoicePrice={invoicePriceLabelForSku(sku)}
+                      onAdjust={adjustCatalogQty}
+                      onUpdateQty={updateCatalogQty}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </section>
         )}
 
@@ -2409,6 +2645,13 @@ export default function OrderPage() {
         onAdjustQty={adjustCartLineQty}
         onQtyInput={updateCartLineQty}
         onRemove={removeSkuFromOrder}
+        unavailableItems={unavailableSubmitItems}
+        onRemoveUnavailable={() => {
+          const removed = removeUnavailableFromOrder();
+          if (removed.length > 0) {
+            showTransientToast(t.unavailableRemoved.replace("{count}", String(removed.length)));
+          }
+        }}
         nudge={
           clearanceUpsellLines.length > 0 ? (
             <details className="order-cart-nudge-fold" open={cartItemCount > 0}>
@@ -2493,6 +2736,7 @@ export default function OrderPage() {
           lang={lang}
           items={cartDisplayItems}
           warnings={orderReviewWarnings}
+          unavailableItems={unavailableSubmitItems}
           clearanceUpsellLines={clearanceUpsellLines}
           onAddUpsellCase={(sku) => adjustQtyForSku(sku, 1, "clearance")}
           onAddAllClearanceUpsell={addAllMissingClearanceUpsell}
@@ -2516,6 +2760,13 @@ export default function OrderPage() {
           onAdjustQty={adjustCartLineQty}
           onQtyInput={updateCartLineQty}
           onRemove={removeSkuFromOrder}
+          onRemoveUnavailable={() => {
+            const removed = removeUnavailableFromOrder();
+            if (removed.length > 0) {
+              showTransientToast(t.unavailableRemoved.replace("{count}", String(removed.length)));
+            }
+          }}
+          onRemoveUnavailableAndSubmit={removeUnavailableAndSubmit}
           onSubmit={submitOrder}
         />
 

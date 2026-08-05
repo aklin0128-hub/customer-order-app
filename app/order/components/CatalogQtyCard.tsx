@@ -189,7 +189,34 @@ export function CatalogQtyCard({
 
   const productInfo = (
     <div className="catalog-qty-card-meta">
-      <div className="catalog-qty-card-sku">{item.sku}</div>
+      <div className="catalog-qty-card-sku-row">
+        <div className="catalog-qty-card-sku">{item.sku}</div>
+        {showAdminEdit ? (
+          <Link
+            href={`/admin/products?sku=${encodeURIComponent(item.sku)}`}
+            className="catalog-qty-card-edit"
+            prefetch={false}
+            aria-label={editLabel}
+            title={editLabel}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <svg
+              className="catalog-qty-card-edit-icon"
+              viewBox="0 0 24 24"
+              width="15"
+              height="15"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path
+                fill="currentColor"
+                d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm2.92 2.33H5v-.92l9.06-9.06.92.92L5.92 19.58zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"
+              />
+            </svg>
+          </Link>
+        ) : null}
+      </div>
       <div className="catalog-qty-card-brand">{item.brand || "-"}</div>
       <div className="catalog-qty-card-name" style={catalogNameStyle}>
         {item.name || "-"}
@@ -285,17 +312,6 @@ export function CatalogQtyCard({
         opacity: disabled ? 0.68 : 1,
       }}
     >
-      {showAdminEdit ? (
-        <Link
-          href={`/admin/products?sku=${encodeURIComponent(item.sku)}`}
-          className="catalog-qty-card-edit"
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          {editLabel}
-        </Link>
-      ) : null}
-
       {alignedPriceLayout && badgeRow ? (
         <div className="catalog-qty-card-badge-slot">{badgeRow}</div>
       ) : badgeRow ? (
@@ -304,7 +320,7 @@ export function CatalogQtyCard({
 
       <div
         className={`catalog-card-image-wrap${alignedPriceLayout ? " catalog-card-image-wrap--fixed" : ""}${stamped ? " catalog-card-image-wrap--stamped" : ""}${comingSoon && outOfStock ? " catalog-card-image-wrap--dual-stamped" : ""}`}
-        style={{ paddingTop: alignedPriceLayout ? 0 : badgeRow ? 2 : 0 }}
+        style={{ paddingTop: alignedPriceLayout ? 4 : badgeRow ? 2 : 0 }}
       >
         <ProductImage sku={item.sku} alt={item.name || item.sku} size={96} imageUrl={item.imageUrl} />
         {comingSoon ? <ComingSoonStamp lang={lang} /> : null}
