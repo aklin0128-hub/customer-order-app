@@ -5,8 +5,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import {
   catalogColumnCountForWidth,
-  catalogGridGapPx,
+  catalogColGapPx,
   catalogRowEstimatePx,
+  catalogRowGapPx,
 } from "../catalogGridLayout";
 import { catalogVirtualScrollStyle } from "../orderStyles";
 import type { CatalogItem, Lang } from "../types";
@@ -113,7 +114,8 @@ export function CatalogVirtualGrid({
     return 4;
   }, [width]);
 
-  const rowGap = useMemo(() => catalogGridGapPx(columnCount), [columnCount]);
+  const colGap = catalogColGapPx();
+  const rowGap = catalogRowGapPx();
   const rowEstimate = useMemo(() => catalogRowEstimatePx(columnCount), [columnCount]);
 
   const rowCount = Math.max(1, Math.ceil(items.length / columnCount));
@@ -122,6 +124,7 @@ export function CatalogVirtualGrid({
     count: rowCount,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowEstimate,
+    // Fixed gap between measured rows — stays even if a row remeasures short.
     gap: rowGap,
     overscan: 3,
     measureElement,
@@ -196,8 +199,10 @@ export function CatalogVirtualGrid({
                 transform: `translateY(${vr.start}px)`,
                 display: "grid",
                 gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
-                alignItems: "stretch",
-                columnGap: rowGap,
+                alignItems: "start",
+                columnGap: colGap,
+                rowGap: 0,
+                boxSizing: "border-box",
               }}
             >
               {rowItems.map((item) => {
