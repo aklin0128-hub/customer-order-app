@@ -35,7 +35,6 @@ export type AdminNav =
   | "activeCarts"
   | "inventory"
   | "priceCompare"
-  | "weeklySales"
   | "invoiceCompare"
   | "productSheet";
 
