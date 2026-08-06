@@ -1,3 +1,8 @@
+export type DeviceCartSlice = {
+  catalogQtyMap: Record<string, string>;
+  updatedAt: string;
+};
+
 export type OrderDraftPayload = {
   accountNo?: string;
   storeName?: string;
@@ -6,14 +11,52 @@ export type OrderDraftPayload = {
   orderEmail?: string;
   cart?: { sku: string; qty: string }[];
   catalogQtyMap?: Record<string, string>;
+  /** Per-browser cart contributions; display qty = sum across devices. */
+  deviceCarts?: Record<string, DeviceCartSlice>;
+  /** SKU -> removedAt. Suppresses a SKU until a newer device add. */
+  removedSkus?: Record<string, string>;
   updatedAt?: string;
 };
 
-/** Single source of truth: merge legacy `cart[]` with `catalogQtyMap` for display and submit. */
+const LEGACY_DEVICE_ID = "legacy";
+
+function cleanSku(sku: string) {
+  return String(sku || "")
+    .trim()
+    .toUpperCase();
+}
+
+function cleanQty(qty: unknown) {
+  return String(qty || "")
+    .trim()
+    .replace(/[^0-9]/g, "");
+}
+
+function positiveQtyMap(raw: Record<string, string> | null | undefined): Record<string, string> {
+  const map: Record<string, string> = {};
+  if (!raw || typeof raw !== "object") return map;
+  for (const [sku, qty] of Object.entries(raw)) {
+    const s = cleanSku(sku);
+    const q = cleanQty(qty);
+    if (s && Number(q) > 0) map[s] = q;
+  }
+  return map;
+}
+
+export function draftTimestamp(draft: { updatedAt?: string } | null | undefined) {
+  const parsed = Date.parse(String(draft?.updatedAt || ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** Single source of truth for legacy drafts: merge `cart[]` with `catalogQtyMap`. */
 export function buildCatalogQtyMapFromDraft(
   draft: OrderDraftPayload | null | undefined
 ): Record<string, string> {
   if (!draft) return {};
+
+  if (draft.deviceCarts && Object.keys(draft.deviceCarts).length > 0) {
+    return aggregateDeviceCarts(draft);
+  }
 
   const map: Record<string, string> =
     draft.catalogQtyMap && typeof draft.catalogQtyMap === "object"
@@ -21,20 +64,12 @@ export function buildCatalogQtyMapFromDraft(
       : {};
 
   for (const item of draft.cart || []) {
-    const sku = String(item?.sku || "")
-      .trim()
-      .toUpperCase();
-    const qty = String(item?.qty || "")
-      .trim()
-      .replace(/[^0-9]/g, "");
+    const sku = cleanSku(item?.sku);
+    const qty = cleanQty(item?.qty);
     if (sku && Number(qty) > 0) map[sku] = qty;
   }
 
-  for (const [sku, qty] of Object.entries(map)) {
-    if (!Number(String(qty || "").trim())) delete map[sku];
-  }
-
-  return map;
+  return positiveQtyMap(map);
 }
 
 export function cartItemsFromQtyMap(map: Record<string, string>) {
@@ -47,83 +82,314 @@ export function countDraftItems(draft: OrderDraftPayload | null | undefined) {
   return Object.keys(buildCatalogQtyMapFromDraft(draft)).length;
 }
 
-export function draftTimestamp(draft: OrderDraftPayload | null | undefined) {
-  const parsed = Date.parse(String(draft?.updatedAt || ""));
-  return Number.isFinite(parsed) ? parsed : 0;
+export function normalizeRemovedSkus(
+  raw: Record<string, string> | null | undefined
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [sku, at] of Object.entries(raw)) {
+    const s = cleanSku(sku);
+    const ts = draftTimestamp({ updatedAt: at });
+    if (s && ts > 0) out[s] = new Date(ts).toISOString();
+  }
+  return out;
 }
 
-/** Combine SKU qty maps — union all lines; same SKU uses the newer draft's qty. */
+export function normalizeDeviceCarts(
+  raw: Record<string, DeviceCartSlice> | null | undefined
+): Record<string, DeviceCartSlice> {
+  const out: Record<string, DeviceCartSlice> = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [deviceId, slice] of Object.entries(raw)) {
+    const id = String(deviceId || "").trim();
+    if (!id) continue;
+    const map = positiveQtyMap(slice?.catalogQtyMap);
+    const updatedAt =
+      slice?.updatedAt && draftTimestamp(slice) > 0
+        ? new Date(draftTimestamp(slice)).toISOString()
+        : new Date().toISOString();
+    out[id] = { catalogQtyMap: map, updatedAt };
+  }
+  return out;
+}
+
+/** Migrate a legacy flat cart into deviceCarts so old drafts keep working. */
+export function ensureDeviceCarts(draft: OrderDraftPayload | null | undefined): OrderDraftPayload | null {
+  if (!draft) return null;
+  const accountNo = String(draft.accountNo || "").trim().toUpperCase();
+  const deviceCarts = normalizeDeviceCarts(draft.deviceCarts);
+  const removedSkus = normalizeRemovedSkus(draft.removedSkus);
+
+  if (Object.keys(deviceCarts).length === 0) {
+    const legacyMap = positiveQtyMap({
+      ...(draft.catalogQtyMap || {}),
+      ...Object.fromEntries(
+        (draft.cart || []).map((item) => [cleanSku(item.sku), cleanQty(item.qty)])
+      ),
+    });
+    if (Object.keys(legacyMap).length > 0) {
+      deviceCarts[LEGACY_DEVICE_ID] = {
+        catalogQtyMap: legacyMap,
+        updatedAt: draft.updatedAt || new Date().toISOString(),
+      };
+    }
+  }
+
+  const aggregate = aggregateDeviceCarts({ deviceCarts, removedSkus });
+  return normalizeOrderDraft(accountNo, {
+    ...draft,
+    deviceCarts,
+    removedSkus,
+    catalogQtyMap: aggregate,
+    cart: cartItemsFromQtyMap(aggregate),
+  });
+}
+
+/**
+ * Sum qty across device slices.
+ * Tombstoned SKUs stay hidden unless a device updated after the removal.
+ */
+export function aggregateDeviceCarts(
+  draft: Pick<OrderDraftPayload, "deviceCarts" | "removedSkus"> | null | undefined
+): Record<string, string> {
+  const sums: Record<string, number> = {};
+  const removed = normalizeRemovedSkus(draft?.removedSkus);
+  const deviceCarts = normalizeDeviceCarts(draft?.deviceCarts);
+
+  for (const slice of Object.values(deviceCarts)) {
+    const sliceTime = draftTimestamp(slice);
+    for (const [sku, qty] of Object.entries(slice.catalogQtyMap)) {
+      const removedAt = removed[sku] ? draftTimestamp({ updatedAt: removed[sku] }) : 0;
+      if (removedAt > 0 && sliceTime <= removedAt) continue;
+      sums[sku] = (sums[sku] || 0) + Number(qty);
+    }
+  }
+
+  const out: Record<string, string> = {};
+  for (const [sku, qty] of Object.entries(sums)) {
+    if (qty > 0) out[sku] = String(qty);
+  }
+  return out;
+}
+
+/** Other devices' combined qty for one SKU (for editing the shared total). */
+export function otherDevicesQty(
+  draft: OrderDraftPayload | null | undefined,
+  deviceId: string,
+  sku: string
+): number {
+  const target = cleanSku(sku);
+  const removed = normalizeRemovedSkus(draft?.removedSkus);
+  const removedAt = removed[target] ? draftTimestamp({ updatedAt: removed[target] }) : 0;
+  let total = 0;
+  for (const [id, slice] of Object.entries(normalizeDeviceCarts(draft?.deviceCarts))) {
+    if (id === deviceId) continue;
+    const sliceTime = draftTimestamp(slice);
+    if (removedAt > 0 && sliceTime <= removedAt) continue;
+    total += Number(slice.catalogQtyMap[target] || 0);
+  }
+  return total;
+}
+
+/**
+ * Convert a desired shared total into this device's contribution.
+ * Example: others=1, desiredTotal=2 → this device stores 1 (display 2).
+ */
+export function deviceQtyForSharedTotal(
+  draft: OrderDraftPayload | null | undefined,
+  deviceId: string,
+  sku: string,
+  desiredTotal: number
+): number {
+  const others = otherDevicesQty(draft, deviceId, sku);
+  return Math.max(0, Math.floor(desiredTotal) - others);
+}
+
+/**
+ * Combine SKU maps for tests / simple LWW helpers.
+ * Collaborative carts should use deviceCarts + aggregateDeviceCarts instead.
+ */
 export function mergeCatalogQtyMaps(
   localMap: Record<string, string>,
   cloudMap: Record<string, string>,
   localTime: number,
   cloudTime: number
 ): Record<string, string> {
-  const merged: Record<string, string> = {};
-  const skus = new Set([...Object.keys(localMap), ...Object.keys(cloudMap)]);
-
-  for (const sku of skus) {
-    const localQty = String(localMap[sku] || "").trim();
-    const cloudQty = String(cloudMap[sku] || "").trim();
-    const localHas = Number(localQty) > 0;
-    const cloudHas = Number(cloudQty) > 0;
-
-    if (localHas && cloudHas) {
-      merged[sku] = localTime >= cloudTime ? localQty : cloudQty;
-    } else if (localHas) {
-      merged[sku] = localQty;
-    } else if (cloudHas) {
-      merged[sku] = cloudQty;
-    }
-  }
-
-  return merged;
+  return localTime >= cloudTime ? { ...localMap } : { ...cloudMap };
 }
 
-/** Merge local + cloud drafts — keep all SKUs from both sides (cross-device carts combine). */
+function mergeRemovedSkus(
+  a: Record<string, string> | undefined,
+  b: Record<string, string> | undefined
+): Record<string, string> {
+  const out = normalizeRemovedSkus(a);
+  for (const [sku, at] of Object.entries(normalizeRemovedSkus(b))) {
+    if (!out[sku] || draftTimestamp({ updatedAt: at }) > draftTimestamp({ updatedAt: out[sku] })) {
+      out[sku] = at;
+    }
+  }
+  return out;
+}
+
+function mergeDeviceCartMaps(
+  a: Record<string, DeviceCartSlice>,
+  b: Record<string, DeviceCartSlice>
+): Record<string, DeviceCartSlice> {
+  const out: Record<string, DeviceCartSlice> = { ...a };
+  for (const [id, slice] of Object.entries(b)) {
+    const prev = out[id];
+    if (!prev || draftTimestamp(slice) >= draftTimestamp(prev)) {
+      out[id] = slice;
+    }
+  }
+  return out;
+}
+
+/**
+ * Merge local + cloud collaborative drafts.
+ * Same device id → newer slice wins; different devices → keep both (qtys sum).
+ */
 export function mergeOrderDrafts(
   local: OrderDraftPayload | null | undefined,
   cloud: OrderDraftPayload | null | undefined
 ): OrderDraftPayload | null {
   if (!local && !cloud) return null;
-  if (!local) return cloud ? { ...cloud } : null;
-  if (!cloud) return { ...local };
+  const left = ensureDeviceCarts(local);
+  const right = ensureDeviceCarts(cloud);
+  if (!left) return right;
+  if (!right) return left;
 
-  const localMap = buildCatalogQtyMapFromDraft(local);
-  const cloudMap = buildCatalogQtyMapFromDraft(cloud);
-  const localTime = draftTimestamp(local);
-  const cloudTime = draftTimestamp(cloud);
-  const newer = localTime >= cloudTime ? local : cloud;
-  const older = newer === local ? cloud : local;
-  const mergedMap = mergeCatalogQtyMaps(localMap, cloudMap, localTime, cloudTime);
+  const newer = draftTimestamp(left) >= draftTimestamp(right) ? left : right;
+  const older = newer === left ? right : left;
+  const deviceCarts = mergeDeviceCartMaps(
+    normalizeDeviceCarts(left.deviceCarts),
+    normalizeDeviceCarts(right.deviceCarts)
+  );
+  const removedSkus = mergeRemovedSkus(left.removedSkus, right.removedSkus);
+  const aggregate = aggregateDeviceCarts({ deviceCarts, removedSkus });
   const accountNo = String(newer.accountNo || older.accountNo || "").trim().toUpperCase();
-  const latestTime = Math.max(localTime, cloudTime);
+  const latestTime = Math.max(draftTimestamp(left), draftTimestamp(right));
 
   return normalizeOrderDraft(accountNo, {
     storeName: newer.storeName || older.storeName,
     phone: newer.phone || older.phone,
     note: newer.note || older.note,
     orderEmail: newer.orderEmail || older.orderEmail,
-    catalogQtyMap: mergedMap,
-    cart: cartItemsFromQtyMap(mergedMap),
+    deviceCarts,
+    removedSkus,
+    catalogQtyMap: aggregate,
+    cart: cartItemsFromQtyMap(aggregate),
     updatedAt: latestTime > 0 ? new Date(latestTime).toISOString() : new Date().toISOString(),
   });
 }
 
-/** Cloud save — union with existing draft unless the user explicitly clears. */
+export function resolveCollaborativeCloudSave(options: {
+  incoming: OrderDraftPayload;
+  existing: OrderDraftPayload | null | undefined;
+  allowClear: boolean;
+  deviceId?: string;
+  deviceQtyMap?: Record<string, string>;
+  removedSkus?: Record<string, string>;
+}): "delete" | OrderDraftPayload {
+  const { incoming, existing, allowClear } = options;
+  const deviceId = String(options.deviceId || "").trim();
+  const now = incoming.updatedAt || new Date().toISOString();
+
+  if (!deviceId) {
+    return resolveCloudDraftSave(incoming, existing, allowClear);
+  }
+
+  const base = ensureDeviceCarts(existing) || normalizeOrderDraft(String(incoming.accountNo || ""), {});
+  const deviceCarts = normalizeDeviceCarts(base.deviceCarts);
+  let removedSkus = mergeRemovedSkus(base.removedSkus, options.removedSkus);
+
+  const deviceMap = positiveQtyMap(options.deviceQtyMap);
+  const incomingAggregate = positiveQtyMap(incoming.catalogQtyMap);
+  if (Object.keys(incomingAggregate).length === 0) {
+    for (const item of incoming.cart || []) {
+      const sku = cleanSku(item?.sku);
+      const qty = cleanQty(item?.qty);
+      if (sku && Number(qty) > 0) incomingAggregate[sku] = qty;
+    }
+  }
+
+  // Empty snapshot before load / beacon race: keep cloud unless explicit clear.
+  if (Object.keys(deviceMap).length === 0 && Object.keys(incomingAggregate).length === 0) {
+    if (allowClear) return "delete";
+    return base;
+  }
+
+  // Removals: SKUs missing from the desired shared cart vs previous aggregate.
+  const prevAggregate = aggregateDeviceCarts(base);
+  for (const sku of Object.keys(prevAggregate)) {
+    if (!incomingAggregate[sku]) {
+      removedSkus[sku] = now;
+      for (const slice of Object.values(deviceCarts)) {
+        delete slice.catalogQtyMap[sku];
+      }
+    }
+  }
+
+  // Re-adds clear tombstones when this device contributes qty again.
+  for (const sku of Object.keys(deviceMap)) {
+    delete removedSkus[sku];
+  }
+
+  deviceCarts[deviceId] = {
+    catalogQtyMap: deviceMap,
+    updatedAt: now,
+  };
+
+  // Drop empty legacy slice noise.
+  for (const [id, slice] of Object.entries(deviceCarts)) {
+    if (Object.keys(slice.catalogQtyMap).length === 0 && id !== deviceId) {
+      delete deviceCarts[id];
+    }
+  }
+
+  const aggregate = aggregateDeviceCarts({ deviceCarts, removedSkus });
+  if (allowClear && Object.keys(aggregate).length === 0) {
+    return "delete";
+  }
+
+  return normalizeOrderDraft(String(incoming.accountNo || base.accountNo || ""), {
+    storeName: incoming.storeName || base.storeName,
+    phone: incoming.phone || base.phone,
+    note: incoming.note ?? base.note,
+    orderEmail: incoming.orderEmail || base.orderEmail,
+    deviceCarts,
+    removedSkus,
+    catalogQtyMap: aggregate,
+    cart: cartItemsFromQtyMap(aggregate),
+    updatedAt: now,
+  });
+}
+
+/**
+ * Cloud save — last-write-wins for non-collaborative / legacy clients.
+ * Prefer resolveCollaborativeCloudSave when deviceId is present.
+ */
 export function resolveCloudDraftSave(
   incoming: OrderDraftPayload,
   existing: OrderDraftPayload | null | undefined,
   allowClear: boolean
 ): "delete" | OrderDraftPayload {
-  if (allowClear && countDraftItems(incoming) === 0) {
-    return "delete";
+  const incomingCount = countDraftItems(incoming);
+
+  if (incomingCount === 0) {
+    if (allowClear) return "delete";
+    return existing ? { ...existing } : incoming;
   }
 
-  const merged = mergeOrderDrafts(incoming, existing ?? null);
-  if (merged) return merged;
+  if (!existing || countDraftItems(existing) === 0) {
+    return incoming;
+  }
 
-  return incoming;
+  if (draftTimestamp(incoming) >= draftTimestamp(existing)) {
+    return incoming;
+  }
+
+  return { ...existing };
 }
 
 export function cloudDraftHasMoreItems(
@@ -137,6 +403,15 @@ export function normalizeOrderDraft(
   accountNo: string,
   raw: Partial<OrderDraftPayload>
 ): OrderDraftPayload {
+  const deviceCarts = normalizeDeviceCarts(raw.deviceCarts);
+  const removedSkus = normalizeRemovedSkus(raw.removedSkus);
+  const hasDevices = Object.keys(deviceCarts).length > 0;
+  const catalogQtyMap = hasDevices
+    ? aggregateDeviceCarts({ deviceCarts, removedSkus })
+    : positiveQtyMap(
+        raw.catalogQtyMap && typeof raw.catalogQtyMap === "object" ? raw.catalogQtyMap : {}
+      );
+
   return {
     accountNo,
     storeName: String(raw.storeName || "").trim(),
@@ -146,15 +421,31 @@ export function normalizeOrderDraft(
     cart: Array.isArray(raw.cart)
       ? raw.cart
           .map((item) => ({
-            sku: String(item?.sku || "")
-              .trim()
-              .toUpperCase(),
-            qty: String(item?.qty || "").trim(),
+            sku: cleanSku(item?.sku),
+            qty: cleanQty(item?.qty),
           }))
           .filter((item) => item.sku && item.qty)
-      : [],
-    catalogQtyMap:
-      raw.catalogQtyMap && typeof raw.catalogQtyMap === "object" ? raw.catalogQtyMap : {},
+      : cartItemsFromQtyMap(catalogQtyMap),
+    catalogQtyMap,
+    deviceCarts: hasDevices ? deviceCarts : undefined,
+    removedSkus: Object.keys(removedSkus).length > 0 ? removedSkus : undefined,
     updatedAt: raw.updatedAt || new Date().toISOString(),
   };
+}
+
+export function getOrCreateOrderDeviceId(): string {
+  if (typeof window === "undefined") return LEGACY_DEVICE_ID;
+  const key = "order_device_id";
+  try {
+    const existing = String(localStorage.getItem(key) || "").trim();
+    if (existing) return existing;
+    const id =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `dev_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(key, id);
+    return id;
+  } catch {
+    return `dev_${Date.now()}`;
+  }
 }
