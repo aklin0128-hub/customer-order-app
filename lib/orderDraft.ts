@@ -15,6 +15,8 @@ export type OrderDraftPayload = {
   deviceCarts?: Record<string, DeviceCartSlice>;
   /** SKU -> removedAt. Suppresses a SKU until a newer device add. */
   removedSkus?: Record<string, string>;
+  /** SKU -> first addedAt (ISO). Used by Active Carts. */
+  itemAddedAt?: Record<string, string>;
   updatedAt?: string;
 };
 
@@ -95,6 +97,84 @@ export function normalizeRemovedSkus(
   return out;
 }
 
+export function normalizeItemAddedAt(
+  raw: Record<string, string> | null | undefined
+): Record<string, string> {
+  return normalizeRemovedSkus(raw);
+}
+
+/**
+ * Keep first-added timestamps for SKUs still in the cart.
+ * New SKUs get `now`; already-present SKUs without a stamp fall back to `fallbackAt`.
+ */
+export function syncItemAddedAt(options: {
+  previousQtyMap: Record<string, string>;
+  nextQtyMap: Record<string, string>;
+  previousAddedAt?: Record<string, string> | null;
+  now: string;
+  fallbackAt?: string;
+}): Record<string, string> {
+  const prevAdded = normalizeItemAddedAt(options.previousAddedAt);
+  const fallbackTs = draftTimestamp({ updatedAt: options.fallbackAt });
+  const nowIso =
+    draftTimestamp({ updatedAt: options.now }) > 0
+      ? new Date(draftTimestamp({ updatedAt: options.now })).toISOString()
+      : new Date().toISOString();
+  const out: Record<string, string> = {};
+
+  for (const sku of Object.keys(options.nextQtyMap)) {
+    if (prevAdded[sku]) {
+      out[sku] = prevAdded[sku];
+      continue;
+    }
+    if (options.previousQtyMap[sku] && fallbackTs > 0) {
+      out[sku] = new Date(fallbackTs).toISOString();
+      continue;
+    }
+    out[sku] = nowIso;
+  }
+  return out;
+}
+
+/** Prefer the earliest known addedAt when merging two drafts. */
+export function mergeItemAddedAt(
+  a: Record<string, string> | null | undefined,
+  b: Record<string, string> | null | undefined
+): Record<string, string> {
+  const left = normalizeItemAddedAt(a);
+  const right = normalizeItemAddedAt(b);
+  const out = { ...left };
+  for (const [sku, at] of Object.entries(right)) {
+    const prev = out[sku];
+    if (!prev || draftTimestamp({ updatedAt: at }) < draftTimestamp({ updatedAt: prev })) {
+      out[sku] = at;
+    }
+  }
+  return out;
+}
+
+/** Best-effort addedAt for Active Carts (explicit stamp, else earliest device slice). */
+export function resolveItemAddedAt(
+  draft: OrderDraftPayload | null | undefined,
+  sku: string
+): string {
+  if (!draft) return "";
+  const target = cleanSku(sku);
+  if (!target) return "";
+  const stamped = normalizeItemAddedAt(draft.itemAddedAt)[target];
+  if (stamped) return stamped;
+
+  let earliest = 0;
+  for (const slice of Object.values(normalizeDeviceCarts(draft.deviceCarts))) {
+    if (!slice.catalogQtyMap[target]) continue;
+    const t = draftTimestamp(slice);
+    if (t > 0 && (earliest === 0 || t < earliest)) earliest = t;
+  }
+  if (earliest > 0) return new Date(earliest).toISOString();
+  const draftAt = draftTimestamp(draft);
+  return draftAt > 0 ? new Date(draftAt).toISOString() : "";
+}
+
 export function normalizeDeviceCarts(
   raw: Record<string, DeviceCartSlice> | null | undefined
 ): Record<string, DeviceCartSlice> {
@@ -136,10 +216,19 @@ export function ensureDeviceCarts(draft: OrderDraftPayload | null | undefined): 
   }
 
   const aggregate = aggregateDeviceCarts({ deviceCarts, removedSkus });
+  const fallbackAt = draft.updatedAt || new Date().toISOString();
+  const itemAddedAt = syncItemAddedAt({
+    previousQtyMap: aggregate,
+    nextQtyMap: aggregate,
+    previousAddedAt: draft.itemAddedAt,
+    now: fallbackAt,
+    fallbackAt,
+  });
   return normalizeOrderDraft(accountNo, {
     ...draft,
     deviceCarts,
     removedSkus,
+    itemAddedAt,
     catalogQtyMap: aggregate,
     cart: cartItemsFromQtyMap(aggregate),
   });
@@ -269,6 +358,15 @@ export function mergeOrderDrafts(
   const aggregate = aggregateDeviceCarts({ deviceCarts, removedSkus });
   const accountNo = String(newer.accountNo || older.accountNo || "").trim().toUpperCase();
   const latestTime = Math.max(draftTimestamp(left), draftTimestamp(right));
+  const updatedAt = latestTime > 0 ? new Date(latestTime).toISOString() : new Date().toISOString();
+  const olderTime = Math.min(draftTimestamp(left), draftTimestamp(right));
+  const itemAddedAt = syncItemAddedAt({
+    previousQtyMap: aggregate,
+    nextQtyMap: aggregate,
+    previousAddedAt: mergeItemAddedAt(left.itemAddedAt, right.itemAddedAt),
+    now: updatedAt,
+    fallbackAt: olderTime > 0 ? new Date(olderTime).toISOString() : updatedAt,
+  });
 
   return normalizeOrderDraft(accountNo, {
     storeName: newer.storeName || older.storeName,
@@ -277,9 +375,10 @@ export function mergeOrderDrafts(
     orderEmail: newer.orderEmail || older.orderEmail,
     deviceCarts,
     removedSkus,
+    itemAddedAt,
     catalogQtyMap: aggregate,
     cart: cartItemsFromQtyMap(aggregate),
-    updatedAt: latestTime > 0 ? new Date(latestTime).toISOString() : new Date().toISOString(),
+    updatedAt,
   });
 }
 
@@ -352,6 +451,14 @@ export function resolveCollaborativeCloudSave(options: {
     return "delete";
   }
 
+  const itemAddedAt = syncItemAddedAt({
+    previousQtyMap: prevAggregate,
+    nextQtyMap: aggregate,
+    previousAddedAt: mergeItemAddedAt(base.itemAddedAt, incoming.itemAddedAt),
+    now,
+    fallbackAt: base.updatedAt || now,
+  });
+
   return normalizeOrderDraft(String(incoming.accountNo || base.accountNo || ""), {
     storeName: incoming.storeName || base.storeName,
     phone: incoming.phone || base.phone,
@@ -359,6 +466,7 @@ export function resolveCollaborativeCloudSave(options: {
     orderEmail: incoming.orderEmail || base.orderEmail,
     deviceCarts,
     removedSkus,
+    itemAddedAt,
     catalogQtyMap: aggregate,
     cart: cartItemsFromQtyMap(aggregate),
     updatedAt: now,
@@ -381,12 +489,28 @@ export function resolveCloudDraftSave(
     return existing ? { ...existing } : incoming;
   }
 
+  const stampLegacy = (draft: OrderDraftPayload, previous?: OrderDraftPayload | null) => {
+    const nextMap = buildCatalogQtyMapFromDraft(draft);
+    const prevMap = buildCatalogQtyMapFromDraft(previous);
+    const now = draft.updatedAt || new Date().toISOString();
+    return normalizeOrderDraft(String(draft.accountNo || ""), {
+      ...draft,
+      itemAddedAt: syncItemAddedAt({
+        previousQtyMap: prevMap,
+        nextQtyMap: nextMap,
+        previousAddedAt: mergeItemAddedAt(previous?.itemAddedAt, draft.itemAddedAt),
+        now,
+        fallbackAt: previous?.updatedAt || draft.updatedAt || now,
+      }),
+    });
+  };
+
   if (!existing || countDraftItems(existing) === 0) {
-    return incoming;
+    return stampLegacy(incoming, existing);
   }
 
   if (draftTimestamp(incoming) >= draftTimestamp(existing)) {
-    return incoming;
+    return stampLegacy(incoming, existing);
   }
 
   return { ...existing };
@@ -411,6 +535,11 @@ export function normalizeOrderDraft(
     : positiveQtyMap(
         raw.catalogQtyMap && typeof raw.catalogQtyMap === "object" ? raw.catalogQtyMap : {}
       );
+  const stamped = normalizeItemAddedAt(raw.itemAddedAt);
+  const itemAddedAt: Record<string, string> = {};
+  for (const sku of Object.keys(catalogQtyMap)) {
+    if (stamped[sku]) itemAddedAt[sku] = stamped[sku];
+  }
 
   return {
     accountNo,
@@ -429,6 +558,7 @@ export function normalizeOrderDraft(
     catalogQtyMap,
     deviceCarts: hasDevices ? deviceCarts : undefined,
     removedSkus: Object.keys(removedSkus).length > 0 ? removedSkus : undefined,
+    itemAddedAt: Object.keys(itemAddedAt).length > 0 ? itemAddedAt : undefined,
     updatedAt: raw.updatedAt || new Date().toISOString(),
   };
 }

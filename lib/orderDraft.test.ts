@@ -9,6 +9,8 @@ import {
   mergeOrderDrafts,
   resolveCloudDraftSave,
   resolveCollaborativeCloudSave,
+  resolveItemAddedAt,
+  syncItemAddedAt,
 } from "@/lib/orderDraft";
 
 test("collaborative aggregate sums the same SKU across devices", () => {
@@ -158,6 +160,137 @@ test("resolveCloudDraftSave deletes only on explicit clear", () => {
   };
 
   assert.equal(resolveCloudDraftSave(incoming, existing, true), "delete");
+});
+
+test("resolveCollaborativeCloudSave stamps first-added time for new SKUs", () => {
+  const existing = {
+    accountNo: "FL111",
+    deviceCarts: {
+      A: { catalogQtyMap: { RICE: "1" }, updatedAt: "2026-08-05T01:00:00.000Z" },
+    },
+    catalogQtyMap: { RICE: "1" },
+    itemAddedAt: { RICE: "2026-08-05T01:00:00.000Z" },
+    updatedAt: "2026-08-05T01:00:00.000Z",
+  };
+
+  const resolved = resolveCollaborativeCloudSave({
+    incoming: {
+      accountNo: "FL111",
+      catalogQtyMap: { RICE: "1", WINE: "1" },
+      updatedAt: "2026-08-05T02:00:00.000Z",
+    },
+    existing,
+    allowClear: false,
+    deviceId: "A",
+    deviceQtyMap: { RICE: "1", WINE: "1" },
+  });
+
+  assert.notEqual(resolved, "delete");
+  assert.equal(resolved.itemAddedAt?.RICE, "2026-08-05T01:00:00.000Z");
+  assert.equal(resolved.itemAddedAt?.WINE, "2026-08-05T02:00:00.000Z");
+});
+
+test("resolveCollaborativeCloudSave clears addedAt when SKU removed and restamps on re-add", () => {
+  const existing = {
+    accountNo: "FL111",
+    deviceCarts: {
+      A: { catalogQtyMap: { RICE: "1", NOODLE: "1" }, updatedAt: "2026-08-05T01:00:00.000Z" },
+    },
+    catalogQtyMap: { RICE: "1", NOODLE: "1" },
+    itemAddedAt: {
+      RICE: "2026-08-05T01:00:00.000Z",
+      NOODLE: "2026-08-05T01:00:00.000Z",
+    },
+    updatedAt: "2026-08-05T01:00:00.000Z",
+  };
+
+  const afterRemove = resolveCollaborativeCloudSave({
+    incoming: {
+      accountNo: "FL111",
+      catalogQtyMap: { RICE: "1" },
+      updatedAt: "2026-08-05T02:00:00.000Z",
+    },
+    existing,
+    allowClear: false,
+    deviceId: "A",
+    deviceQtyMap: { RICE: "1" },
+  });
+
+  assert.notEqual(afterRemove, "delete");
+  assert.equal(afterRemove.itemAddedAt?.NOODLE, undefined);
+
+  const afterReadd = resolveCollaborativeCloudSave({
+    incoming: {
+      accountNo: "FL111",
+      catalogQtyMap: { RICE: "1", NOODLE: "1" },
+      updatedAt: "2026-08-05T03:00:00.000Z",
+    },
+    existing: afterRemove,
+    allowClear: false,
+    deviceId: "A",
+    deviceQtyMap: { RICE: "1", NOODLE: "1" },
+  });
+
+  assert.notEqual(afterReadd, "delete");
+  assert.equal(afterReadd.itemAddedAt?.NOODLE, "2026-08-05T03:00:00.000Z");
+  assert.equal(afterReadd.itemAddedAt?.RICE, "2026-08-05T01:00:00.000Z");
+});
+
+test("mergeOrderDrafts keeps the earliest itemAddedAt", () => {
+  const local = {
+    accountNo: "FL111",
+    deviceCarts: {
+      A: { catalogQtyMap: { RICE: "1" }, updatedAt: "2026-08-05T01:00:00.000Z" },
+    },
+    catalogQtyMap: { RICE: "1" },
+    itemAddedAt: { RICE: "2026-08-05T01:00:00.000Z" },
+    updatedAt: "2026-08-05T01:00:00.000Z",
+  };
+  const cloud = {
+    accountNo: "FL111",
+    deviceCarts: {
+      B: { catalogQtyMap: { RICE: "1", WINE: "1" }, updatedAt: "2026-08-05T02:00:00.000Z" },
+    },
+    catalogQtyMap: { RICE: "1", WINE: "1" },
+    itemAddedAt: {
+      RICE: "2026-08-05T01:30:00.000Z",
+      WINE: "2026-08-05T02:00:00.000Z",
+    },
+    updatedAt: "2026-08-05T02:00:00.000Z",
+  };
+
+  const merged = mergeOrderDrafts(local, cloud);
+  assert.equal(merged?.itemAddedAt?.RICE, "2026-08-05T01:00:00.000Z");
+  assert.equal(merged?.itemAddedAt?.WINE, "2026-08-05T02:00:00.000Z");
+});
+
+test("resolveItemAddedAt falls back to earliest device slice for legacy drafts", () => {
+  const draft = {
+    accountNo: "FL111",
+    deviceCarts: {
+      A: { catalogQtyMap: { RICE: "1" }, updatedAt: "2026-08-05T03:00:00.000Z" },
+      B: { catalogQtyMap: { RICE: "1" }, updatedAt: "2026-08-05T01:00:00.000Z" },
+    },
+    catalogQtyMap: { RICE: "2" },
+    updatedAt: "2026-08-05T03:00:00.000Z",
+  };
+
+  assert.equal(resolveItemAddedAt(draft, "RICE"), "2026-08-05T01:00:00.000Z");
+});
+
+test("syncItemAddedAt keeps existing stamps and stamps only new SKUs", () => {
+  const stamped = syncItemAddedAt({
+    previousQtyMap: { RICE: "1" },
+    nextQtyMap: { RICE: "1", WINE: "2" },
+    previousAddedAt: { RICE: "2026-08-05T01:00:00.000Z" },
+    now: "2026-08-05T04:00:00.000Z",
+    fallbackAt: "2026-08-05T00:00:00.000Z",
+  });
+
+  assert.deepEqual(stamped, {
+    RICE: "2026-08-05T01:00:00.000Z",
+    WINE: "2026-08-05T04:00:00.000Z",
+  });
 });
 
 test("buildCatalogQtyMapFromDraft uses cart lines when catalogQtyMap is empty", () => {
