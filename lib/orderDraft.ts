@@ -382,6 +382,51 @@ export function mergeOrderDrafts(
   });
 }
 
+/**
+ * Client-side remove: stamp tombstone and scrub the SKU from every device slice
+ * so autosave cannot re-aggregate peer leftovers back into the shared cart.
+ */
+export function markSkuRemovedInDraft(
+  draft: OrderDraftPayload | null | undefined,
+  sku: string,
+  now = new Date().toISOString()
+): OrderDraftPayload | null {
+  if (!draft) return null;
+  const target = cleanSku(sku);
+  if (!target) return draft;
+  const removedSkus = normalizeRemovedSkus(draft.removedSkus);
+  removedSkus[target] = draftTimestamp({ updatedAt: now }) > 0 ? new Date(draftTimestamp({ updatedAt: now })).toISOString() : new Date().toISOString();
+  const deviceCarts = normalizeDeviceCarts(draft.deviceCarts);
+  for (const slice of Object.values(deviceCarts)) {
+    delete slice.catalogQtyMap[target];
+  }
+  const aggregate = aggregateDeviceCarts({ deviceCarts, removedSkus });
+  return normalizeOrderDraft(String(draft.accountNo || "").trim().toUpperCase(), {
+    ...draft,
+    deviceCarts,
+    removedSkus,
+    catalogQtyMap: aggregate,
+    cart: cartItemsFromQtyMap(aggregate),
+    updatedAt: removedSkus[target],
+  });
+}
+
+/** Client-side re-add: drop the tombstone so the SKU can appear again. */
+export function markSkuReaddedInDraft(
+  draft: OrderDraftPayload | null | undefined,
+  sku: string
+): OrderDraftPayload | null {
+  if (!draft) return null;
+  const target = cleanSku(sku);
+  if (!target || !draft.removedSkus?.[target]) return draft;
+  const removedSkus = normalizeRemovedSkus(draft.removedSkus);
+  delete removedSkus[target];
+  return {
+    ...draft,
+    removedSkus: Object.keys(removedSkus).length > 0 ? removedSkus : undefined,
+  };
+}
+
 export function resolveCollaborativeCloudSave(options: {
   incoming: OrderDraftPayload;
   existing: OrderDraftPayload | null | undefined;
@@ -389,6 +434,12 @@ export function resolveCollaborativeCloudSave(options: {
   deviceId?: string;
   deviceQtyMap?: Record<string, string>;
   removedSkus?: Record<string, string>;
+  /**
+   * Client's intended shared cart (React catalogQtyMap).
+   * Prefer this over incoming.catalogQtyMap when present — normalizeOrderDraft
+   * recomputes catalogQtyMap from deviceCarts and can hide removals.
+   */
+  desiredSharedQtyMap?: Record<string, string> | null;
 }): "delete" | OrderDraftPayload {
   const { incoming, existing, allowClear } = options;
   const deviceId = String(options.deviceId || "").trim();
@@ -403,8 +454,11 @@ export function resolveCollaborativeCloudSave(options: {
   let removedSkus = mergeRemovedSkus(base.removedSkus, options.removedSkus);
 
   const deviceMap = positiveQtyMap(options.deviceQtyMap);
-  const incomingAggregate = positiveQtyMap(incoming.catalogQtyMap);
-  if (Object.keys(incomingAggregate).length === 0) {
+  const hasDesiredShared = options.desiredSharedQtyMap != null;
+  const incomingAggregate = hasDesiredShared
+    ? positiveQtyMap(options.desiredSharedQtyMap)
+    : positiveQtyMap(incoming.catalogQtyMap);
+  if (!hasDesiredShared && Object.keys(incomingAggregate).length === 0) {
     for (const item of incoming.cart || []) {
       const sku = cleanSku(item?.sku);
       const qty = cleanQty(item?.qty);
@@ -429,9 +483,15 @@ export function resolveCollaborativeCloudSave(options: {
     }
   }
 
-  // Re-adds clear tombstones when this device contributes qty again.
+  // Re-adds: only this device contributing the SKU again clears the tombstone.
+  // A stale desiredSharedQtyMap alone must not revive a deleted line.
   for (const sku of Object.keys(deviceMap)) {
-    delete removedSkus[sku];
+    if (incomingAggregate[sku]) delete removedSkus[sku];
+  }
+
+  // Drop stale contributions for SKUs the shared cart still considers removed.
+  for (const sku of Object.keys(removedSkus)) {
+    if (!incomingAggregate[sku]) delete deviceMap[sku];
   }
 
   deviceCarts[deviceId] = {

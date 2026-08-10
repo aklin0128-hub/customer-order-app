@@ -18,6 +18,15 @@ export async function POST(req: Request) {
 
     const allowClear = Boolean(body?.allowClear);
     const deviceId = String(body?.deviceId || "").trim();
+    // Capture before normalizeOrderDraft — it recomputes catalogQtyMap from deviceCarts
+    // and can hide intentional removals when peer slices still list the SKU.
+    const desiredSharedQtyMap =
+      body?.desiredSharedQtyMap && typeof body.desiredSharedQtyMap === "object"
+        ? body.desiredSharedQtyMap
+        : body?.catalogQtyMap && typeof body.catalogQtyMap === "object"
+          ? body.catalogQtyMap
+          : undefined;
+
     const incoming = normalizeOrderDraft(accountNo, {
       storeName: body?.storeName,
       phone: body?.phone,
@@ -27,6 +36,7 @@ export async function POST(req: Request) {
       catalogQtyMap: body?.catalogQtyMap,
       deviceCarts: body?.deviceCarts,
       removedSkus: body?.removedSkus,
+      itemAddedAt: body?.itemAddedAt,
       updatedAt: body?.updatedAt,
     });
 
@@ -38,6 +48,7 @@ export async function POST(req: Request) {
       deviceId,
       deviceQtyMap: body?.deviceQtyMap,
       removedSkus: body?.removedSkus,
+      desiredSharedQtyMap,
     });
 
     if (resolved === "delete") {

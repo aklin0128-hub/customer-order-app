@@ -64,6 +64,8 @@ import {
   deviceQtyForSharedTotal,
   ensureDeviceCarts,
   getOrCreateOrderDeviceId,
+  markSkuReaddedInDraft,
+  markSkuRemovedInDraft,
   mergeOrderDrafts,
   normalizeOrderDraft,
   type OrderDraftPayload,
@@ -136,6 +138,7 @@ export default function OrderPage() {
   const cloudDraftRef = useRef<OrderDraftPayload | null>(null);
   const deviceQtyMapRef = useRef<Record<string, string>>({});
   const cartDirtyRef = useRef(false);
+  const lastLocalEditAtRef = useRef(0);
   const lastCloudUpdatedAtRef = useRef("");
 
   const [lang, setLang] = useState<Lang>("en");
@@ -550,6 +553,7 @@ export default function OrderPage() {
 
     const deviceId = deviceIdRef.current || getOrCreateOrderDeviceId();
     deviceIdRef.current = deviceId;
+    const editAt = lastLocalEditAtRef.current;
     const draft = normalizeOrderDraft(accountNo, {
       storeName,
       phone,
@@ -565,6 +569,7 @@ export default function OrderPage() {
         },
       },
       removedSkus: cloudDraftRef.current?.removedSkus,
+      itemAddedAt: cloudDraftRef.current?.itemAddedAt,
       updatedAt: new Date().toISOString(),
     });
     localStorage.setItem(`draft_${accountNo}`, JSON.stringify(draft));
@@ -573,6 +578,9 @@ export default function OrderPage() {
       const allowClear = countDraftItems(draft) === 0;
       const saveBody = {
         ...draft,
+        // Authoritative shared cart from UI — not re-aggregated peer leftovers.
+        desiredSharedQtyMap: catalogQtyMap,
+        catalogQtyMap,
         deviceId,
         deviceQtyMap: deviceQtyMapRef.current,
         removedSkus: cloudDraftRef.current?.removedSkus,
@@ -589,6 +597,18 @@ export default function OrderPage() {
         const data = await res.json();
         if (data?.draft) {
           const normalized = ensureDeviceCarts(data.draft) || normalizeOrderDraft(accountNo, data.draft);
+          // Newer local edits while this save was in flight — keep UI; next autosave will sync.
+          if (lastLocalEditAtRef.current > editAt) {
+            const localRemoved = cloudDraftRef.current?.removedSkus || {};
+            let merged: OrderDraftPayload = normalized;
+            for (const [sku, at] of Object.entries(localRemoved)) {
+              if (!catalogQtyMap[sku]) {
+                merged = markSkuRemovedInDraft(merged, sku, at) || merged;
+              }
+            }
+            cloudDraftRef.current = merged;
+            return;
+          }
           cloudDraftRef.current = normalized;
           deviceQtyMapRef.current = {
             ...(normalized.deviceCarts?.[deviceId]?.catalogQtyMap || {}),
@@ -665,6 +685,8 @@ export default function OrderPage() {
       if (typeof navigator.sendBeacon === "function") {
         const body = JSON.stringify({
           ...payload,
+          desiredSharedQtyMap: snapshot.catalogQtyMap || payload.catalogQtyMap,
+          catalogQtyMap: snapshot.catalogQtyMap || payload.catalogQtyMap,
           deviceId,
           deviceQtyMap: deviceQtyMapRef.current,
           removedSkus: cloudDraftRef.current?.removedSkus,
@@ -965,7 +987,15 @@ export default function OrderPage() {
     if (myQty > 0) nextDevice[sku] = String(myQty);
     else delete nextDevice[sku];
     deviceQtyMapRef.current = nextDevice;
+    lastLocalEditAtRef.current = Date.now();
     cartDirtyRef.current = true;
+
+    // Tombstone + scrub peer slices immediately so autosave/poll cannot revive the line.
+    if (desiredTotal <= 0) {
+      cloudDraftRef.current = markSkuRemovedInDraft(cloudDraftRef.current, sku);
+    } else {
+      cloudDraftRef.current = markSkuReaddedInDraft(cloudDraftRef.current, sku);
+    }
   };
 
   const setQtyForSku = (sku: string, value: string, source: "clearance" | "normal" = "normal") => {
@@ -1731,6 +1761,10 @@ export default function OrderPage() {
       setQtyInput("");
       setSelectedItem(null);
       setNote("");
+      deviceQtyMapRef.current = {};
+      cloudDraftRef.current = null;
+      cartDirtyRef.current = false;
+      lastCloudUpdatedAtRef.current = "";
       localStorage.removeItem(`draft_${accountNo}`);
 
       await fetch("/api/delete-draft", {

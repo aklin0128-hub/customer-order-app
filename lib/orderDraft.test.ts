@@ -6,7 +6,9 @@ import {
   buildCatalogQtyMapFromDraft,
   countDraftItems,
   deviceQtyForSharedTotal,
+  markSkuRemovedInDraft,
   mergeOrderDrafts,
+  normalizeOrderDraft,
   resolveCloudDraftSave,
   resolveCollaborativeCloudSave,
   resolveItemAddedAt,
@@ -101,6 +103,123 @@ test("resolveCollaborativeCloudSave tombstones removed SKUs for all devices", ()
     WINE: "1",
   });
   assert.ok(resolved.removedSkus?.NOODLE);
+});
+
+test("client-shaped remove: peer slices still list SKU but desiredSharedQtyMap does not", () => {
+  const existing = {
+    accountNo: "FL111",
+    deviceCarts: {
+      A: { catalogQtyMap: { RICE: "1", NOODLE: "1" }, updatedAt: "2026-08-05T01:00:00.000Z" },
+      B: { catalogQtyMap: { RICE: "1", NOODLE: "1" }, updatedAt: "2026-08-05T01:01:00.000Z" },
+    },
+    catalogQtyMap: { RICE: "2", NOODLE: "2" },
+    updatedAt: "2026-08-05T01:01:00.000Z",
+  };
+
+  // Mimic autosave after Device A removes NOODLE: normalizeOrderDraft would
+  // re-aggregate NOODLE from peer B, but desiredSharedQtyMap is the React cart.
+  const clientDeviceCarts = {
+    A: { catalogQtyMap: { RICE: "1" }, updatedAt: "2026-08-05T01:03:00.000Z" },
+    B: { catalogQtyMap: { RICE: "1", NOODLE: "1" }, updatedAt: "2026-08-05T01:01:00.000Z" },
+  };
+  const incoming = normalizeOrderDraft("FL111", {
+    deviceCarts: clientDeviceCarts,
+    catalogQtyMap: { RICE: "1" },
+    updatedAt: "2026-08-05T01:03:00.000Z",
+  });
+  // Prove the bug shape: normalized incoming still has NOODLE from peer B.
+  assert.equal(incoming.catalogQtyMap?.NOODLE, "1");
+
+  const resolved = resolveCollaborativeCloudSave({
+    incoming,
+    existing,
+    allowClear: false,
+    deviceId: "A",
+    deviceQtyMap: { RICE: "1" },
+    desiredSharedQtyMap: { RICE: "1" },
+  });
+
+  assert.notEqual(resolved, "delete");
+  assert.deepEqual(buildCatalogQtyMapFromDraft(resolved), { RICE: "2" });
+  assert.ok(resolved.removedSkus?.NOODLE);
+  assert.equal(resolved.deviceCarts?.B?.catalogQtyMap?.NOODLE, undefined);
+});
+
+test("stale deviceQtyMap alone does not clear a tombstone", () => {
+  const existing = {
+    accountNo: "FL111",
+    deviceCarts: {
+      A: { catalogQtyMap: { RICE: "1" }, updatedAt: "2026-08-05T02:00:00.000Z" },
+    },
+    catalogQtyMap: { RICE: "1" },
+    removedSkus: { NOODLE: "2026-08-05T01:30:00.000Z" },
+    updatedAt: "2026-08-05T02:00:00.000Z",
+  };
+
+  const resolved = resolveCollaborativeCloudSave({
+    incoming: {
+      accountNo: "FL111",
+      catalogQtyMap: { RICE: "1" },
+      updatedAt: "2026-08-05T02:05:00.000Z",
+    },
+    existing,
+    allowClear: false,
+    deviceId: "B",
+    // Stale offline device still thinks NOODLE is in its contribution.
+    deviceQtyMap: { RICE: "1", NOODLE: "1" },
+    desiredSharedQtyMap: { RICE: "1" },
+  });
+
+  assert.notEqual(resolved, "delete");
+  assert.equal(buildCatalogQtyMapFromDraft(resolved).NOODLE, undefined);
+  assert.ok(resolved.removedSkus?.NOODLE);
+});
+
+test("stale desiredSharedQtyMap without device contribution does not clear tombstone", () => {
+  const existing = {
+    accountNo: "FL111",
+    deviceCarts: {
+      A: { catalogQtyMap: { RICE: "1" }, updatedAt: "2026-08-05T02:00:00.000Z" },
+    },
+    catalogQtyMap: { RICE: "1" },
+    removedSkus: { NOODLE: "2026-08-05T01:30:00.000Z" },
+    updatedAt: "2026-08-05T02:00:00.000Z",
+  };
+
+  const resolved = resolveCollaborativeCloudSave({
+    incoming: {
+      accountNo: "FL111",
+      catalogQtyMap: { RICE: "1", NOODLE: "1" },
+      updatedAt: "2026-08-05T02:05:00.000Z",
+    },
+    existing,
+    allowClear: false,
+    deviceId: "B",
+    deviceQtyMap: { RICE: "1" },
+    // UI still shows NOODLE from an old shared view, but this device never re-added it.
+    desiredSharedQtyMap: { RICE: "1", NOODLE: "1" },
+  });
+
+  assert.notEqual(resolved, "delete");
+  assert.equal(buildCatalogQtyMapFromDraft(resolved).NOODLE, undefined);
+  assert.ok(resolved.removedSkus?.NOODLE);
+});
+
+test("markSkuRemovedInDraft scrubs every device slice", () => {
+  const draft = {
+    accountNo: "FL111",
+    deviceCarts: {
+      A: { catalogQtyMap: { RICE: "1", NOODLE: "1" }, updatedAt: "2026-08-05T01:00:00.000Z" },
+      B: { catalogQtyMap: { NOODLE: "2" }, updatedAt: "2026-08-05T01:01:00.000Z" },
+    },
+    catalogQtyMap: { RICE: "1", NOODLE: "3" },
+    updatedAt: "2026-08-05T01:01:00.000Z",
+  };
+
+  const next = markSkuRemovedInDraft(draft, "NOODLE", "2026-08-05T01:05:00.000Z");
+  assert.deepEqual(buildCatalogQtyMapFromDraft(next), { RICE: "1" });
+  assert.equal(next?.removedSkus?.NOODLE, "2026-08-05T01:05:00.000Z");
+  assert.equal(next?.deviceCarts?.B?.catalogQtyMap?.NOODLE, undefined);
 });
 
 test("mergeOrderDrafts keeps both device slices so reload does not double-count", () => {
