@@ -20,6 +20,7 @@
     "@upstash/redis": "^1.37.0",
     "@vercel/blob": "^2.3.3",
     "html5-qrcode": "^2.3.8",
+    "jsbarcode": "^3.12.3",
     "next": "16.2.3",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",

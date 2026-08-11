@@ -182,6 +182,7 @@ export default function OrderPage() {
   const [showAvailableOnly, setShowAvailableOnly] = useState(true);
   const [catalogShowFavoritesOnly, setCatalogShowFavoritesOnly] = useState(false);
   const [favoriteSkus, setFavoriteSkus] = useState<string[]>([]);
+  const [showUpc, setShowUpc] = useState(false);
   const [showCustomerInfo, setShowCustomerInfo] = useState(false);
   const [invoicePricingEnabled, setInvoicePricingEnabled] = useState(false);
   const [invoicePriceEntries, setInvoicePriceEntries] = useState<
@@ -225,6 +226,26 @@ export default function OrderPage() {
     }
     setFavoriteSkus(loadFavoriteSkus(accountNo));
   }, [accountNo]);
+
+  useEffect(() => {
+    try {
+      setShowUpc(localStorage.getItem("order_show_upc") === "1");
+    } catch {
+      setShowUpc(false);
+    }
+  }, []);
+
+  const toggleShowUpc = useCallback(() => {
+    setShowUpc((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("order_show_upc", next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
 
   const favoriteSkuSet = useMemo(
     () => new Set(favoriteSkus.map((sku) => normalizeFavoriteSku(sku))),
@@ -1956,6 +1977,9 @@ export default function OrderPage() {
       >
         {t.favoritesOnly} ({favoriteItemCount})
       </button>
+      <button type="button" onClick={toggleShowUpc} style={categoryButtonStyle(showUpc)}>
+        {showUpc ? t.hideUpc : t.showUpc}
+      </button>
       <label className="order-sticky-filter-check">
         <input
           type="checkbox"
@@ -1982,6 +2006,7 @@ export default function OrderPage() {
       onToggleFavorite: toggleFavorite,
       lastOrderedLabel: summary ? t.lastOrderedLine.replace("{summary}", summary) : undefined,
       onOpenHistory: openSkuHistory,
+      showUpc,
     };
   };
 

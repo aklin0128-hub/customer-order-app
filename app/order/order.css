@@ -1823,6 +1823,20 @@
   opacity: 0.75;
 }
 
+.catalog-qty-card-upc-wrap {
+  margin-top: 6px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.catalog-qty-card-upc {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
 .catalog-qty-card-edit {
   position: static;
   flex: 0 0 auto;

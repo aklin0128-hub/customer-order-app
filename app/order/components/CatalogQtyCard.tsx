@@ -29,7 +29,9 @@ import {
   promoTagStyle,
   justAddedTagStyle,
 } from "../orderStyles";
+import { resolveCatalogUpc } from "@/lib/catalogUpc";
 import { ProductImage } from "./ProductImage";
+import { UpcBarcode } from "./UpcBarcode";
 
 export function CatalogQtyCard({
   item,
@@ -59,6 +61,7 @@ export function CatalogQtyCard({
   onToggleFavorite,
   lastOrderedLabel,
   onOpenHistory,
+  showUpc,
   palletLabel,
   justAddedLabel,
   /** Show catalog import date (New items tab). */
@@ -106,6 +109,8 @@ export function CatalogQtyCard({
   /** e.g. "Last: Aug 10 · 3 cs" — tappable history entry point. */
   lastOrderedLabel?: string;
   onOpenHistory?: (sku: string) => void;
+  /** When true, render UPC/barcode under product info if available. */
+  showUpc?: boolean;
   /** e.g. "Pallet size" / "板数" — shown as `{label}: {value}` */
   palletLabel?: string;
   /** e.g. "JUST ADDED" — shown when admin sets justAdded on the SKU */
@@ -158,6 +163,7 @@ export function CatalogQtyCard({
   const storageLabel = showNewItemExtras ? resolveNewItemStorageLabel(item) : undefined;
   const showJustAdded = Boolean(justAddedLabel && !showNewProductBadge && (uniformNewPill || isJustAddedItem(item)));
   const showPinnedJustAdded = Boolean(justAddedLabel && showNewProductBadge && isJustAddedItem(item));
+  const upcDigits = showUpc ? resolveCatalogUpc(item) : "";
 
   const badgeRow =
     promoNote || showPinnedJustAdded || showJustAdded || storageLabel || highlight || promoRemaining ? (
@@ -294,6 +300,7 @@ export function CatalogQtyCard({
           </span>
         </button>
       ) : null}
+      {upcDigits ? <UpcBarcode value={upcDigits} /> : null}
       {comingDateText ? (
         <div className="catalog-coming-date">
           {comingDateLabel}: {comingDateText}
