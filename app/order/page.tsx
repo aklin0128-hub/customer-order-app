@@ -1011,9 +1011,7 @@ export default function OrderPage() {
         return scoreCatalogSearchQuery(item, q) >= 0;
       })
       .sort((a, b) => {
-        const aFav = favoriteSkuSet.has(a.sku?.toUpperCase() || "");
-        const bFav = favoriteSkuSet.has(b.sku?.toUpperCase() || "");
-        if (aFav !== bFav) return aFav ? -1 : 1;
+        // Do not pin favorites to the top — starring would jump the card/scroll.
         const aNormal = isOrderableItem(a);
         const bNormal = isOrderableItem(b);
         if (aNormal !== bNormal) return aNormal ? -1 : 1;
