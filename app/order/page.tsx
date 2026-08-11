@@ -17,6 +17,7 @@ import { OrderQuickOrderPanel } from "./components/OrderQuickOrderPanel";
 import { OrderQuickPicksStrip } from "./components/OrderQuickPicksStrip";
 import { OrderShopNudge } from "./components/OrderShopNudge";
 import { RecommendedStrip } from "./components/RecommendedStrip";
+import { SkuOrderHistoryModal } from "./components/SkuOrderHistoryModal";
 import { OrderInput } from "./components/OrderInput";
 import { OrderReviewModal } from "./components/OrderReviewModal";
 import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
@@ -76,6 +77,7 @@ import {
   saveFavoriteSkus,
   toggleFavoriteSku,
 } from "@/lib/favoriteSkus";
+import { buildSkuOrderHistoryIndex } from "@/lib/skuOrderHistory";
 import {
   applyQtyDelta,
   applyQtySet,
@@ -183,6 +185,7 @@ export default function OrderPage() {
   >({});
   const [fullscreen, setFullscreen] = useState(false);
   const [showPastOrders, setShowPastOrders] = useState(false);
+  const [skuHistorySku, setSkuHistorySku] = useState("");
   const [showCart, setShowCart] = useState(false);
   const [catalogShowSelectedOnly, setCatalogShowSelectedOnly] = useState(false);
   const [catalogShowRecommendedOnly, setCatalogShowRecommendedOnly] = useState(false);
@@ -191,6 +194,10 @@ export default function OrderPage() {
   const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false);
   const [recentItems, setRecentItems] = useState<CartItem[]>([]);
   const [orderHistory, setOrderHistory] = useState<OrderHistoryItem[]>([]);
+  const skuOrderHistoryIndex = useMemo(
+    () => buildSkuOrderHistoryIndex(orderHistory),
+    [orderHistory]
+  );
   const [catalogVersion, setCatalogVersion] = useState(0);
   const [promotionItems, setPromotionItems] = useState<PromotionItem[]>([]);
   const [promotionsLoading, setPromotionsLoading] = useState(false);
@@ -230,6 +237,11 @@ export default function OrderPage() {
     },
     [accountNo]
   );
+
+  const openSkuHistory = useCallback((sku: string) => {
+    const clean = normalizeFavoriteSku(sku);
+    if (clean) setSkuHistorySku(clean);
+  }, []);
 
   const toggleCategoryFilter = (cat: string) => {
     if (cat === "ALL") {
@@ -1951,11 +1963,19 @@ export default function OrderPage() {
   );
 
   const favoriteCardProps = (sku: string) => {
-    const isFavorite = favoriteSkuSet.has(sku.toUpperCase());
+    const cleanSku = sku.toUpperCase();
+    const isFavorite = favoriteSkuSet.has(cleanSku);
+    const historyCount = skuOrderHistoryIndex.get(cleanSku)?.length || 0;
     return {
       favorite: isFavorite,
       favoriteLabel: isFavorite ? t.removeFavorite : t.addFavorite,
       onToggleFavorite: toggleFavorite,
+      historyCount,
+      historyLabel:
+        historyCount > 0
+          ? t.skuHistoryCount.replace("{count}", String(historyCount))
+          : t.skuHistory,
+      onOpenHistory: openSkuHistory,
     };
   };
 
@@ -2871,6 +2891,18 @@ export default function OrderPage() {
         onReorder={reorderItems}
       />
 
+      <SkuOrderHistoryModal
+        open={Boolean(skuHistorySku)}
+        onClose={() => setSkuHistorySku("")}
+        lang={lang}
+        sku={skuHistorySku}
+        entries={skuOrderHistoryIndex.get(skuHistorySku) || []}
+        onAddQty={(qty) => {
+          if (!skuHistorySku || qty <= 0) return;
+          updateCatalogQty(skuHistorySku, String(qty));
+        }}
+      />
+
       <OrderBarcodeScanner
         open={barcodeScannerOpen}
         onClose={() => setBarcodeScannerOpen(false)}
@@ -2888,7 +2920,7 @@ export default function OrderPage() {
       <OrderFloatingCartFab
         count={cartItemCount}
         label={t.cartSummary}
-        hidden={showCart || showPastOrders || barcodeScannerOpen}
+        hidden={showCart || showPastOrders || Boolean(skuHistorySku) || barcodeScannerOpen}
         onClick={() => (showCart ? toggleCartPanel() : setShowCart(true))}
       />
 

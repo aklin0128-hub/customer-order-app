@@ -57,6 +57,9 @@ export function CatalogQtyCard({
   favorite,
   favoriteLabel,
   onToggleFavorite,
+  historyCount,
+  historyLabel,
+  onOpenHistory,
   palletLabel,
   justAddedLabel,
   /** Show catalog import date (New items tab). */
@@ -101,6 +104,10 @@ export function CatalogQtyCard({
   favorite?: boolean;
   favoriteLabel?: string;
   onToggleFavorite?: (sku: string) => void;
+  /** Past order count for this SKU; button only renders when > 0. */
+  historyCount?: number;
+  historyLabel?: string;
+  onOpenHistory?: (sku: string) => void;
   /** e.g. "Pallet size" / "板数" — shown as `{label}: {value}` */
   palletLabel?: string;
   /** e.g. "JUST ADDED" — shown when admin sets justAdded on the SKU */
@@ -198,6 +205,34 @@ export function CatalogQtyCard({
       <div className="catalog-qty-card-sku-row">
         <div className="catalog-qty-card-sku">{item.sku}</div>
         <div className="catalog-qty-card-sku-actions">
+          {onOpenHistory && Number(historyCount) > 0 ? (
+            <button
+              type="button"
+              className="catalog-qty-card-history"
+              aria-label={historyLabel || "Order history"}
+              title={historyLabel || "Order history"}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenHistory(item.sku);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <svg
+                className="catalog-qty-card-history-icon"
+                viewBox="0 0 24 24"
+                width="15"
+                height="15"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  fill="currentColor"
+                  d="M13 3a9 9 0 0 0-9 9H1l4 4 4-4H6a7 7 0 1 1 1.7 4.6l-1.45 1.45A9 9 0 1 0 13 3zm-1 4v5.25l4.5 2.67.75-1.23-3.75-2.22V7H12z"
+                />
+              </svg>
+              <span className="catalog-qty-card-history-count">{historyCount}</span>
+            </button>
+          ) : null}
           {onToggleFavorite ? (
             <button
               type="button"
