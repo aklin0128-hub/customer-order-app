@@ -11,6 +11,7 @@ import {
   type InvoiceImportRecord,
   type InvoiceLineWithCatalog,
 } from "@/lib/invoice/invoiceImportRecord";
+import { resolveInvoiceCaseUnitPrice } from "@/lib/invoice/invoiceCaseUnitPrice";
 import { parseInvoiceText } from "@/lib/invoice/parseInvoiceText";
 import { bustAnalyticsCache } from "@/lib/analyticsCache";
 import { findDuplicateInvoiceImport } from "@/lib/invoiceDedup";
@@ -100,10 +101,18 @@ export async function POST(req: Request) {
     let appliedToHistory = false;
 
     if (applyToHistory && linesWithFlags.length > 0 && accountNo) {
-      const itemsForHistory = linesWithFlags.map((l) => ({
-        sku: l.sku,
-        qty: String(l.qty),
-      }));
+      const itemsForHistory = linesWithFlags.map((l) => {
+        const unitPrice = resolveInvoiceCaseUnitPrice({
+          qty: l.qty,
+          unitPrice: l.unitPrice,
+          lineTotal: l.lineTotal,
+        });
+        return {
+          sku: l.sku,
+          qty: String(l.qty),
+          ...(typeof unitPrice === "number" && unitPrice > 0 ? { unitPrice } : {}),
+        };
+      });
 
       await mergeRecentItems(accountNo, itemsForHistory);
 
