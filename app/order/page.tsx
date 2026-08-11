@@ -701,7 +701,19 @@ export default function OrderPage() {
             const clearance = Object.fromEntries(
               prev.filter((item) => item.nhItems).map((item) => [item.sku.toUpperCase(), item.qty])
             );
-            return buildCartDisplayItems({ catalog: shared, clearance });
+            const next = buildCartDisplayItems({ catalog: shared, clearance });
+            const same =
+              prev.length === next.length &&
+              next.every((item, index) => {
+                const old = prev[index];
+                return (
+                  old &&
+                  old.sku === item.sku &&
+                  old.qty === item.qty &&
+                  Boolean(old.nhItems) === Boolean(item.nhItems)
+                );
+              });
+            return same ? prev : next;
           });
         }
       } catch {

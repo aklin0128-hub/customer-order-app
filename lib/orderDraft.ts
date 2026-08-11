@@ -436,8 +436,9 @@ export function resolveCollaborativeCloudSave(options: {
   removedSkus?: Record<string, string>;
   /**
    * Client's intended shared cart (React catalogQtyMap).
+   * Used to decide re-adds / keep tombstones — not to infer peer removals.
    * Prefer this over incoming.catalogQtyMap when present — normalizeOrderDraft
-   * recomputes catalogQtyMap from deviceCarts and can hide removals.
+   * recomputes catalogQtyMap from deviceCarts and can hide intentional local state.
    */
   desiredSharedQtyMap?: Record<string, string> | null;
 }): "delete" | OrderDraftPayload {
@@ -472,14 +473,15 @@ export function resolveCollaborativeCloudSave(options: {
     return base;
   }
 
-  // Removals: SKUs missing from the desired shared cart vs previous aggregate.
   const prevAggregate = aggregateDeviceCarts(base);
-  for (const sku of Object.keys(prevAggregate)) {
-    if (!incomingAggregate[sku]) {
-      removedSkus[sku] = now;
-      for (const slice of Object.values(deviceCarts)) {
-        delete slice.catalogQtyMap[sku];
-      }
+
+  // Removals come from explicit client tombstones (markSkuRemovedInDraft), already
+  // merged into removedSkus above. Do NOT infer removals from desiredSharedQtyMap
+  // gaps — an idle/stale UI map routinely omits peer-only SKUs and would wipe the
+  // other device's adds.
+  for (const sku of Object.keys(removedSkus)) {
+    for (const slice of Object.values(deviceCarts)) {
+      delete slice.catalogQtyMap[sku];
     }
   }
 

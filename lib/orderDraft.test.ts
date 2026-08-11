@@ -74,7 +74,7 @@ test("resolveCollaborativeCloudSave merges two device carts by sum", () => {
   });
 });
 
-test("resolveCollaborativeCloudSave tombstones removed SKUs for all devices", () => {
+test("dropping this device's only contribution removes the SKU without tombstoning peers", () => {
   const existing = {
     accountNo: "FL111",
     deviceCarts: {
@@ -85,6 +85,7 @@ test("resolveCollaborativeCloudSave tombstones removed SKUs for all devices", ()
     updatedAt: "2026-08-05T01:01:00.000Z",
   };
 
+  // A clears NOODLE from its own slice (peer never had it) — no explicit tombstone needed.
   const resolved = resolveCollaborativeCloudSave({
     incoming: {
       accountNo: "FL111",
@@ -102,10 +103,10 @@ test("resolveCollaborativeCloudSave tombstones removed SKUs for all devices", ()
     RICE: "2",
     WINE: "1",
   });
-  assert.ok(resolved.removedSkus?.NOODLE);
+  assert.equal(resolved.removedSkus?.NOODLE, undefined);
 });
 
-test("client-shaped remove: peer slices still list SKU but desiredSharedQtyMap does not", () => {
+test("explicit remove tombstones SKU across every device slice", () => {
   const existing = {
     accountNo: "FL111",
     deviceCarts: {
@@ -116,22 +117,60 @@ test("client-shaped remove: peer slices still list SKU but desiredSharedQtyMap d
     updatedAt: "2026-08-05T01:01:00.000Z",
   };
 
-  // Mimic autosave after Device A removes NOODLE: normalizeOrderDraft would
-  // re-aggregate NOODLE from peer B, but desiredSharedQtyMap is the React cart.
+  // Mimic autosave after Device A removes NOODLE via markSkuRemovedInDraft.
   const clientDeviceCarts = {
     A: { catalogQtyMap: { RICE: "1" }, updatedAt: "2026-08-05T01:03:00.000Z" },
     B: { catalogQtyMap: { RICE: "1", NOODLE: "1" }, updatedAt: "2026-08-05T01:01:00.000Z" },
   };
-  const incoming = normalizeOrderDraft("FL111", {
+  // Without the tombstone, normalize would re-aggregate NOODLE from peer B.
+  const withoutTombstone = normalizeOrderDraft("FL111", {
     deviceCarts: clientDeviceCarts,
     catalogQtyMap: { RICE: "1" },
     updatedAt: "2026-08-05T01:03:00.000Z",
   });
-  // Prove the bug shape: normalized incoming still has NOODLE from peer B.
-  assert.equal(incoming.catalogQtyMap?.NOODLE, "1");
+  assert.equal(withoutTombstone.catalogQtyMap?.NOODLE, "1");
+
+  const incoming = normalizeOrderDraft("FL111", {
+    deviceCarts: clientDeviceCarts,
+    catalogQtyMap: { RICE: "1" },
+    removedSkus: { NOODLE: "2026-08-05T01:03:00.000Z" },
+    updatedAt: "2026-08-05T01:03:00.000Z",
+  });
 
   const resolved = resolveCollaborativeCloudSave({
     incoming,
+    existing,
+    allowClear: false,
+    deviceId: "A",
+    deviceQtyMap: { RICE: "1" },
+    removedSkus: { NOODLE: "2026-08-05T01:03:00.000Z" },
+    desiredSharedQtyMap: { RICE: "1" },
+  });
+
+  assert.notEqual(resolved, "delete");
+  assert.deepEqual(buildCatalogQtyMapFromDraft(resolved), { RICE: "2" });
+  assert.ok(resolved.removedSkus?.NOODLE);
+  assert.equal(resolved.deviceCarts?.B?.catalogQtyMap?.NOODLE, undefined);
+});
+
+test("stale desiredSharedQtyMap must not tombstone peer-only SKUs", () => {
+  const existing = {
+    accountNo: "FL111",
+    deviceCarts: {
+      A: { catalogQtyMap: { RICE: "1" }, updatedAt: "2026-08-05T01:00:00.000Z" },
+      B: { catalogQtyMap: { WINE: "2" }, updatedAt: "2026-08-05T01:02:00.000Z" },
+    },
+    catalogQtyMap: { RICE: "1", WINE: "2" },
+    updatedAt: "2026-08-05T01:02:00.000Z",
+  };
+
+  // Idle Device A autosaves an outdated UI cart that never saw B's WINE add.
+  const resolved = resolveCollaborativeCloudSave({
+    incoming: {
+      accountNo: "FL111",
+      catalogQtyMap: { RICE: "1" },
+      updatedAt: "2026-08-05T01:03:00.000Z",
+    },
     existing,
     allowClear: false,
     deviceId: "A",
@@ -140,9 +179,12 @@ test("client-shaped remove: peer slices still list SKU but desiredSharedQtyMap d
   });
 
   assert.notEqual(resolved, "delete");
-  assert.deepEqual(buildCatalogQtyMapFromDraft(resolved), { RICE: "2" });
-  assert.ok(resolved.removedSkus?.NOODLE);
-  assert.equal(resolved.deviceCarts?.B?.catalogQtyMap?.NOODLE, undefined);
+  assert.deepEqual(buildCatalogQtyMapFromDraft(resolved), {
+    RICE: "1",
+    WINE: "2",
+  });
+  assert.equal(resolved.removedSkus?.WINE, undefined);
+  assert.equal(resolved.deviceCarts?.B?.catalogQtyMap?.WINE, "2");
 });
 
 test("stale deviceQtyMap alone does not clear a tombstone", () => {
