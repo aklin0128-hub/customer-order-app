@@ -1886,9 +1886,15 @@
   margin-top: 8px;
   margin-bottom: 2px;
   width: 100%;
+  min-height: 46px;
   display: flex;
   justify-content: center;
+  align-items: center;
   overflow: hidden;
+}
+
+.catalog-qty-card-upc-wrap--empty {
+  visibility: hidden;
 }
 
 .catalog-qty-card-upc {

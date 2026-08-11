@@ -337,7 +337,13 @@ export function CatalogQtyCard({
           ) : null}
         </div>
       ) : null}
-      {upcDigits ? <UpcBarcode value={upcDigits} /> : null}
+      {showUpc ? (
+        upcDigits ? (
+          <UpcBarcode value={upcDigits} />
+        ) : (
+          <div className="catalog-qty-card-upc-wrap catalog-qty-card-upc-wrap--empty" aria-hidden="true" />
+        )
+      ) : null}
       {comingDateText ? (
         <div className="catalog-coming-date">
           {comingDateLabel}: {comingDateText}
