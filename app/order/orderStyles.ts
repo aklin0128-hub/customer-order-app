@@ -242,6 +242,7 @@ export const catalogNameStyle: CSSProperties = {
   fontSize: 12,
   color: "#4b5563",
   lineHeight: 1.3,
+  minHeight: 31,
   maxHeight: 36,
   overflow: "hidden",
   display: "-webkit-box",

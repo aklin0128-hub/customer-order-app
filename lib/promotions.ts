@@ -44,6 +44,8 @@ export type PromotionProduct = {
   limitedQty?: string;
   palletSize?: string;
   category?: string;
+  upc?: string;
+  barcode?: string;
   promoNote?: string;
   promoPrice?: string;
   promoQty?: number;
@@ -176,6 +178,53 @@ export function getPromotionRemainingQty(record: PromotionRecord): number | null
   return Math.max(0, remaining);
 }
 
+/** Parse invoice/upload dates (YYYY-MM-DD or M/D/YYYY) into the same noon-local day as promo windows. */
+export function parsePromotionSaleDate(value?: string | null): Date | null {
+  const text = String(value || "").trim();
+  if (!text) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) {
+    return parseDateOnly(text.slice(0, 10));
+  }
+
+  const us = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (us) {
+    const y = Number(us[3].length === 2 ? `20${us[3]}` : us[3]);
+    const m = String(Number(us[1])).padStart(2, "0");
+    const d = String(Number(us[2])).padStart(2, "0");
+    if (!Number.isFinite(y)) return null;
+    return parseDateOnly(`${y}-${m}-${d}`);
+  }
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const y = parsed.getFullYear();
+  const m = String(parsed.getMonth() + 1).padStart(2, "0");
+  const d = String(parsed.getDate()).padStart(2, "0");
+  return parseDateOnly(`${y}-${m}-${d}`);
+}
+
+/**
+ * Inclusive calendar window using promo startDate/endDate.
+ * Missing start or end = open on that side. Unknown sale date = not in window.
+ */
+export function isSaleDateWithinPromotionWindow(
+  record: Pick<PromotionRecord, "startDate" | "endDate">,
+  saleDate?: string | Date | null
+): boolean {
+  const sale =
+    saleDate instanceof Date
+      ? parsePromotionSaleDate(saleDate.toISOString())
+      : parsePromotionSaleDate(saleDate);
+  if (!sale) return false;
+
+  const start = record.startDate ? parseDateOnly(record.startDate) : null;
+  const end = record.endDate ? parseDateOnly(record.endDate) : null;
+  if (start && sale < start) return false;
+  if (end && sale > end) return false;
+  return true;
+}
+
 export function getPromotionStatus(record: PromotionRecord, now = new Date()): PromotionStatus {
   if (record.ended) return "ended";
 
@@ -289,6 +338,8 @@ function recordToProduct(record: PromotionRecord, product: PromotionProduct): Pr
     priceTiers: clean.priceTiers,
     promoStatus: getPromotionStatus(clean),
     pinned: clean.pinned,
+    upc: product.upc,
+    barcode: product.barcode,
   };
 }
 
@@ -314,13 +365,19 @@ export async function getPromotionProducts(options?: {
   return products;
 }
 
-export async function incrementPromotionSold(
-  items: { sku: string; qty: number }[]
-) {
-  if (!items.length) return;
-
-  const records = await getPromotionRecords();
-  if (!records.length) return;
+/** Pure soldQty bump used by order submit and invoice upload. */
+export function applyPromotionSoldIncrements(
+  records: PromotionRecord[],
+  items: { sku: string; qty: number }[],
+  options?: {
+    /** When set with onlyWithinValidWindow, only count sales inside promo start/end. */
+    saleDate?: string | Date | null;
+    onlyWithinValidWindow?: boolean;
+  }
+): { next: PromotionRecord[]; changed: boolean } {
+  if (!records.length || !items.length) {
+    return { next: records, changed: false };
+  }
 
   const soldMap = new Map<string, number>();
   for (const item of items) {
@@ -336,6 +393,9 @@ export async function incrementPromotionSold(
   const next = records.map((record) => {
     const add = soldMap.get(record.sku);
     if (!add || !record.promoQty) return record;
+    if (options?.onlyWithinValidWindow && !isSaleDateWithinPromotionWindow(record, options.saleDate)) {
+      return record;
+    }
 
     changed = true;
     return {
@@ -345,6 +405,38 @@ export async function incrementPromotionSold(
     };
   });
 
+  return { next, changed };
+}
+
+export async function incrementPromotionSold(
+  items: { sku: string; qty: number }[]
+) {
+  if (!items.length) return;
+
+  const records = await getPromotionRecords();
+  if (!records.length) return;
+
+  const { next, changed } = applyPromotionSoldIncrements(records, items);
+  if (changed) await savePromotionRecords(next);
+}
+
+/**
+ * Count invoice lines toward limited promo qty when the invoice date
+ * (or upload time fallback) falls inside the promo's valid date window.
+ */
+export async function incrementPromotionSoldFromInvoice(
+  items: { sku: string; qty: number }[],
+  saleDate?: string | null
+) {
+  if (!items.length) return;
+
+  const records = await getPromotionRecords();
+  if (!records.length) return;
+
+  const { next, changed } = applyPromotionSoldIncrements(records, items, {
+    saleDate: saleDate || todayDateOnly(),
+    onlyWithinValidWindow: true,
+  });
   if (changed) await savePromotionRecords(next);
 }
 
