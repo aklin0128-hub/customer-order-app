@@ -2004,6 +2004,8 @@ export default function OrderPage() {
       lastOrderedLabel: summary ? t.lastOrderedLine.replace("{summary}", summary) : undefined,
       onOpenHistory: openSkuHistory,
       showUpc,
+      invoicePrice: invoicePriceLabelForSku(cleanSku),
+      reserveInvoicePrice: invoicePricingEnabled,
     };
   };
 
@@ -2626,7 +2628,6 @@ export default function OrderPage() {
                           ? formatOrderNotAvailableMessage(item.sku || "", item.status, t)
                           : undefined
                       }
-                      invoicePrice={invoicePriceLabelForSku(sku)}
                       onAdjust={adjustCatalogQty}
                       onUpdateQty={updateCatalogQty}
                       {...favoriteCardProps(sku)}
@@ -2841,7 +2842,6 @@ export default function OrderPage() {
                       unavailableNote={
                         !canOrder ? formatOrderNotAvailableMessage(item.sku || "", item.status, t) : undefined
                       }
-                      invoicePrice={invoicePriceLabelForSku(sku)}
                       onAdjust={adjustCatalogQty}
                       onUpdateQty={updateCatalogQty}
                       {...favoriteCardProps(sku)}

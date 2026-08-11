@@ -33,12 +33,26 @@ import { resolveCatalogUpc } from "@/lib/catalogUpc";
 import { ProductImage } from "./ProductImage";
 import { UpcBarcode } from "./UpcBarcode";
 
+function InvoicePriceLine({ text }: { text: string }) {
+  const idx = text.indexOf(": ");
+  if (idx > 0) {
+    return (
+      <>
+        <span className="catalog-qty-card-invoice-price-label">{text.slice(0, idx)}</span>
+        <span className="catalog-qty-card-invoice-price-value">{text.slice(idx + 2)}</span>
+      </>
+    );
+  }
+  return <span className="catalog-qty-card-invoice-price-value">{text}</span>;
+}
+
 export function CatalogQtyCard({
   item,
   qty,
   promoNote,
   promoPrice,
   invoicePrice,
+  reserveInvoicePrice,
   promoDetails,
   promoDealLabel,
   promoDealDetail,
@@ -86,6 +100,8 @@ export function CatalogQtyCard({
   promoPrice?: string;
   /** Per-customer latest invoice unit price (when admin enables invoice pricing). */
   invoicePrice?: string;
+  /** Reserve a price row so cards stay even when some SKUs lack a last price. */
+  reserveInvoicePrice?: boolean;
   promoDetails?: string;
   promoDealLabel?: string;
   promoDealDetail?: string;
@@ -284,21 +300,42 @@ export function CatalogQtyCard({
           {palletLabel}: {item.palletSize}
         </div>
       ) : null}
-      {lastOrderedLabel && onOpenHistory ? (
-        <button
-          type="button"
-          className="catalog-qty-card-last-ordered"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenHistory(item.sku);
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <span className="catalog-qty-card-last-ordered-text">{lastOrderedLabel}</span>
-          <span className="catalog-qty-card-last-ordered-chevron" aria-hidden="true">
-            ›
-          </span>
-        </button>
+      {onOpenHistory || reserveInvoicePrice || invoicePrice ? (
+        <div className="catalog-qty-card-commerce">
+          {onOpenHistory ? (
+            <div className="catalog-qty-card-history-slot">
+              {lastOrderedLabel ? (
+                <button
+                  type="button"
+                  className="catalog-qty-card-last-ordered"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenHistory(item.sku);
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  <span className="catalog-qty-card-last-ordered-text">{lastOrderedLabel}</span>
+                  <span className="catalog-qty-card-last-ordered-chevron" aria-hidden="true">
+                    ›
+                  </span>
+                </button>
+              ) : (
+                <span className="catalog-qty-card-history-placeholder" aria-hidden="true" />
+              )}
+            </div>
+          ) : null}
+          {reserveInvoicePrice || invoicePrice ? (
+            <div className="catalog-qty-card-price-row">
+              {invoicePrice ? (
+                <div className="catalog-qty-card-invoice-price">
+                  <InvoicePriceLine text={invoicePrice} />
+                </div>
+              ) : (
+                <span className="catalog-qty-card-invoice-price-placeholder" aria-hidden="true" />
+              )}
+            </div>
+          ) : null}
+        </div>
       ) : null}
       {upcDigits ? <UpcBarcode value={upcDigits} /> : null}
       {comingDateText ? (
@@ -366,10 +403,6 @@ export function CatalogQtyCard({
         </div>
       ) : null}
       {promoPrice ? <div style={promoPriceStyle}>{promoPrice}</div> : null}
-      {!promoPrice && invoicePrice ? <div style={promoPriceStyle}>{invoicePrice}</div> : null}
-      {promoPrice && invoicePrice ? (
-        <div style={{ ...promoPriceStyle, color: "#1d4ed8", marginTop: promoPrice ? 2 : 0 }}>{invoicePrice}</div>
-      ) : null}
       {promoDetails ? <div className="catalog-qty-card-promo-details">{promoDetails}</div> : null}
       {policyNote ? <div style={clearancePolicyStyle}>{policyNote}</div> : null}
       {hasQty ? <div style={inCartTagStyle}>{inCartLabel}: {qty}</div> : null}
