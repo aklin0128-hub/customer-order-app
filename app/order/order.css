@@ -1520,6 +1520,51 @@
   min-width: 0;
 }
 
+.catalog-qty-card-sku-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.catalog-qty-card-favorite {
+  position: static;
+  flex: 0 0 auto;
+  z-index: 2;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  color: #9ca3af;
+  padding: 0;
+  font-size: 0;
+  line-height: 0;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  min-width: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.catalog-qty-card-favorite.is-on {
+  border-color: #fbbf24;
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.catalog-qty-card-favorite:active {
+  transform: scale(0.98);
+}
+
+.catalog-qty-card-favorite-icon {
+  display: block;
+  flex: 0 0 auto;
+}
+
 .catalog-qty-card-edit {
   position: static;
   flex: 0 0 auto;
@@ -2856,6 +2901,7 @@
     height: auto !important;
   }
 
+  .catalog-qty-card-favorite,
   .catalog-qty-card-edit {
     width: 40px;
     height: 40px;
@@ -2865,6 +2911,7 @@
     border-radius: 11px;
   }
 
+  .catalog-qty-card-favorite-icon,
   .catalog-qty-card-edit-icon {
     width: 16px;
     height: 16px;

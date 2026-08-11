@@ -71,6 +71,12 @@ import {
   type OrderDraftPayload,
 } from "@/lib/orderDraft";
 import {
+  loadFavoriteSkus,
+  normalizeFavoriteSku,
+  saveFavoriteSkus,
+  toggleFavoriteSku,
+} from "@/lib/favoriteSkus";
+import {
   applyQtyDelta,
   applyQtySet,
   buildCartDisplayItems,
@@ -168,6 +174,8 @@ export default function OrderPage() {
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [autoLoaded, setAutoLoaded] = useState(false);
   const [showAvailableOnly, setShowAvailableOnly] = useState(true);
+  const [catalogShowFavoritesOnly, setCatalogShowFavoritesOnly] = useState(false);
+  const [favoriteSkus, setFavoriteSkus] = useState<string[]>([]);
   const [showCustomerInfo, setShowCustomerInfo] = useState(false);
   const [invoicePricingEnabled, setInvoicePricingEnabled] = useState(false);
   const [invoicePriceEntries, setInvoicePriceEntries] = useState<
@@ -197,6 +205,31 @@ export default function OrderPage() {
       setStickyPanelOpen(true);
     }
   }, [isMobileViewport, mode]);
+
+  useEffect(() => {
+    if (!accountNo) {
+      setFavoriteSkus([]);
+      setCatalogShowFavoritesOnly(false);
+      return;
+    }
+    setFavoriteSkus(loadFavoriteSkus(accountNo));
+  }, [accountNo]);
+
+  const favoriteSkuSet = useMemo(
+    () => new Set(favoriteSkus.map((sku) => normalizeFavoriteSku(sku))),
+    [favoriteSkus]
+  );
+
+  const toggleFavorite = useCallback(
+    (sku: string) => {
+      setFavoriteSkus((prev) => {
+        const next = toggleFavoriteSku(prev, sku);
+        if (accountNo) saveFavoriteSkus(accountNo, next);
+        return next;
+      });
+    },
+    [accountNo]
+  );
 
   const toggleCategoryFilter = (cat: string) => {
     if (cat === "ALL") {
@@ -895,6 +928,11 @@ export default function OrderPage() {
     setSkuInput(next.sku || "");
   };
 
+  const favoriteItemCount = useMemo(
+    () => catalogBrowseBase.filter((item) => favoriteSkuSet.has(item.sku?.toUpperCase() || "")).length,
+    [catalogBrowseBase, favoriteSkuSet]
+  );
+
   const activeCatalogFilterCount = useMemo(() => {
     let count = 0;
     if (showAvailableOnly) count += 1;
@@ -902,21 +940,28 @@ export default function OrderPage() {
     if (brandFilter !== "ALL") count += 1;
     if (catalogShowRecommendedOnly) count += 1;
     if (catalogShowSelectedOnly) count += 1;
+    if (catalogShowFavoritesOnly) count += 1;
     return count;
-  }, [brandFilter, catalogShowRecommendedOnly, catalogShowSelectedOnly, categoryFilters, showAvailableOnly]);
+  }, [
+    brandFilter,
+    catalogShowFavoritesOnly,
+    catalogShowRecommendedOnly,
+    catalogShowSelectedOnly,
+    categoryFilters,
+    showAvailableOnly,
+  ]);
 
   const orderableCatalogItems = useMemo(() => {
     const q = catalogSearch.trim().toUpperCase();
 
     return catalogBrowseBase
       .filter((item) => {
-        if (catalogShowSelectedOnly) {
-          const sku = (item.sku || "").toUpperCase();
-          if (Number(catalogQtyMap[sku] || 0) <= 0) return false;
-        }
+        const sku = (item.sku || "").toUpperCase();
+        if (catalogShowSelectedOnly && Number(catalogQtyMap[sku] || 0) <= 0) return false;
+        if (catalogShowFavoritesOnly && !favoriteSkuSet.has(sku)) return false;
         if (!productMatchesCategoryFilters(item, categoryFilters)) return false;
         if (brandFilter !== "ALL" && !brandMatchesFilter(item.brand, brandFilter)) return false;
-        if (catalogShowRecommendedOnly && !recommendedSkuSet.has(item.sku?.toUpperCase() || "")) return false;
+        if (catalogShowRecommendedOnly && !recommendedSkuSet.has(sku)) return false;
         return true;
       })
       .filter((item) => {
@@ -924,12 +969,26 @@ export default function OrderPage() {
         return scoreCatalogSearchQuery(item, q) >= 0;
       })
       .sort((a, b) => {
+        const aFav = favoriteSkuSet.has(a.sku?.toUpperCase() || "");
+        const bFav = favoriteSkuSet.has(b.sku?.toUpperCase() || "");
+        if (aFav !== bFav) return aFav ? -1 : 1;
         const aNormal = isOrderableItem(a);
         const bNormal = isOrderableItem(b);
         if (aNormal !== bNormal) return aNormal ? -1 : 1;
         return compareCatalogForDisplay(a, b);
       });
-  }, [catalogSearch, categoryFilters, brandFilter, catalogQtyMap, catalogBrowseBase, catalogShowSelectedOnly, catalogShowRecommendedOnly, recommendedSkuSet]);
+  }, [
+    catalogSearch,
+    categoryFilters,
+    brandFilter,
+    catalogQtyMap,
+    catalogBrowseBase,
+    catalogShowSelectedOnly,
+    catalogShowFavoritesOnly,
+    catalogShowRecommendedOnly,
+    recommendedSkuSet,
+    favoriteSkuSet,
+  ]);
 
   useEffect(() => {
     if (brandFilter !== "ALL" && !isKnownBrandFilter(brandSplit, brandFilter)) {
@@ -1880,8 +1939,25 @@ export default function OrderPage() {
         <input type="checkbox" checked={showAvailableOnly} onChange={(e) => setShowAvailableOnly(e.target.checked)} />
         {t.availableOnly}
       </label>
+      <label className="order-sticky-filter-check">
+        <input
+          type="checkbox"
+          checked={catalogShowFavoritesOnly}
+          onChange={(e) => setCatalogShowFavoritesOnly(e.target.checked)}
+        />
+        {t.favoritesOnly} ({favoriteItemCount})
+      </label>
     </div>
   );
+
+  const favoriteCardProps = (sku: string) => {
+    const isFavorite = favoriteSkuSet.has(sku.toUpperCase());
+    return {
+      favorite: isFavorite,
+      favoriteLabel: isFavorite ? t.removeFavorite : t.addFavorite,
+      onToggleFavorite: toggleFavorite,
+    };
+  };
 
   const renderModeTabs = () => (
     <div className="order-mode-tabs" role="tablist" aria-label="Order mode">
@@ -2505,6 +2581,7 @@ export default function OrderPage() {
                       invoicePrice={invoicePriceLabelForSku(sku)}
                       onAdjust={adjustCatalogQty}
                       onUpdateQty={updateCatalogQty}
+                      {...favoriteCardProps(sku)}
                     />
                   );
                 })}
@@ -2582,6 +2659,7 @@ export default function OrderPage() {
                       }
                       onAdjust={adjustCatalogQty}
                       onUpdateQty={updateCatalogQty}
+                      {...favoriteCardProps(sku)}
                     />
                   );
                 })}
@@ -2640,7 +2718,8 @@ export default function OrderPage() {
                       unavailableNote={
                         notOrderable ? formatOrderNotAvailableMessage(sku, catalogItem.status, t) : undefined
                       }
-                      onAdjust={adjustClearanceQty} onUpdateQty={updateClearanceQty} />
+                      onAdjust={adjustClearanceQty} onUpdateQty={updateClearanceQty}
+                      {...favoriteCardProps(sku)} />
                   );
                 })}
               </div>
@@ -2664,7 +2743,13 @@ export default function OrderPage() {
             ) : null}
 
             {orderableCatalogItems.length === 0 ? (
-              <div style={{ ...emptyStyle, marginTop: 10 }}>{catalogShowSelectedOnly ? t.noItems : t.noMatches}</div>
+              <div style={{ ...emptyStyle, marginTop: 10 }}>
+                {catalogShowFavoritesOnly
+                  ? t.noFavorites
+                  : catalogShowSelectedOnly
+                    ? t.noItems
+                    : t.noMatches}
+              </div>
             ) : (
               <div className="order-catalog-css-grid">
                 {orderableCatalogItems.map((item) => {
@@ -2700,6 +2785,7 @@ export default function OrderPage() {
                       invoicePrice={invoicePriceLabelForSku(sku)}
                       onAdjust={adjustCatalogQty}
                       onUpdateQty={updateCatalogQty}
+                      {...favoriteCardProps(sku)}
                     />
                   );
                 })}
