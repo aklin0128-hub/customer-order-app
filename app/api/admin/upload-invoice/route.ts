@@ -16,6 +16,7 @@ import { parseInvoiceText } from "@/lib/invoice/parseInvoiceText";
 import { bustAnalyticsCache } from "@/lib/analyticsCache";
 import { findDuplicateInvoiceImport } from "@/lib/invoiceDedup";
 import { prependOrderHistory } from "@/lib/orderHistory";
+import { incrementPromotionSoldFromInvoice } from "@/lib/promotions";
 import { guessRegionFromText } from "@/lib/regionGuess";
 import { mergeRecentItems } from "@/lib/recentItems";
 import { redis } from "@/lib/redis";
@@ -99,6 +100,7 @@ export async function POST(req: Request) {
     });
 
     let appliedToHistory = false;
+    let appliedToPromoSold = false;
 
     if (applyToHistory && linesWithFlags.length > 0 && accountNo) {
       const itemsForHistory = linesWithFlags.map((l) => {
@@ -141,6 +143,24 @@ export async function POST(req: Request) {
       appliedToHistory = true;
     }
 
+    // Limited promo qty: count invoice lines when invoice date is inside the promo window.
+    // Skip duplicates so re-uploads do not double-count.
+    if (!duplicate && linesWithFlags.length > 0) {
+      const promoItems = linesWithFlags
+        .map((line) => ({
+          sku: line.sku,
+          qty: Number(line.qty) || 0,
+        }))
+        .filter((line) => line.sku && line.qty > 0);
+      if (promoItems.length > 0) {
+        await incrementPromotionSoldFromInvoice(
+          promoItems,
+          parsed.invoiceDate || new Date().toISOString()
+        );
+        appliedToPromoSold = true;
+      }
+    }
+
     const record: InvoiceImportRecord = {
       id,
       uploadedAt: new Date().toISOString(),
@@ -157,6 +177,12 @@ export async function POST(req: Request) {
       warnings: [...parsed.warnings],
       appliedToHistory,
     };
+
+    if (duplicate) {
+      record.warnings.push(
+        "Duplicate invoice — skipped counting lines toward promotion limited qty."
+      );
+    }
 
     if (!accountNo) {
       record.warnings.unshift("No customer account resolved — skipped updating order history / recent items.");
