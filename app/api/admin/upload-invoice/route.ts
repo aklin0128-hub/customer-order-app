@@ -100,7 +100,6 @@ export async function POST(req: Request) {
     });
 
     let appliedToHistory = false;
-    let appliedToPromoSold = false;
 
     if (applyToHistory && linesWithFlags.length > 0 && accountNo) {
       const itemsForHistory = linesWithFlags.map((l) => {
@@ -157,7 +156,6 @@ export async function POST(req: Request) {
           promoItems,
           parsed.invoiceDate || new Date().toISOString()
         );
-        appliedToPromoSold = true;
       }
     }
 
