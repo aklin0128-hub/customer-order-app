@@ -56,3 +56,25 @@ export function formatSkuOrderHistoryDate(iso: string, lang = "en") {
     day: "numeric",
   });
 }
+
+export function getLatestSkuOrderHistoryEntry(
+  entries: SkuOrderHistoryEntry[] | null | undefined
+): SkuOrderHistoryEntry | null {
+  if (!Array.isArray(entries) || entries.length === 0) return null;
+  return entries[0] || null;
+}
+
+/** Short card line, e.g. "Aug 10 · 3". */
+export function formatSkuLastOrderedSummary(
+  entry: SkuOrderHistoryEntry | null | undefined,
+  lang = "en"
+): string {
+  if (!entry || !entry.qty) return "";
+  const date = formatSkuOrderHistoryDate(entry.createdAt, lang);
+  return `${date} · ${entry.qty}`;
+}
+
+export function sumSkuOrderHistoryCases(entries: SkuOrderHistoryEntry[] | null | undefined) {
+  if (!Array.isArray(entries)) return 0;
+  return entries.reduce((sum, entry) => sum + (Number(entry.qty) || 0), 0);
+}

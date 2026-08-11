@@ -77,7 +77,11 @@ import {
   saveFavoriteSkus,
   toggleFavoriteSku,
 } from "@/lib/favoriteSkus";
-import { buildSkuOrderHistoryIndex } from "@/lib/skuOrderHistory";
+import {
+  buildSkuOrderHistoryIndex,
+  formatSkuLastOrderedSummary,
+  getLatestSkuOrderHistoryEntry,
+} from "@/lib/skuOrderHistory";
 import {
   applyQtyDelta,
   applyQtySet,
@@ -227,17 +231,6 @@ export default function OrderPage() {
     [favoriteSkus]
   );
 
-  const toggleFavorite = useCallback(
-    (sku: string) => {
-      setFavoriteSkus((prev) => {
-        const next = toggleFavoriteSku(prev, sku);
-        if (accountNo) saveFavoriteSkus(accountNo, next);
-        return next;
-      });
-    },
-    [accountNo]
-  );
-
   const openSkuHistory = useCallback((sku: string) => {
     const clean = normalizeFavoriteSku(sku);
     if (clean) setSkuHistorySku(clean);
@@ -270,6 +263,23 @@ export default function OrderPage() {
       transientMsgTimerRef.current = null;
     }, ms);
   }, []);
+
+  const toggleFavorite = useCallback(
+    (sku: string) => {
+      const clean = normalizeFavoriteSku(sku);
+      const wasFavorite = favoriteSkuSet.has(clean);
+      setFavoriteSkus((prev) => {
+        const next = toggleFavoriteSku(prev, sku);
+        if (accountNo) saveFavoriteSkus(accountNo, next);
+        return next;
+      });
+      showTransientToast(
+        (wasFavorite ? t.favoriteRemoved : t.favoriteAdded).replace("{sku}", clean),
+        2200
+      );
+    },
+    [accountNo, favoriteSkuSet, showTransientToast, t.favoriteAdded, t.favoriteRemoved]
+  );
 
   const dismissFloatingNotice = useCallback(() => {
     if (transientMsgTimerRef.current) {
@@ -1939,6 +1949,13 @@ export default function OrderPage() {
       >
         {t.recommended} ({recommendedItemCount})
       </button>
+      <button
+        type="button"
+        onClick={() => setCatalogShowFavoritesOnly((prev) => !prev)}
+        style={categoryButtonStyle(catalogShowFavoritesOnly)}
+      >
+        {t.favoritesOnly} ({favoriteItemCount})
+      </button>
       <label className="order-sticky-filter-check">
         <input
           type="checkbox"
@@ -1951,30 +1968,19 @@ export default function OrderPage() {
         <input type="checkbox" checked={showAvailableOnly} onChange={(e) => setShowAvailableOnly(e.target.checked)} />
         {t.availableOnly}
       </label>
-      <label className="order-sticky-filter-check">
-        <input
-          type="checkbox"
-          checked={catalogShowFavoritesOnly}
-          onChange={(e) => setCatalogShowFavoritesOnly(e.target.checked)}
-        />
-        {t.favoritesOnly} ({favoriteItemCount})
-      </label>
     </div>
   );
 
   const favoriteCardProps = (sku: string) => {
     const cleanSku = sku.toUpperCase();
     const isFavorite = favoriteSkuSet.has(cleanSku);
-    const historyCount = skuOrderHistoryIndex.get(cleanSku)?.length || 0;
+    const latest = getLatestSkuOrderHistoryEntry(skuOrderHistoryIndex.get(cleanSku));
+    const summary = formatSkuLastOrderedSummary(latest, lang);
     return {
       favorite: isFavorite,
       favoriteLabel: isFavorite ? t.removeFavorite : t.addFavorite,
       onToggleFavorite: toggleFavorite,
-      historyCount,
-      historyLabel:
-        historyCount > 0
-          ? t.skuHistoryCount.replace("{count}", String(historyCount))
-          : t.skuHistory,
+      lastOrderedLabel: summary ? t.lastOrderedLine.replace("{summary}", summary) : undefined,
       onOpenHistory: openSkuHistory,
     };
   };
@@ -2763,12 +2769,23 @@ export default function OrderPage() {
             ) : null}
 
             {orderableCatalogItems.length === 0 ? (
-              <div style={{ ...emptyStyle, marginTop: 10 }}>
-                {catalogShowFavoritesOnly
-                  ? t.noFavorites
-                  : catalogShowSelectedOnly
-                    ? t.noItems
-                    : t.noMatches}
+              <div style={{ ...emptyStyle, marginTop: 10 }} className={catalogShowFavoritesOnly ? "order-favorites-empty" : undefined}>
+                <div>
+                  {catalogShowFavoritesOnly
+                    ? t.noFavorites
+                    : catalogShowSelectedOnly
+                      ? t.noItems
+                      : t.noMatches}
+                </div>
+                {catalogShowFavoritesOnly ? (
+                  <button
+                    type="button"
+                    className="order-favorites-empty-btn"
+                    onClick={() => setCatalogShowFavoritesOnly(false)}
+                  >
+                    {t.showAllCatalog}
+                  </button>
+                ) : null}
               </div>
             ) : (
               <div className="order-catalog-css-grid">
@@ -2897,9 +2914,14 @@ export default function OrderPage() {
         lang={lang}
         sku={skuHistorySku}
         entries={skuOrderHistoryIndex.get(skuHistorySku) || []}
+        currentQty={catalogQtyMap[skuHistorySku] || ""}
         onAddQty={(qty) => {
           if (!skuHistorySku || qty <= 0) return;
           updateCatalogQty(skuHistorySku, String(qty));
+          showTransientToast(
+            t.historyQtyAdded.replace("{sku}", skuHistorySku).replace("{qty}", String(qty)),
+            2200
+          );
         }}
       />
 

@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildSkuOrderHistoryIndex, formatSkuOrderHistoryDate } from "@/lib/skuOrderHistory";
+import {
+  buildSkuOrderHistoryIndex,
+  formatSkuLastOrderedSummary,
+  formatSkuOrderHistoryDate,
+  getLatestSkuOrderHistoryEntry,
+  sumSkuOrderHistoryCases,
+} from "@/lib/skuOrderHistory";
 
 test("buildSkuOrderHistoryIndex groups qty by SKU newest-first", () => {
   const index = buildSkuOrderHistoryIndex([
@@ -24,6 +30,9 @@ test("buildSkuOrderHistoryIndex groups qty by SKU newest-first", () => {
     { orderRef: "A2", createdAt: "2026-08-10T12:00:00.000Z", qty: 3 },
     { orderRef: "A1", createdAt: "2026-07-01T12:00:00.000Z", qty: 4 },
   ]);
+  assert.equal(getLatestSkuOrderHistoryEntry(index.get("RICE"))?.qty, 3);
+  assert.equal(sumSkuOrderHistoryCases(index.get("RICE")), 7);
+  assert.match(formatSkuLastOrderedSummary(index.get("RICE")?.[0], "en"), /· 3$/);
 });
 
 test("formatSkuOrderHistoryDate formats valid ISO", () => {

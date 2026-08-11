@@ -2,7 +2,12 @@
 
 import { useEffect } from "react";
 
-import { formatSkuOrderHistoryDate, type SkuOrderHistoryEntry } from "@/lib/skuOrderHistory";
+import {
+  formatSkuOrderHistoryDate,
+  getLatestSkuOrderHistoryEntry,
+  sumSkuOrderHistoryCases,
+  type SkuOrderHistoryEntry,
+} from "@/lib/skuOrderHistory";
 import { getCatalogItemBySku } from "../catalogUtils";
 import { copy } from "../orderCopy";
 import type { Lang } from "../types";
@@ -14,6 +19,7 @@ export function SkuOrderHistoryModal({
   lang,
   sku,
   entries,
+  currentQty,
   onAddQty,
 }: {
   open: boolean;
@@ -21,11 +27,16 @@ export function SkuOrderHistoryModal({
   lang: Lang;
   sku: string;
   entries: SkuOrderHistoryEntry[];
+  currentQty?: string | number;
   onAddQty: (qty: number) => void;
 }) {
   const t = copy[lang];
   const cleanSku = String(sku || "").trim().toUpperCase();
   const catalogItem = getCatalogItemBySku(cleanSku);
+  const latest = getLatestSkuOrderHistoryEntry(entries);
+  const totalCases = sumSkuOrderHistoryCases(entries);
+  const older = latest ? entries.slice(1) : entries;
+  const inCart = Math.max(0, Math.floor(Number(currentQty) || 0));
 
   useEffect(() => {
     if (!open) return;
@@ -67,7 +78,7 @@ export function SkuOrderHistoryModal({
             <ProductImage
               sku={cleanSku}
               alt={cleanSku}
-              size={48}
+              size={52}
               imageUrl={catalogItem?.imageUrl}
             />
             <div>
@@ -85,40 +96,81 @@ export function SkuOrderHistoryModal({
           </button>
         </header>
 
-        <p className="sku-order-history-hint">{t.skuHistoryHint}</p>
+        {entries.length > 0 ? (
+          <p className="sku-order-history-summary">
+            {t.skuHistorySummary
+              .replace("{count}", String(entries.length))
+              .replace("{cases}", String(totalCases))}
+            {inCart > 0 ? ` · ${t.inCart}: ${inCart}` : ""}
+          </p>
+        ) : (
+          <p className="sku-order-history-hint">{t.skuHistoryHint}</p>
+        )}
 
         <div className="sku-order-history-body">
-          {entries.length === 0 ? (
+          {entries.length === 0 || !latest ? (
             <p className="sku-order-history-empty">{t.skuHistoryEmpty}</p>
           ) : (
-            <ul className="sku-order-history-list">
-              {entries.map((entry, index) => {
-                const key = `${entry.orderRef || "ref"}-${entry.createdAt || index}`;
-                return (
-                  <li key={key} className="sku-order-history-row">
-                    <div className="sku-order-history-row-meta">
-                      <div className="sku-order-history-date">
-                        {formatSkuOrderHistoryDate(entry.createdAt, lang)}
-                      </div>
-                      <div className="sku-order-history-detail">
-                        {entry.qty} {t.cases}
-                        {entry.orderRef ? ` · ${entry.orderRef}` : ""}
-                      </div>
+            <>
+              <section className="sku-order-history-latest">
+                <div className="sku-order-history-latest-label">{t.lastOrdered}</div>
+                <div className="sku-order-history-latest-row">
+                  <div>
+                    <div className="sku-order-history-date">
+                      {formatSkuOrderHistoryDate(latest.createdAt, lang)}
                     </div>
-                    <button
-                      type="button"
-                      className="sku-order-history-add"
-                      onClick={() => {
-                        onAddQty(entry.qty);
-                        onClose();
-                      }}
-                    >
-                      {t.addHistoryQty.replace("{qty}", String(entry.qty))}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+                    <div className="sku-order-history-detail">
+                      {latest.qty} {t.cases}
+                      {latest.orderRef ? ` · ${latest.orderRef}` : ""}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="sku-order-history-reorder"
+                    onClick={() => {
+                      onAddQty(latest.qty);
+                      onClose();
+                    }}
+                  >
+                    {t.reorderLastQty.replace("{qty}", String(latest.qty))}
+                  </button>
+                </div>
+              </section>
+
+              {older.length > 0 ? (
+                <>
+                  <div className="sku-order-history-section-label">{t.earlierOrders}</div>
+                  <ul className="sku-order-history-list">
+                    {older.map((entry, index) => {
+                      const key = `${entry.orderRef || "ref"}-${entry.createdAt || index}`;
+                      return (
+                        <li key={key} className="sku-order-history-row">
+                          <div className="sku-order-history-row-meta">
+                            <div className="sku-order-history-date">
+                              {formatSkuOrderHistoryDate(entry.createdAt, lang)}
+                            </div>
+                            <div className="sku-order-history-detail">
+                              {entry.qty} {t.cases}
+                              {entry.orderRef ? ` · ${entry.orderRef}` : ""}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            className="sku-order-history-add"
+                            onClick={() => {
+                              onAddQty(entry.qty);
+                              onClose();
+                            }}
+                          >
+                            {t.addHistoryQty.replace("{qty}", String(entry.qty))}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              ) : null}
+            </>
           )}
         </div>
       </div>
