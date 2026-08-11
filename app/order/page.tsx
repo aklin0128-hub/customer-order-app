@@ -262,9 +262,8 @@ export default function OrderPage() {
       setCategoryFilters([]);
       return;
     }
-    setCategoryFilters((prev) =>
-      prev.includes(cat) ? prev.filter((value) => value !== cat) : [...prev, cat]
-    );
+    // Single-select: picking one category clears any other.
+    setCategoryFilters((prev) => (prev.length === 1 && prev[0] === cat ? [] : [cat]));
   };
 
   const categoryAllActive = categoryFilters.length === 0;
