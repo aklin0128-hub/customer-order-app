@@ -122,7 +122,7 @@ export function CatalogQtyCard({
   favorite?: boolean;
   favoriteLabel?: string;
   onToggleFavorite?: (sku: string) => void;
-  /** e.g. "Last: Aug 10 · 3 cs" — tappable history entry point. */
+  /** e.g. "History" — tappable history entry point. */
   lastOrderedLabel?: string;
   onOpenHistory?: (sku: string) => void;
   /** When true, render UPC/barcode under product info if available. */

@@ -1996,12 +1996,11 @@ export default function OrderPage() {
     const cleanSku = sku.toUpperCase();
     const isFavorite = favoriteSkuSet.has(cleanSku);
     const latest = getLatestSkuOrderHistoryEntry(skuOrderHistoryIndex.get(cleanSku));
-    const summary = formatSkuLastOrderedSummary(latest, lang);
     return {
       favorite: isFavorite,
       favoriteLabel: isFavorite ? t.removeFavorite : t.addFavorite,
       onToggleFavorite: toggleFavorite,
-      lastOrderedLabel: summary ? t.lastOrderedLine.replace("{summary}", summary) : undefined,
+      lastOrderedLabel: latest ? t.historyLink : undefined,
       onOpenHistory: openSkuHistory,
       showUpc,
       invoicePrice: invoicePriceLabelForSku(cleanSku),
