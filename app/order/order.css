@@ -583,6 +583,18 @@
   font-weight: 700;
 }
 
+.sku-order-history-price {
+  margin-left: 0.35em;
+  color: #0f766e;
+  font-weight: 900;
+}
+
+.sku-order-history-price::before {
+  content: "· ";
+  color: #9ca3af;
+  font-weight: 700;
+}
+
 .sku-order-history-reorder {
   flex: 0 0 auto;
   border: 1px solid #14b8a6;

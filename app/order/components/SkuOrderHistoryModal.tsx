@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { formatInvoiceUnitPrice } from "@/lib/customerInvoicePriceDisplay";
+import {
+  attachUnitPricesToSkuHistory,
+  type SkuInvoicePricePoint,
+} from "@/lib/skuInvoicePriceHistory";
 import {
   formatSkuOrderHistoryDate,
   getLatestSkuOrderHistoryEntry,
@@ -13,11 +18,18 @@ import { copy } from "../orderCopy";
 import type { Lang } from "../types";
 import { ProductImage } from "./ProductImage";
 
+function HistoryPriceText({ unitPrice }: { unitPrice?: number }) {
+  if (typeof unitPrice !== "number" || !(unitPrice > 0)) return null;
+  return <span className="sku-order-history-price">{formatInvoiceUnitPrice(unitPrice)}</span>;
+}
+
 export function SkuOrderHistoryModal({
   open,
   onClose,
   lang,
   sku,
+  accountNo,
+  invoicePricingEnabled,
   entries,
   currentQty,
   onAddQty,
@@ -26,6 +38,8 @@ export function SkuOrderHistoryModal({
   onClose: () => void;
   lang: Lang;
   sku: string;
+  accountNo?: string;
+  invoicePricingEnabled?: boolean;
   entries: SkuOrderHistoryEntry[];
   currentQty?: string | number;
   onAddQty: (qty: number) => void;
@@ -33,9 +47,14 @@ export function SkuOrderHistoryModal({
   const t = copy[lang];
   const cleanSku = String(sku || "").trim().toUpperCase();
   const catalogItem = getCatalogItemBySku(cleanSku);
-  const latest = getLatestSkuOrderHistoryEntry(entries);
-  const totalCases = sumSkuOrderHistoryCases(entries);
-  const older = latest ? entries.slice(1) : entries;
+  const [pricePoints, setPricePoints] = useState<SkuInvoicePricePoint[]>([]);
+  const pricedEntries = useMemo(
+    () => attachUnitPricesToSkuHistory(entries, pricePoints),
+    [entries, pricePoints]
+  );
+  const latest = getLatestSkuOrderHistoryEntry(pricedEntries);
+  const totalCases = sumSkuOrderHistoryCases(pricedEntries);
+  const older = latest ? pricedEntries.slice(1) : pricedEntries;
   const inCart = Math.max(0, Math.floor(Number(currentQty) || 0));
 
   useEffect(() => {
@@ -55,6 +74,40 @@ export function SkuOrderHistoryModal({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open) {
+      setPricePoints([]);
+      return;
+    }
+    if (!invoicePricingEnabled || !accountNo || !cleanSku) {
+      setPricePoints([]);
+      return;
+    }
+
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(
+          `/api/customer-sku-price-history?accountNo=${encodeURIComponent(accountNo)}&sku=${encodeURIComponent(cleanSku)}`,
+          { cache: "no-store" }
+        );
+        const data = await res.json().catch(() => null);
+        if (cancelled) return;
+        if (!res.ok || !data?.enabled || !Array.isArray(data.points)) {
+          setPricePoints([]);
+          return;
+        }
+        setPricePoints(data.points as SkuInvoicePricePoint[]);
+      } catch {
+        if (!cancelled) setPricePoints([]);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, invoicePricingEnabled, accountNo, cleanSku]);
 
   if (!open || !cleanSku) return null;
 
@@ -96,10 +149,10 @@ export function SkuOrderHistoryModal({
           </button>
         </header>
 
-        {entries.length > 0 ? (
+        {pricedEntries.length > 0 ? (
           <p className="sku-order-history-summary">
             {t.skuHistorySummary
-              .replace("{count}", String(entries.length))
+              .replace("{count}", String(pricedEntries.length))
               .replace("{cases}", String(totalCases))}
             {inCart > 0 ? ` · ${t.inCart}: ${inCart}` : ""}
           </p>
@@ -108,7 +161,7 @@ export function SkuOrderHistoryModal({
         )}
 
         <div className="sku-order-history-body">
-          {entries.length === 0 || !latest ? (
+          {pricedEntries.length === 0 || !latest ? (
             <p className="sku-order-history-empty">{t.skuHistoryEmpty}</p>
           ) : (
             <>
@@ -121,6 +174,7 @@ export function SkuOrderHistoryModal({
                     </div>
                     <div className="sku-order-history-detail">
                       {latest.qty} {t.cases}
+                      <HistoryPriceText unitPrice={latest.unitPrice} />
                       {latest.orderRef ? ` · ${latest.orderRef}` : ""}
                     </div>
                   </div>
@@ -151,6 +205,7 @@ export function SkuOrderHistoryModal({
                             </div>
                             <div className="sku-order-history-detail">
                               {entry.qty} {t.cases}
+                              <HistoryPriceText unitPrice={entry.unitPrice} />
                               {entry.orderRef ? ` · ${entry.orderRef}` : ""}
                             </div>
                           </div>

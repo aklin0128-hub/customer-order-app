@@ -2935,6 +2935,8 @@ export default function OrderPage() {
         onClose={() => setSkuHistorySku("")}
         lang={lang}
         sku={skuHistorySku}
+        accountNo={accountNo}
+        invoicePricingEnabled={invoicePricingEnabled}
         entries={skuOrderHistoryIndex.get(skuHistorySku) || []}
         currentQty={catalogQtyMap[skuHistorySku] || ""}
         onAddQty={(qty) => {

@@ -1,13 +1,15 @@
 export type SkuOrderHistorySourceOrder = {
   orderRef?: string;
   createdAt?: string;
-  items?: { sku?: string; qty?: string | number }[];
+  items?: { sku?: string; qty?: string | number; unitPrice?: number | null }[];
 };
 
 export type SkuOrderHistoryEntry = {
   orderRef: string;
   createdAt: string;
   qty: number;
+  /** Case unit price when known (invoice import / stored history). */
+  unitPrice?: number;
 };
 
 function cleanSku(sku: string) {
@@ -27,17 +29,23 @@ export function buildSkuOrderHistoryIndex(
     const createdAt = String(order?.createdAt || "").trim();
     const orderRef = String(order?.orderRef || "").trim();
     const qtyBySku = new Map<string, number>();
+    const priceBySku = new Map<string, number>();
 
     for (const item of order?.items || []) {
       const sku = cleanSku(String(item?.sku || ""));
       const qty = Math.floor(Number(item?.qty) || 0);
       if (!sku || qty <= 0) continue;
       qtyBySku.set(sku, (qtyBySku.get(sku) || 0) + qty);
+      const price = Number(item?.unitPrice);
+      if (Number.isFinite(price) && price > 0 && !priceBySku.has(sku)) {
+        priceBySku.set(sku, Math.round(price * 100) / 100);
+      }
     }
 
     for (const [sku, qty] of qtyBySku) {
       const list = map.get(sku) || [];
-      list.push({ orderRef, createdAt, qty });
+      const unitPrice = priceBySku.get(sku);
+      list.push(unitPrice != null ? { orderRef, createdAt, qty, unitPrice } : { orderRef, createdAt, qty });
       map.set(sku, list);
     }
   }
