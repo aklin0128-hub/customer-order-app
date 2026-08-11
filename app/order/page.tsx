@@ -1977,6 +1977,17 @@ export default function OrderPage() {
     </div>
   );
 
+  const renderUpcToggle = (className = "") => (
+    <button
+      type="button"
+      onClick={toggleShowUpc}
+      className={className || undefined}
+      style={categoryButtonStyle(showUpc)}
+    >
+      {showUpc ? t.hideUpc : t.showUpc}
+    </button>
+  );
+
   const renderCatalogScopeChips = (className = "") => (
     <div className={`order-sticky-catalog-chips${className ? ` ${className}` : ""}`}>
       <button
@@ -1993,9 +2004,7 @@ export default function OrderPage() {
       >
         {t.favoritesOnly} ({favoriteItemCount})
       </button>
-      <button type="button" onClick={toggleShowUpc} style={categoryButtonStyle(showUpc)}>
-        {showUpc ? t.hideUpc : t.showUpc}
-      </button>
+      {renderUpcToggle()}
       <label className="order-sticky-filter-check">
         <input
           type="checkbox"
@@ -2176,6 +2185,10 @@ export default function OrderPage() {
       </div>
 
       {renderMobileModeTags()}
+
+      {mode === "promotion" || mode === "newItems" ? (
+        <div className="order-shop-upc-row">{renderUpcToggle("order-shop-upc-toggle")}</div>
+      ) : null}
 
       {mode === "catalog" ? (
         <div className="order-shop-search-row">
@@ -2511,6 +2524,14 @@ export default function OrderPage() {
                   </>
                 ) : null}
 
+                {mode === "promotion" || mode === "newItems" ? (
+                  !isMobileViewport ? (
+                    <div className="order-sticky-catalog-chips order-sticky-upc-only">
+                      {renderUpcToggle()}
+                    </div>
+                  ) : null
+                ) : null}
+
                 {mode === "search" && !isMobileViewport ? (
                   <>
                     <div className="order-sticky-search-row is-single">
@@ -2696,9 +2717,12 @@ export default function OrderPage() {
                   const bogoPack = soldOut ? null : getPromoBogoPackSize(item);
                   const catalogItem = getCatalogItemBySku(sku) || item;
                   const notOrderable = !isOrderableItem(catalogItem);
-                  const cardItem = catalogItem.palletSize
-                    ? { ...item, palletSize: catalogItem.palletSize }
-                    : item;
+                  const cardItem = {
+                    ...item,
+                    ...(catalogItem.palletSize ? { palletSize: catalogItem.palletSize } : {}),
+                    upc: catalogItem.upc || (item as { upc?: string }).upc,
+                    barcode: catalogItem.barcode || (item as { barcode?: string }).barcode,
+                  };
                   return (
                     <CatalogQtyCard
                       key={item.sku}
@@ -2770,9 +2794,12 @@ export default function OrderPage() {
                   const remainingLabel = soldOut ? t.clearanceSoldOut : item.remainingQty !== null && item.remainingQty !== undefined ? `${t.clearanceRemaining}: ${item.remainingQty}` : undefined;
                   const catalogItem = getCatalogItemBySku(sku) || item;
                   const notOrderable = !isOrderableItem(catalogItem);
-                  const cardItem = catalogItem.palletSize
-                    ? { ...item, palletSize: catalogItem.palletSize }
-                    : item;
+                  const cardItem = {
+                    ...item,
+                    ...(catalogItem.palletSize ? { palletSize: catalogItem.palletSize } : {}),
+                    upc: catalogItem.upc || (item as { upc?: string }).upc,
+                    barcode: catalogItem.barcode || (item as { barcode?: string }).barcode,
+                  };
                   return (
                     <CatalogQtyCard key={item.sku} item={cardItem} qty={qty}
                       palletLabel={t.pallet}

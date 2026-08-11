@@ -44,6 +44,8 @@ export type PromotionProduct = {
   limitedQty?: string;
   palletSize?: string;
   category?: string;
+  upc?: string;
+  barcode?: string;
   promoNote?: string;
   promoPrice?: string;
   promoQty?: number;
@@ -336,6 +338,8 @@ function recordToProduct(record: PromotionRecord, product: PromotionProduct): Pr
     priceTiers: clean.priceTiers,
     promoStatus: getPromotionStatus(clean),
     pinned: clean.pinned,
+    upc: product.upc,
+    barcode: product.barcode,
   };
 }
 

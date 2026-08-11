@@ -30,6 +30,7 @@ import {
   justAddedTagStyle,
 } from "../orderStyles";
 import { resolveCatalogUpc } from "@/lib/catalogUpc";
+import { getCatalogItemBySku } from "../catalogUtils";
 import { ProductImage } from "./ProductImage";
 import { UpcBarcode } from "./UpcBarcode";
 
@@ -179,7 +180,9 @@ export function CatalogQtyCard({
   const storageLabel = showNewItemExtras ? resolveNewItemStorageLabel(item) : undefined;
   const showJustAdded = Boolean(justAddedLabel && !showNewProductBadge && (uniformNewPill || isJustAddedItem(item)));
   const showPinnedJustAdded = Boolean(justAddedLabel && showNewProductBadge && isJustAddedItem(item));
-  const upcDigits = showUpc ? resolveCatalogUpc(item) : "";
+  const upcDigits = showUpc
+    ? resolveCatalogUpc(item) || resolveCatalogUpc(getCatalogItemBySku(item.sku || ""))
+    : "";
 
   const badgeRow =
     promoNote || showPinnedJustAdded || showJustAdded || storageLabel || highlight || promoRemaining ? (
