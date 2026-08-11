@@ -1,4 +1,5 @@
 import { isOrderableCatalogStatus } from "@/lib/orderableCatalog";
+import { scoreCatalogTextSearch } from "@/lib/catalogTextSearch";
 
 export type CatalogBrowseItem = {
   sku: string;
@@ -65,21 +66,14 @@ export function mapProductsToCatalogBrowse(
 }
 
 export function filterCatalogBrowseItems(items: CatalogBrowseItem[], query: string): CatalogBrowseItem[] {
-  const q = query.trim().toUpperCase();
+  const q = query.trim();
   if (!q) return items;
 
-  const digits = q.replace(/\D/g, "");
-
-  return items.filter((item) => {
-    if (item.sku.includes(q)) return true;
-    if (item.name?.toUpperCase().includes(q)) return true;
-    if (item.name_k?.toUpperCase().includes(q)) return true;
-    if (item.brand?.toUpperCase().includes(q)) return true;
-    if (item.category?.toUpperCase().includes(q)) return true;
-    if (digits && item.upc?.replace(/\D/g, "").includes(digits)) return true;
-    if (digits && item.barcode?.replace(/\D/g, "").includes(digits)) return true;
-    return false;
-  });
+  return items
+    .map((item) => ({ item, score: scoreCatalogTextSearch(item, q) }))
+    .filter((row) => row.score >= 0)
+    .sort((a, b) => b.score - a.score || a.item.sku.localeCompare(b.item.sku))
+    .map((row) => row.item);
 }
 
 export function displayCatalogStatus(status?: string) {
