@@ -6,7 +6,7 @@ import { formatInvoiceUnitPrice } from "@/lib/customerInvoicePriceDisplay";
 import {
   attachUnitPricesToSkuHistory,
   type SkuInvoicePricePoint,
-} from "@/lib/skuInvoicePriceHistory";
+} from "@/lib/skuInvoicePriceHistoryPure";
 import {
   formatSkuOrderHistoryDate,
   getLatestSkuOrderHistoryEntry,

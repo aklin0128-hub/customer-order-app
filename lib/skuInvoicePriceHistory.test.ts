@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
+import { buildSkuInvoicePricePointsFromImports } from "@/lib/skuInvoicePriceHistory";
 import {
   attachUnitPricesToSkuHistory,
-  buildSkuInvoicePricePointsFromImports,
   invoiceNoFromOrderRef,
   orderRefFromInvoiceNo,
-} from "@/lib/skuInvoicePriceHistory";
+} from "@/lib/skuInvoicePriceHistoryPure";
 
 function record(
   partial: Partial<InvoiceImportRecord> & Pick<InvoiceImportRecord, "id" | "accountNo" | "lines">

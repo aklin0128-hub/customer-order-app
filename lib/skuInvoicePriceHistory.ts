@@ -2,45 +2,18 @@ import { cleanSku } from "@/lib/analyticsPure";
 import { resolveInvoiceCaseUnitPrice } from "@/lib/invoice/invoiceCaseUnitPrice";
 import type { InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
 import { invoiceRecencyKey } from "@/lib/invoice/invoiceRecency";
-import type { SkuOrderHistoryEntry } from "@/lib/skuOrderHistory";
+import {
+  orderRefFromInvoiceNo,
+  skuInvoicePriceDayKey,
+  type SkuInvoicePricePoint,
+} from "@/lib/skuInvoicePriceHistoryPure";
 
-export type SkuInvoicePricePoint = {
-  orderRef: string;
-  invoiceDate: string;
-  uploadedAt: string;
-  unitPrice: number;
-};
-
-function normalizeInvoiceNo(value: string) {
-  return String(value || "")
-    .trim()
-    .toUpperCase()
-    .replace(/[^\w\-]+/g, "_");
-}
-
-/** Match history orderRef like INV-12345 → invoice number key. */
-export function invoiceNoFromOrderRef(orderRef: string): string {
-  const raw = String(orderRef || "").trim();
-  const match = /^INV-(.+)$/i.exec(raw);
-  return match ? normalizeInvoiceNo(match[1] || "") : "";
-}
-
-export function orderRefFromInvoiceNo(invoiceNo: string | null | undefined): string {
-  const safe = normalizeInvoiceNo(String(invoiceNo || ""));
-  return safe ? `INV-${safe}` : "";
-}
-
-function dayKey(isoOrDate: string): string {
-  const raw = String(isoOrDate || "").trim();
-  if (!raw) return "";
-  const parsed = Date.parse(raw.length === 10 ? `${raw}T12:00:00.000Z` : raw);
-  if (!Number.isFinite(parsed)) {
-    // Already YYYY-MM-DD-ish
-    const m = /^(\d{4}-\d{2}-\d{2})/.exec(raw);
-    return m?.[1] || "";
-  }
-  return new Date(parsed).toISOString().slice(0, 10);
-}
+export type { SkuInvoicePricePoint } from "@/lib/skuInvoicePriceHistoryPure";
+export {
+  attachUnitPricesToSkuHistory,
+  invoiceNoFromOrderRef,
+  orderRefFromInvoiceNo,
+} from "@/lib/skuInvoicePriceHistoryPure";
 
 function priceForLine(line: InvoiceImportRecord["lines"][number]): number | null {
   const price = resolveInvoiceCaseUnitPrice({
@@ -53,7 +26,7 @@ function priceForLine(line: InvoiceImportRecord["lines"][number]): number | null
     : null;
 }
 
-/** Invoice unit-price points for one account + SKU (newest first). */
+/** Invoice unit-price points for one account + SKU (newest first). Server-only. */
 export function buildSkuInvoicePricePointsFromImports(
   imports: InvoiceImportRecord[],
   accountNo: string,
@@ -95,61 +68,8 @@ export function buildSkuInvoicePricePointsFromImports(
   }
 
   return points.sort((a, b) => {
-    const aDay = dayKey(a.invoiceDate || a.uploadedAt);
-    const bDay = dayKey(b.invoiceDate || b.uploadedAt);
+    const aDay = skuInvoicePriceDayKey(a.invoiceDate || a.uploadedAt);
+    const bDay = skuInvoicePriceDayKey(b.invoiceDate || b.uploadedAt);
     return bDay.localeCompare(aDay) || b.uploadedAt.localeCompare(a.uploadedAt);
-  });
-}
-
-/**
- * Attach a unit price to each history row: stored price → INV orderRef → same calendar day → nearest earlier invoice.
- */
-export function attachUnitPricesToSkuHistory(
-  entries: SkuOrderHistoryEntry[],
-  points: SkuInvoicePricePoint[]
-): SkuOrderHistoryEntry[] {
-  if (!Array.isArray(entries) || entries.length === 0) return [];
-
-  const byOrderRef = new Map<string, number>();
-  const byDay = new Map<string, number>();
-  for (const point of points) {
-    const ref = String(point.orderRef || "").trim().toUpperCase();
-    if (ref && !byOrderRef.has(ref)) byOrderRef.set(ref, point.unitPrice);
-    const day = dayKey(point.invoiceDate || point.uploadedAt);
-    if (day && !byDay.has(day)) byDay.set(day, point.unitPrice);
-  }
-
-  const sortedPoints = [...points].sort((a, b) => {
-    const aDay = dayKey(a.invoiceDate || a.uploadedAt);
-    const bDay = dayKey(b.invoiceDate || b.uploadedAt);
-    return aDay.localeCompare(bDay);
-  });
-
-  return entries.map((entry) => {
-    if (typeof entry.unitPrice === "number" && Number.isFinite(entry.unitPrice) && entry.unitPrice > 0) {
-      return entry;
-    }
-
-    const ref = String(entry.orderRef || "").trim().toUpperCase();
-    if (ref && byOrderRef.has(ref)) {
-      return { ...entry, unitPrice: byOrderRef.get(ref)! };
-    }
-
-    const entryDay = dayKey(entry.createdAt);
-    if (entryDay && byDay.has(entryDay)) {
-      return { ...entry, unitPrice: byDay.get(entryDay)! };
-    }
-
-    if (entryDay) {
-      let nearest: number | null = null;
-      for (const point of sortedPoints) {
-        const pointDay = dayKey(point.invoiceDate || point.uploadedAt);
-        if (!pointDay || pointDay > entryDay) break;
-        nearest = point.unitPrice;
-      }
-      if (nearest != null) return { ...entry, unitPrice: nearest };
-    }
-
-    return entry;
   });
 }
