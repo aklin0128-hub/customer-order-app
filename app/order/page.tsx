@@ -821,7 +821,12 @@ export default function OrderPage() {
         };
         lastCloudUpdatedAtRef.current = updatedAt;
         const shared = buildCatalogQtyMapFromDraft(normalized);
-        setCatalogQtyMap(shared);
+        setCatalogQtyMap((prev) => {
+          const same =
+            Object.keys(prev).length === Object.keys(shared).length &&
+            Object.entries(shared).every(([sku, qty]) => prev[sku] === qty);
+          return same ? prev : shared;
+        });
         setCart((prev) => {
           // Keep clearance lines; replace catalog portion via buildCartDisplayItems.
           const clearance = Object.fromEntries(
@@ -829,7 +834,19 @@ export default function OrderPage() {
               .filter((item) => item.nhItems)
               .map((item) => [item.sku.toUpperCase(), item.qty])
           );
-          return buildCartDisplayItems({ catalog: shared, clearance });
+          const next = buildCartDisplayItems({ catalog: shared, clearance });
+          const same =
+            prev.length === next.length &&
+            next.every((item, index) => {
+              const old = prev[index];
+              return (
+                old &&
+                old.sku === item.sku &&
+                old.qty === item.qty &&
+                Boolean(old.nhItems) === Boolean(item.nhItems)
+              );
+            });
+          return same ? prev : next;
         });
         localStorage.setItem(`draft_${accountNo}`, JSON.stringify(normalized));
       } catch {
