@@ -54,6 +54,12 @@ export function CatalogQtyCard({
   unavailableNote,
   showAdminEdit,
   editLabel = "Edit",
+  favorite,
+  favoriteLabel,
+  onToggleFavorite,
+  historyCount,
+  historyLabel,
+  onOpenHistory,
   palletLabel,
   justAddedLabel,
   /** Show catalog import date (New items tab). */
@@ -95,6 +101,13 @@ export function CatalogQtyCard({
   unavailableNote?: string;
   showAdminEdit?: boolean;
   editLabel?: string;
+  favorite?: boolean;
+  favoriteLabel?: string;
+  onToggleFavorite?: (sku: string) => void;
+  /** Past order count for this SKU; button only renders when > 0. */
+  historyCount?: number;
+  historyLabel?: string;
+  onOpenHistory?: (sku: string) => void;
   /** e.g. "Pallet size" / "板数" — shown as `{label}: {value}` */
   palletLabel?: string;
   /** e.g. "JUST ADDED" — shown when admin sets justAdded on the SKU */
@@ -189,7 +202,92 @@ export function CatalogQtyCard({
 
   const productInfo = (
     <div className="catalog-qty-card-meta">
-      <div className="catalog-qty-card-sku">{item.sku}</div>
+      <div className="catalog-qty-card-sku-row">
+        <div className="catalog-qty-card-sku">{item.sku}</div>
+        <div className="catalog-qty-card-sku-actions">
+          {onOpenHistory && Number(historyCount) > 0 ? (
+            <button
+              type="button"
+              className="catalog-qty-card-history"
+              aria-label={historyLabel || "Order history"}
+              title={historyLabel || "Order history"}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenHistory(item.sku);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <svg
+                className="catalog-qty-card-history-icon"
+                viewBox="0 0 24 24"
+                width="15"
+                height="15"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  fill="currentColor"
+                  d="M13 3a9 9 0 0 0-9 9H1l4 4 4-4H6a7 7 0 1 1 1.7 4.6l-1.45 1.45A9 9 0 1 0 13 3zm-1 4v5.25l4.5 2.67.75-1.23-3.75-2.22V7H12z"
+                />
+              </svg>
+              <span className="catalog-qty-card-history-count">{historyCount}</span>
+            </button>
+          ) : null}
+          {onToggleFavorite ? (
+            <button
+              type="button"
+              className={`catalog-qty-card-favorite${favorite ? " is-on" : ""}`}
+              aria-label={favoriteLabel || (favorite ? "Remove favorite" : "Add favorite")}
+              aria-pressed={Boolean(favorite)}
+              title={favoriteLabel || (favorite ? "Remove favorite" : "Add favorite")}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleFavorite(item.sku);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <svg
+                className="catalog-qty-card-favorite-icon"
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  fill="currentColor"
+                  d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+                />
+              </svg>
+            </button>
+          ) : null}
+          {showAdminEdit ? (
+            <Link
+              href={`/admin/products?sku=${encodeURIComponent(item.sku)}`}
+              className="catalog-qty-card-edit"
+              prefetch={false}
+              aria-label={editLabel}
+              title={editLabel}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <svg
+                className="catalog-qty-card-edit-icon"
+                viewBox="0 0 24 24"
+                width="15"
+                height="15"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  fill="currentColor"
+                  d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm2.92 2.33H5v-.92l9.06-9.06.92.92L5.92 19.58zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"
+                />
+              </svg>
+            </Link>
+          ) : null}
+        </div>
+      </div>
       <div className="catalog-qty-card-brand">{item.brand || "-"}</div>
       <div className="catalog-qty-card-name" style={catalogNameStyle}>
         {item.name || "-"}
@@ -285,17 +383,6 @@ export function CatalogQtyCard({
         opacity: disabled ? 0.68 : 1,
       }}
     >
-      {showAdminEdit ? (
-        <Link
-          href={`/admin/products?sku=${encodeURIComponent(item.sku)}`}
-          className="catalog-qty-card-edit"
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          {editLabel}
-        </Link>
-      ) : null}
-
       {alignedPriceLayout && badgeRow ? (
         <div className="catalog-qty-card-badge-slot">{badgeRow}</div>
       ) : badgeRow ? (
@@ -304,7 +391,7 @@ export function CatalogQtyCard({
 
       <div
         className={`catalog-card-image-wrap${alignedPriceLayout ? " catalog-card-image-wrap--fixed" : ""}${stamped ? " catalog-card-image-wrap--stamped" : ""}${comingSoon && outOfStock ? " catalog-card-image-wrap--dual-stamped" : ""}`}
-        style={{ paddingTop: alignedPriceLayout ? 0 : badgeRow ? 2 : 0 }}
+        style={{ paddingTop: alignedPriceLayout ? 4 : badgeRow ? 2 : 0 }}
       >
         <ProductImage sku={item.sku} alt={item.name || item.sku} size={96} imageUrl={item.imageUrl} />
         {comingSoon ? <ComingSoonStamp lang={lang} /> : null}

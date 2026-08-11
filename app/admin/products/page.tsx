@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AdminPage } from "../_components/AdminPage";
 import { AdminProductsVirtualList } from "../_components/AdminProductsVirtualList";
 import { AdminSkuAutocomplete } from "../_components/AdminSkuAutocomplete";
-import { formGrid, inputStyle, labelStyle, splitForm, splitLayout, splitList } from "../_components/admin-styles";
+import { inputStyle, splitLayout } from "../_components/admin-styles";
 import {
   BtnPrimary,
   BtnRow,
@@ -18,7 +18,8 @@ import {
 } from "../_components/admin-utils";
 import { AdminPublicShowcaseHint } from "../_components/AdminPublicShowcaseHint";
 import { useAdminAuth } from "../_components/useAdminAuth";
-import { isJustAddedItem, parseImportedAtMs } from "@/lib/catalogNewItems";
+import { isJustAddedItem } from "@/lib/catalogNewItems";
+import { scoreCatalogTextSearch } from "@/lib/catalogTextSearch";
 import { readNewItemComingSoonForAdmin, readNewItemOutOfStockForAdmin } from "@/lib/comingSoonBadge";
 import { resolveNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import {
@@ -90,8 +91,6 @@ async function readApiJson(res: Response) {
   }
 }
 /** Bump when admin new-item showcase UI changes — visible in Products editor to confirm deploy. */
-const ADMIN_PRODUCTS_BUILD_TAG = "new-desc-v2";
-
 function productImageSrc(sku: string, imageUrl?: string) {
   if (imageUrl) return imageUrl;
   if (sku) return `/product/${sku}.jpg`;
@@ -100,12 +99,6 @@ function productImageSrc(sku: string, imageUrl?: string) {
 
 function isNewProduct(p?: Product | null) {
   return Boolean(p?.isNew);
-}
-
-function formatImportedAtLabel(value?: string) {
-  const ms = parseImportedAtMs(value);
-  if (ms == null) return "—";
-  return new Date(ms).toLocaleString();
 }
 
 export default function AdminProductsPage() {
@@ -140,7 +133,6 @@ export default function AdminProductsPage() {
   const [newPublishedDate, setNewPublishedDate] = useState("");
   const [newItemComingDate, setNewItemComingDate] = useState("");
   const [newItemListPrice, setNewItemListPrice] = useState("");
-  const [newItemOutOfStock, setNewItemOutOfStock] = useState(false);
   const [newItemComingSoon, setNewItemComingSoon] = useState(false);
   const [outOfStock, setOutOfStock] = useState(false);
 
@@ -171,14 +163,6 @@ export default function AdminProductsPage() {
   const markDirty = () => {
     setFormDirty(true);
     setAutoSaveStatus("Saving...");
-  };
-
-  const toggleProductCategory = (cat: string) => {
-    setCategories((prev) => {
-      if (prev.includes(cat)) return [];
-      return [cat];
-    });
-    markDirty();
   };
 
   const updateText = (setter: (value: string) => void, value: string) => {
@@ -253,19 +237,30 @@ export default function AdminProductsPage() {
     if (!q) return list.slice(0, 120);
 
     return list
-      .filter((p) => {
-        return (
-          p.sku?.toUpperCase().includes(q) ||
-          p.name?.toUpperCase().includes(q) ||
-          p.brand?.toUpperCase().includes(q) ||
-          p.category?.toUpperCase().includes(q) ||
-          p.barcode?.toUpperCase().includes(q) ||
-          p.upc?.toUpperCase().includes(q)
+      .map((p) => {
+        const score = scoreCatalogTextSearch(
+          {
+            sku: p.sku,
+            name: p.name,
+            brand: p.brand,
+            barcode: p.barcode,
+            upc: p.upc,
+          },
+          search
         );
+        const categoryHit =
+          score < 0 &&
+          Boolean(
+            p.category?.toUpperCase().includes(q) ||
+              readProductCategories(p).some((c) => c.toUpperCase().includes(q))
+          );
+        return { p, score: categoryHit ? 100 : score };
       })
-      .slice(0, 200);
+      .filter((row) => row.score >= 0)
+      .sort((a, b) => b.score - a.score || a.p.sku.localeCompare(b.p.sku))
+      .slice(0, 200)
+      .map((row) => row.p);
   }, [products, search, listFilter]);
-
   const scrollFormIntoView = () => {
     requestAnimationFrame(() => {
       formPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -294,9 +289,8 @@ export default function AdminProductsPage() {
     setNewPublishedDate(p.newPublishedDate || "");
     setNewItemComingDate(p.newItemComingDate || "");
     setNewItemListPrice(p.newItemListPrice || "");
-    setNewItemOutOfStock(readNewItemOutOfStockForAdmin(p));
     setNewItemComingSoon(readNewItemComingSoonForAdmin(p));
-    setOutOfStock(Boolean(p.outOfStock));
+    setOutOfStock(Boolean(p.outOfStock) || readNewItemOutOfStockForAdmin(p));
     setFormDirty(false);
     setAutoSaveStatus("");
     setEditFocusFromLink(Boolean(options?.fromLink));
@@ -404,7 +398,6 @@ export default function AdminProductsPage() {
     setNewPublishedDate("");
     setNewItemComingDate("");
     setNewItemListPrice("");
-    setNewItemOutOfStock(false);
     setNewItemComingSoon(false);
     setOutOfStock(false);
     setFormDirty(false);
@@ -450,7 +443,7 @@ export default function AdminProductsPage() {
           newPublishedDate: newPublishedDate || undefined,
           newItemComingDate: newItemComingDate || undefined,
           newItemListPrice: newItemListPrice || undefined,
-          newItemOutOfStock: isNew ? newItemOutOfStock : false,
+          newItemOutOfStock: isNew ? outOfStock : false,
           newItemComingSoon: isNew ? newItemComingSoon : false,
           outOfStock,
         }),
@@ -497,7 +490,7 @@ export default function AdminProductsPage() {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, outOfStock, newItemOutOfStock, newItemComingSoon, newItemDescription, newItemDescriptionPdfUrl, newPublishedDate, newItemComingDate, newItemListPrice]);
+  }, [authed, formDirty, uploadingNewPdf, sku, name, brand, status, categories, size, barcode, upc, limitedQty, palletSize, imageUrl, isNew, justAdded, outOfStock, newItemComingSoon, newItemDescription, newItemDescriptionPdfUrl, newPublishedDate, newItemComingDate, newItemListPrice]);
 
   const uploadNewItemPdf = async (file: File | null) => {
     const finalSku = sku.trim().toUpperCase();
@@ -644,7 +637,7 @@ export default function AdminProductsPage() {
       <Panel title="Bulk tools">
         <details>
           <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 900, color: "#2563eb" }}>
-            Upload today_update.xlsx (status, UPC, pallet size)
+            Upload today_update.xlsx (status, UPC, pallet size, INV)
           </summary>
           <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
             <input
@@ -690,8 +683,9 @@ export default function AdminProductsPage() {
 
       <div
         style={splitLayout}
-        className={`admin-split${editFocusFromLink ? " admin-split--edit-focus" : ""}`}
+        className={`admin-split admin-products-workspace${editFocusFromLink ? " admin-split--edit-focus" : ""}`}
       >
+        <div className="admin-products-list-col">
         <Panel title={`SKU list (${filteredProducts.length}${search ? "" : ", search for more"})`}>
           <input
             value={search}
@@ -777,13 +771,10 @@ export default function AdminProductsPage() {
             />
           )}
         </Panel>
+        </div>
 
-        <div ref={formPanelRef} style={splitForm} className="admin-catalog-form-sticky">
+        <div ref={formPanelRef} className="admin-catalog-form-sticky admin-products-form-col">
           <Panel title={sku ? `Edit ${sku}` : "SKU details"}>
-            <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 8, fontWeight: 700 }}>
-              Build {ADMIN_PRODUCTS_BUILD_TAG}
-              {!sku.trim() ? " · 选择左侧 SKU 后可编辑新品介绍" : null}
-            </div>
             {autoSaveStatus ? (
               <div
                 style={{
@@ -797,41 +788,21 @@ export default function AdminProductsPage() {
               </div>
             ) : null}
 
-            {previewSrc ? (
-              <img
-                src={previewSrc}
-                alt=""
-                style={{
-                  width: 96,
-                  height: 96,
-                  objectFit: "contain",
-                  borderRadius: 12,
-                  border: "1px solid #e5e7eb",
-                  marginBottom: 12,
-                  background: "#fff",
-                }}
-              />
-            ) : null}
-
-            <div style={formGrid}>
+            <div className="admin-products-form-dense">
               <div>
-                <label style={labelStyle}>SKU</label>
+                <label className="admin-field-label">SKU</label>
                 <AdminSkuAutocomplete
                   value={sku}
                   onChange={(v) => updateText(setSku, v)}
-                  placeholder="Type SKU or name…"
+                  placeholder="SKU…"
                 />
               </div>
               <div>
-                <label style={labelStyle}>Brand</label>
+                <label className="admin-field-label">Brand</label>
                 <input value={brand} onChange={(e) => updateText(setBrand, e.target.value)} style={inputStyle} />
               </div>
-              <div style={{ gridColumn: "1 / -1" }}>
-                <label style={labelStyle}>Item name</label>
-                <input value={name} onChange={(e) => updateText(setName, e.target.value)} style={inputStyle} />
-              </div>
               <div>
-                <label style={labelStyle}>Status</label>
+                <label className="admin-field-label">Status</label>
                 <select value={status} onChange={(e) => updateText(setStatus, e.target.value)} style={inputStyle}>
                   {editStatusOptions.map((s) => (
                     <option key={s} value={s}>
@@ -840,174 +811,108 @@ export default function AdminProductsPage() {
                   ))}
                 </select>
               </div>
-              <label
-                style={{
-                  gridColumn: "1 / -1",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  border: "1px solid #fecaca",
-                  borderRadius: 12,
-                  padding: 12,
-                  background: outOfStock ? "#fef2f2" : "#fff",
-                  color: "#991b1b",
-                  fontSize: 13,
-                  fontWeight: 900,
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={outOfStock}
-                  onChange={(e) => {
-                    setOutOfStock(e.target.checked);
-                    markDirty();
-                  }}
-                />
-                Out of stock — show stamp on catalog / weekly picks / clearance and block ordering
-              </label>
-              <div style={{ gridColumn: "1 / -1" }}>
-                <label style={labelStyle}>Category</label>
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 8,
-                    marginTop: 6,
-                    paddingBottom: 4,
-                  }}
-                >
-                  {categoryOptions.map((cat) => {
-                    const active = categories.includes(cat);
-                    return (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => toggleProductCategory(cat)}
-                        style={{
-                          padding: "8px 12px",
-                          borderRadius: 999,
-                          border: active ? "1px solid #2563eb" : "1px solid #d1d5db",
-                          background: active ? "#eff6ff" : "#ffffff",
-                          color: active ? "#2563eb" : "#374151",
-                          fontSize: 12,
-                          fontWeight: 900,
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {cat}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>
-                  {categories.length > 0
-                    ? `Selected: ${categories[0]}. Pick one of DRY, FROZEN, FRESH, HOUSEWARE. Tap again to clear (AUTO).`
-                    : "No selection = AUTO (use catalog-inferred category). Pick one category."}
-                </div>
-              </div>
-              <label
-                style={{
-                  gridColumn: "1 / -1",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  border: "1px solid #fed7aa",
-                  borderRadius: 12,
-                  padding: 12,
-                  background: isNew ? "#fff7ed" : "#fff",
-                  color: "#9a3412",
-                  fontSize: 13,
-                  fontWeight: 900,
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={isNew}
-                  onChange={(e) => {
-                    const next = e.target.checked;
-                    setIsNew(next);
-                    markDirty();
-                    if (!next) {
-                      setNewItemOutOfStock(false);
-                      setNewItemComingSoon(false);
-                      setNewItemComingDate("");
-                    }
-                    if (next) {
-                      requestAnimationFrame(() => {
-                        document.getElementById("admin-new-item-showcase")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                      });
-                    }
-                  }}
-                />
-                Show in customer “New items” (you set this — not read from name or Excel)
-                <span style={{ fontWeight: 600, color: "#c2410c" }}>
-                  {" "}
-                  (
-                  <a href="/new/" target="_blank" rel="noopener noreferrer" style={{ color: "#1d4ed8" }}>
-                    /new/
-                  </a>
-                  )
-                </span>
-              </label>
-              <label
-                style={{
-                  gridColumn: "1 / -1",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  border: "1px solid #fca5a5",
-                  borderRadius: 12,
-                  padding: 12,
-                  background: justAdded ? "#fef2f2" : "#fff",
-                  color: "#991b1b",
-                  fontSize: 13,
-                  fontWeight: 900,
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={justAdded}
-                  onChange={(e) => {
-                    setJustAdded(e.target.checked);
-                    markDirty();
-                  }}
-                />
-                JUST ADDED — red badge on customer order
-              </label>
-              <div style={{ gridColumn: "1 / -1", fontSize: 11, color: "#6b7280", marginTop: -4 }}>
-                Catalog import time (reference only):{" "}
-                {formatImportedAtLabel(products.find((p) => p.sku?.toUpperCase() === sku.toUpperCase())?.importedAt)}
-              </div>
               <div>
-                <label style={labelStyle}>Size</label>
+                <label className="admin-field-label">Category</label>
+                <select
+                  value={categories[0] || ""}
+                  onChange={(e) => {
+                    const next = e.target.value.trim();
+                    setCategories(next ? [next] : []);
+                    markDirty();
+                  }}
+                  style={inputStyle}
+                >
+                  <option value="">AUTO</option>
+                  {categoryOptions.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="admin-field-span">
+                <div className="admin-name-with-thumb">
+                  {previewSrc ? <img src={previewSrc} alt="" /> : <div style={{ width: 56, height: 56, borderRadius: 8, border: "1px dashed #d1d5db", background: "#f9fafb" }} />}
+                  <div>
+                    <label className="admin-field-label">Item name</label>
+                    <input value={name} onChange={(e) => updateText(setName, e.target.value)} style={inputStyle} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="admin-check-row">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={isNew}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setIsNew(next);
+                      markDirty();
+                      if (!next) {
+                        setNewItemComingSoon(false);
+                        setNewItemComingDate("");
+                      }
+                      if (next) {
+                        requestAnimationFrame(() => {
+                          document.getElementById("admin-new-item-showcase")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                        });
+                      }
+                    }}
+                  />
+                  New items
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={justAdded}
+                    onChange={(e) => {
+                      setJustAdded(e.target.checked);
+                      markDirty();
+                    }}
+                  />
+                  JUST ADDED
+                </label>
+                <label style={{ color: outOfStock ? "#991b1b" : undefined }}>
+                  <input
+                    type="checkbox"
+                    checked={outOfStock}
+                    onChange={(e) => {
+                      setOutOfStock(e.target.checked);
+                      markDirty();
+                    }}
+                  />
+                  Out of stock
+                </label>
+              </div>
+
+              <div>
+                <label className="admin-field-label">Size</label>
                 <input value={size} onChange={(e) => updateText(setSize, e.target.value)} style={inputStyle} />
               </div>
               <div>
-                <label style={labelStyle}>Limited qty</label>
+                <label className="admin-field-label">Limited qty</label>
                 <input value={limitedQty} onChange={(e) => updateText(setLimitedQty, e.target.value)} style={inputStyle} placeholder="e.g. 10" />
               </div>
               <div>
-                <label style={labelStyle}>Pallet size</label>
+                <label className="admin-field-label">Pallet</label>
                 <input value={palletSize} onChange={(e) => updateText(setPalletSize, e.target.value)} style={inputStyle} placeholder="e.g. 56" />
               </div>
               <div>
-                <label style={labelStyle}>Barcode</label>
+                <label className="admin-field-label">Barcode</label>
                 <input value={barcode} onChange={(e) => updateText(setBarcode, e.target.value)} style={inputStyle} />
               </div>
-              <div>
-                <label style={labelStyle}>UPC</label>
+              <div className="admin-field-span-2">
+                <label className="admin-field-label">UPC</label>
                 <input value={upc} onChange={(e) => updateText(setUpc, e.target.value)} style={inputStyle} />
               </div>
-              <div style={{ gridColumn: "1 / -1" }}>
-                <label style={labelStyle}>Image URL</label>
+              <div className="admin-field-span-2">
+                <label className="admin-field-label">Image URL</label>
                 <input value={imageUrl} onChange={(e) => updateText(setImageUrl, e.target.value)} style={inputStyle} placeholder="Filled after upload" />
               </div>
-              <div style={{ gridColumn: "1 / -1" }}>
-                <label style={labelStyle}>Upload photo</label>
+              <div className="admin-field-span-2">
+                <label className="admin-field-label">{uploadingImage ? "Uploading…" : "Upload photo"}</label>
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/webp"
@@ -1015,196 +920,169 @@ export default function AdminProductsPage() {
                   style={inputStyle}
                   disabled={uploadingImage}
                 />
-                <p style={{ fontSize: 11, color: "#9ca3af", margin: "4px 0 0" }}>
-                  {uploadingImage ? "Uploading..." : "PNG, JPG, or WEBP"}
-                </p>
               </div>
             </div>
 
             {sku.trim() ? (
-              <div
+              <details
+                key={sku}
                 id="admin-new-item-showcase"
                 className="admin-new-showcase-panel"
                 style={{
-                  marginTop: 16,
-                  marginBottom: 16,
-                  border: isNew ? "2px solid #2563eb" : "2px dashed #94a3b8",
-                  borderRadius: 14,
-                  padding: 16,
+                  marginTop: 12,
+                  marginBottom: 12,
+                  border: isNew ? "2px solid #2563eb" : "1px solid #cbd5e1",
+                  borderRadius: 12,
+                  padding: "8px 12px 12px",
                   background: isNew ? "#eff6ff" : "#f8fafc",
                   scrollMarginTop: 88,
                 }}
               >
-                <div style={{ fontSize: 17, fontWeight: 950, color: isNew ? "#1e40af" : "#334155", marginBottom: 6 }}>
-                  新品介绍 · /new/ 页面
-                </div>
-                <div style={{ fontSize: 13, color: isNew ? "#1d4ed8" : "#64748b", marginBottom: 14, lineHeight: 1.55 }}>
-                  {isNew
-                    ? "顾客在 /new/ 新品页可点「查看说明」弹出介绍。可填文字、上传 PDF、设上架日期与标价（仅 /new/ 显示，不影响订货页目录）。DRY / FROZEN / FRESH 标签来自上方 Category。"
-                    : "请先在上方勾选「Show in customer New items」，再填写下方内容。"}
-                </div>
+                <summary
+                  style={{
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 900,
+                    color: isNew ? "#1e40af" : "#334155",
+                    listStyle: "none",
+                  }}
+                >
+                  新品介绍 · /new/
+                  <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#64748b" }}>
+                    {isNew ? "展开" : "先勾选 New items"}
+                  </span>
+                </summary>
                 <fieldset disabled={!isNew} style={{ border: "none", margin: 0, padding: 0, opacity: isNew ? 1 : 0.5 }}>
-                  <label style={labelStyle}>/new/ list price (optional)</label>
-                  <input
-                    value={newItemListPrice}
-                    onChange={(e) => updateText(setNewItemListPrice, e.target.value)}
-                    style={inputStyle}
-                    placeholder="e.g. 12.99 or $12.99/cs"
-                  />
-                  <p style={{ fontSize: 11, color: "#64748b", margin: "6px 0 0" }}>
-                    Shown on public /new/ only. Does not change order totals or catalog browse.
-                  </p>
-                  <label
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      marginTop: 14,
-                      border: "1px solid #fecaca",
-                      borderRadius: 12,
-                      padding: 12,
-                      background: newItemOutOfStock ? "#fef2f2" : "#fff",
-                      color: "#991b1b",
-                      fontSize: 13,
-                      fontWeight: 900,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={newItemOutOfStock}
-                      onChange={(e) => {
-                        setNewItemOutOfStock(e.target.checked);
-                        markDirty();
-                      }}
-                    />
-                    Out of stock — show stamp on /new/ and New items tab (in addition to general flag above)
-                  </label>
-                  <label
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      marginTop: 10,
-                      border: "1px solid #fed7aa",
-                      borderRadius: 12,
-                      padding: 12,
-                      background: newItemComingSoon ? "#fff7ed" : "#fff",
-                      color: "#9a3412",
-                      fontSize: 13,
-                      fontWeight: 900,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={newItemComingSoon}
-                      onChange={(e) => {
-                        setNewItemComingSoon(e.target.checked);
-                        markDirty();
-                      }}
-                    />
-                    Coming soon — show stamp on /new/ and order New items (not orderable yet)
-                  </label>
-                  <label style={{ ...labelStyle, marginTop: 12 }}>Coming date</label>
-                  <input
-                    type="date"
-                    value={newItemComingDate}
-                    onChange={(e) => updateText(setNewItemComingDate, e.target.value)}
-                    style={inputStyle}
-                  />
-                  <p style={{ fontSize: 11, color: "#64748b", margin: "6px 0 0" }}>
-                    Expected arrival — shown on /new/ and New items when set (especially with Coming soon).
-                  </p>
-                  <label style={{ ...labelStyle, marginTop: 12 }}>Published date</label>
-                  <input
-                    type="date"
-                    value={newPublishedDate}
-                    onChange={(e) => updateText(setNewPublishedDate, e.target.value)}
-                    style={inputStyle}
-                  />
-                  <p style={{ fontSize: 11, color: "#64748b", margin: "6px 0 0" }}>
-                    Shown on /new/ and used to sort new items (newest first). Leave blank to use auto date when marked new.
-                  </p>
-                  <label style={{ ...labelStyle, marginTop: 12 }}>仓储标签 (from Category)</label>
-                  <div
-                    style={{
-                      ...inputStyle,
-                      display: "flex",
-                      alignItems: "center",
-                      minHeight: 40,
-                      fontWeight: 800,
-                      color: showcaseStorageLabel ? "#111827" : "#9ca3af",
-                      background: "#f9fafb",
-                    }}
-                  >
-                    {showcaseStorageLabel ||
-                      (categories.length > 0
-                        ? "—"
-                        : "Select Category above (DRY / FROZEN / FRESH / HOUSEWARE → DRY)")}
-                  </div>
-                  <label style={{ ...labelStyle, marginTop: 12 }}>文字介绍</label>
-                  <textarea
-                    value={newItemDescription}
-                    onChange={(e) => updateText(setNewItemDescription, e.target.value)}
-                    style={{ ...inputStyle, minHeight: 100, resize: "vertical", width: "100%", boxSizing: "border-box" }}
-                    placeholder="例如：卖点、规格、到货说明…"
-                  />
-                  <label style={{ ...labelStyle, marginTop: 12 }}>上传产品介绍 PDF</label>
-                  <input
-                    type="file"
-                    accept="application/pdf,.pdf"
-                    onChange={(e) => uploadNewItemPdf(e.target.files?.[0] || null)}
-                    style={{ ...inputStyle, width: "100%", boxSizing: "border-box" }}
-                    disabled={uploadingNewPdf || !isNew}
-                  />
-                  <p style={{ fontSize: 12, color: "#64748b", margin: "8px 0 0" }}>
-                    {uploadingNewPdf ? "正在上传…" : "仅 PDF，最大 12 MB。大文件直传存储，选择后立即保存。"}
-                  </p>
-                  {newItemDescriptionPdfUrl ? (
-                    <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                      <a
-                        href={newItemDescriptionPdfUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ fontSize: 13, fontWeight: 800, color: "#2563eb" }}
-                      >
-                        预览 PDF
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewItemDescriptionPdfUrl("");
-                          markDirty();
-                        }}
-                        style={{
-                          border: "1px solid #fecaca",
-                          background: "#fff",
-                          borderRadius: 8,
-                          padding: "6px 12px",
-                          fontSize: 12,
-                          fontWeight: 800,
-                          color: "#b91c1c",
-                          cursor: "pointer",
-                        }}
-                      >
-                        删除 PDF
-                      </button>
+                  <div className="admin-new-showcase-dense">
+                    <div>
+                      <label className="admin-field-label">List price</label>
+                      <input
+                        value={newItemListPrice}
+                        onChange={(e) => updateText(setNewItemListPrice, e.target.value)}
+                        style={inputStyle}
+                        placeholder="12.99"
+                      />
                     </div>
-                  ) : null}
+                    <div>
+                      <label className="admin-field-label">Coming date</label>
+                      <input
+                        type="date"
+                        value={newItemComingDate}
+                        onChange={(e) => updateText(setNewItemComingDate, e.target.value)}
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <label className="admin-field-label">Published</label>
+                      <input
+                        type="date"
+                        value={newPublishedDate}
+                        onChange={(e) => updateText(setNewPublishedDate, e.target.value)}
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <label className="admin-field-label">仓储标签</label>
+                      <div
+                        style={{
+                          ...inputStyle,
+                          display: "flex",
+                          alignItems: "center",
+                          minHeight: 40,
+                          fontWeight: 800,
+                          color: showcaseStorageLabel ? "#111827" : "#9ca3af",
+                          background: "#f9fafb",
+                        }}
+                      >
+                        {showcaseStorageLabel || "—"}
+                      </div>
+                    </div>
+
+                    <div className="admin-check-row">
+                      <label style={{ color: newItemComingSoon ? "#9a3412" : undefined }}>
+                        <input
+                          type="checkbox"
+                          checked={newItemComingSoon}
+                          onChange={(e) => {
+                            setNewItemComingSoon(e.target.checked);
+                            markDirty();
+                          }}
+                        />
+                        Coming soon
+                      </label>
+                    </div>
+
+                    <div className="admin-field-span">
+                      <label className="admin-field-label">文字介绍</label>
+                      <textarea
+                        value={newItemDescription}
+                        onChange={(e) => updateText(setNewItemDescription, e.target.value)}
+                        style={{ ...inputStyle, minHeight: 72, resize: "vertical", width: "100%", boxSizing: "border-box" }}
+                        placeholder="卖点、规格、到货说明…"
+                      />
+                    </div>
+
+                    <div className="admin-field-span-2">
+                      <label className="admin-field-label">{uploadingNewPdf ? "上传中…" : "介绍 PDF"}</label>
+                      <input
+                        type="file"
+                        accept="application/pdf,.pdf"
+                        onChange={(e) => uploadNewItemPdf(e.target.files?.[0] || null)}
+                        style={{ ...inputStyle, width: "100%", boxSizing: "border-box" }}
+                        disabled={uploadingNewPdf || !isNew}
+                      />
+                    </div>
+                    <div className="admin-field-span-2" style={{ display: "flex", gap: 8, alignItems: "end", flexWrap: "wrap", minHeight: 40 }}>
+                      {newItemDescriptionPdfUrl ? (
+                        <>
+                          <a
+                            href={newItemDescriptionPdfUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ fontSize: 13, fontWeight: 800, color: "#2563eb" }}
+                          >
+                            预览 PDF
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewItemDescriptionPdfUrl("");
+                              markDirty();
+                            }}
+                            style={{
+                              border: "1px solid #fecaca",
+                              background: "#fff",
+                              borderRadius: 8,
+                              padding: "6px 12px",
+                              fontSize: 12,
+                              fontWeight: 800,
+                              color: "#b91c1c",
+                              cursor: "pointer",
+                            }}
+                          >
+                            删除
+                          </button>
+                        </>
+                      ) : (
+                        <span style={{ fontSize: 11, color: "#9ca3af" }}>PDF ≤ 12 MB</span>
+                      )}
+                    </div>
+                  </div>
                 </fieldset>
-              </div>
+              </details>
             ) : null}
 
-            <BtnRow>
-              <BtnPrimary onClick={() => void saveProduct()} disabled={busy || !formDirty}>
-                {busy ? "Saving..." : formDirty ? "Save now" : "Saved automatically"}
-              </BtnPrimary>
-              <BtnSecondary onClick={clearForm}>Clear</BtnSecondary>
-              <BtnSecondary onClick={loadProducts} disabled={busy}>
-                Refresh
-              </BtnSecondary>
-            </BtnRow>
+            <div className="admin-form-actions-sticky">
+              <BtnRow>
+                <BtnPrimary onClick={() => void saveProduct()} disabled={busy || !formDirty}>
+                  {busy ? "Saving..." : formDirty ? "Save now" : "Saved automatically"}
+                </BtnPrimary>
+                <BtnSecondary onClick={clearForm}>Clear</BtnSecondary>
+                <BtnSecondary onClick={loadProducts} disabled={busy}>
+                  Refresh
+                </BtnSecondary>
+              </BtnRow>
+            </div>
 
             <Toast message={msg} tone={msgTone} />
           </Panel>

@@ -84,11 +84,17 @@ export function PeriodBanner({
   );
 }
 
-export function downloadCsv(filename: string, header: string[], rows: (string | number)[][]) {
-  const csv = [header, ...rows]
+export function downloadCsv(
+  filename: string,
+  header: string[] | string[][],
+  rows: (string | number)[][]
+) {
+  const headerRows = Array.isArray(header[0]) ? (header as string[][]) : [header as string[]];
+  const csv = [...headerRows, ...rows]
     .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
     .join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  // UTF-8 BOM so Excel on Windows opens non-ASCII correctly when present.
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
