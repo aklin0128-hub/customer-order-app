@@ -3766,6 +3766,21 @@
   display: none;
 }
 
+.order-shop-upc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.order-shop-upc-toggle {
+  flex: 0 0 auto;
+}
+
+.order-sticky-upc-only {
+  margin-bottom: 4px;
+}
+
 .order-shop-tag {
   flex: 0 0 auto;
   border: none;
