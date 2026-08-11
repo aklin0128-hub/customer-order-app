@@ -1272,15 +1272,6 @@ export default function OrderPage() {
     [lang, clearanceItems, clearanceCartSkuSet, t]
   );
 
-  const showNewItemsReviewReminder = useMemo(() => {
-    const catalogLines = expandOrderSubmitLines(qtyMaps).filter((item) => !item.nhItems);
-    if (newItemCount === 0 || catalogLines.length === 0) return false;
-    return catalogLines.every((item) => {
-      const catalogItem = getCatalogItemBySku(item.sku);
-      return !isNewItem(catalogItem);
-    });
-  }, [qtyMaps, newItemCount]);
-
   const recommendedStripItems = useMemo(() => {
     if (catalogShowRecommendedOnly) return [];
     return catalogBrowseBase
@@ -3019,18 +3010,6 @@ export default function OrderPage() {
           onAddAllClearanceUpsell={addAllMissingClearanceUpsell}
           nhItemsSkus={nhItemsSkuSetForOrder}
           promoDealBySku={promoDealBySku}
-          newItemsReminder={
-            showNewItemsReviewReminder
-              ? {
-                  count: newItemCount,
-                  onView: () => {
-                    setShowReview(false);
-                    changeMode("newItems");
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  },
-                }
-              : null
-          }
           accountNo={accountNo}
           storeName={storeName}
           submitting={submitting}

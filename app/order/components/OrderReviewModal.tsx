@@ -45,7 +45,6 @@ export function OrderReviewModal({
   onAddAllClearanceUpsell,
   nhItemsSkus,
   promoDealBySku,
-  newItemsReminder,
   accountNo,
   storeName,
   submitting,
@@ -67,10 +66,6 @@ export function OrderReviewModal({
   onAddAllClearanceUpsell: () => void;
   nhItemsSkus?: Set<string>;
   promoDealBySku?: Record<string, string>;
-  newItemsReminder?: {
-    count: number;
-    onView: () => void;
-  } | null;
   accountNo: string;
   storeName: string;
   submitting: boolean;
@@ -113,7 +108,6 @@ export function OrderReviewModal({
       onAddAllClearanceUpsell={onAddAllClearanceUpsell}
       nhItemsSkus={nhItemsSkus}
       promoDealBySku={promoDealBySku}
-      newItemsReminder={newItemsReminder}
       accountNo={accountNo}
       storeName={storeName}
       submitting={submitting}
@@ -139,7 +133,6 @@ function OrderReviewModalContent({
   onAddAllClearanceUpsell,
   nhItemsSkus,
   promoDealBySku,
-  newItemsReminder,
   accountNo,
   storeName,
   submitting,
@@ -315,31 +308,6 @@ function OrderReviewModalContent({
               onSkip={() => setHideClearanceUpsell(true)}
               skipLabel={t.skipClearanceUpsell}
             />
-          ) : null}
-
-          {newItemsReminder ? (
-            <div style={{ border: "1px solid #fdba74", background: "#fff7ed", color: "#9a3412", borderRadius: 12, padding: 10, fontSize: 12, lineHeight: 1.45, marginBottom: 10 }}>
-              <div style={{ fontWeight: 900, marginBottom: 6 }}>
-                {t.newItemsReviewReminder.replace("{count}", String(newItemsReminder.count))}
-              </div>
-              <button
-                type="button"
-                onClick={newItemsReminder.onView}
-                disabled={submitting}
-                style={{
-                  border: "1px solid #ea580c",
-                  background: "#ffedd5",
-                  color: "#c2410c",
-                  borderRadius: 999,
-                  padding: "7px 12px",
-                  fontSize: 12,
-                  fontWeight: 900,
-                  cursor: submitting ? "not-allowed" : "pointer",
-                }}
-              >
-                {t.viewNewItems}
-              </button>
-            </div>
           ) : null}
 
           <div style={reviewListStyle}>
