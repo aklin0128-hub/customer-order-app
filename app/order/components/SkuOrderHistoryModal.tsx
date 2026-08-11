@@ -144,7 +144,7 @@ export function SkuOrderHistoryModal({
                     {older.map((entry, index) => {
                       const key = `${entry.orderRef || "ref"}-${entry.createdAt || index}`;
                       return (
-                        <li key={key} className="sku-order-history-row">
+                        <li key={key} className="sku-order-history-row sku-order-history-row--readonly">
                           <div className="sku-order-history-row-meta">
                             <div className="sku-order-history-date">
                               {formatSkuOrderHistoryDate(entry.createdAt, lang)}
@@ -154,16 +154,6 @@ export function SkuOrderHistoryModal({
                               {entry.orderRef ? ` · ${entry.orderRef}` : ""}
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            className="sku-order-history-add"
-                            onClick={() => {
-                              onAddQty(entry.qty);
-                              onClose();
-                            }}
-                          >
-                            {t.addHistoryQty.replace("{qty}", String(entry.qty))}
-                          </button>
                         </li>
                       );
                     })}
