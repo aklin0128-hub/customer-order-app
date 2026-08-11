@@ -79,7 +79,6 @@ import {
 } from "@/lib/favoriteSkus";
 import {
   buildSkuOrderHistoryIndex,
-  formatSkuLastOrderedSummary,
   getLatestSkuOrderHistoryEntry,
 } from "@/lib/skuOrderHistory";
 import {
