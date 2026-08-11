@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { AdminPage } from "../_components/AdminPage";
 import { inputStyle, panel, panelTitle } from "../_components/admin-styles";
 import { downloadCsv } from "../_components/admin-analytics-ui";
-import { BtnSecondary, EmptyState, FilterChips, StatGrid, Toast, downloadOrderCsv, formatDate } from "../_components/admin-utils";
+import { BtnSecondary, EmptyState, FilterChips, StatGrid, Toast, formatDate } from "../_components/admin-utils";
 import { useAdminAuth } from "../_components/useAdminAuth";
 
 type ActiveCart = {
@@ -15,7 +15,7 @@ type ActiveCart = {
   phone?: string;
   note?: string;
   updatedAt?: string;
-  items: { sku: string; qty: string }[];
+  items: { sku: string; qty: string; addedAt?: string }[];
   lineCount: number;
   totalCases: number;
 };
@@ -197,6 +197,7 @@ function AdminActiveCartsContent() {
                             <tr style={{ background: "#f3f4f6", textAlign: "left" }}>
                               <th style={{ padding: "8px 10px" }}>SKU</th>
                               <th style={{ padding: "8px 10px" }}>Qty</th>
+                              <th style={{ padding: "8px 10px" }}>Added</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -204,6 +205,9 @@ function AdminActiveCartsContent() {
                               <tr key={item.sku} style={{ borderTop: "1px solid #e5e7eb" }}>
                                 <td style={{ padding: "8px 10px", fontWeight: 800 }}>{item.sku}</td>
                                 <td style={{ padding: "8px 10px" }}>{item.qty}</td>
+                                <td style={{ padding: "8px 10px", color: "#6b7280", whiteSpace: "nowrap" }}>
+                                  {formatDate(item.addedAt)}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -211,13 +215,17 @@ function AdminActiveCartsContent() {
                       </div>
                       <div style={{ marginTop: 10 }}>
                         <BtnSecondary
-                          onClick={() =>
-                            downloadOrderCsv({
-                              accountNo: cart.accountNo,
-                              orderRef: "active-cart",
-                              items: cart.items,
-                            })
-                          }
+                          onClick={() => {
+                            downloadCsv(
+                              `${cart.accountNo}_active-cart.csv`,
+                              ["SKU", "Qty", "Added"],
+                              cart.items.map((item) => [
+                                item.sku,
+                                item.qty,
+                                item.addedAt || "",
+                              ])
+                            );
+                          }}
                         >
                           Download CSV
                         </BtnSecondary>
