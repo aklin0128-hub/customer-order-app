@@ -538,6 +538,7 @@ export default function OrderPage() {
     const loadDrafts = async () => {
       let localParsed: OrderDraftPayload | null = null;
       let cloudParsed: OrderDraftPayload | null = null;
+      let cloudExplicitlyEmpty = false;
       if (!deviceIdRef.current) {
         deviceIdRef.current = getOrCreateOrderDeviceId();
       }
@@ -552,30 +553,47 @@ export default function OrderPage() {
       try {
         const res = await fetch(`/api/load-draft?accountNo=${encodeURIComponent(accountNo)}`, { method: "GET", cache: "no-store" });
         const data = await res.json();
-        if (res.ok && data?.draft) {
-          cloudParsed = normalizeOrderDraft(accountNo, data.draft);
+        if (res.ok) {
+          if (data?.draft) {
+            cloudParsed = normalizeOrderDraft(accountNo, data.draft);
+          } else {
+            // Cloud draft deleted (other device submitted/cleared) — do not revive from localStorage.
+            cloudExplicitlyEmpty = true;
+          }
         }
       } catch {}
 
-      const merged = mergeOrderDrafts(localParsed, cloudParsed);
-      if (merged) {
-        applySharedDraft(merged);
-        if (countDraftItems(merged) > 0) {
-          showTransientToast(t.loadedDraft);
-        }
-
+      if (cloudExplicitlyEmpty) {
         try {
-          await fetch("/api/save-draft", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              ...merged,
-              deviceId: deviceIdRef.current,
-              deviceQtyMap: deviceQtyMapRef.current,
-              allowClear: countDraftItems(merged) === 0,
-            }),
-          });
-        } catch {}
+          localStorage.removeItem(`draft_${accountNo}`);
+        } catch {
+          /* ignore */
+        }
+        cloudDraftRef.current = null;
+        deviceQtyMapRef.current = {};
+        lastCloudUpdatedAtRef.current = "";
+        cartDirtyRef.current = false;
+      } else {
+        const merged = mergeOrderDrafts(localParsed, cloudParsed);
+        if (merged) {
+          applySharedDraft(merged);
+          if (countDraftItems(merged) > 0) {
+            showTransientToast(t.loadedDraft);
+          }
+
+          try {
+            await fetch("/api/save-draft", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...merged,
+                deviceId: deviceIdRef.current,
+                deviceQtyMap: deviceQtyMapRef.current,
+                allowClear: countDraftItems(merged) === 0,
+              }),
+            });
+          } catch {}
+        }
       }
 
       try {
@@ -808,7 +826,37 @@ export default function OrderPage() {
           cache: "no-store",
         });
         const data = await res.json();
-        if (!res.ok || !data?.draft) return;
+        if (!res.ok) return;
+
+        // Peer submitted/cleared — drop local shared cart (keep Near Date Sale session lines).
+        if (!data?.draft) {
+          const hadSharedCart =
+            Boolean(lastCloudUpdatedAtRef.current) ||
+            Boolean(cloudDraftRef.current) ||
+            Object.keys(deviceQtyMapRef.current).length > 0;
+          if (hadSharedCart && !cartDirtyRef.current) {
+            cloudDraftRef.current = null;
+            deviceQtyMapRef.current = {};
+            lastCloudUpdatedAtRef.current = "";
+            cartDirtyRef.current = false;
+            setCatalogQtyMap({});
+            setCart((prev) => {
+              const clearance = Object.fromEntries(
+                prev
+                  .filter((item) => item.nhItems)
+                  .map((item) => [item.sku.toUpperCase(), item.qty])
+              );
+              return buildCartDisplayItems({ catalog: {}, clearance });
+            });
+            try {
+              localStorage.removeItem(`draft_${accountNo}`);
+            } catch {
+              /* ignore */
+            }
+          }
+          return;
+        }
+
         const normalized = ensureDeviceCarts(data.draft) || normalizeOrderDraft(accountNo, data.draft);
         const updatedAt = String(normalized.updatedAt || "");
         if (!updatedAt || updatedAt === lastCloudUpdatedAtRef.current) return;
@@ -1122,6 +1170,32 @@ export default function OrderPage() {
       cloudDraftRef.current = markSkuRemovedInDraft(cloudDraftRef.current, sku);
     } else {
       cloudDraftRef.current = markSkuReaddedInDraft(cloudDraftRef.current, sku);
+    }
+  };
+
+  /** Keep deviceCarts/tombstones aligned when bulk-updating the shared catalog map. */
+  const syncDeviceContributionsForCatalogMap = (
+    nextCatalog: Record<string, string>,
+    options?: { replace?: boolean }
+  ) => {
+    const replace = Boolean(options?.replace);
+    const previous = {
+      ...buildCatalogQtyMapFromDraft(cloudDraftRef.current),
+      ...catalogQtyMap,
+    };
+
+    if (replace) {
+      for (const sku of Object.keys(previous)) {
+        if (!nextCatalog[sku]) syncDeviceContribution(sku, 0);
+      }
+    }
+
+    for (const [sku, qty] of Object.entries(nextCatalog)) {
+      const cleanSku = sku.trim().toUpperCase();
+      const total = Math.max(0, Math.floor(Number(qty) || 0));
+      if (!cleanSku) continue;
+      if (!replace && previous[cleanSku] === String(total)) continue;
+      syncDeviceContribution(cleanSku, total);
     }
   };
 
@@ -1627,15 +1701,18 @@ export default function OrderPage() {
 
     if (orderable.length === 0) return;
 
-    setCart((prev) => [...prev, ...orderable]);
-    setCatalogQtyMap((prev) => {
-      const next = { ...prev };
-      for (const item of orderable) {
-        const qtyNumber = Number(String(item.qty || "").replace(/[^0-9]/g, ""));
-        if (qtyNumber > 0) next[item.sku.toUpperCase()] = String(Number(next[item.sku.toUpperCase()] || 0) + qtyNumber);
+    const nextCatalog = { ...catalogQtyMap };
+    for (const item of orderable) {
+      const sku = item.sku.toUpperCase();
+      const qtyNumber = Number(String(item.qty || "").replace(/[^0-9]/g, ""));
+      if (qtyNumber > 0) {
+        nextCatalog[sku] = String(Number(nextCatalog[sku] || 0) + qtyNumber);
       }
-      return next;
-    });
+    }
+
+    syncDeviceContributionsForCatalogMap(nextCatalog);
+    setCatalogQtyMap(nextCatalog);
+    setCart(buildCartDisplayItems({ catalog: nextCatalog, clearance: clearanceQtyMap }));
     showTransientToast(`${orderable.length} ${t.items} added.`);
     // Do not auto-focus SKU input; prevents page from jumping.
   };
@@ -1778,9 +1855,10 @@ export default function OrderPage() {
         return;
       }
 
+      syncDeviceContributionsForCatalogMap(parsedMap, { replace: true });
       setCatalogQtyMap(parsedMap);
       setClearanceQtyMap({});
-      setCart(parsed);
+      setCart(buildCartDisplayItems({ catalog: parsedMap, clearance: {} }));
       showTransientToast(`${parsed.length} ${t.items} loaded.`);
     } catch (error: any) {
       alert(error?.message || "Failed to read CSV.");
