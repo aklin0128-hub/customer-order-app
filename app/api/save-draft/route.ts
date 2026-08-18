@@ -1,6 +1,6 @@
 import {
+  resolveCollaborativeCloudSave,
   normalizeOrderDraft,
-  resolveCloudDraftSave,
   type OrderDraftPayload,
 } from "@/lib/orderDraft";
 import { NextResponse } from "next/server";
@@ -17,6 +17,16 @@ export async function POST(req: Request) {
     }
 
     const allowClear = Boolean(body?.allowClear);
+    const deviceId = String(body?.deviceId || "").trim();
+    // Capture before normalizeOrderDraft — it recomputes catalogQtyMap from deviceCarts
+    // and can hide intentional removals when peer slices still list the SKU.
+    const desiredSharedQtyMap =
+      body?.desiredSharedQtyMap && typeof body.desiredSharedQtyMap === "object"
+        ? body.desiredSharedQtyMap
+        : body?.catalogQtyMap && typeof body.catalogQtyMap === "object"
+          ? body.catalogQtyMap
+          : undefined;
+
     const incoming = normalizeOrderDraft(accountNo, {
       storeName: body?.storeName,
       phone: body?.phone,
@@ -24,11 +34,22 @@ export async function POST(req: Request) {
       orderEmail: body?.orderEmail,
       cart: body?.cart,
       catalogQtyMap: body?.catalogQtyMap,
+      deviceCarts: body?.deviceCarts,
+      removedSkus: body?.removedSkus,
+      itemAddedAt: body?.itemAddedAt,
       updatedAt: body?.updatedAt,
     });
 
     const existing = await redis.get<OrderDraftPayload>(`draft:${accountNo}`);
-    const resolved = resolveCloudDraftSave(incoming, existing, allowClear);
+    const resolved = resolveCollaborativeCloudSave({
+      incoming,
+      existing,
+      allowClear,
+      deviceId,
+      deviceQtyMap: body?.deviceQtyMap,
+      removedSkus: body?.removedSkus,
+      desiredSharedQtyMap,
+    });
 
     if (resolved === "delete") {
       await redis.del(`draft:${accountNo}`);
