@@ -72,10 +72,12 @@ import {
   type OrderDraftPayload,
 } from "@/lib/orderDraft";
 import {
-  loadFavoriteSkus,
+  loadFavoriteSkusPayload,
+  mergeFavoriteSkusPayloads,
   normalizeFavoriteSku,
-  saveFavoriteSkus,
+  saveFavoriteSkusPayload,
   toggleFavoriteSku,
+  type FavoriteSkusPayload,
 } from "@/lib/favoriteSkus";
 import {
   buildSkuOrderHistoryIndex,
@@ -151,6 +153,8 @@ export default function OrderPage() {
   const cartDirtyRef = useRef(false);
   const lastLocalEditAtRef = useRef(0);
   const lastCloudUpdatedAtRef = useRef("");
+  const favoriteUpdatedAtRef = useRef(0);
+  const favoriteDirtyRef = useRef(false);
 
   const [lang, setLang] = useState<Lang>("en");
   const [mode, setMode] = useState<OrderMode>("promotion");
@@ -221,9 +225,78 @@ export default function OrderPage() {
     if (!accountNo) {
       setFavoriteSkus([]);
       setCatalogShowFavoritesOnly(false);
+      favoriteUpdatedAtRef.current = 0;
+      favoriteDirtyRef.current = false;
       return;
     }
-    setFavoriteSkus(loadFavoriteSkus(accountNo));
+
+    let cancelled = false;
+
+    const syncFavorites = async () => {
+      const local = loadFavoriteSkusPayload(accountNo);
+      // Show local immediately so stars paint before the network round-trip.
+      if (local && !cancelled) {
+        setFavoriteSkus(local.skus);
+        favoriteUpdatedAtRef.current = local.updatedAt;
+      }
+
+      let cloud: FavoriteSkusPayload | null = null;
+      try {
+        const res = await fetch(
+          `/api/favorite-skus?accountNo=${encodeURIComponent(accountNo)}`,
+          { method: "GET", cache: "no-store" }
+        );
+        const data = await res.json();
+        if (res.ok && data?.favorites) {
+          cloud = data.favorites as FavoriteSkusPayload;
+        }
+      } catch {
+        /* offline — keep local */
+      }
+      if (cancelled) return;
+
+      const merged = mergeFavoriteSkusPayloads(local, cloud);
+      if (!merged) return;
+
+      setFavoriteSkus(merged.skus);
+      favoriteUpdatedAtRef.current = merged.updatedAt;
+      saveFavoriteSkusPayload(accountNo, merged);
+
+      // Push union / local migration so tablet/desktop share the same list.
+      const sameSkuSet =
+        Boolean(cloud) &&
+        cloud!.skus.length === merged.skus.length &&
+        merged.skus.every((sku) => cloud!.skus.includes(sku));
+      const needsUpload =
+        !cloud || cloud.updatedAt !== merged.updatedAt || !sameSkuSet;
+      if (needsUpload) {
+        try {
+          const res = await fetch("/api/favorite-skus", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              accountNo,
+              skus: merged.skus,
+              updatedAt: merged.updatedAt || Date.now(),
+            }),
+          });
+          const data = await res.json();
+          if (res.ok && data?.favorites && !cancelled) {
+            const saved = data.favorites as FavoriteSkusPayload;
+            setFavoriteSkus(saved.skus);
+            favoriteUpdatedAtRef.current = saved.updatedAt;
+            saveFavoriteSkusPayload(accountNo, saved);
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+
+    void syncFavorites();
+    return () => {
+      cancelled = true;
+    };
   }, [accountNo]);
 
   useEffect(() => {
@@ -287,9 +360,35 @@ export default function OrderPage() {
     (sku: string) => {
       const clean = normalizeFavoriteSku(sku);
       const wasFavorite = favoriteSkuSet.has(clean);
+      const updatedAt = Date.now();
+      favoriteDirtyRef.current = true;
+      favoriteUpdatedAtRef.current = updatedAt;
       setFavoriteSkus((prev) => {
         const next = toggleFavoriteSku(prev, sku);
-        if (accountNo) saveFavoriteSkus(accountNo, next);
+        if (accountNo) {
+          saveFavoriteSkusPayload(accountNo, { accountNo, skus: next, updatedAt });
+          void fetch("/api/favorite-skus", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ accountNo, skus: next, updatedAt }),
+          })
+            .then(async (res) => {
+              const data = await res.json().catch(() => null);
+              if (!res.ok || !data?.favorites) return;
+              const saved = data.favorites as FavoriteSkusPayload;
+              // Ignore stale responses after a newer local toggle.
+              if (saved.updatedAt < favoriteUpdatedAtRef.current) return;
+              favoriteUpdatedAtRef.current = saved.updatedAt;
+              favoriteDirtyRef.current = false;
+              setFavoriteSkus(saved.skus);
+              saveFavoriteSkusPayload(accountNo, saved);
+            })
+            .catch(() => {
+              /* local cache still has the toggle */
+            });
+        } else {
+          favoriteDirtyRef.current = false;
+        }
         return next;
       });
       showTransientToast(
@@ -902,9 +1001,35 @@ export default function OrderPage() {
       }
     };
 
-    const timer = setInterval(pullSharedCart, 4000);
+    const pullFavoriteSkus = async () => {
+      if (favoriteDirtyRef.current) return;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      try {
+        const res = await fetch(
+          `/api/favorite-skus?accountNo=${encodeURIComponent(accountNo)}`,
+          { method: "GET", cache: "no-store" }
+        );
+        const data = await res.json();
+        if (!res.ok || !data?.favorites) return;
+        const cloud = data.favorites as FavoriteSkusPayload;
+        if (!cloud.updatedAt || cloud.updatedAt <= favoriteUpdatedAtRef.current) return;
+        if (favoriteDirtyRef.current) return;
+        favoriteUpdatedAtRef.current = cloud.updatedAt;
+        setFavoriteSkus(cloud.skus);
+        saveFavoriteSkusPayload(accountNo, cloud);
+      } catch {
+        /* ignore poll errors */
+      }
+    };
+
+    const pullShared = () => {
+      void pullSharedCart();
+      void pullFavoriteSkus();
+    };
+
+    const timer = setInterval(pullShared, 4000);
     const onVisible = () => {
-      if (document.visibilityState === "visible") pullSharedCart();
+      if (document.visibilityState === "visible") pullShared();
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
