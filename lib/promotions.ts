@@ -19,7 +19,7 @@ export type PromotionRecord = {
   endDate?: string;
   promoQty?: number;
   soldQty?: number;
-  /** Single promo price when deal type is none. */
+  /** Promo unit price — used for simple price and optional Buy X Get Y price. */
   promoPrice?: string;
   /** Buy this many cases to qualify (e.g. 2 in Buy 2 Get 1 free). */
   buyQty?: number;
@@ -511,7 +511,8 @@ export function validatePromotionInput(input: {
     startDate: startDate || undefined,
     endDate: endDate || undefined,
     promoQty,
-    promoPrice: wantsBogo || wantsTiered ? undefined : promoPrice || undefined,
+    // Volume tiers own pricing; Buy X Get Y may still carry a unit promo price.
+    promoPrice: wantsTiered ? undefined : promoPrice || undefined,
     buyQty: wantsBogo ? buyQty : undefined,
     getQtyFree: wantsBogo ? getQtyFree : undefined,
     priceTiers: wantsTiered ? priceTiers : undefined,

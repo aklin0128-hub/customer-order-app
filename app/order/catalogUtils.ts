@@ -60,31 +60,47 @@ export type PromotionDealHighlight = {
   simplePrice?: string;
 };
 
+function formatSimplePromoPriceLabel(
+  promoPrice: string | undefined,
+  t: Pick<PromoCopyStrings, "promoPrice">
+) {
+  const simple = String(promoPrice || "").trim();
+  if (!simple) return undefined;
+  const display = simple.startsWith("$") ? simple : formatMoneyPrice(simple);
+  return `${t.promoPrice}: ${display}`;
+}
+
 /** BOGO and volume tiers use the amber deal highlight; simple price uses promo price line. */
 export function getPromotionDealHighlight(
   item: Pick<PromotionItem, "buyQty" | "getQtyFree" | "priceTiers" | "promoPrice">,
   t: PromoCopyStrings
 ): PromotionDealHighlight {
   const bogo = formatPromoBuyXGetY(item, t);
-  if (bogo) return { headline: bogo };
+  if (bogo) {
+    return {
+      headline: bogo,
+      simplePrice: formatSimplePromoPriceLabel(item.promoPrice, t),
+    };
+  }
 
   const tierLine = formatPromoVolumeTiersLine(item, t.casesAbbr);
   if (tierLine) {
     return { headline: t.promoVolumeTiers, detail: tierLine };
   }
 
-  const simple = String(item.promoPrice || "").trim();
-  if (!simple) return {};
-
-  const display = simple.startsWith("$") ? simple : formatMoneyPrice(simple);
-  return { simplePrice: `${t.promoPrice}: ${display}` };
+  const simplePrice = formatSimplePromoPriceLabel(item.promoPrice, t);
+  if (!simplePrice) return {};
+  return { simplePrice };
 }
 
 export function formatPromotionDealReviewLabel(highlight: PromotionDealHighlight) {
   if (highlight.headline && highlight.detail) {
     return `${highlight.headline}\n${highlight.detail}`;
   }
-  return highlight.headline || highlight.detail || "";
+  if (highlight.headline && highlight.simplePrice) {
+    return `${highlight.headline}\n${highlight.simplePrice}`;
+  }
+  return highlight.headline || highlight.detail || highlight.simplePrice || "";
 }
 
 export function formatPromotionPriceLabel(
