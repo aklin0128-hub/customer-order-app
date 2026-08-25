@@ -589,7 +589,7 @@ export function inferCategory(item: CategoryItem): ProductCategory {
   return mapGranularToMain(inferGranularCategory(item));
 }
 
-/** True for vegetables & fruits (spreadsheet PRODUCE / inferred produce). */
+/** True for Vege & Pears tab items (spreadsheet PRODUCE / inferred produce). */
 export function isVegesFruitsItem(item: CategoryItem): boolean {
   const candidates = [
     item.category,
