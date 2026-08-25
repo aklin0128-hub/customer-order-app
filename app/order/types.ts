@@ -7,7 +7,7 @@ export type OrderMode = "catalog" | "deals" | "picks" | "search";
 export type DealsSubMode = "promotion" | "clearance";
 
 /** Picks tab: curated featured lists. */
-export type PicksSubMode = "newItems" | "seasonal" | "vegesFruits";
+export type PicksSubMode = "newItems" | "seasonal";
 
 export type CatalogItem = {
   sku: string;

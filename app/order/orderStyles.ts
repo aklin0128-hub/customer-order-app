@@ -103,13 +103,6 @@ export const newItemsModeButtonStyle = (active: boolean): CSSProperties => ({
   color: active ? "#ffffff" : "#c2410c",
   fontSize: 11,
 });
-export const vegesFruitsModeButtonStyle = (active: boolean): CSSProperties => ({
-  ...modeButtonStyle(active),
-  border: active ? "1px solid #16a34a" : "1px solid #86efac",
-  background: active ? "#16a34a" : "#f0fdf4",
-  color: active ? "#ffffff" : "#15803d",
-  fontSize: 11,
-});
 export const seasonalModeButtonStyle = (active: boolean): CSSProperties => ({
   ...modeButtonStyle(active),
   border: active ? "1px solid #d97706" : "1px solid #fcd34d",

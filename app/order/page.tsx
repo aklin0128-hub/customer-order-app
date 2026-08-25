@@ -217,8 +217,6 @@ export default function OrderPage() {
   const [catalogVersion, setCatalogVersion] = useState(0);
   const [promotionItems, setPromotionItems] = useState<PromotionItem[]>([]);
   const [promotionsLoading, setPromotionsLoading] = useState(false);
-  const [vegePearsItems, setVegePearsItems] = useState<CatalogItem[]>([]);
-  const [vegePearsLoading, setVegePearsLoading] = useState(false);
   const [seasonalItems, setSeasonalItems] = useState<CatalogItem[]>([]);
   const [seasonalLoading, setSeasonalLoading] = useState(false);
   const [clearanceItems, setClearanceItems] = useState<ClearanceItem[]>([]);
@@ -486,27 +484,6 @@ export default function OrderPage() {
   useEffect(() => {
     if (!ready) return;
 
-    const loadVegePears = async () => {
-      setVegePearsLoading(true);
-      try {
-        const res = await fetch("/api/vege-pears", { cache: "no-store" });
-        const data = await res.json();
-        if (res.ok && Array.isArray(data.products)) {
-          setVegePearsItems(data.products);
-        }
-      } catch {
-        /* ignore */
-      } finally {
-        setVegePearsLoading(false);
-      }
-    };
-
-    void loadVegePears();
-  }, [ready]);
-
-  useEffect(() => {
-    if (!ready) return;
-
     const loadSeasonal = async () => {
       setSeasonalLoading(true);
       try {
@@ -556,7 +533,7 @@ export default function OrderPage() {
     const savedPicks = localStorage.getItem("order_picks_sub") as PicksSubMode | null;
 
     if (savedDeals === "promotion" || savedDeals === "clearance") setDealsSub(savedDeals);
-    if (savedPicks === "newItems" || savedPicks === "seasonal" || savedPicks === "vegesFruits") {
+    if (savedPicks === "newItems" || savedPicks === "seasonal") {
       setPicksSub(savedPicks);
     }
 
@@ -569,9 +546,12 @@ export default function OrderPage() {
     } else if (savedMode === "clearance") {
       setMode("deals");
       setDealsSub("clearance");
-    } else if (savedMode === "newItems" || savedMode === "seasonal" || savedMode === "vegesFruits") {
+    } else if (savedMode === "newItems" || savedMode === "seasonal") {
       setMode("picks");
       setPicksSub(savedMode);
+    } else if (savedMode === "vegesFruits") {
+      setMode("picks");
+      setPicksSub("newItems");
     } else {
       setMode("catalog");
     }
@@ -1162,24 +1142,6 @@ export default function OrderPage() {
         .sort(compareCatalogByNewestImport),
     [catalogBrowseBase]
   );
-
-  const vegePearsCatalogItems = useMemo(() => {
-    const bySku = new Map(
-      catalogBrowseBase.map((item) => [String(item.sku || "").toUpperCase(), item])
-    );
-    return vegePearsItems
-      .map((row) => {
-        const sku = String(row.sku || "").toUpperCase();
-        const fromCatalog = bySku.get(sku);
-        return fromCatalog ? { ...row, ...fromCatalog, sku } : { ...row, sku };
-      })
-      .filter((item) => {
-        if (!showAvailableOnly) return true;
-        return passesAvailableFilter(item);
-      });
-  }, [vegePearsItems, catalogBrowseBase, showAvailableOnly, passesAvailableFilter]);
-
-  const vegesFruitsCount = vegePearsCatalogItems.length;
 
   const seasonalCatalogItems = useMemo(() => {
     const bySku = new Map(
@@ -2200,7 +2162,7 @@ export default function OrderPage() {
           : t.searchMode;
 
   const dealsCount = promotionItems.length + clearanceItems.length;
-  const picksCount = newItemCount + seasonalCount + vegesFruitsCount;
+  const picksCount = newItemCount + seasonalCount;
 
   const renderSubChips = (
     options: { id: string; label: string; count?: number }[],
@@ -2454,7 +2416,6 @@ export default function OrderPage() {
             [
               { id: "newItems", label: t.newItemsMode, count: newItemCount },
               { id: "seasonal", label: t.seasonalMode, count: seasonalCount },
-              { id: "vegesFruits", label: t.vegesFruitsMode, count: vegesFruitsCount },
             ],
             picksSub,
             (id) => changePicksSub(id as PicksSubMode)
@@ -2809,7 +2770,6 @@ export default function OrderPage() {
                             [
                               { id: "newItems", label: t.newItemsMode, count: newItemCount },
                               { id: "seasonal", label: t.seasonalMode, count: seasonalCount },
-                              { id: "vegesFruits", label: t.vegesFruitsMode, count: vegesFruitsCount },
                             ],
                             picksSub,
                             (id) => changePicksSub(id as PicksSubMode)
@@ -2947,51 +2907,6 @@ export default function OrderPage() {
                       comingDateLabel={t.comingDate}
                       listPriceLabel={t.listPrice}
                       lang={lang}
-                      disabled={!isOrderableItem(item)}
-                      unavailableNote={
-                        !isOrderableItem(item)
-                          ? formatOrderNotAvailableMessage(item.sku || "", item.status, t)
-                          : undefined
-                      }
-                      onAdjust={adjustCatalogQty}
-                      onUpdateQty={updateCatalogQty}
-                      {...favoriteCardProps(sku)}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        ) : mode === "picks" && picksSub === "vegesFruits" ? (
-          <section className="order-shop-card">
-            {vegePearsLoading ? (
-              <div style={{ ...emptyStyle, border: "1px solid #86efac", background: "#f0fdf4", color: "#15803d" }}>
-                {t.loadingVegesFruits}
-              </div>
-            ) : vegePearsCatalogItems.length === 0 ? (
-              <div style={{ ...emptyStyle, border: "1px solid #86efac", background: "#f0fdf4", color: "#15803d" }}>
-                {t.noVegesFruits}
-              </div>
-            ) : (
-              <div className="order-promo-grid order-veges-fruits-grid">
-                {vegePearsCatalogItems.map((item) => {
-                  const sku = item.sku?.toUpperCase() || "";
-                  const qty = catalogQtyMap[sku] || "";
-                  const note = String((item as { vegePearsNote?: string }).vegePearsNote || "").trim();
-                  return (
-                    <CatalogQtyCard
-                      key={item.sku}
-                      item={item}
-                      qty={qty}
-                      palletLabel={t.pallet}
-                      justAddedLabel={t.justAdded}
-                      promoNote={note || undefined}
-                      inCartLabel={t.inCart}
-                      promoBadgeLabel={t.vegesFruitsBadge}
-                      editLabel={t.editProduct}
-                      showAdminEdit={showAdminEditLinks}
-                      lang={lang}
-                      highlight
                       disabled={!isOrderableItem(item)}
                       unavailableNote={
                         !isOrderableItem(item)
