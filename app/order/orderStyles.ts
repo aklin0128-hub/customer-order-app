@@ -103,6 +103,20 @@ export const newItemsModeButtonStyle = (active: boolean): CSSProperties => ({
   color: active ? "#ffffff" : "#c2410c",
   fontSize: 11,
 });
+export const vegesFruitsModeButtonStyle = (active: boolean): CSSProperties => ({
+  ...modeButtonStyle(active),
+  border: active ? "1px solid #16a34a" : "1px solid #86efac",
+  background: active ? "#16a34a" : "#f0fdf4",
+  color: active ? "#ffffff" : "#15803d",
+  fontSize: 11,
+});
+export const seasonalModeButtonStyle = (active: boolean): CSSProperties => ({
+  ...modeButtonStyle(active),
+  border: active ? "1px solid #d97706" : "1px solid #fcd34d",
+  background: active ? "#d97706" : "#fffbeb",
+  color: active ? "#ffffff" : "#b45309",
+  fontSize: 11,
+});
 export const qtyButtonStyle: CSSProperties = {
   padding: "6px 0",
   borderRadius: 10,
@@ -242,6 +256,7 @@ export const catalogNameStyle: CSSProperties = {
   fontSize: 12,
   color: "#4b5563",
   lineHeight: 1.3,
+  minHeight: 31,
   maxHeight: 36,
   overflow: "hidden",
   display: "-webkit-box",
