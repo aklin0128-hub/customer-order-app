@@ -12,9 +12,26 @@ test("normalizeSeasonalItemRecord uppercases sku", () => {
   assert.deepEqual(record, {
     sku: "AB12",
     note: "napa",
+    etaDate: undefined,
     sortOrder: undefined,
     updatedAt: undefined,
   });
+});
+
+test("normalizeSeasonalItemRecord keeps valid etaDate", () => {
+  const record = normalizeSeasonalItemRecord({
+    sku: "80000V",
+    etaDate: "2026-09-15",
+  });
+  assert.equal(record?.etaDate, "2026-09-15");
+});
+
+test("normalizeSeasonalItemRecord drops invalid etaDate", () => {
+  const record = normalizeSeasonalItemRecord({
+    sku: "80000V",
+    etaDate: "09/15/2026",
+  });
+  assert.equal(record?.etaDate, undefined);
 });
 
 test("parseSeasonalItemSkuList dedupes tokens", () => {

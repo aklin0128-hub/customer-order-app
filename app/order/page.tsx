@@ -3080,10 +3080,14 @@ export default function OrderPage() {
                   const sku = item.sku?.toUpperCase() || "";
                   const qty = catalogQtyMap[sku] || "";
                   const note = String((item as { seasonalNote?: string }).seasonalNote || "").trim();
+                  const etaDate = String((item as { seasonalEtaDate?: string }).seasonalEtaDate || "").trim();
                   return (
                     <CatalogQtyCard
                       key={item.sku}
-                      item={item}
+                      item={{
+                        ...item,
+                        ...(etaDate ? { newItemComingDate: etaDate } : {}),
+                      }}
                       qty={qty}
                       palletLabel={t.pallet}
                       justAddedLabel={t.justAdded}
@@ -3092,6 +3096,8 @@ export default function OrderPage() {
                       promoBadgeLabel={t.seasonalBadge}
                       editLabel={t.editProduct}
                       showAdminEdit={showAdminEditLinks}
+                      showComingDate={Boolean(etaDate)}
+                      comingDateLabel={t.etaDate}
                       lang={lang}
                       highlight
                       disabled={!isOrderableItem(item)}

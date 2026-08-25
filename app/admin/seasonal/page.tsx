@@ -24,13 +24,14 @@ import { useAdminAuth } from "../_components/useAdminAuth";
 type SeasonalItemRecord = {
   sku: string;
   note?: string;
+  etaDate?: string;
   sortOrder?: number;
 };
 
 type SeasonalItemProduct = { sku: string; name?: string; brand?: string };
 
 function emptyForm() {
-  return { sku: "", note: "", sortOrder: "" };
+  return { sku: "", note: "", etaDate: "", sortOrder: "" };
 }
 
 export default function AdminSeasonalPage() {
@@ -103,6 +104,7 @@ export default function AdminSeasonalPage() {
     setForm({
       sku: record.sku,
       note: record.note || "",
+      etaDate: record.etaDate || "",
       sortOrder: record.sortOrder !== undefined ? String(record.sortOrder) : "",
     });
   };
@@ -119,6 +121,7 @@ export default function AdminSeasonalPage() {
         body: JSON.stringify({
           sku,
           note: form.note,
+          etaDate: form.etaDate || undefined,
           sortOrder: form.sortOrder || undefined,
         }),
       });
@@ -258,6 +261,11 @@ export default function AdminSeasonalPage() {
                     {r.note ? (
                       <div style={{ marginTop: 4, fontSize: 12, color: "#4b5563" }}>{r.note}</div>
                     ) : null}
+                    {r.etaDate ? (
+                      <div style={{ marginTop: 2, fontSize: 11, color: "#b45309", fontWeight: 700 }}>
+                        ETA: {r.etaDate}
+                      </div>
+                    ) : null}
                     {typeof r.sortOrder === "number" ? (
                       <div style={{ marginTop: 2, fontSize: 11, color: "#6b7280" }}>
                         Sort: {r.sortOrder}
@@ -285,6 +293,15 @@ export default function AdminSeasonalPage() {
                   value={form.note}
                   onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
                   placeholder="Shown under the card"
+                  style={inputStyle}
+                />
+              </div>
+              <div style={{ marginTop: 10 }}>
+                <FieldLabel>ETA date (optional)</FieldLabel>
+                <input
+                  type="date"
+                  value={form.etaDate}
+                  onChange={(e) => setForm((f) => ({ ...f, etaDate: e.target.value }))}
                   style={inputStyle}
                 />
               </div>

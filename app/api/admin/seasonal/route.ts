@@ -3,6 +3,7 @@ import {
   getSeasonalItemProducts,
   getSeasonalItemRecords,
   lookupSeasonalItemCatalogProduct,
+  normalizeSeasonalItemRecord,
   parseSeasonalItemSkuList,
   saveSeasonalItemRecords,
   type SeasonalItemRecord,
@@ -110,6 +111,7 @@ export async function POST(req: Request) {
     }
 
     const note = String(body?.note || "").trim() || undefined;
+    const etaDate = String(body?.etaDate || "").trim() || undefined;
     const sortRaw = body?.sortOrder;
     const sortOrder =
       sortRaw === undefined || sortRaw === null || sortRaw === ""
@@ -120,12 +122,20 @@ export async function POST(req: Request) {
 
     const existing = await getSeasonalItemRecords();
     const next: SeasonalItemRecord[] = existing.filter((r) => r.sku !== sku);
-    next.push({
+    const draft = normalizeSeasonalItemRecord({
       sku,
       note,
+      etaDate,
       sortOrder,
       updatedAt: new Date().toISOString(),
     });
+    if (!draft) {
+      return NextResponse.json({ error: "Invalid seasonal item." }, { status: 400 });
+    }
+    if (etaDate && !draft.etaDate) {
+      return NextResponse.json({ error: "Invalid ETA date. Use YYYY-MM-DD." }, { status: 400 });
+    }
+    next.push(draft);
     await saveSeasonalItemRecords(next);
     bust();
 

@@ -7,6 +7,8 @@ export const SEASONAL_ITEMS_KEY = "seasonalItems:list";
 export type SeasonalItemRecord = {
   sku: string;
   note?: string;
+  /** Expected arrival / ETA (YYYY-MM-DD). */
+  etaDate?: string;
   sortOrder?: number;
   updatedAt?: string;
 };
@@ -25,8 +27,16 @@ export type SeasonalItemProduct = {
   barcode?: string;
   outOfStock?: boolean;
   seasonalNote?: string;
+  seasonalEtaDate?: string;
   sortOrder?: number;
 };
+
+function parseDateOnly(value?: unknown): string | undefined {
+  const text = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return undefined;
+  const date = new Date(`${text}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? undefined : text;
+}
 
 export function normalizeSeasonalItemRecord(entry: unknown): SeasonalItemRecord | null {
   if (!entry || typeof entry !== "object") return null;
@@ -42,6 +52,7 @@ export function normalizeSeasonalItemRecord(entry: unknown): SeasonalItemRecord 
   return {
     sku,
     note: String(raw.note || "").trim() || undefined,
+    etaDate: parseDateOnly(raw.etaDate),
     sortOrder,
     updatedAt: String(raw.updatedAt || "").trim() || undefined,
   };
@@ -128,6 +139,7 @@ export async function getSeasonalItemProducts(opts?: {
       ...base,
       sku: record.sku,
       seasonalNote: record.note || "",
+      seasonalEtaDate: record.etaDate || "",
       sortOrder: record.sortOrder,
     });
   }
