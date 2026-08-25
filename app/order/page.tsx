@@ -117,6 +117,9 @@ import {
 } from "./orderStyles";
 import type { CartItem, CatalogItem, ClearanceItem, Lang, OrderHistoryItem, OrderMode, PromotionItem } from "./types";
 
+/** Temporary: hide Quick order tab until we re-enable it. */
+const QUICK_ORDER_ENABLED = false;
+
 const ORDER_LANG_LABELS: Record<Lang, string> = {
   en: "EN",
   zh: "中文",
@@ -516,8 +519,9 @@ export default function OrderPage() {
   };
 
   const changeMode = (next: OrderMode) => {
-    setMode(next);
-    localStorage.setItem("order_mode", next);
+    const resolved = !QUICK_ORDER_ENABLED && next === "search" ? "promotion" : next;
+    setMode(resolved);
+    localStorage.setItem("order_mode", resolved);
     dismissFloatingNotice();
   };
 
@@ -2284,16 +2288,18 @@ export default function OrderPage() {
       >
         {t.catalogMode}
       </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "search"}
-        onClick={() => changeMode("search")}
-        className="order-mode-tab"
-        style={modeButtonStyle(mode === "search")}
-      >
-        {t.searchMode}
-      </button>
+      {QUICK_ORDER_ENABLED ? (
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "search"}
+          onClick={() => changeMode("search")}
+          className="order-mode-tab"
+          style={modeButtonStyle(mode === "search")}
+        >
+          {t.searchMode}
+        </button>
+      ) : null}
     </div>
   );
 
@@ -2338,15 +2344,17 @@ export default function OrderPage() {
       >
         {t.catalogMode}
       </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "search"}
-        onClick={() => changeMode("search")}
-        className={`order-shop-tag order-shop-tag--quick${mode === "search" ? " is-active" : ""}`}
-      >
-        {t.searchMode}
-      </button>
+      {QUICK_ORDER_ENABLED ? (
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "search"}
+          onClick={() => changeMode("search")}
+          className={`order-shop-tag order-shop-tag--quick${mode === "search" ? " is-active" : ""}`}
+        >
+          {t.searchMode}
+        </button>
+      ) : null}
     </div>
   );
 
