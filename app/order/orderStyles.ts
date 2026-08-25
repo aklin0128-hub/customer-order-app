@@ -69,7 +69,7 @@ export const langButtonStyle = (active: boolean): CSSProperties => ({
 });
 export const modeTabsStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
   gap: 8,
 };
 export const modeButtonStyle = (active: boolean): CSSProperties => ({

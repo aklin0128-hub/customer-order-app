@@ -15,13 +15,10 @@ import { OrderFloatingCartFab } from "./components/OrderFloatingCartFab";
 import { OrderPastOrdersModal } from "./components/OrderPastOrdersModal";
 import { OrderQuickOrderPanel } from "./components/OrderQuickOrderPanel";
 import { OrderQuickPicksStrip } from "./components/OrderQuickPicksStrip";
-import { OrderShopNudge } from "./components/OrderShopNudge";
-import { RecommendedStrip } from "./components/RecommendedStrip";
 import { SkuOrderHistoryModal } from "./components/SkuOrderHistoryModal";
 import { OrderInput } from "./components/OrderInput";
 import { OrderReviewModal } from "./components/OrderReviewModal";
 import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
-import { buildClearanceUpsellLines, buildWeeklyUpsellLines, pickPostSubmitSuggestions } from "./salesFlow";
 import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog } from "./catalogState";
 import { isProductOrderingBlocked } from "@/lib/productAvailability";
@@ -107,17 +104,22 @@ import {
   filterLabelStyle,
   limitedBadgeStyle,
   modeButtonStyle,
-  newItemsModeButtonStyle,
-  vegesFruitsModeButtonStyle,
-  seasonalModeButtonStyle,
   primarySmallButtonStyle,
-  clearanceModeButtonStyle,
-  promoModeButtonStyle,
   secondaryButtonStyle,
   smallButtonStyle,
   submitButtonStyle,
 } from "./orderStyles";
-import type { CartItem, CatalogItem, ClearanceItem, Lang, OrderHistoryItem, OrderMode, PromotionItem } from "./types";
+import type {
+  CartItem,
+  CatalogItem,
+  ClearanceItem,
+  DealsSubMode,
+  Lang,
+  OrderHistoryItem,
+  OrderMode,
+  PicksSubMode,
+  PromotionItem,
+} from "./types";
 
 /** Temporary: hide Quick order tab until we re-enable it. */
 const QUICK_ORDER_ENABLED = false;
@@ -162,7 +164,9 @@ export default function OrderPage() {
   const favoriteDirtyRef = useRef(false);
 
   const [lang, setLang] = useState<Lang>("en");
-  const [mode, setMode] = useState<OrderMode>("promotion");
+  const [mode, setMode] = useState<OrderMode>("catalog");
+  const [dealsSub, setDealsSub] = useState<DealsSubMode>("promotion");
+  const [picksSub, setPicksSub] = useState<PicksSubMode>("newItems");
   const [ready, setReady] = useState(false);
   const [accountNo, setAccountNo] = useState("");
   const [storeName, setStoreName] = useState("");
@@ -202,7 +206,6 @@ export default function OrderPage() {
   const [showCart, setShowCart] = useState(false);
   const [catalogShowSelectedOnly, setCatalogShowSelectedOnly] = useState(false);
   const [catalogShowRecommendedOnly, setCatalogShowRecommendedOnly] = useState(false);
-  const [suggestedStripHidden, setSuggestedStripHidden] = useState(false);
   const [catalogFiltersOpen, setCatalogFiltersOpen] = useState(false);
   const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false);
   const [recentItems, setRecentItems] = useState<CartItem[]>([]);
@@ -523,7 +526,7 @@ export default function OrderPage() {
   }, [ready]);
 
   useEffect(() => {
-    if (!ready || mode !== "clearance" || clearanceFetchedRef.current) return;
+    if (!ready || mode !== "deals" || clearanceFetchedRef.current) return;
 
     const loadClearance = async () => {
       clearanceFetchedRef.current = true;
@@ -548,18 +551,29 @@ export default function OrderPage() {
     const saved = localStorage.getItem("lang") as Lang | null;
     if (saved === "en" || saved === "zh" || saved === "ko" || saved === "vi") setLang(saved);
 
-    const savedMode = localStorage.getItem("order_mode") as OrderMode | null;
-    if (
-      savedMode === "catalog" ||
-      savedMode === "promotion" ||
-      savedMode === "clearance" ||
-      savedMode === "newItems" ||
-      savedMode === "vegesFruits" ||
-      savedMode === "seasonal"
-    ) {
+    const savedMode = localStorage.getItem("order_mode");
+    const savedDeals = localStorage.getItem("order_deals_sub") as DealsSubMode | null;
+    const savedPicks = localStorage.getItem("order_picks_sub") as PicksSubMode | null;
+
+    if (savedDeals === "promotion" || savedDeals === "clearance") setDealsSub(savedDeals);
+    if (savedPicks === "newItems" || savedPicks === "seasonal" || savedPicks === "vegesFruits") {
+      setPicksSub(savedPicks);
+    }
+
+    // Migrate legacy per-section modes into Catalog / Deals / Picks.
+    if (savedMode === "catalog" || savedMode === "deals" || savedMode === "picks") {
       setMode(savedMode);
-    } else if (savedMode === "search" || !savedMode) {
-      setMode("promotion");
+    } else if (savedMode === "promotion") {
+      setMode("deals");
+      setDealsSub("promotion");
+    } else if (savedMode === "clearance") {
+      setMode("deals");
+      setDealsSub("clearance");
+    } else if (savedMode === "newItems" || savedMode === "seasonal" || savedMode === "vegesFruits") {
+      setMode("picks");
+      setPicksSub(savedMode);
+    } else {
+      setMode("catalog");
     }
   }, []);
 
@@ -569,10 +583,20 @@ export default function OrderPage() {
   };
 
   const changeMode = (next: OrderMode) => {
-    const resolved = !QUICK_ORDER_ENABLED && next === "search" ? "promotion" : next;
+    const resolved = !QUICK_ORDER_ENABLED && next === "search" ? "catalog" : next;
     setMode(resolved);
     localStorage.setItem("order_mode", resolved);
     dismissFloatingNotice();
+  };
+
+  const changeDealsSub = (next: DealsSubMode) => {
+    setDealsSub(next);
+    localStorage.setItem("order_deals_sub", next);
+  };
+
+  const changePicksSub = (next: PicksSubMode) => {
+    setPicksSub(next);
+    localStorage.setItem("order_picks_sub", next);
   };
 
   const setFullscreenMode = async (next: boolean) => {
@@ -1429,32 +1453,6 @@ export default function OrderPage() {
     applyQtyState(applyQtySet(qtyMaps, cleanSku, cleanQty, source));
   };
 
-  useEffect(() => {
-    try {
-      setSuggestedStripHidden(localStorage.getItem("order_hide_suggested_strip") === "1");
-    } catch {
-      setSuggestedStripHidden(false);
-    }
-  }, []);
-
-  const hideSuggestedStrip = () => {
-    setSuggestedStripHidden(true);
-    try {
-      localStorage.setItem("order_hide_suggested_strip", "1");
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const showSuggestedStrip = () => {
-    setSuggestedStripHidden(false);
-    try {
-      localStorage.removeItem("order_hide_suggested_strip");
-    } catch {
-      /* ignore */
-    }
-  };
-
   const getPromoRemainingForSku = (cleanSku: string) => {
     const promo = promotionItems.find((p) => p.sku?.toUpperCase() === cleanSku);
     if (!promo) return null;
@@ -1554,32 +1552,6 @@ export default function OrderPage() {
     return map;
   }, [promotionItems, t]);
 
-  const clearanceCartSkuSet = useMemo(() => nhItemsSkuSet(qtyMaps), [qtyMaps]);
-
-  const clearanceUpsellLines = useMemo(
-    () => buildClearanceUpsellLines(lang, clearanceItems, clearanceCartSkuSet, t),
-    [lang, clearanceItems, clearanceCartSkuSet, t]
-  );
-
-  const recommendedStripItems = useMemo(() => {
-    if (catalogShowRecommendedOnly) return [];
-    return catalogBrowseBase
-      .filter((item) => recommendedSkuSet.has((item.sku || "").toUpperCase()))
-      .filter((item) => !isNewItem(item))
-      .filter((item) => Number(catalogQtyMap[(item.sku || "").toUpperCase()] || 0) <= 0)
-      .filter((item) => isOrderableItem(item) && !isProductOrderingBlocked(item))
-      .slice(0, 8);
-  }, [catalogBrowseBase, recommendedSkuSet, catalogQtyMap, catalogShowRecommendedOnly]);
-
-  const postSubmitSuggestLines = useMemo(() => {
-    if (!lastSubmittedRef || lastSubmittedItems.length === 0) return [];
-    const submitted = new Set(
-      lastSubmittedItems.map((item) => String(item.sku || "").trim().toUpperCase()).filter(Boolean)
-    );
-    const picks = pickPostSubmitSuggestions(promotionItems, submitted, 4);
-    return buildWeeklyUpsellLines(lang, picks, submitted, copy[lang]).slice(0, 4);
-  }, [lastSubmittedRef, lastSubmittedItems, promotionItems, lang]);
-
   const scrollToCart = () => {
     setShowCart(true);
     requestAnimationFrame(() => {
@@ -1676,25 +1648,6 @@ export default function OrderPage() {
       if (!sku) continue;
       const catalogItem = getCatalogItemBySku(sku) || item;
       if (!isOrderableItem(catalogItem)) continue;
-      if (getClearanceQty(next, sku) <= 0 && blockAddForSku(sku)) continue;
-
-      const current = getClearanceQty(next, sku);
-      let appliedDelta = 1;
-      const clearanceRemaining = getClearanceRemainingForSku(sku);
-      if (clearanceRemaining !== null && current + 1 > clearanceRemaining) {
-        appliedDelta = clearanceRemaining - current;
-        if (appliedDelta <= 0) continue;
-      }
-      next = applyQtyDelta(next, sku, appliedDelta, "clearance");
-    }
-    applyQtyState(next);
-  };
-
-  const addAllMissingClearanceUpsell = () => {
-    let next = qtyMaps;
-    for (const line of clearanceUpsellLines) {
-      const sku = String(line.sku || "").trim().toUpperCase();
-      if (!sku) continue;
       if (getClearanceQty(next, sku) <= 0 && blockAddForSku(sku)) continue;
 
       const current = getClearanceQty(next, sku);
@@ -2237,19 +2190,38 @@ export default function OrderPage() {
   );
 
   const stickyModeLabel =
-    mode === "promotion"
-      ? t.promotionMode
-      : mode === "newItems"
-        ? t.newItemsMode
-        : mode === "vegesFruits"
-          ? t.vegesFruitsMode
-          : mode === "seasonal"
-            ? t.seasonalMode
-            : mode === "clearance"
-              ? t.clearanceMode
-              : mode === "catalog"
-                ? t.catalogMode
-                : t.searchMode;
+    mode === "catalog"
+      ? t.catalogMode
+      : mode === "deals"
+        ? t.dealsMode
+        : mode === "picks"
+          ? t.picksMode
+          : t.searchMode;
+
+  const dealsCount = promotionItems.length + clearanceItems.length;
+  const picksCount = newItemCount + seasonalCount + vegesFruitsCount;
+
+  const renderSubChips = (
+    options: { id: string; label: string; count?: number }[],
+    activeId: string,
+    onChange: (id: string) => void
+  ) => (
+    <div className="order-subchips" role="tablist" aria-label="Section">
+      {options.map((opt) => (
+        <button
+          key={opt.id}
+          type="button"
+          role="tab"
+          aria-selected={activeId === opt.id}
+          className={`order-subchip${activeId === opt.id ? " is-active" : ""}`}
+          onClick={() => onChange(opt.id)}
+        >
+          {opt.label}
+          {typeof opt.count === "number" && opt.count > 0 ? ` (${opt.count})` : ""}
+        </button>
+      ))}
+    </div>
+  );
 
   const renderCatalogSearchRow = (className = "") => (
     <div className={`order-sticky-search-row${className ? ` ${className}` : ""}`}>
@@ -2338,67 +2310,34 @@ export default function OrderPage() {
       <button
         type="button"
         role="tab"
-        aria-selected={mode === "promotion"}
-        onClick={() => changeMode("promotion")}
-        className="order-mode-tab"
-        style={promoModeButtonStyle(mode === "promotion")}
-      >
-        {t.promotionMode}
-        {promotionItems.length > 0 ? ` (${promotionItems.length})` : ""}
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "newItems"}
-        onClick={() => changeMode("newItems")}
-        className="order-mode-tab"
-        style={newItemsModeButtonStyle(mode === "newItems")}
-      >
-        {t.newItemsMode}
-        {newItemCount > 0 ? ` (${newItemCount})` : ""}
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "vegesFruits"}
-        onClick={() => changeMode("vegesFruits")}
-        className="order-mode-tab"
-        style={vegesFruitsModeButtonStyle(mode === "vegesFruits")}
-      >
-        {t.vegesFruitsMode}
-        {vegesFruitsCount > 0 ? ` (${vegesFruitsCount})` : ""}
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "seasonal"}
-        onClick={() => changeMode("seasonal")}
-        className="order-mode-tab"
-        style={seasonalModeButtonStyle(mode === "seasonal")}
-      >
-        {t.seasonalMode}
-        {seasonalCount > 0 ? ` (${seasonalCount})` : ""}
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "clearance"}
-        onClick={() => changeMode("clearance")}
-        className="order-mode-tab"
-        style={clearanceModeButtonStyle(mode === "clearance")}
-      >
-        {t.clearanceMode}
-        {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
-      </button>
-      <button
-        type="button"
-        role="tab"
         aria-selected={mode === "catalog"}
         onClick={() => changeMode("catalog")}
         className="order-mode-tab"
         style={modeButtonStyle(mode === "catalog")}
       >
         {t.catalogMode}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "deals"}
+        onClick={() => changeMode("deals")}
+        className="order-mode-tab"
+        style={modeButtonStyle(mode === "deals")}
+      >
+        {t.dealsMode}
+        {dealsCount > 0 ? ` (${dealsCount})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "picks"}
+        onClick={() => changeMode("picks")}
+        className="order-mode-tab"
+        style={modeButtonStyle(mode === "picks")}
+      >
+        {t.picksMode}
+        {picksCount > 0 ? ` (${picksCount})` : ""}
       </button>
       {QUICK_ORDER_ENABLED ? (
         <button
@@ -2420,61 +2359,31 @@ export default function OrderPage() {
       <button
         type="button"
         role="tab"
-        aria-selected={mode === "promotion"}
-        onClick={() => changeMode("promotion")}
-        className={`order-shop-tag order-shop-tag--promo${mode === "promotion" ? " is-active" : ""}`}
-      >
-        {t.promotionMode}
-        {promotionItems.length > 0 ? ` (${promotionItems.length})` : ""}
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "newItems"}
-        onClick={() => changeMode("newItems")}
-        className={`order-shop-tag order-shop-tag--new${mode === "newItems" ? " is-active" : ""}`}
-      >
-        {t.newItemsMode}
-        {newItemCount > 0 ? ` (${newItemCount})` : ""}
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "vegesFruits"}
-        onClick={() => changeMode("vegesFruits")}
-        className={`order-shop-tag order-shop-tag--veges${mode === "vegesFruits" ? " is-active" : ""}`}
-      >
-        {t.vegesFruitsMode}
-        {vegesFruitsCount > 0 ? ` (${vegesFruitsCount})` : ""}
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "seasonal"}
-        onClick={() => changeMode("seasonal")}
-        className={`order-shop-tag order-shop-tag--seasonal${mode === "seasonal" ? " is-active" : ""}`}
-      >
-        {t.seasonalMode}
-        {seasonalCount > 0 ? ` (${seasonalCount})` : ""}
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "clearance"}
-        onClick={() => changeMode("clearance")}
-        className={`order-shop-tag order-shop-tag--clearance${mode === "clearance" ? " is-active" : ""}`}
-      >
-        {t.clearanceMode}
-        {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
-      </button>
-      <button
-        type="button"
-        role="tab"
         aria-selected={mode === "catalog"}
         onClick={() => changeMode("catalog")}
-        className={`order-shop-tag order-shop-tag--catalog${mode === "catalog" ? " is-active" : ""}`}
+        className={`order-shop-tag${mode === "catalog" ? " is-active" : ""}`}
       >
         {t.catalogMode}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "deals"}
+        onClick={() => changeMode("deals")}
+        className={`order-shop-tag${mode === "deals" ? " is-active" : ""}`}
+      >
+        {t.dealsMode}
+        {dealsCount > 0 ? ` (${dealsCount})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "picks"}
+        onClick={() => changeMode("picks")}
+        className={`order-shop-tag${mode === "picks" ? " is-active" : ""}`}
+      >
+        {t.picksMode}
+        {picksCount > 0 ? ` (${picksCount})` : ""}
       </button>
       {QUICK_ORDER_ENABLED ? (
         <button
@@ -2482,7 +2391,7 @@ export default function OrderPage() {
           role="tab"
           aria-selected={mode === "search"}
           onClick={() => changeMode("search")}
-          className={`order-shop-tag order-shop-tag--quick${mode === "search" ? " is-active" : ""}`}
+          className={`order-shop-tag${mode === "search" ? " is-active" : ""}`}
         >
           {t.searchMode}
         </button>
@@ -2529,7 +2438,29 @@ export default function OrderPage() {
 
       {renderMobileModeTags()}
 
-      {mode === "promotion" || mode === "newItems" || mode === "vegesFruits" || mode === "seasonal" ? (
+      {mode === "deals"
+        ? renderSubChips(
+            [
+              { id: "promotion", label: t.promotionMode, count: promotionItems.length },
+              { id: "clearance", label: t.clearanceMode, count: clearanceItems.length },
+            ],
+            dealsSub,
+            (id) => changeDealsSub(id as DealsSubMode)
+          )
+        : null}
+      {mode === "picks"
+        ? renderSubChips(
+            [
+              { id: "newItems", label: t.newItemsMode, count: newItemCount },
+              { id: "seasonal", label: t.seasonalMode, count: seasonalCount },
+              { id: "vegesFruits", label: t.vegesFruitsMode, count: vegesFruitsCount },
+            ],
+            picksSub,
+            (id) => changePicksSub(id as PicksSubMode)
+          )
+        : null}
+
+      {mode === "deals" || mode === "picks" ? (
         <div className="order-shop-upc-row">{renderUpcToggle("order-shop-upc-toggle")}</div>
       ) : null}
 
@@ -2867,9 +2798,27 @@ export default function OrderPage() {
                   </>
                 ) : null}
 
-                {mode === "promotion" || mode === "newItems" || mode === "vegesFruits" || mode === "seasonal" ? (
+                {mode === "deals" || mode === "picks" ? (
                   !isMobileViewport ? (
                     <div className="order-sticky-catalog-chips order-sticky-upc-only">
+                      {mode === "deals"
+                        ? renderSubChips(
+                            [
+                              { id: "promotion", label: t.promotionMode, count: promotionItems.length },
+                              { id: "clearance", label: t.clearanceMode, count: clearanceItems.length },
+                            ],
+                            dealsSub,
+                            (id) => changeDealsSub(id as DealsSubMode)
+                          )
+                        : renderSubChips(
+                            [
+                              { id: "newItems", label: t.newItemsMode, count: newItemCount },
+                              { id: "seasonal", label: t.seasonalMode, count: seasonalCount },
+                              { id: "vegesFruits", label: t.vegesFruitsMode, count: vegesFruitsCount },
+                            ],
+                            picksSub,
+                            (id) => changePicksSub(id as PicksSubMode)
+                          )}
                       {renderUpcToggle()}
                     </div>
                   ) : null
@@ -2976,8 +2925,8 @@ export default function OrderPage() {
             onUpdateQty={updateCatalogQty}
             onAddSkuToCart={addSkuFromSearch}
           />
-        ) : mode === "newItems" ? (
-          <section className="order-shop-card order-shop-card--new">
+        ) : mode === "picks" && picksSub === "newItems" ? (
+          <section className="order-shop-card">
             {newItemCatalogItems.length === 0 ? (
               <div style={{ ...emptyStyle, border: "1px solid #fdba74", background: "#fff7ed", color: "#c2410c" }}>{t.noNewItems}</div>
             ) : (
@@ -3019,8 +2968,8 @@ export default function OrderPage() {
               </div>
             )}
           </section>
-        ) : mode === "vegesFruits" ? (
-          <section className="order-shop-card order-shop-card--veges">
+        ) : mode === "picks" && picksSub === "vegesFruits" ? (
+          <section className="order-shop-card">
             {vegePearsLoading ? (
               <div style={{ ...emptyStyle, border: "1px solid #86efac", background: "#f0fdf4", color: "#15803d" }}>
                 {t.loadingVegesFruits}
@@ -3064,8 +3013,8 @@ export default function OrderPage() {
               </div>
             )}
           </section>
-        ) : mode === "seasonal" ? (
-          <section className="order-shop-card order-shop-card--seasonal">
+        ) : mode === "picks" && picksSub === "seasonal" ? (
+          <section className="order-shop-card">
             {seasonalLoading ? (
               <div style={{ ...emptyStyle, border: "1px solid #fcd34d", background: "#fffbeb", color: "#b45309" }}>
                 {t.loadingSeasonal}
@@ -3115,22 +3064,8 @@ export default function OrderPage() {
               </div>
             )}
           </section>
-        ) : mode === "promotion" ? (
-          <section className="order-shop-card order-shop-card--promo">
-            {recommendedStripItems.length > 0 ? (
-              suggestedStripHidden ? (
-                <button type="button" className="order-recommended-strip-show" onClick={showSuggestedStrip}>
-                  {t.showSuggested}
-                </button>
-              ) : (
-                <RecommendedStrip
-                  lang={lang}
-                  items={recommendedStripItems}
-                  onAddOne={(sku) => adjustCatalogQty(sku, 1)}
-                  onHide={hideSuggestedStrip}
-                />
-              )
-            ) : null}
+        ) : mode === "deals" && dealsSub === "promotion" ? (
+          <section className="order-shop-card">
             {promotionsLoading ? (
               <div style={{ ...emptyStyle, border: "1px solid #5eead4", background: "#f0fdfa", color: "#0f766e" }}>{t.loadingPromotions}</div>
             ) : promotionItems.length === 0 ? (
@@ -3196,8 +3131,8 @@ export default function OrderPage() {
               </div>
             )}
           </section>
-        ) : mode === "clearance" ? (
-          <section className="order-shop-card order-shop-card--clearance">
+        ) : mode === "deals" && dealsSub === "clearance" ? (
+          <section className="order-shop-card">
             {clearanceItems.length > 0 ? (
               <div className="order-clearance-bulk-row">
                 <button
@@ -3260,20 +3195,6 @@ export default function OrderPage() {
           </section>
         ) : (
           <section className="order-shop-card order-shop-card--listing">
-            {recommendedStripItems.length > 0 ? (
-              suggestedStripHidden ? (
-                <button type="button" className="order-recommended-strip-show" onClick={showSuggestedStrip}>
-                  {t.showSuggested}
-                </button>
-              ) : (
-                <RecommendedStrip
-                  lang={lang}
-                  items={recommendedStripItems}
-                  onAddOne={(sku) => adjustCatalogQty(sku, 1)}
-                  onHide={hideSuggestedStrip}
-                />
-              )
-            ) : null}
 
             {orderableCatalogItems.length === 0 ? (
               <div style={{ ...emptyStyle, marginTop: 10 }} className={catalogShowFavoritesOnly ? "order-favorites-empty" : undefined}>
@@ -3367,22 +3288,7 @@ export default function OrderPage() {
             showTransientToast(t.unavailableRemoved.replace("{count}", String(removed.length)));
           }
         }}
-        nudge={
-          clearanceUpsellLines.length > 0 ? (
-            <details className="order-cart-nudge-fold" open={cartItemCount > 0}>
-              <summary>
-                {t.clearanceMode} ({clearanceItems.length})
-              </summary>
-              <OrderShopNudge
-                lang={lang}
-                clearanceMissing={clearanceUpsellLines.length}
-                clearanceDealCount={clearanceItems.length}
-                onAddClearanceMissing={addAllMissingClearanceUpsell}
-                onViewClearance={() => changeMode("clearance")}
-              />
-            </details>
-          ) : null
-        }
+        nudge={null}
         tools={
           <div className="order-cart-tools">
             <div className="order-cart-tools-row">
@@ -3471,9 +3377,9 @@ export default function OrderPage() {
           items={cartDisplayItems}
           warnings={orderReviewWarnings}
           unavailableItems={unavailableSubmitItems}
-          clearanceUpsellLines={clearanceUpsellLines}
+          clearanceUpsellLines={[]}
           onAddUpsellCase={(sku) => adjustQtyForSku(sku, 1, "clearance")}
-          onAddAllClearanceUpsell={addAllMissingClearanceUpsell}
+          onAddAllClearanceUpsell={() => {}}
           nhItemsSkus={nhItemsSkuSetForOrder}
           promoDealBySku={promoDealBySku}
           accountNo={accountNo}
@@ -3501,32 +3407,14 @@ export default function OrderPage() {
           lang={lang}
           orderRef={lastSubmittedRef}
           items={lastSubmittedItems}
-          suggestLines={postSubmitSuggestLines}
-          onAddSuggestCase={(sku) => {
-            adjustCatalogQty(sku, 1);
-            showTransientToast(`+1 ${sku}`);
-          }}
-          onAddAllSuggest={() => {
-            for (const line of postSubmitSuggestLines) {
-              adjustCatalogQty(line.sku, 1);
-            }
-            if (postSubmitSuggestLines.length > 0) {
-              showTransientToast(
-                lang === "zh"
-                  ? `已加入 ${postSubmitSuggestLines.length} 个促销商品`
-                  : `Added ${postSubmitSuggestLines.length} promo item${postSubmitSuggestLines.length === 1 ? "" : "s"}`
-              );
-            }
-          }}
+          suggestLines={[]}
+          onAddSuggestCase={() => {}}
+          onAddAllSuggest={() => {}}
           onBrowseWeeklyPicks={() => {
             setLastSubmittedRef("");
             setLastSubmittedItems([]);
-            setMode("promotion");
-            try {
-              localStorage.setItem("order_mode", "promotion");
-            } catch {
-              /* ignore */
-            }
+            changeMode("deals");
+            changeDealsSub("promotion");
           }}
         />
     </main>

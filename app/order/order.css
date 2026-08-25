@@ -980,32 +980,37 @@
 }
 
 .order-shop-card--listing,
-.order-shop-card--promo,
-.order-shop-card--new,
-.order-shop-card--veges,
-.order-shop-card--seasonal,
-.order-shop-card--clearance {
+.order-shop-card {
   padding: 8px 8px 10px !important;
+  border-color: #e5e7eb !important;
 }
 
-.order-shop-card--promo {
-  border-color: #99f6e4 !important;
+.order-subchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 4px;
 }
 
-.order-shop-card--new {
-  border-color: #fdba74 !important;
+.order-subchip {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
 }
 
-.order-shop-card--veges {
-  border-color: #86efac !important;
+.order-subchip.is-active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
-.order-shop-card--seasonal {
-  border-color: #fcd34d !important;
-}
-
-.order-shop-card--clearance {
-  border-color: #fdba74 !important;
+.order-shop-tag {
+  background: #334155 !important;
 }
 
 .order-shop-card:has(.order-catalog-virtual-scroll) {
