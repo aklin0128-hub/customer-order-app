@@ -117,7 +117,6 @@ import type {
   Lang,
   OrderHistoryItem,
   OrderMode,
-  PicksSubMode,
   PromotionItem,
 } from "./types";
 
@@ -166,7 +165,6 @@ export default function OrderPage() {
   const [lang, setLang] = useState<Lang>("en");
   const [mode, setMode] = useState<OrderMode>("catalog");
   const [dealsSub, setDealsSub] = useState<DealsSubMode>("promotion");
-  const [picksSub, setPicksSub] = useState<PicksSubMode>("newItems");
   const [ready, setReady] = useState(false);
   const [accountNo, setAccountNo] = useState("");
   const [storeName, setStoreName] = useState("");
@@ -530,15 +528,17 @@ export default function OrderPage() {
 
     const savedMode = localStorage.getItem("order_mode");
     const savedDeals = localStorage.getItem("order_deals_sub") as DealsSubMode | null;
-    const savedPicks = localStorage.getItem("order_picks_sub") as PicksSubMode | null;
+    const savedPicks = localStorage.getItem("order_picks_sub");
 
     if (savedDeals === "promotion" || savedDeals === "clearance") setDealsSub(savedDeals);
-    if (savedPicks === "newItems" || savedPicks === "seasonal") {
-      setPicksSub(savedPicks);
-    }
 
-    // Migrate legacy per-section modes into Catalog / Deals / Picks.
-    if (savedMode === "catalog" || savedMode === "deals" || savedMode === "picks") {
+    // Migrate legacy modes into Catalog / Deals / New items / Seasonal.
+    if (
+      savedMode === "catalog" ||
+      savedMode === "deals" ||
+      savedMode === "newItems" ||
+      savedMode === "seasonal"
+    ) {
       setMode(savedMode);
     } else if (savedMode === "promotion") {
       setMode("deals");
@@ -546,12 +546,10 @@ export default function OrderPage() {
     } else if (savedMode === "clearance") {
       setMode("deals");
       setDealsSub("clearance");
-    } else if (savedMode === "newItems" || savedMode === "seasonal") {
-      setMode("picks");
-      setPicksSub(savedMode);
+    } else if (savedMode === "picks") {
+      setMode(savedPicks === "seasonal" ? "seasonal" : "newItems");
     } else if (savedMode === "vegesFruits") {
-      setMode("picks");
-      setPicksSub("newItems");
+      setMode("newItems");
     } else {
       setMode("catalog");
     }
@@ -573,11 +571,6 @@ export default function OrderPage() {
   const changeDealsSub = (next: DealsSubMode) => {
     setDealsSub(next);
     localStorage.setItem("order_deals_sub", next);
-  };
-
-  const changePicksSub = (next: PicksSubMode) => {
-    setPicksSub(next);
-    localStorage.setItem("order_picks_sub", next);
   };
 
   const setFullscreenMode = async (next: boolean) => {
@@ -2157,12 +2150,13 @@ export default function OrderPage() {
       ? t.catalogMode
       : mode === "deals"
         ? t.dealsMode
-        : mode === "picks"
-          ? t.picksMode
-          : t.searchMode;
+        : mode === "newItems"
+          ? t.newItemsMode
+          : mode === "seasonal"
+            ? t.seasonalMode
+            : t.searchMode;
 
   const dealsCount = promotionItems.length + clearanceItems.length;
-  const picksCount = newItemCount + seasonalCount;
 
   const renderSubChips = (
     options: { id: string; label: string; count?: number }[],
@@ -2294,13 +2288,24 @@ export default function OrderPage() {
       <button
         type="button"
         role="tab"
-        aria-selected={mode === "picks"}
-        onClick={() => changeMode("picks")}
+        aria-selected={mode === "newItems"}
+        onClick={() => changeMode("newItems")}
         className="order-mode-tab"
-        style={modeButtonStyle(mode === "picks")}
+        style={modeButtonStyle(mode === "newItems")}
       >
-        {t.picksMode}
-        {picksCount > 0 ? ` (${picksCount})` : ""}
+        {t.newItemsMode}
+        {newItemCount > 0 ? ` (${newItemCount})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "seasonal"}
+        onClick={() => changeMode("seasonal")}
+        className="order-mode-tab"
+        style={modeButtonStyle(mode === "seasonal")}
+      >
+        {t.seasonalMode}
+        {seasonalCount > 0 ? ` (${seasonalCount})` : ""}
       </button>
       {QUICK_ORDER_ENABLED ? (
         <button
@@ -2341,12 +2346,22 @@ export default function OrderPage() {
       <button
         type="button"
         role="tab"
-        aria-selected={mode === "picks"}
-        onClick={() => changeMode("picks")}
-        className={`order-shop-tag${mode === "picks" ? " is-active" : ""}`}
+        aria-selected={mode === "newItems"}
+        onClick={() => changeMode("newItems")}
+        className={`order-shop-tag${mode === "newItems" ? " is-active" : ""}`}
       >
-        {t.picksMode}
-        {picksCount > 0 ? ` (${picksCount})` : ""}
+        {t.newItemsMode}
+        {newItemCount > 0 ? ` (${newItemCount})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "seasonal"}
+        onClick={() => changeMode("seasonal")}
+        className={`order-shop-tag${mode === "seasonal" ? " is-active" : ""}`}
+      >
+        {t.seasonalMode}
+        {seasonalCount > 0 ? ` (${seasonalCount})` : ""}
       </button>
       {QUICK_ORDER_ENABLED ? (
         <button
@@ -2409,16 +2424,6 @@ export default function OrderPage() {
             ],
             dealsSub,
             (id) => changeDealsSub(id as DealsSubMode)
-          )
-        : null}
-      {mode === "picks"
-        ? renderSubChips(
-            [
-              { id: "newItems", label: t.newItemsMode, count: newItemCount },
-              { id: "seasonal", label: t.seasonalMode, count: seasonalCount },
-            ],
-            picksSub,
-            (id) => changePicksSub(id as PicksSubMode)
           )
         : null}
 
@@ -2754,26 +2759,17 @@ export default function OrderPage() {
                   </>
                 ) : null}
 
-                {mode === "deals" || mode === "picks" ? (
+                {mode === "deals" ? (
                   !isMobileViewport ? (
                     <div className="order-sticky-catalog-chips order-sticky-upc-only">
-                      {mode === "deals"
-                        ? renderSubChips(
-                            [
-                              { id: "promotion", label: t.promotionMode, count: promotionItems.length },
-                              { id: "clearance", label: t.clearanceMode, count: clearanceItems.length },
-                            ],
-                            dealsSub,
-                            (id) => changeDealsSub(id as DealsSubMode)
-                          )
-                        : renderSubChips(
-                            [
-                              { id: "newItems", label: t.newItemsMode, count: newItemCount },
-                              { id: "seasonal", label: t.seasonalMode, count: seasonalCount },
-                            ],
-                            picksSub,
-                            (id) => changePicksSub(id as PicksSubMode)
-                          )}
+                      {renderSubChips(
+                        [
+                          { id: "promotion", label: t.promotionMode, count: promotionItems.length },
+                          { id: "clearance", label: t.clearanceMode, count: clearanceItems.length },
+                        ],
+                        dealsSub,
+                        (id) => changeDealsSub(id as DealsSubMode)
+                      )}
                     </div>
                   ) : null
                 ) : null}
@@ -2879,7 +2875,7 @@ export default function OrderPage() {
             onUpdateQty={updateCatalogQty}
             onAddSkuToCart={addSkuFromSearch}
           />
-        ) : mode === "picks" && picksSub === "newItems" ? (
+        ) : mode === "newItems" ? (
           <section className="order-shop-card">
             {newItemCatalogItems.length === 0 ? (
               <div style={{ ...emptyStyle, border: "1px solid #fdba74", background: "#fff7ed", color: "#c2410c" }}>{t.noNewItems}</div>
@@ -2922,7 +2918,7 @@ export default function OrderPage() {
               </div>
             )}
           </section>
-        ) : mode === "picks" && picksSub === "seasonal" ? (
+        ) : mode === "seasonal" ? (
           <section className="order-shop-card">
             {seasonalLoading ? (
               <div style={{ ...emptyStyle, border: "1px solid #fcd34d", background: "#fffbeb", color: "#b45309" }}>
