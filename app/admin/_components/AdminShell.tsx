@@ -26,6 +26,7 @@ export type AdminNav =
   | "products"
   | "promotions"
   | "clearance"
+  | "vegePears"
   | "orders"
   | "invoices"
   | "topSkus"
@@ -35,7 +36,8 @@ export type AdminNav =
   | "activeCarts"
   | "inventory"
   | "priceCompare"
-  | "weeklySales";
+  | "invoiceCompare"
+  | "productSheet";
 
 function NavLinks({ active, onNavigate }: { active: AdminNav; onNavigate?: () => void }) {
   return (
