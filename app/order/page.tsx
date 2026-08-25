@@ -586,6 +586,7 @@ export default function OrderPage() {
     const resolved = !QUICK_ORDER_ENABLED && next === "search" ? "catalog" : next;
     setMode(resolved);
     localStorage.setItem("order_mode", resolved);
+    if (resolved !== "catalog") setCatalogFiltersOpen(false);
     dismissFloatingNotice();
   };
 
@@ -2460,10 +2461,6 @@ export default function OrderPage() {
           )
         : null}
 
-      {mode === "deals" || mode === "picks" ? (
-        <div className="order-shop-upc-row">{renderUpcToggle("order-shop-upc-toggle")}</div>
-      ) : null}
-
       {mode === "catalog" ? (
         <div className="order-shop-search-row">
           <label className="order-shop-search-field">
@@ -2594,14 +2591,10 @@ export default function OrderPage() {
   const renderCatalogFiltersPanel = () =>
     catalogFiltersOpen && mode === "catalog" ? (
       <div className="order-sticky-filters">
-        {isMobileViewport ? (
-          <>
-            {renderCatalogScopeChips("order-sticky-catalog-chips--in-filters")}
-            <div className="order-sticky-catalog-meta order-sticky-catalog-meta--in-filters">
-              {t.selected}: {cartItemCount} · {t.showing} {orderableCatalogItems.length} {t.catalogCount}
-            </div>
-          </>
-        ) : null}
+        {renderCatalogScopeChips("order-sticky-catalog-chips--in-filters")}
+        <div className="order-sticky-catalog-meta order-sticky-catalog-meta--in-filters">
+          {t.selected}: {cartItemCount} · {t.showing} {orderableCatalogItems.length} {t.catalogCount}
+        </div>
         <div style={filterBlockStyle}>
           <div style={filterLabelStyle}>{t.category}</div>
           <div style={categoryBarStyle} className="order-category-filters">
@@ -2786,11 +2779,13 @@ export default function OrderPage() {
 
                 {mode === "catalog" ? (
                   <>
-                    {!isMobileViewport ? renderCatalogScopeChips() : null}
                     {!isMobileViewport ? (
                       <div className="order-sticky-catalog-footer">
                         <div className="order-sticky-catalog-meta">
                           {t.selected}: {cartItemCount} · {t.showing} {orderableCatalogItems.length} {t.catalogCount}
+                          {activeCatalogFilterCount > 0
+                            ? ` · ${t.showFilters} ${activeCatalogFilterCount}`
+                            : ""}
                         </div>
                         {renderStickyPanelToggle(true)}
                       </div>
@@ -2819,7 +2814,6 @@ export default function OrderPage() {
                             picksSub,
                             (id) => changePicksSub(id as PicksSubMode)
                           )}
-                      {renderUpcToggle()}
                     </div>
                   ) : null
                 ) : null}
