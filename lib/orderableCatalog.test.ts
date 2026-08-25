@@ -14,6 +14,7 @@ test("NORMAL* and TBD are orderable; READYTOORDER is not", () => {
   assert.equal(isOrderableCatalogStatus("NORMAL NOBR"), true);
   assert.equal(isOrderableCatalogStatus("normal"), true);
   assert.equal(isOrderableCatalogStatus("TBD"), true);
+  assert.equal(isOrderableCatalogStatus("SEASONAL"), true);
 
   assert.equal(isOrderableCatalogStatus("READYTOORDER"), false);
   assert.equal(isOrderableCatalogStatus("DISCONTINUED"), false);

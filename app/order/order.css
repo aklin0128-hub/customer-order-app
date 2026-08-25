@@ -983,6 +983,7 @@
 .order-shop-card--promo,
 .order-shop-card--new,
 .order-shop-card--veges,
+.order-shop-card--seasonal,
 .order-shop-card--clearance {
   padding: 8px 8px 10px !important;
 }
@@ -997,6 +998,10 @@
 
 .order-shop-card--veges {
   border-color: #86efac !important;
+}
+
+.order-shop-card--seasonal {
+  border-color: #fcd34d !important;
 }
 
 .order-shop-card--clearance {
@@ -3819,6 +3824,10 @@
 
 .order-shop-tag--veges {
   background: #15803d;
+}
+
+.order-shop-tag--seasonal {
+  background: #d97706;
 }
 
 .order-shop-tag--clearance {

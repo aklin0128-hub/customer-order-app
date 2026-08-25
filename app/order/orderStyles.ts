@@ -110,6 +110,13 @@ export const vegesFruitsModeButtonStyle = (active: boolean): CSSProperties => ({
   color: active ? "#ffffff" : "#15803d",
   fontSize: 11,
 });
+export const seasonalModeButtonStyle = (active: boolean): CSSProperties => ({
+  ...modeButtonStyle(active),
+  border: active ? "1px solid #d97706" : "1px solid #fcd34d",
+  background: active ? "#d97706" : "#fffbeb",
+  color: active ? "#ffffff" : "#b45309",
+  fontSize: 11,
+});
 export const qtyButtonStyle: CSSProperties = {
   padding: "6px 0",
   borderRadius: 10,

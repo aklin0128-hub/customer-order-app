@@ -1,5 +1,12 @@
 export type Lang = "en" | "zh" | "ko" | "vi";
-export type OrderMode = "search" | "catalog" | "promotion" | "clearance" | "newItems" | "vegesFruits";
+export type OrderMode =
+  | "search"
+  | "catalog"
+  | "promotion"
+  | "clearance"
+  | "newItems"
+  | "vegesFruits"
+  | "seasonal";
 
 export type CatalogItem = {
   sku: string;

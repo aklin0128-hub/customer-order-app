@@ -109,6 +109,7 @@ import {
   modeButtonStyle,
   newItemsModeButtonStyle,
   vegesFruitsModeButtonStyle,
+  seasonalModeButtonStyle,
   primarySmallButtonStyle,
   clearanceModeButtonStyle,
   promoModeButtonStyle,
@@ -215,6 +216,8 @@ export default function OrderPage() {
   const [promotionsLoading, setPromotionsLoading] = useState(false);
   const [vegePearsItems, setVegePearsItems] = useState<CatalogItem[]>([]);
   const [vegePearsLoading, setVegePearsLoading] = useState(false);
+  const [seasonalItems, setSeasonalItems] = useState<CatalogItem[]>([]);
+  const [seasonalLoading, setSeasonalLoading] = useState(false);
   const [clearanceItems, setClearanceItems] = useState<ClearanceItem[]>([]);
   const [clearanceLoading, setClearanceLoading] = useState(false);
   const [showAdminEditLinks, setShowAdminEditLinks] = useState(false);
@@ -499,6 +502,27 @@ export default function OrderPage() {
   }, [ready]);
 
   useEffect(() => {
+    if (!ready) return;
+
+    const loadSeasonal = async () => {
+      setSeasonalLoading(true);
+      try {
+        const res = await fetch("/api/seasonal", { cache: "no-store" });
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.products)) {
+          setSeasonalItems(data.products);
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        setSeasonalLoading(false);
+      }
+    };
+
+    void loadSeasonal();
+  }, [ready]);
+
+  useEffect(() => {
     if (!ready || mode !== "clearance" || clearanceFetchedRef.current) return;
 
     const loadClearance = async () => {
@@ -530,7 +554,8 @@ export default function OrderPage() {
       savedMode === "promotion" ||
       savedMode === "clearance" ||
       savedMode === "newItems" ||
-      savedMode === "vegesFruits"
+      savedMode === "vegesFruits" ||
+      savedMode === "seasonal"
     ) {
       setMode(savedMode);
     } else if (savedMode === "search" || !savedMode) {
@@ -1130,6 +1155,24 @@ export default function OrderPage() {
   }, [vegePearsItems, catalogBrowseBase, showAvailableOnly, passesAvailableFilter]);
 
   const vegesFruitsCount = vegePearsCatalogItems.length;
+
+  const seasonalCatalogItems = useMemo(() => {
+    const bySku = new Map(
+      catalogBrowseBase.map((item) => [String(item.sku || "").toUpperCase(), item])
+    );
+    return seasonalItems
+      .map((row) => {
+        const sku = String(row.sku || "").toUpperCase();
+        const fromCatalog = bySku.get(sku);
+        return fromCatalog ? { ...row, ...fromCatalog, sku } : { ...row, sku };
+      })
+      .filter((item) => {
+        if (!showAvailableOnly) return true;
+        return passesAvailableFilter(item);
+      });
+  }, [seasonalItems, catalogBrowseBase, showAvailableOnly, passesAvailableFilter]);
+
+  const seasonalCount = seasonalCatalogItems.length;
 
   const [invoiceFrequentSkus, setInvoiceFrequentSkus] = useState<string[]>([]);
 
@@ -2200,11 +2243,13 @@ export default function OrderPage() {
         ? t.newItemsMode
         : mode === "vegesFruits"
           ? t.vegesFruitsMode
-          : mode === "clearance"
-            ? t.clearanceMode
-            : mode === "catalog"
-              ? t.catalogMode
-              : t.searchMode;
+          : mode === "seasonal"
+            ? t.seasonalMode
+            : mode === "clearance"
+              ? t.clearanceMode
+              : mode === "catalog"
+                ? t.catalogMode
+                : t.searchMode;
 
   const renderCatalogSearchRow = (className = "") => (
     <div className={`order-sticky-search-row${className ? ` ${className}` : ""}`}>
@@ -2326,6 +2371,17 @@ export default function OrderPage() {
       <button
         type="button"
         role="tab"
+        aria-selected={mode === "seasonal"}
+        onClick={() => changeMode("seasonal")}
+        className="order-mode-tab"
+        style={seasonalModeButtonStyle(mode === "seasonal")}
+      >
+        {t.seasonalMode}
+        {seasonalCount > 0 ? ` (${seasonalCount})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
         aria-selected={mode === "clearance"}
         onClick={() => changeMode("clearance")}
         className="order-mode-tab"
@@ -2390,6 +2446,16 @@ export default function OrderPage() {
       >
         {t.vegesFruitsMode}
         {vegesFruitsCount > 0 ? ` (${vegesFruitsCount})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "seasonal"}
+        onClick={() => changeMode("seasonal")}
+        className={`order-shop-tag order-shop-tag--seasonal${mode === "seasonal" ? " is-active" : ""}`}
+      >
+        {t.seasonalMode}
+        {seasonalCount > 0 ? ` (${seasonalCount})` : ""}
       </button>
       <button
         type="button"
@@ -2463,7 +2529,7 @@ export default function OrderPage() {
 
       {renderMobileModeTags()}
 
-      {mode === "promotion" || mode === "newItems" || mode === "vegesFruits" ? (
+      {mode === "promotion" || mode === "newItems" || mode === "vegesFruits" || mode === "seasonal" ? (
         <div className="order-shop-upc-row">{renderUpcToggle("order-shop-upc-toggle")}</div>
       ) : null}
 
@@ -2801,7 +2867,7 @@ export default function OrderPage() {
                   </>
                 ) : null}
 
-                {mode === "promotion" || mode === "newItems" || mode === "vegesFruits" ? (
+                {mode === "promotion" || mode === "newItems" || mode === "vegesFruits" || mode === "seasonal" ? (
                   !isMobileViewport ? (
                     <div className="order-sticky-catalog-chips order-sticky-upc-only">
                       {renderUpcToggle()}
@@ -2979,6 +3045,51 @@ export default function OrderPage() {
                       promoNote={note || undefined}
                       inCartLabel={t.inCart}
                       promoBadgeLabel={t.vegesFruitsBadge}
+                      editLabel={t.editProduct}
+                      showAdminEdit={showAdminEditLinks}
+                      lang={lang}
+                      highlight
+                      disabled={!isOrderableItem(item)}
+                      unavailableNote={
+                        !isOrderableItem(item)
+                          ? formatOrderNotAvailableMessage(item.sku || "", item.status, t)
+                          : undefined
+                      }
+                      onAdjust={adjustCatalogQty}
+                      onUpdateQty={updateCatalogQty}
+                      {...favoriteCardProps(sku)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        ) : mode === "seasonal" ? (
+          <section className="order-shop-card order-shop-card--seasonal">
+            {seasonalLoading ? (
+              <div style={{ ...emptyStyle, border: "1px solid #fcd34d", background: "#fffbeb", color: "#b45309" }}>
+                {t.loadingSeasonal}
+              </div>
+            ) : seasonalCatalogItems.length === 0 ? (
+              <div style={{ ...emptyStyle, border: "1px solid #fcd34d", background: "#fffbeb", color: "#b45309" }}>
+                {t.noSeasonal}
+              </div>
+            ) : (
+              <div className="order-promo-grid order-seasonal-grid">
+                {seasonalCatalogItems.map((item) => {
+                  const sku = item.sku?.toUpperCase() || "";
+                  const qty = catalogQtyMap[sku] || "";
+                  const note = String((item as { seasonalNote?: string }).seasonalNote || "").trim();
+                  return (
+                    <CatalogQtyCard
+                      key={item.sku}
+                      item={item}
+                      qty={qty}
+                      palletLabel={t.pallet}
+                      justAddedLabel={t.justAdded}
+                      promoNote={note || undefined}
+                      inCartLabel={t.inCart}
+                      promoBadgeLabel={t.seasonalBadge}
                       editLabel={t.editProduct}
                       showAdminEdit={showAdminEditLinks}
                       lang={lang}

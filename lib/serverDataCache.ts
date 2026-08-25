@@ -12,6 +12,7 @@ export const SERVER_CACHE = {
   clearance: "clearance",
   showcase: "showcase",
   vegePears: "vegePears",
+  seasonal: "seasonal",
 } as const;
 
 export async function cachedServerData<T>(
