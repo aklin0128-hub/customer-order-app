@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { brandMatchesFilter, isKnownBrandFilter, splitBrandFilters } from "@/lib/catalogBrands";
 import { productMatchesCategoryFilters } from "@/lib/productCategories";
-import { CATEGORY_OPTIONS } from "@/lib/inferCategory";
+import { CATEGORY_OPTIONS, isVegesFruitsItem } from "@/lib/inferCategory";
 
 import { CatalogVirtualGrid } from "./components/CatalogVirtualGrid";
 import { CatalogQtyCard } from "./components/CatalogQtyCard";
@@ -108,6 +108,7 @@ import {
   limitedBadgeStyle,
   modeButtonStyle,
   newItemsModeButtonStyle,
+  vegesFruitsModeButtonStyle,
   primarySmallButtonStyle,
   clearanceModeButtonStyle,
   promoModeButtonStyle,
@@ -505,7 +506,8 @@ export default function OrderPage() {
       savedMode === "catalog" ||
       savedMode === "promotion" ||
       savedMode === "clearance" ||
-      savedMode === "newItems"
+      savedMode === "newItems" ||
+      savedMode === "vegesFruits"
     ) {
       setMode(savedMode);
     } else if (savedMode === "search" || !savedMode) {
@@ -1085,6 +1087,19 @@ export default function OrderPage() {
       catalogBrowseBase
         .filter((item) => isNewItem(item))
         .sort(compareCatalogByNewestImport),
+    [catalogBrowseBase]
+  );
+
+  const vegesFruitsCount = useMemo(
+    () => catalogBrowseBase.filter((item) => isVegesFruitsItem(item)).length,
+    [catalogBrowseBase]
+  );
+
+  const vegesFruitsCatalogItems = useMemo(
+    () =>
+      catalogBrowseBase
+        .filter((item) => isVegesFruitsItem(item))
+        .sort(compareCatalogForDisplay),
     [catalogBrowseBase]
   );
 
@@ -2155,11 +2170,13 @@ export default function OrderPage() {
       ? t.promotionMode
       : mode === "newItems"
         ? t.newItemsMode
-        : mode === "clearance"
-          ? t.clearanceMode
-          : mode === "catalog"
-            ? t.catalogMode
-            : t.searchMode;
+        : mode === "vegesFruits"
+          ? t.vegesFruitsMode
+          : mode === "clearance"
+            ? t.clearanceMode
+            : mode === "catalog"
+              ? t.catalogMode
+              : t.searchMode;
 
   const renderCatalogSearchRow = (className = "") => (
     <div className={`order-sticky-search-row${className ? ` ${className}` : ""}`}>
@@ -2270,6 +2287,17 @@ export default function OrderPage() {
       <button
         type="button"
         role="tab"
+        aria-selected={mode === "vegesFruits"}
+        onClick={() => changeMode("vegesFruits")}
+        className="order-mode-tab"
+        style={vegesFruitsModeButtonStyle(mode === "vegesFruits")}
+      >
+        {t.vegesFruitsMode}
+        {vegesFruitsCount > 0 ? ` (${vegesFruitsCount})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
         aria-selected={mode === "clearance"}
         onClick={() => changeMode("clearance")}
         className="order-mode-tab"
@@ -2324,6 +2352,16 @@ export default function OrderPage() {
       >
         {t.newItemsMode}
         {newItemCount > 0 ? ` (${newItemCount})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "vegesFruits"}
+        onClick={() => changeMode("vegesFruits")}
+        className={`order-shop-tag order-shop-tag--veges${mode === "vegesFruits" ? " is-active" : ""}`}
+      >
+        {t.vegesFruitsMode}
+        {vegesFruitsCount > 0 ? ` (${vegesFruitsCount})` : ""}
       </button>
       <button
         type="button"
@@ -2397,7 +2435,7 @@ export default function OrderPage() {
 
       {renderMobileModeTags()}
 
-      {mode === "promotion" || mode === "newItems" ? (
+      {mode === "promotion" || mode === "newItems" || mode === "vegesFruits" ? (
         <div className="order-shop-upc-row">{renderUpcToggle("order-shop-upc-toggle")}</div>
       ) : null}
 
@@ -2735,7 +2773,7 @@ export default function OrderPage() {
                   </>
                 ) : null}
 
-                {mode === "promotion" || mode === "newItems" ? (
+                {mode === "promotion" || mode === "newItems" || mode === "vegesFruits" ? (
                   !isMobileViewport ? (
                     <div className="order-sticky-catalog-chips order-sticky-upc-only">
                       {renderUpcToggle()}
@@ -2872,6 +2910,45 @@ export default function OrderPage() {
                       comingDateLabel={t.comingDate}
                       listPriceLabel={t.listPrice}
                       lang={lang}
+                      disabled={!isOrderableItem(item)}
+                      unavailableNote={
+                        !isOrderableItem(item)
+                          ? formatOrderNotAvailableMessage(item.sku || "", item.status, t)
+                          : undefined
+                      }
+                      onAdjust={adjustCatalogQty}
+                      onUpdateQty={updateCatalogQty}
+                      {...favoriteCardProps(sku)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        ) : mode === "vegesFruits" ? (
+          <section className="order-shop-card order-shop-card--veges">
+            {vegesFruitsCatalogItems.length === 0 ? (
+              <div style={{ ...emptyStyle, border: "1px solid #86efac", background: "#f0fdf4", color: "#15803d" }}>
+                {t.noVegesFruits}
+              </div>
+            ) : (
+              <div className="order-promo-grid order-veges-fruits-grid">
+                {vegesFruitsCatalogItems.map((item) => {
+                  const sku = item.sku?.toUpperCase() || "";
+                  const qty = catalogQtyMap[sku] || "";
+                  return (
+                    <CatalogQtyCard
+                      key={item.sku}
+                      item={item}
+                      qty={qty}
+                      palletLabel={t.pallet}
+                      justAddedLabel={t.justAdded}
+                      inCartLabel={t.inCart}
+                      promoBadgeLabel={t.vegesFruitsBadge}
+                      editLabel={t.editProduct}
+                      showAdminEdit={showAdminEditLinks}
+                      lang={lang}
+                      highlight
                       disabled={!isOrderableItem(item)}
                       unavailableNote={
                         !isOrderableItem(item)

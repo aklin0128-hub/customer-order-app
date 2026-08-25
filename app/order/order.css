@@ -982,6 +982,7 @@
 .order-shop-card--listing,
 .order-shop-card--promo,
 .order-shop-card--new,
+.order-shop-card--veges,
 .order-shop-card--clearance {
   padding: 8px 8px 10px !important;
 }
@@ -992,6 +993,10 @@
 
 .order-shop-card--new {
   border-color: #fdba74 !important;
+}
+
+.order-shop-card--veges {
+  border-color: #86efac !important;
 }
 
 .order-shop-card--clearance {
