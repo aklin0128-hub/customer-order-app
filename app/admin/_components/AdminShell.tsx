@@ -26,6 +26,7 @@ export type AdminNav =
   | "products"
   | "promotions"
   | "clearance"
+  | "vegePears"
   | "orders"
   | "invoices"
   | "topSkus"

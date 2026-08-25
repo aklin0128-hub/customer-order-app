@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { brandMatchesFilter, isKnownBrandFilter, splitBrandFilters } from "@/lib/catalogBrands";
 import { productMatchesCategoryFilters } from "@/lib/productCategories";
-import { CATEGORY_OPTIONS, isVegesFruitsItem } from "@/lib/inferCategory";
+import { CATEGORY_OPTIONS } from "@/lib/inferCategory";
 
 import { CatalogVirtualGrid } from "./components/CatalogVirtualGrid";
 import { CatalogQtyCard } from "./components/CatalogQtyCard";
@@ -213,6 +213,8 @@ export default function OrderPage() {
   const [catalogVersion, setCatalogVersion] = useState(0);
   const [promotionItems, setPromotionItems] = useState<PromotionItem[]>([]);
   const [promotionsLoading, setPromotionsLoading] = useState(false);
+  const [vegePearsItems, setVegePearsItems] = useState<CatalogItem[]>([]);
+  const [vegePearsLoading, setVegePearsLoading] = useState(false);
   const [clearanceItems, setClearanceItems] = useState<ClearanceItem[]>([]);
   const [clearanceLoading, setClearanceLoading] = useState(false);
   const [showAdminEditLinks, setShowAdminEditLinks] = useState(false);
@@ -473,6 +475,27 @@ export default function OrderPage() {
     };
 
     void loadPromotions();
+  }, [ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+
+    const loadVegePears = async () => {
+      setVegePearsLoading(true);
+      try {
+        const res = await fetch("/api/vege-pears", { cache: "no-store" });
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.products)) {
+          setVegePearsItems(data.products);
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        setVegePearsLoading(false);
+      }
+    };
+
+    void loadVegePears();
   }, [ready]);
 
   useEffect(() => {
@@ -1090,18 +1113,23 @@ export default function OrderPage() {
     [catalogBrowseBase]
   );
 
-  const vegesFruitsCount = useMemo(
-    () => catalogBrowseBase.filter((item) => isVegesFruitsItem(item)).length,
-    [catalogBrowseBase]
-  );
+  const vegePearsCatalogItems = useMemo(() => {
+    const bySku = new Map(
+      catalogBrowseBase.map((item) => [String(item.sku || "").toUpperCase(), item])
+    );
+    return vegePearsItems
+      .map((row) => {
+        const sku = String(row.sku || "").toUpperCase();
+        const fromCatalog = bySku.get(sku);
+        return fromCatalog ? { ...row, ...fromCatalog, sku } : { ...row, sku };
+      })
+      .filter((item) => {
+        if (!showAvailableOnly) return true;
+        return passesAvailableFilter(item);
+      });
+  }, [vegePearsItems, catalogBrowseBase, showAvailableOnly, passesAvailableFilter]);
 
-  const vegesFruitsCatalogItems = useMemo(
-    () =>
-      catalogBrowseBase
-        .filter((item) => isVegesFruitsItem(item))
-        .sort(compareCatalogForDisplay),
-    [catalogBrowseBase]
-  );
+  const vegesFruitsCount = vegePearsCatalogItems.length;
 
   const [invoiceFrequentSkus, setInvoiceFrequentSkus] = useState<string[]>([]);
 
@@ -2927,15 +2955,20 @@ export default function OrderPage() {
           </section>
         ) : mode === "vegesFruits" ? (
           <section className="order-shop-card order-shop-card--veges">
-            {vegesFruitsCatalogItems.length === 0 ? (
+            {vegePearsLoading ? (
+              <div style={{ ...emptyStyle, border: "1px solid #86efac", background: "#f0fdf4", color: "#15803d" }}>
+                {t.loadingVegesFruits}
+              </div>
+            ) : vegePearsCatalogItems.length === 0 ? (
               <div style={{ ...emptyStyle, border: "1px solid #86efac", background: "#f0fdf4", color: "#15803d" }}>
                 {t.noVegesFruits}
               </div>
             ) : (
               <div className="order-promo-grid order-veges-fruits-grid">
-                {vegesFruitsCatalogItems.map((item) => {
+                {vegePearsCatalogItems.map((item) => {
                   const sku = item.sku?.toUpperCase() || "";
                   const qty = catalogQtyMap[sku] || "";
+                  const note = String((item as { vegePearsNote?: string }).vegePearsNote || "").trim();
                   return (
                     <CatalogQtyCard
                       key={item.sku}
@@ -2943,6 +2976,7 @@ export default function OrderPage() {
                       qty={qty}
                       palletLabel={t.pallet}
                       justAddedLabel={t.justAdded}
+                      promoNote={note || undefined}
                       inCartLabel={t.inCart}
                       promoBadgeLabel={t.vegesFruitsBadge}
                       editLabel={t.editProduct}
