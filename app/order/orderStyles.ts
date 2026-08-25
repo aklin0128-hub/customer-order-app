@@ -69,7 +69,7 @@ export const langButtonStyle = (active: boolean): CSSProperties => ({
 });
 export const modeTabsStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
   gap: 8,
 };
 export const modeButtonStyle = (active: boolean): CSSProperties => ({
@@ -101,6 +101,13 @@ export const newItemsModeButtonStyle = (active: boolean): CSSProperties => ({
   border: active ? "1px solid #ea580c" : "1px solid #fdba74",
   background: active ? "#ea580c" : "#fff7ed",
   color: active ? "#ffffff" : "#c2410c",
+  fontSize: 11,
+});
+export const seasonalModeButtonStyle = (active: boolean): CSSProperties => ({
+  ...modeButtonStyle(active),
+  border: active ? "1px solid #d97706" : "1px solid #fcd34d",
+  background: active ? "#d97706" : "#fffbeb",
+  color: active ? "#ffffff" : "#b45309",
   fontSize: 11,
 });
 export const qtyButtonStyle: CSSProperties = {
@@ -242,6 +249,7 @@ export const catalogNameStyle: CSSProperties = {
   fontSize: 12,
   color: "#4b5563",
   lineHeight: 1.3,
+  minHeight: 31,
   maxHeight: 36,
   overflow: "hidden",
   display: "-webkit-box",
