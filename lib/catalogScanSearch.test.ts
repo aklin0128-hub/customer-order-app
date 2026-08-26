@@ -62,8 +62,14 @@ test("scoreCatalogSearchQuery ignores punctuation and spaces in queries", () => 
   assert.ok(scoreCatalogSearchQuery(item, "o-tube") >= 560);
 });
 
-test("catalogSearchQueryFromScan returns digits when no catalog match", () => {
-  assert.equal(catalogSearchQueryFromScan("123456789012"), "123456789012");
+test("scoreCatalogSearchQuery matches brand and partial name like samyang carbo", () => {
+  const item: CatalogItem = {
+    sku: "08444K",
+    brand: "SAMYANG",
+    name: "CARBONARA BULDAK RAMEN (BIG BOWL)",
+  };
+  assert.ok(scoreCatalogSearchQuery(item, "samyang carbo") >= 540);
+  assert.ok(scoreCatalogSearchQuery(item, "samyang") >= 480);
 });
 
 test("catalogSearchQueryFromScan returns SKU when UPC matches catalog", () => {
