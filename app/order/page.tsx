@@ -2910,7 +2910,6 @@ export default function OrderPage() {
                       item={{
                         ...item,
                         ...(etaDate ? { newItemComingDate: etaDate } : {}),
-                        ...(etaPending ? { isNew: true, newItemComingSoon: true } : {}),
                       }}
                       qty={qty}
                       palletLabel={t.pallet}
