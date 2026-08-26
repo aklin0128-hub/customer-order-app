@@ -105,6 +105,10 @@ import {
   filterLabelStyle,
   limitedBadgeStyle,
   modeButtonStyle,
+  promoModeButtonStyle,
+  clearanceModeButtonStyle,
+  newItemsModeButtonStyle,
+  seasonalModeButtonStyle,
   primarySmallButtonStyle,
   secondaryButtonStyle,
   smallButtonStyle,
@@ -114,7 +118,6 @@ import type {
   CartItem,
   CatalogItem,
   ClearanceItem,
-  DealsSubMode,
   Lang,
   OrderHistoryItem,
   OrderMode,
@@ -165,7 +168,6 @@ export default function OrderPage() {
 
   const [lang, setLang] = useState<Lang>("en");
   const [mode, setMode] = useState<OrderMode>("catalog");
-  const [dealsSub, setDealsSub] = useState<DealsSubMode>("promotion");
   const [ready, setReady] = useState(false);
   const [accountNo, setAccountNo] = useState("");
   const [storeName, setStoreName] = useState("");
@@ -502,7 +504,7 @@ export default function OrderPage() {
   }, [ready]);
 
   useEffect(() => {
-    if (!ready || mode !== "deals" || clearanceFetchedRef.current) return;
+    if (!ready || mode !== "clearance" || clearanceFetchedRef.current) return;
 
     const loadClearance = async () => {
       clearanceFetchedRef.current = true;
@@ -528,25 +530,20 @@ export default function OrderPage() {
     if (saved === "en" || saved === "zh" || saved === "ko" || saved === "vi") setLang(saved);
 
     const savedMode = localStorage.getItem("order_mode");
-    const savedDeals = localStorage.getItem("order_deals_sub") as DealsSubMode | null;
+    const savedDeals = localStorage.getItem("order_deals_sub");
     const savedPicks = localStorage.getItem("order_picks_sub");
 
-    if (savedDeals === "promotion" || savedDeals === "clearance") setDealsSub(savedDeals);
-
-    // Migrate legacy modes into Catalog / Deals / New items / Seasonal.
+    // Migrate legacy modes into Catalog / Promotions / Near Date / New items / Seasonal.
     if (
       savedMode === "catalog" ||
-      savedMode === "deals" ||
+      savedMode === "promotion" ||
+      savedMode === "clearance" ||
       savedMode === "newItems" ||
       savedMode === "seasonal"
     ) {
       setMode(savedMode);
-    } else if (savedMode === "promotion") {
-      setMode("deals");
-      setDealsSub("promotion");
-    } else if (savedMode === "clearance") {
-      setMode("deals");
-      setDealsSub("clearance");
+    } else if (savedMode === "deals") {
+      setMode(savedDeals === "clearance" ? "clearance" : "promotion");
     } else if (savedMode === "picks") {
       setMode(savedPicks === "seasonal" ? "seasonal" : "newItems");
     } else if (savedMode === "vegesFruits") {
@@ -567,11 +564,6 @@ export default function OrderPage() {
     localStorage.setItem("order_mode", resolved);
     if (resolved !== "catalog") setCatalogFiltersOpen(false);
     dismissFloatingNotice();
-  };
-
-  const changeDealsSub = (next: DealsSubMode) => {
-    setDealsSub(next);
-    localStorage.setItem("order_deals_sub", next);
   };
 
   const setFullscreenMode = async (next: boolean) => {
@@ -2149,37 +2141,15 @@ export default function OrderPage() {
   const stickyModeLabel =
     mode === "catalog"
       ? t.catalogMode
-      : mode === "deals"
-        ? t.dealsMode
-        : mode === "newItems"
-          ? t.newItemsMode
-          : mode === "seasonal"
-            ? t.seasonalMode
-            : t.searchMode;
-
-  const dealsCount = promotionItems.length + clearanceItems.length;
-
-  const renderSubChips = (
-    options: { id: string; label: string; count?: number }[],
-    activeId: string,
-    onChange: (id: string) => void
-  ) => (
-    <div className="order-subchips" role="tablist" aria-label="Section">
-      {options.map((opt) => (
-        <button
-          key={opt.id}
-          type="button"
-          role="tab"
-          aria-selected={activeId === opt.id}
-          className={`order-subchip${activeId === opt.id ? " is-active" : ""}`}
-          onClick={() => onChange(opt.id)}
-        >
-          {opt.label}
-          {typeof opt.count === "number" && opt.count > 0 ? ` (${opt.count})` : ""}
-        </button>
-      ))}
-    </div>
-  );
+      : mode === "promotion"
+        ? t.promotionMode
+        : mode === "clearance"
+          ? t.clearanceMode
+          : mode === "newItems"
+            ? t.newItemsMode
+            : mode === "seasonal"
+              ? t.seasonalMode
+              : t.searchMode;
 
   const renderCatalogSearchRow = (className = "") => (
     <div className={`order-sticky-search-row${className ? ` ${className}` : ""}`}>
@@ -2270,7 +2240,7 @@ export default function OrderPage() {
         role="tab"
         aria-selected={mode === "catalog"}
         onClick={() => changeMode("catalog")}
-        className="order-mode-tab"
+        className={`order-mode-tab order-mode-tab--catalog${mode === "catalog" ? " is-active" : ""}`}
         style={modeButtonStyle(mode === "catalog")}
       >
         {t.catalogMode}
@@ -2278,21 +2248,32 @@ export default function OrderPage() {
       <button
         type="button"
         role="tab"
-        aria-selected={mode === "deals"}
-        onClick={() => changeMode("deals")}
-        className="order-mode-tab"
-        style={modeButtonStyle(mode === "deals")}
+        aria-selected={mode === "promotion"}
+        onClick={() => changeMode("promotion")}
+        className={`order-mode-tab order-mode-tab--promo${mode === "promotion" ? " is-active" : ""}`}
+        style={promoModeButtonStyle(mode === "promotion")}
       >
-        {t.dealsMode}
-        {dealsCount > 0 ? ` (${dealsCount})` : ""}
+        {t.promotionMode}
+        {promotionItems.length > 0 ? ` (${promotionItems.length})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "clearance"}
+        onClick={() => changeMode("clearance")}
+        className={`order-mode-tab order-mode-tab--clearance${mode === "clearance" ? " is-active" : ""}`}
+        style={clearanceModeButtonStyle(mode === "clearance")}
+      >
+        {t.clearanceMode}
+        {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
       </button>
       <button
         type="button"
         role="tab"
         aria-selected={mode === "newItems"}
         onClick={() => changeMode("newItems")}
-        className="order-mode-tab"
-        style={modeButtonStyle(mode === "newItems")}
+        className={`order-mode-tab order-mode-tab--new${mode === "newItems" ? " is-active" : ""}`}
+        style={newItemsModeButtonStyle(mode === "newItems")}
       >
         {t.newItemsMode}
         {newItemCount > 0 ? ` (${newItemCount})` : ""}
@@ -2302,8 +2283,8 @@ export default function OrderPage() {
         role="tab"
         aria-selected={mode === "seasonal"}
         onClick={() => changeMode("seasonal")}
-        className="order-mode-tab"
-        style={modeButtonStyle(mode === "seasonal")}
+        className={`order-mode-tab order-mode-tab--seasonal${mode === "seasonal" ? " is-active" : ""}`}
+        style={seasonalModeButtonStyle(mode === "seasonal")}
       >
         {t.seasonalMode}
         {seasonalCount > 0 ? ` (${seasonalCount})` : ""}
@@ -2330,26 +2311,36 @@ export default function OrderPage() {
         role="tab"
         aria-selected={mode === "catalog"}
         onClick={() => changeMode("catalog")}
-        className={`order-shop-tag${mode === "catalog" ? " is-active" : ""}`}
+        className={`order-shop-tag order-shop-tag--catalog${mode === "catalog" ? " is-active" : ""}`}
       >
         {t.catalogMode}
       </button>
       <button
         type="button"
         role="tab"
-        aria-selected={mode === "deals"}
-        onClick={() => changeMode("deals")}
-        className={`order-shop-tag${mode === "deals" ? " is-active" : ""}`}
+        aria-selected={mode === "promotion"}
+        onClick={() => changeMode("promotion")}
+        className={`order-shop-tag order-shop-tag--promo${mode === "promotion" ? " is-active" : ""}`}
       >
-        {t.dealsMode}
-        {dealsCount > 0 ? ` (${dealsCount})` : ""}
+        {t.promotionMode}
+        {promotionItems.length > 0 ? ` (${promotionItems.length})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "clearance"}
+        onClick={() => changeMode("clearance")}
+        className={`order-shop-tag order-shop-tag--clearance${mode === "clearance" ? " is-active" : ""}`}
+      >
+        {t.clearanceMode}
+        {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
       </button>
       <button
         type="button"
         role="tab"
         aria-selected={mode === "newItems"}
         onClick={() => changeMode("newItems")}
-        className={`order-shop-tag${mode === "newItems" ? " is-active" : ""}`}
+        className={`order-shop-tag order-shop-tag--new${mode === "newItems" ? " is-active" : ""}`}
       >
         {t.newItemsMode}
         {newItemCount > 0 ? ` (${newItemCount})` : ""}
@@ -2359,7 +2350,7 @@ export default function OrderPage() {
         role="tab"
         aria-selected={mode === "seasonal"}
         onClick={() => changeMode("seasonal")}
-        className={`order-shop-tag${mode === "seasonal" ? " is-active" : ""}`}
+        className={`order-shop-tag order-shop-tag--seasonal${mode === "seasonal" ? " is-active" : ""}`}
       >
         {t.seasonalMode}
         {seasonalCount > 0 ? ` (${seasonalCount})` : ""}
@@ -2370,7 +2361,7 @@ export default function OrderPage() {
           role="tab"
           aria-selected={mode === "search"}
           onClick={() => changeMode("search")}
-          className={`order-shop-tag${mode === "search" ? " is-active" : ""}`}
+          className={`order-shop-tag order-shop-tag--quick${mode === "search" ? " is-active" : ""}`}
         >
           {t.searchMode}
         </button>
@@ -2416,17 +2407,6 @@ export default function OrderPage() {
       </div>
 
       {renderMobileModeTags()}
-
-      {mode === "deals"
-        ? renderSubChips(
-            [
-              { id: "promotion", label: t.promotionMode, count: promotionItems.length },
-              { id: "clearance", label: t.clearanceMode, count: clearanceItems.length },
-            ],
-            dealsSub,
-            (id) => changeDealsSub(id as DealsSubMode)
-          )
-        : null}
 
       {mode === "catalog" ? (
         <div className="order-shop-search-row">
@@ -2760,21 +2740,6 @@ export default function OrderPage() {
                   </>
                 ) : null}
 
-                {mode === "deals" ? (
-                  !isMobileViewport ? (
-                    <div className="order-sticky-catalog-chips order-sticky-upc-only">
-                      {renderSubChips(
-                        [
-                          { id: "promotion", label: t.promotionMode, count: promotionItems.length },
-                          { id: "clearance", label: t.clearanceMode, count: clearanceItems.length },
-                        ],
-                        dealsSub,
-                        (id) => changeDealsSub(id as DealsSubMode)
-                      )}
-                    </div>
-                  ) : null
-                ) : null}
-
                 {mode === "search" && !isMobileViewport ? (
                   <>
                     <div className="order-sticky-search-row is-single">
@@ -2976,7 +2941,7 @@ export default function OrderPage() {
               </div>
             )}
           </section>
-        ) : mode === "deals" && dealsSub === "promotion" ? (
+        ) : mode === "promotion" ? (
           <section className="order-shop-card">
             {promotionsLoading ? (
               <div style={{ ...emptyStyle, border: "1px solid #5eead4", background: "#f0fdfa", color: "#0f766e" }}>{t.loadingPromotions}</div>
@@ -3043,7 +3008,7 @@ export default function OrderPage() {
               </div>
             )}
           </section>
-        ) : mode === "deals" && dealsSub === "clearance" ? (
+        ) : mode === "clearance" ? (
           <section className="order-shop-card">
             {clearanceItems.length > 0 ? (
               <div className="order-clearance-bulk-row">
@@ -3325,8 +3290,7 @@ export default function OrderPage() {
           onBrowseWeeklyPicks={() => {
             setLastSubmittedRef("");
             setLastSubmittedItems([]);
-            changeMode("deals");
-            changeDealsSub("promotion");
+            changeMode("promotion");
           }}
         />
     </main>

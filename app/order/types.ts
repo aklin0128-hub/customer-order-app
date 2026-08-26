@@ -1,10 +1,7 @@
 export type Lang = "en" | "zh" | "ko" | "vi";
 
 /** Top-level order shop tabs. Quick order (`search`) stays available but hidden. */
-export type OrderMode = "catalog" | "deals" | "newItems" | "seasonal" | "search";
-
-/** Deals tab: promotions + near-date sale. */
-export type DealsSubMode = "promotion" | "clearance";
+export type OrderMode = "catalog" | "promotion" | "clearance" | "newItems" | "seasonal" | "search";
 
 export type CatalogItem = {
   sku: string;
