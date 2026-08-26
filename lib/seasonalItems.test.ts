@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   normalizeSeasonalItemRecord,
+  isSeasonalEtaPending,
   parseSeasonalItemSkuList,
   sortSeasonalItemRecords,
 } from "@/lib/seasonalItems";
@@ -32,6 +33,18 @@ test("normalizeSeasonalItemRecord drops invalid etaDate", () => {
     etaDate: "09/15/2026",
   });
   assert.equal(record?.etaDate, undefined);
+});
+
+test("isSeasonalEtaPending is true before ETA day", () => {
+  assert.equal(isSeasonalEtaPending("2026-09-15", new Date("2026-09-14T15:00:00")), true);
+  assert.equal(isSeasonalEtaPending("2026-09-15", new Date("2026-09-15T08:00:00")), false);
+  assert.equal(isSeasonalEtaPending("2026-09-15", new Date("2026-09-16T08:00:00")), false);
+});
+
+test("isSeasonalEtaPending ignores missing or invalid ETA", () => {
+  assert.equal(isSeasonalEtaPending("", new Date("2026-09-14")), false);
+  assert.equal(isSeasonalEtaPending(undefined, new Date("2026-09-14")), false);
+  assert.equal(isSeasonalEtaPending("09/15/2026", new Date("2026-09-14")), false);
 });
 
 test("parseSeasonalItemSkuList dedupes tokens", () => {

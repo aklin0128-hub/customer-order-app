@@ -22,7 +22,8 @@ import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
 import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog } from "./catalogState";
 import { isProductOrderingBlocked } from "@/lib/productAvailability";
-import { compareCatalogByNewestImport, compareCatalogForDisplay } from "@/lib/catalogNewItems";
+import { compareCatalogByNewestImport, compareCatalogForDisplay, formatNewItemComingDate } from "@/lib/catalogNewItems";
+import { isSeasonalEtaPending } from "@/lib/seasonalItems";
 import { clearCustomerSession, readCustomerSession, updateCustomerOrderEmail } from "@/lib/customerSession";
 import { hasSavedAdminPassword } from "@/app/admin/_components/useAdminAuth";
 import {
@@ -2935,12 +2936,16 @@ export default function OrderPage() {
                   const qty = catalogQtyMap[sku] || "";
                   const note = String((item as { seasonalNote?: string }).seasonalNote || "").trim();
                   const etaDate = String((item as { seasonalEtaDate?: string }).seasonalEtaDate || "").trim();
+                  const etaPending = isSeasonalEtaPending(etaDate);
+                  const etaLabel = etaDate ? formatNewItemComingDate(etaDate, lang) || etaDate : "";
+                  const canOrder = isOrderableItem(item) && !etaPending;
                   return (
                     <CatalogQtyCard
                       key={item.sku}
                       item={{
                         ...item,
                         ...(etaDate ? { newItemComingDate: etaDate } : {}),
+                        ...(etaPending ? { isNew: true, newItemComingSoon: true } : {}),
                       }}
                       qty={qty}
                       palletLabel={t.pallet}
@@ -2954,11 +2959,13 @@ export default function OrderPage() {
                       comingDateLabel={t.etaDate}
                       lang={lang}
                       highlight
-                      disabled={!isOrderableItem(item)}
+                      disabled={!canOrder}
                       unavailableNote={
-                        !isOrderableItem(item)
-                          ? formatOrderNotAvailableMessage(item.sku || "", item.status, t)
-                          : undefined
+                        etaPending
+                          ? t.seasonalEtaBlocked.replace("{date}", etaLabel)
+                          : !isOrderableItem(item)
+                            ? formatOrderNotAvailableMessage(item.sku || "", item.status, t)
+                            : undefined
                       }
                       onAdjust={adjustCatalogQty}
                       onUpdateQty={updateCatalogQty}

@@ -38,6 +38,24 @@ function parseDateOnly(value?: unknown): string | undefined {
   return Number.isNaN(date.getTime()) ? undefined : text;
 }
 
+/** Local calendar YYYY-MM-DD for ETA comparisons. */
+export function formatLocalDateYmd(now = new Date()): string {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * True when Seasonal ETA is set and today is still before that date.
+ * On/after the ETA day the SKU becomes orderable again.
+ */
+export function isSeasonalEtaPending(etaDate?: string | null, now = new Date()): boolean {
+  const eta = parseDateOnly(etaDate);
+  if (!eta) return false;
+  return formatLocalDateYmd(now) < eta;
+}
+
 export function normalizeSeasonalItemRecord(entry: unknown): SeasonalItemRecord | null {
   if (!entry || typeof entry !== "object") return null;
   const raw = entry as Record<string, unknown>;

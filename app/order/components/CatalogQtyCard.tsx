@@ -172,7 +172,7 @@ export function CatalogQtyCard({
       ? formatNewItemListPriceDisplay(item.newItemListPrice)
       : "";
   const alignedPriceLayout = Boolean(showNewItemListPrice);
-  const comingSoon = alignedPriceLayout && isComingSoonNewItem(item);
+  const comingSoon = isComingSoonNewItem(item);
   const outOfStock = isProductOutOfStockStamp(item);
   const stamped = comingSoon || outOfStock;
   const orderingBlocked = isProductOrderingBlocked(item);
