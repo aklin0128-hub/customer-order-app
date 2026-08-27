@@ -94,7 +94,10 @@ function formatTierPricesLine(tiers: PromoPriceTier[]) {
 }
 
 function dealSummary(p: PromotionRecord) {
-  if (p.buyQty && p.getQtyFree) return `Buy ${p.buyQty} Get ${p.getQtyFree} free`;
+  if (p.buyQty && p.getQtyFree) {
+    const deal = `Buy ${p.buyQty} Get ${p.getQtyFree} free`;
+    return p.promoPrice ? `${deal} · ${p.promoPrice}` : deal;
+  }
   if (p.priceTiers?.length) return formatTierPricesLine(p.priceTiers);
   if (p.promoPrice) return `Price: ${p.promoPrice}`;
   return "";
@@ -290,7 +293,10 @@ export default function AdminPromotionsPage() {
           endDate: form.endDate || undefined,
           promoQty: form.promoQty || undefined,
           dealType: form.dealMode,
-          promoPrice: form.dealMode === "none" ? form.promoPrice || undefined : undefined,
+          promoPrice:
+            form.dealMode === "none" || form.dealMode === "bogo"
+              ? form.promoPrice || undefined
+              : undefined,
           buyQty: form.dealMode === "bogo" ? form.buyQty || undefined : undefined,
           getQtyFree: form.dealMode === "bogo" ? form.getQtyFree || undefined : undefined,
           priceTiers:
@@ -612,26 +618,42 @@ export default function AdminPromotionsPage() {
               ) : null}
 
               {form.dealMode === "bogo" ? (
-                <div className="admin-form-grid-2" style={{ marginTop: 10 }}>
-                  <div>
-                    <FieldLabel>Buy qty</FieldLabel>
-                    <input
-                      value={form.buyQty}
-                      onChange={(e) => setForm((f) => ({ ...f, buyQty: e.target.value.replace(/[^0-9]/g, "") }))}
-                      placeholder="2"
-                      inputMode="numeric"
-                      style={inputStyle}
-                    />
+                <div style={{ marginTop: 10 }}>
+                  <div className="admin-form-grid-2">
+                    <div>
+                      <FieldLabel>Buy qty</FieldLabel>
+                      <input
+                        value={form.buyQty}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, buyQty: e.target.value.replace(/[^0-9]/g, "") }))
+                        }
+                        placeholder="2"
+                        inputMode="numeric"
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <FieldLabel>Free qty</FieldLabel>
+                      <input
+                        value={form.getQtyFree}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            getQtyFree: e.target.value.replace(/[^0-9]/g, ""),
+                          }))
+                        }
+                        placeholder="1"
+                        inputMode="numeric"
+                        style={inputStyle}
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <FieldLabel>Free qty</FieldLabel>
+                  <div style={{ marginTop: 10 }}>
+                    <FieldLabel>Promo price (optional)</FieldLabel>
                     <input
-                      value={form.getQtyFree}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, getQtyFree: e.target.value.replace(/[^0-9]/g, "") }))
-                      }
-                      placeholder="1"
-                      inputMode="numeric"
+                      value={form.promoPrice}
+                      onChange={(e) => setForm((f) => ({ ...f, promoPrice: e.target.value }))}
+                      placeholder="$12.99"
                       style={inputStyle}
                     />
                   </div>
