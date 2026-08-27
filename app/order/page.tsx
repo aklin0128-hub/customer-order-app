@@ -1130,20 +1130,17 @@ export default function OrderPage() {
   );
 
   const seasonalCatalogItems = useMemo(() => {
+    // Curated Seasonal list must stay visible even when SKUs are READYTOORDER
+    // (hidden from Catalog) or when "Available only" is on.
     const bySku = new Map(
-      catalogBrowseBase.map((item) => [String(item.sku || "").toUpperCase(), item])
+      catalog.map((item) => [String(item.sku || "").toUpperCase(), item])
     );
-    return seasonalItems
-      .map((row) => {
-        const sku = String(row.sku || "").toUpperCase();
-        const fromCatalog = bySku.get(sku);
-        return fromCatalog ? { ...row, ...fromCatalog, sku } : { ...row, sku };
-      })
-      .filter((item) => {
-        if (!showAvailableOnly) return true;
-        return passesAvailableFilter(item);
-      });
-  }, [seasonalItems, catalogBrowseBase, showAvailableOnly, passesAvailableFilter]);
+    return seasonalItems.map((row) => {
+      const sku = String(row.sku || "").toUpperCase();
+      const fromCatalog = bySku.get(sku);
+      return fromCatalog ? { ...row, ...fromCatalog, sku } : { ...row, sku };
+    });
+  }, [seasonalItems, catalogVersion]);
 
   const seasonalCount = seasonalCatalogItems.length;
 
