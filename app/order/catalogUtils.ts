@@ -225,7 +225,11 @@ export function formatOrderNotAvailableMessage(
   t: { orderNotAvailable: string; statusWarning: string; unavailableMissingSku?: string }
 ) {
   const cleanSku = String(sku || "").trim().toUpperCase();
-  const display = getDisplayStatus(status) || String(status || "").trim().toUpperCase();
+  const rawStatus = String(status || "").trim().toUpperCase();
+  // Prefer customer-safe display status; never echo READYTOORDER.
+  const display =
+    getDisplayStatus(status) ||
+    (rawStatus && !isReadyToOrderStatus(rawStatus) ? rawStatus : "");
 
   if (cleanSku && display === "NOT FOUND" && t.unavailableMissingSku) {
     return t.unavailableMissingSku.replace("{sku}", cleanSku);
