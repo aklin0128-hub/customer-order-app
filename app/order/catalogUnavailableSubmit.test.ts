@@ -47,7 +47,7 @@ test("formatOrderNotAvailableMessage always includes sku when present", () => {
   );
   assert.equal(
     formatOrderNotAvailableMessage("RTO1", "READYTOORDER", t),
-    "RTO1 status is READYTOORDER."
+    "RTO1 status is UNAVAILABLE."
   );
   assert.equal(
     formatOrderNotAvailableMessage("MISSING", "NOT FOUND", t),

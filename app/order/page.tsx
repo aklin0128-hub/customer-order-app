@@ -48,6 +48,7 @@ import {
   resolveQuickSearchTargetItem,
   isNewItem,
   isOrderableItem,
+  isReadyToOrderItem,
   isCustomerVisibleCatalogItem,
   scoreCatalogSearchQuery,
 } from "./catalogUtils";
@@ -2924,7 +2925,7 @@ export default function OrderPage() {
                       unavailableNote={
                         etaPending
                           ? t.seasonalEtaBlocked.replace("{date}", etaLabel)
-                          : !isOrderableItem(item)
+                          : !isOrderableItem(item) && !isReadyToOrderItem(item)
                             ? formatOrderNotAvailableMessage(item.sku || "", item.status, t)
                             : undefined
                       }
