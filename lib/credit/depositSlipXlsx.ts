@@ -13,9 +13,14 @@ export function buildDepositSlipWorkbook(opts: {
   const seenChecks = new Set<string>();
   const rows: Array<Array<string | number>> = [
     ["PNC BANK CHECK DEPOSIT (SE)"],
-    [`Name: ${opts.meta.name || ""}`, `Date: ${opts.meta.date || ""}`, `Code: ${opts.meta.code || ""}`],
+    [
+      `Name: ${opts.meta.name || ""}`,
+      `Store ID: ${opts.meta.storeId || ""}`,
+      `Date: ${opts.meta.date || ""}`,
+      `Code: ${opts.meta.code || ""}`,
+    ],
     [],
-    ["STORE ID", "INVOICE #", "Invoice Amount", "Check NO", "Deposit Amount", "Check date"],
+    ["INVOICE #", "Invoice Amount", "Check NO", "Deposit Amount", "Check date"],
   ];
 
   let invoiceTotal = 0;
@@ -31,7 +36,6 @@ export function buildDepositSlipWorkbook(opts: {
     }
 
     rows.push([
-      line.storeId || opts.meta.storeId || "",
       line.document,
       money(line.amount),
       showCheck && line.checkNo ? `# ${line.checkNo}` : "",
@@ -41,7 +45,7 @@ export function buildDepositSlipWorkbook(opts: {
   }
 
   rows.push([]);
-  rows.push(["TOTAL", "", money(invoiceTotal), "", money(depositTotal), ""]);
+  rows.push(["TOTAL", money(invoiceTotal), "", money(depositTotal), ""]);
 
   const sheet = XLSX.utils.aoa_to_sheet(rows);
   const wb = XLSX.utils.book_new();

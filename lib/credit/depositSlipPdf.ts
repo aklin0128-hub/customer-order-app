@@ -39,6 +39,10 @@ export async function buildDepositSlipPdf(opts: {
   let page = pdf.addPage([pageWidth, pageHeight]);
   let y = pageHeight - margin;
 
+  // No per-row STORE ID — show once in the yellow header.
+  const cols = [260, 120, 120, 120, 110];
+  const headers = ["INVOICE #", "Invoice Amount", "Check NO", "Deposit Amount", "Check date"];
+
   const drawHeader = () => {
     page.drawRectangle({
       x: margin,
@@ -61,22 +65,26 @@ export async function buildDepositSlipPdf(opts: {
       font,
       color: rgb(0.1, 0.1, 0.1),
     });
+    page.drawText(`Store ID: ${opts.meta.storeId || ""}`, {
+      x: margin + 200,
+      y: y - 34,
+      size: 10,
+      font,
+    });
     page.drawText(`Date: ${opts.meta.date || ""}`, {
-      x: margin + 260,
+      x: margin + 360,
       y: y - 34,
       size: 10,
       font,
     });
     page.drawText(`Code: ${opts.meta.code || ""}`, {
-      x: margin + 420,
+      x: margin + 520,
       y: y - 34,
       size: 10,
       font,
     });
     y -= 58;
 
-    const headers = ["STORE ID", "INVOICE #", "Invoice Amount", "Check NO", "Deposit Amount", "Check date"];
-    const cols = [70, 220, 110, 110, 110, 90];
     let x = margin;
     for (let i = 0; i < headers.length; i++) {
       page.drawText(headers[i]!, { x, y, size: 9, font: bold });
@@ -94,7 +102,6 @@ export async function buildDepositSlipPdf(opts: {
 
   drawHeader();
 
-  const cols = [70, 220, 110, 110, 110, 90];
   let invoiceTotal = 0;
   let depositTotal = 0;
   const seenChecks = new Set<string>();
@@ -115,7 +122,6 @@ export async function buildDepositSlipPdf(opts: {
     }
 
     const values = [
-      line.storeId || opts.meta.storeId || "",
       line.document,
       money(line.amount),
       showCheck && line.checkNo ? `# ${line.checkNo}` : "",
@@ -127,7 +133,7 @@ export async function buildDepositSlipPdf(opts: {
     for (let i = 0; i < values.length; i++) {
       const text = values[i]!;
       const isNeg = text.includes("(");
-      page.drawText(text.slice(0, 42), {
+      page.drawText(text.slice(0, 48), {
         x,
         y,
         size: 9,
@@ -148,8 +154,13 @@ export async function buildDepositSlipPdf(opts: {
     color: rgb(1, 0.95, 0.2),
   });
   page.drawText("TOTAL", { x: margin + 10, y, size: 10, font: bold });
-  page.drawText(money(invoiceTotal), { x: margin + 300, y, size: 10, font: bold });
-  page.drawText(money(depositTotal), { x: margin + 520, y, size: 10, font: bold });
+  page.drawText(money(invoiceTotal), { x: margin + cols[0]!, y, size: 10, font: bold });
+  page.drawText(money(depositTotal), {
+    x: margin + cols[0]! + cols[1]! + cols[2]!,
+    y,
+    size: 10,
+    font: bold,
+  });
 
   return pdf.save();
 }
