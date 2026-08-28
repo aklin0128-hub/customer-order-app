@@ -415,10 +415,10 @@ export function CreditClient() {
                   />
                 </th>
                 <th className="credit-th-actions">Actions</th>
-                <th>Document</th>
-                <th>Code</th>
-                <th>Remaining Debits</th>
-                <th>Remaining Credits</th>
+                <th className="credit-th-document">Document</th>
+                <th className="credit-th-code">Code</th>
+                <th className="credit-th-money">Remaining Debits</th>
+                <th className="credit-th-money">Remaining Credits</th>
               </tr>
             </thead>
             <tbody>
@@ -518,7 +518,7 @@ export function CreditClient() {
                         </div>
                       </div>
                     </td>
-                    <td>
+                    <td className="credit-td-document">
                       <input
                         className="credit-cell"
                         value={row.document}
@@ -531,7 +531,7 @@ export function CreditClient() {
                         }
                       />
                     </td>
-                    <td>
+                    <td className="credit-td-code">
                       <span className={`credit-code credit-code-${row.code.toLowerCase()}`}>{row.code}</span>
                     </td>
                     <td className="credit-money">

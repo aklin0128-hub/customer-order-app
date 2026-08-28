@@ -207,7 +207,8 @@
 .credit-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 640px;
+  table-layout: fixed;
+  min-width: 720px;
   font-size: 12px;
 }
 
@@ -232,13 +233,35 @@
 }
 
 .credit-th-actions {
-  width: 1%;
+  width: 118px;
   white-space: nowrap;
 }
 
 .credit-th-check {
-  width: 1%;
+  width: 36px;
   text-align: center;
+}
+
+.credit-th-document {
+  width: 34%;
+}
+
+.credit-th-code {
+  width: 88px;
+}
+
+.credit-th-money {
+  width: 140px;
+  text-align: right;
+}
+
+.credit-td-document {
+  width: 34%;
+}
+
+.credit-td-code {
+  width: 88px;
+  white-space: nowrap;
 }
 
 .credit-row-actions {
@@ -368,6 +391,7 @@
 }
 
 .credit-money {
+  width: 140px;
   text-align: right;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
@@ -380,7 +404,9 @@
 
 .credit-cell {
   width: 100%;
-  min-width: 140px;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 6px 8px;
 }
 
