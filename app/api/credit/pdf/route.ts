@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireCredit } from "@/lib/creditAuth";
 import { buildDepositSlipPdf, type DepositSlipLine, type DepositSlipMeta } from "@/lib/credit/depositSlipPdf";
+import { MAX_DEPOSIT_SLIP_LINES } from "@/lib/credit/limits";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -40,6 +41,12 @@ export async function POST(req: Request) {
     const lines = asLines(body?.lines);
     if (!lines.length) {
       return NextResponse.json({ error: "Select at least one document." }, { status: 400 });
+    }
+    if (lines.length > MAX_DEPOSIT_SLIP_LINES) {
+      return NextResponse.json(
+        { error: `Too many documents. Max ${MAX_DEPOSIT_SLIP_LINES} rows per deposit slip.` },
+        { status: 400 }
+      );
     }
 
     const pdf = await buildDepositSlipPdf({ meta, lines });
