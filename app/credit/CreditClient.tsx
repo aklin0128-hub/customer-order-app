@@ -4,6 +4,12 @@ import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 
 import { defaultSlipAmount, type StatementLineKind } from "@/lib/credit/parseStatement";
 import { MAX_DEPOSIT_SLIP_LINES } from "@/lib/credit/limits";
+import {
+  clearCreditDraft,
+  formatDraftSavedAt,
+  loadCreditDraft,
+  saveCreditDraft,
+} from "@/lib/credit/creditDraft";
 import { useCreditAuth } from "./useCreditAuth";
 
 type CreditRow = {
@@ -97,7 +103,37 @@ export function CreditClient() {
   const [filter, setFilter] = useState<RowFilter>("all");
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropId, setDropId] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
   const dragIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const draft = loadCreditDraft();
+    if (draft) {
+      setRows(
+        draft.rows.map((r) => ({
+          id: r.id || uid(),
+          document: String(r.document || "").toUpperCase(),
+          code: (r.code || "Other") as StatementLineKind,
+          date: r.date,
+          remainingDebit: Number(r.remainingDebit) || 0,
+          remainingCredit: Number(r.remainingCredit) || 0,
+          selected: Boolean(r.selected),
+        }))
+      );
+      setStoreId(String(draft.storeId || "").toUpperCase());
+      setName(draft.name || "ELLISON LIN");
+      setCode(String(draft.code || "S32").toUpperCase());
+      setSlipDate(draft.slipDate || todayInput());
+      setCheckNo(draft.checkNo || "");
+      setCheckAmount(draft.checkAmount || "");
+      setCheckDate(draft.checkDate || todayInput());
+      setFilter(draft.filter === "debit" || draft.filter === "credit" ? draft.filter : "all");
+      setSavedAt(draft.savedAt);
+      setMessage(`Restored saved draft (${draft.rows.length} docs).`);
+    }
+    setHydrated(true);
+  }, []);
 
   const visibleRows = useMemo(() => rows.filter((r) => rowMatchesFilter(r, filter)), [rows, filter]);
   const allVisibleSelected =
@@ -300,8 +336,67 @@ export function CreditClient() {
     }
   };
 
+  const persistDraft = (quiet = false) => {
+    try {
+      const saved = saveCreditDraft({
+        storeId,
+        name,
+        code,
+        slipDate,
+        checkNo,
+        checkAmount,
+        checkDate,
+        filter,
+        rows,
+      });
+      setSavedAt(saved.savedAt);
+      if (!quiet) {
+        setError("");
+        setMessage(`Saved ${rows.length} documents to this browser.`);
+      }
+    } catch {
+      setError("Could not save draft in this browser.");
+    }
+  };
+
+  const onClearSaved = () => {
+    clearCreditDraft();
+    setSavedAt(null);
+    setMessage("Cleared saved draft.");
+  };
+
+  // Autosave after edits (once hydrated).
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!rows.length && !storeId && !checkNo) return;
+    const t = window.setTimeout(() => persistDraft(true), 800);
+    return () => window.clearTimeout(t);
+  }, [hydrated, rows, storeId, name, code, slipDate, checkNo, checkAmount, checkDate, filter]);
+
   return (
     <div className="credit-client">
+      <section className="credit-card credit-save-bar">
+        <div>
+          <h2>Save</h2>
+          <p className="credit-hint" style={{ marginBottom: 0 }}>
+            Saves documents, check info, and header on this browser. Restores when you reopen /credit.
+          </p>
+          {savedAt ? (
+            <p className="credit-meta" style={{ marginTop: 6 }}>
+              Last saved: {formatDraftSavedAt(savedAt)}
+            </p>
+          ) : null}
+        </div>
+        <div className="credit-actions" style={{ marginTop: 0 }}>
+          <button type="button" className="credit-btn primary" onClick={() => persistDraft(false)}>
+            Save
+          </button>
+          <button type="button" className="credit-btn ghost" onClick={onClearSaved} disabled={!savedAt}>
+            Clear saved
+          </button>
+        </div>
+      </section>
+
       <section className="credit-card">
         <h2>1. Upload statement</h2>
         <p className="credit-hint">
@@ -563,11 +658,17 @@ export function CreditClient() {
       <section className="credit-card credit-export">
         <h2>5. Download</h2>
         <div className="credit-actions">
+          <button type="button" className="credit-btn" onClick={() => persistDraft(false)}>
+            Save
+          </button>
           <button
             type="button"
             className="credit-btn primary"
             disabled={exporting !== null}
-            onClick={() => void exportFile("pdf")}
+            onClick={() => {
+              persistDraft(true);
+              void exportFile("pdf");
+            }}
           >
             {exporting === "pdf" ? "Building PDF…" : "Download PDF"}
           </button>
@@ -575,7 +676,10 @@ export function CreditClient() {
             type="button"
             className="credit-btn primary"
             disabled={exporting !== null}
-            onClick={() => void exportFile("xlsx")}
+            onClick={() => {
+              persistDraft(true);
+              void exportFile("xlsx");
+            }}
           >
             {exporting === "xlsx" ? "Building Excel…" : "Download Excel"}
           </button>

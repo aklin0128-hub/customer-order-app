@@ -58,6 +58,20 @@
   gap: 14px;
 }
 
+.credit-save-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  background: linear-gradient(180deg, #fff7ed 0%, #fff 70%);
+  border-color: #fdba74;
+}
+
+.credit-save-bar h2 {
+  margin-bottom: 4px;
+}
+
 .credit-card {
   background: #fff;
   border: 1px solid #e2e8f0;
