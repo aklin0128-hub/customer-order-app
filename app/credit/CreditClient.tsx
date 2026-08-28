@@ -200,6 +200,34 @@ export function CreditClient() {
     ]);
   };
 
+  const moveRow = (id: string, direction: -1 | 1) => {
+    setRows((prev) => {
+      const visibleIds = prev
+        .filter((r) => {
+          if (filter === "debit") return r.remainingDebit > 0;
+          if (filter === "credit") return r.remainingCredit > 0;
+          return true;
+        })
+        .map((r) => r.id);
+      const visIdx = visibleIds.indexOf(id);
+      if (visIdx < 0) return prev;
+      const swapVisIdx = visIdx + direction;
+      if (swapVisIdx < 0 || swapVisIdx >= visibleIds.length) return prev;
+
+      const aId = visibleIds[visIdx]!;
+      const bId = visibleIds[swapVisIdx]!;
+      const aIdx = prev.findIndex((r) => r.id === aId);
+      const bIdx = prev.findIndex((r) => r.id === bId);
+      if (aIdx < 0 || bIdx < 0) return prev;
+
+      const next = prev.slice();
+      const tmp = next[aIdx]!;
+      next[aIdx] = next[bIdx]!;
+      next[bIdx] = tmp;
+      return next;
+    });
+  };
+
   const exportPayload = () => {
     const exportRows = rows.filter((r) => r.selected && r.document.trim());
     return {
@@ -350,6 +378,7 @@ export function CreditClient() {
             <thead>
               <tr>
                 <th />
+                <th>Move</th>
                 <th>Document</th>
                 <th>Code</th>
                 <th>Remaining Debits</th>
@@ -363,12 +392,12 @@ export function CreditClient() {
             <tbody>
               {visibleRows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="credit-empty">
+                  <td colSpan={10} className="credit-empty">
                     Upload a statement to begin.
                   </td>
                 </tr>
               ) : (
-                visibleRows.map((row) => (
+                visibleRows.map((row, index) => (
                   <tr key={row.id} className={row.selected ? "is-selected" : ""}>
                     <td>
                       <input
@@ -380,6 +409,28 @@ export function CreditClient() {
                           )
                         }
                       />
+                    </td>
+                    <td>
+                      <div className="credit-move">
+                        <button
+                          type="button"
+                          className="credit-move-btn"
+                          aria-label="Move up"
+                          disabled={index === 0}
+                          onClick={() => moveRow(row.id, -1)}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="credit-move-btn"
+                          aria-label="Move down"
+                          disabled={index === visibleRows.length - 1}
+                          onClick={() => moveRow(row.id, 1)}
+                        >
+                          ↓
+                        </button>
+                      </div>
                     </td>
                     <td>
                       <input

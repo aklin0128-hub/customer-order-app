@@ -211,6 +211,30 @@
   text-align: right;
 }
 
+.credit-move {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.credit-move-btn {
+  width: 28px;
+  height: 22px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  color: #334155;
+}
+
+.credit-move-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .credit-empty {
   text-align: center;
   color: #94a3b8;
