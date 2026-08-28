@@ -29,7 +29,7 @@ const DATE_RE = /\b(\d{1,2}\/\d{1,2}\/\d{2,4})\b/;
 export function parseMoneyToken(raw: string): number | null {
   const text = String(raw || "").trim();
   if (!text) return null;
-  const negative = /^\(.*\)$/.test(text) || text.includes("-");
+  const negative = /^\(.*\)$/.test(text) || /-\s*\$?\s*[\d,]+\.\d{2}/.test(text) || text.trim().startsWith("-");
   const digits = text.replace(/[^0-9.]/g, "");
   if (!digits) return null;
   const value = Number(digits);
@@ -52,13 +52,12 @@ function isLikelyDocument(token: string) {
   if (/^FL\d+$/i.test(t)) return false;
   if (t === "NET-30" || t === "NET30") return false;
   // Prefer invoice / credit / deposit style docs.
-  return /^(SJCM|PSI|PSCM|PNC|CM|INV|CN)/i.test(t) || t.includes("-");
+  return /^(SJCM|PSI|PSCM|PNC|CM|INV|CN)/i.test(t);
 }
 
 function pickDocument(tokens: string[]) {
   const docs = tokens.filter(isLikelyDocument);
   if (!docs.length) return "";
-  // Prefer non-deposit documents first, then deposits.
   const preferred = docs.find((d) => !/^PNC-DEPOSIT/i.test(d));
   return preferred || docs[0] || "";
 }
@@ -78,17 +77,81 @@ function extractHeaderField(text: string, labels: string[]) {
   return undefined;
 }
 
+function round2(n: number) {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Statement columns: Original | Remaining Debits | Remaining Credits | Balance
+ * Empty remaining cells are omitted by PDF/OCR, so the trailing amount is usually Balance.
+ * Use Code to decide debit vs credit; never treat Balance as a remaining amount.
+ */
+export function resolveRemainingAmounts(
+  code: StatementLineKind,
+  moneyValues: number[]
+): { originalAmount?: number; remainingDebit: number; remainingCredit: number } {
+  if (!moneyValues.length) return { remainingDebit: 0, remainingCredit: 0 };
+
+  // Drop trailing running balance when present.
+  let working = moneyValues.slice();
+  if (working.length >= 2) {
+    working = working.slice(0, -1);
+  }
+
+  const originalAmount = working[0];
+  const rest = working.slice(1);
+
+  if (code === "Invoice" || code === "Refund") {
+    const debit =
+      rest.find((n) => n > 0) ??
+      (originalAmount != null && originalAmount > 0 ? originalAmount : 0);
+    return {
+      originalAmount,
+      remainingDebit: round2(Math.max(0, debit)),
+      remainingCredit: 0,
+    };
+  }
+
+  if (code === "Credit" || code === "Payment") {
+    const creditCandidate =
+      rest.find((n) => n !== 0) ??
+      (originalAmount != null && originalAmount !== 0 ? originalAmount : 0);
+    return {
+      originalAmount,
+      remainingDebit: 0,
+      remainingCredit: round2(Math.abs(creditCandidate)),
+    };
+  }
+
+  // Unknown code: negative original => credit, else debit.
+  if ((originalAmount ?? 0) < 0) {
+    const credit = rest.find((n) => n !== 0) ?? originalAmount ?? 0;
+    return {
+      originalAmount,
+      remainingDebit: 0,
+      remainingCredit: round2(Math.abs(credit)),
+    };
+  }
+
+  const debit = rest.find((n) => n > 0) ?? Math.max(0, originalAmount ?? 0);
+  return {
+    originalAmount,
+    remainingDebit: round2(debit),
+    remainingCredit: 0,
+  };
+}
+
 /**
  * Parse one statement line of mixed OCR/PDF text.
- * Expected pieces: Document … Code … amounts (remaining debit / credit near end).
+ * Expected pieces: Document … Code … amounts (remaining debit / credit), then Balance.
  */
 export function parseStatementLineText(line: string): ParsedStatementLine | null {
   const raw = String(line || "").replace(/\s+/g, " ").trim();
   if (!raw) return null;
-  if (/statement\s+aging|days\s+overdue|aged\s+amounts|remaining\s+debits\s+remaining\s+credits/i.test(raw)) {
-    return null;
-  }
+  if (/statement\s+aging|days\s+overdue|aged\s+amounts/i.test(raw)) return null;
+  if (/remaining\s+debits\s+remaining\s+credits/i.test(raw)) return null;
   if (/^document\b/i.test(raw) && /remaining/i.test(raw)) return null;
+  if (/statement\s+balance|total\s+debits|total\s+credits/i.test(raw)) return null;
 
   const docs = [...raw.matchAll(DOC_RE)].map((m) => m[1]!.toUpperCase());
   const document = pickDocument(docs);
@@ -100,56 +163,16 @@ export function parseStatementLineText(line: string): ParsedStatementLine | null
   const dateMatch = raw.match(DATE_RE);
   const date = dateMatch?.[1];
 
-  const moneyTokens = [...raw.matchAll(MONEY_RE)].map((m) => m[0]);
-  const moneyValues = moneyTokens
-    .map(parseMoneyToken)
+  const moneyValues = [...raw.matchAll(MONEY_RE)]
+    .map((m) => parseMoneyToken(m[0]!))
     .filter((n): n is number => n != null);
 
   if (moneyValues.length === 0) return null;
 
-  let remainingDebit = 0;
-  let remainingCredit = 0;
-  let originalAmount: number | undefined;
-
-  // Heuristic: last two non-running-balance amounts are often Remaining Debit / Credit.
-  // OCR/PDF order is usually: Original, Remaining Debit, Remaining Credit, Balance.
-  if (moneyValues.length >= 4) {
-    originalAmount = moneyValues[0];
-    remainingDebit = Math.max(0, moneyValues[moneyValues.length - 3] || 0);
-    remainingCredit = Math.max(0, moneyValues[moneyValues.length - 2] || 0);
-  } else if (moneyValues.length === 3) {
-    originalAmount = moneyValues[0];
-    remainingDebit = Math.max(0, moneyValues[1] || 0);
-    remainingCredit = Math.max(0, moneyValues[2] || 0);
-  } else if (moneyValues.length === 2) {
-    originalAmount = moneyValues[0];
-    if (code === "Credit" || code === "Payment" || (originalAmount ?? 0) < 0) {
-      remainingCredit = Math.abs(moneyValues[1] || 0);
-    } else {
-      remainingDebit = Math.max(0, moneyValues[1] || 0);
-    }
-  } else {
-    originalAmount = moneyValues[0];
-    if (code === "Credit" || code === "Payment" || (originalAmount ?? 0) < 0) {
-      remainingCredit = Math.abs(originalAmount || 0);
-    } else {
-      remainingDebit = Math.max(0, originalAmount || 0);
-    }
-  }
-
-  // Code-based cleanup when one side should be zero.
-  if (code === "Invoice" || code === "Refund") {
-    if (remainingDebit <= 0 && remainingCredit > 0) {
-      remainingDebit = remainingCredit;
-      remainingCredit = 0;
-    }
-  }
-  if (code === "Credit" || code === "Payment") {
-    if (remainingCredit <= 0 && remainingDebit > 0) {
-      remainingCredit = remainingDebit;
-      remainingDebit = 0;
-    }
-  }
+  const { originalAmount, remainingDebit, remainingCredit } = resolveRemainingAmounts(
+    code,
+    moneyValues
+  );
 
   if (remainingDebit <= 0 && remainingCredit <= 0) return null;
 
@@ -161,13 +184,26 @@ export function parseStatementLineText(line: string): ParsedStatementLine | null
     date,
     orderNo,
     originalAmount,
-    remainingDebit: round2(remainingDebit),
-    remainingCredit: round2(remainingCredit),
+    remainingDebit,
+    remainingCredit,
   };
 }
 
-function round2(n: number) {
-  return Math.round(n * 100) / 100;
+function pushUnique(lines: ParsedStatementLine[], seen: Set<string>, parsed: ParsedStatementLine) {
+  const key = `${parsed.document}|${parsed.code}|${parsed.remainingDebit}|${parsed.remainingCredit}`;
+  if (seen.has(key)) return;
+  // Prefer first non-Other code if same doc appears twice.
+  const existingIdx = lines.findIndex((l) => l.document === parsed.document);
+  if (existingIdx >= 0) {
+    const existing = lines[existingIdx]!;
+    if (existing.code === "Other" && parsed.code !== "Other") {
+      lines[existingIdx] = parsed;
+      seen.add(key);
+    }
+    return;
+  }
+  seen.add(key);
+  lines.push(parsed);
 }
 
 export function parseStatementText(text: string): ParsedStatement {
@@ -182,26 +218,31 @@ export function parseStatementText(text: string): ParsedStatement {
 
   for (const line of raw.split("\n")) {
     const parsed = parseStatementLineText(line);
-    if (!parsed) continue;
-    const key = `${parsed.document}|${parsed.remainingDebit}|${parsed.remainingCredit}|${parsed.code}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    lines.push(parsed);
+    if (parsed) pushUnique(lines, seen, parsed);
   }
 
-  // Fallback: some PDFs dump the table into fewer wrapped lines — scan windows.
-  if (lines.length === 0) {
-    const collapsed = raw.replace(/\n+/g, " ");
-    const chunks = collapsed.split(/(?=\b(?:SJCM|PSI|PSCM|PNC|CM)-)/i);
-    for (const chunk of chunks) {
-      const parsed = parseStatementLineText(chunk);
-      if (!parsed) continue;
-      const key = `${parsed.document}|${parsed.remainingDebit}|${parsed.remainingCredit}|${parsed.code}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      lines.push(parsed);
-    }
+  // PDF text often wraps or concatenates rows — also split on document anchors.
+  const collapsed = raw.replace(/\n+/g, " ");
+  const chunks = collapsed.split(/(?=\b(?:SJCM|PSI|PSCM|PNC|CM)-)/i);
+  for (const chunk of chunks) {
+    const parsed = parseStatementLineText(chunk);
+    if (parsed) pushUnique(lines, seen, parsed);
   }
+
+  // Keep statement order by first appearance of each document in text.
+  const order: string[] = [];
+  for (const m of collapsed.matchAll(/\b((?:SJCM|PSI|PSCM|PNC|CM)-[A-Z0-9-]+)\b/gi)) {
+    const doc = m[1]!.toUpperCase();
+    if (!order.includes(doc)) order.push(doc);
+  }
+  lines.sort((a, b) => {
+    const ai = order.indexOf(a.document);
+    const bi = order.indexOf(b.document);
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
 
   return {
     accountNo: accountNo?.replace(/[^A-Za-z0-9]/g, "").toUpperCase() || undefined,
