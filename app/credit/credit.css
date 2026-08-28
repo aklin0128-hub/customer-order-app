@@ -242,6 +242,10 @@
   text-align: center;
 }
 
+.credit-table th.credit-th-check {
+  text-align: center;
+}
+
 .credit-th-document {
   width: 34%;
 }
@@ -252,6 +256,9 @@
 
 .credit-th-money {
   width: 140px;
+}
+
+.credit-table th.credit-th-money {
   text-align: right;
 }
 
@@ -262,6 +269,10 @@
 .credit-td-code {
   width: 88px;
   white-space: nowrap;
+}
+
+.credit-table td.credit-money {
+  text-align: right;
 }
 
 .credit-row-actions {
