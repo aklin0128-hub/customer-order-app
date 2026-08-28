@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type DragEvent } from "react";
 
 import { defaultSlipAmount, type StatementLineKind } from "@/lib/credit/parseStatement";
 import { useCreditAuth } from "./useCreditAuth";
@@ -14,6 +14,8 @@ type CreditRow = {
   remainingCredit: number;
   selected: boolean;
 };
+
+type RowFilter = "all" | "debit" | "credit";
 
 function money(n: number) {
   const abs = Math.abs(n).toLocaleString("en-US", {
@@ -39,6 +41,29 @@ function toDisplayDate(iso: string) {
 
 function uid() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function rowMatchesFilter(r: CreditRow, filter: RowFilter) {
+  if (filter === "debit") return r.remainingDebit > 0;
+  if (filter === "credit") return r.remainingCredit > 0;
+  return true;
+}
+
+/** Reorder among currently visible rows; keep filtered-out rows in place. */
+function reorderVisibleRows(prev: CreditRow[], filter: RowFilter, fromId: string, toId: string) {
+  if (fromId === toId) return prev;
+  const visible = prev.filter((r) => rowMatchesFilter(r, filter));
+  const from = visible.findIndex((r) => r.id === fromId);
+  const to = visible.findIndex((r) => r.id === toId);
+  if (from < 0 || to < 0) return prev;
+
+  const nextVisible = visible.slice();
+  const [item] = nextVisible.splice(from, 1);
+  if (!item) return prev;
+  nextVisible.splice(to, 0, item);
+
+  let i = 0;
+  return prev.map((r) => (rowMatchesFilter(r, filter) ? nextVisible[i++]! : r));
 }
 
 async function downloadBlob(res: Response, fallbackName: string) {
@@ -68,13 +93,12 @@ export function CreditClient() {
   const [exporting, setExporting] = useState<"pdf" | "xlsx" | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState<"all" | "debit" | "credit">("all");
+  const [filter, setFilter] = useState<RowFilter>("all");
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropId, setDropId] = useState<string | null>(null);
+  const dragIdRef = useRef<string | null>(null);
 
-  const visibleRows = useMemo(() => {
-    if (filter === "debit") return rows.filter((r) => r.remainingDebit > 0);
-    if (filter === "credit") return rows.filter((r) => r.remainingCredit > 0);
-    return rows;
-  }, [rows, filter]);
+  const visibleRows = useMemo(() => rows.filter((r) => rowMatchesFilter(r, filter)), [rows, filter]);
 
   const selectedRows = useMemo(() => rows.filter((r) => r.selected), [rows]);
   const selectedInvoiceTotal = useMemo(
@@ -168,31 +192,39 @@ export function CreditClient() {
   };
 
   const moveRow = (id: string, direction: -1 | 1) => {
-    setRows((prev) => {
-      const visibleIds = prev
-        .filter((r) => {
-          if (filter === "debit") return r.remainingDebit > 0;
-          if (filter === "credit") return r.remainingCredit > 0;
-          return true;
-        })
-        .map((r) => r.id);
-      const visIdx = visibleIds.indexOf(id);
-      if (visIdx < 0) return prev;
-      const swapVisIdx = visIdx + direction;
-      if (swapVisIdx < 0 || swapVisIdx >= visibleIds.length) return prev;
+    const idx = visibleRows.findIndex((r) => r.id === id);
+    if (idx < 0) return;
+    const target = visibleRows[idx + direction];
+    if (!target) return;
+    setRows((prev) => reorderVisibleRows(prev, filter, id, target.id));
+  };
 
-      const aId = visibleIds[visIdx]!;
-      const bId = visibleIds[swapVisIdx]!;
-      const aIdx = prev.findIndex((r) => r.id === aId);
-      const bIdx = prev.findIndex((r) => r.id === bId);
-      if (aIdx < 0 || bIdx < 0) return prev;
+  const clearDrag = () => {
+    dragIdRef.current = null;
+    setDragId(null);
+    setDropId(null);
+  };
 
-      const next = prev.slice();
-      const tmp = next[aIdx]!;
-      next[aIdx] = next[bIdx]!;
-      next[bIdx] = tmp;
-      return next;
-    });
+  const onDragStart = (id: string, e: DragEvent) => {
+    dragIdRef.current = id;
+    setDragId(id);
+    setDropId(id);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", id);
+  };
+
+  const onDragOverRow = (id: string, e: DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dropId !== id) setDropId(id);
+  };
+
+  const onDropRow = (id: string, e: DragEvent) => {
+    e.preventDefault();
+    const fromId = dragIdRef.current || e.dataTransfer.getData("text/plain");
+    clearDrag();
+    if (!fromId || fromId === id) return;
+    setRows((prev) => reorderVisibleRows(prev, filter, fromId, id));
   };
 
   const exportPayload = () => {
@@ -367,7 +399,19 @@ export function CreditClient() {
                 </tr>
               ) : (
                 visibleRows.map((row, index) => (
-                  <tr key={row.id} className={row.selected ? "is-selected" : ""}>
+                  <tr
+                    key={row.id}
+                    className={[
+                      row.selected ? "is-selected" : "",
+                      dragId === row.id ? "is-dragging" : "",
+                      dropId === row.id && dragId && dragId !== row.id ? "is-drop-target" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    onDragOver={(e) => onDragOverRow(row.id, e)}
+                    onDrop={(e) => onDropRow(row.id, e)}
+                    onDragEnd={clearDrag}
+                  >
                     <td>
                       <input
                         type="checkbox"
@@ -381,6 +425,22 @@ export function CreditClient() {
                     </td>
                     <td>
                       <div className="credit-row-actions">
+                        <button
+                          type="button"
+                          className="credit-drag-handle"
+                          aria-label="Drag to reorder"
+                          title="Drag to reorder"
+                          draggable
+                          onDragStart={(e) => onDragStart(row.id, e)}
+                          onClick={(e) => e.preventDefault()}
+                        >
+                          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M5 3.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5zm6 0a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5zM5 6.75a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5zm6 0a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5zM5 10a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5zm6 0a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5z"
+                            />
+                          </svg>
+                        </button>
                         <button
                           type="button"
                           className="credit-icon-btn danger"
