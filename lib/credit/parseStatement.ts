@@ -25,6 +25,10 @@ const DOC_RE = /\b([A-Z]{2,}[A-Z0-9]*(?:-[A-Z0-9]+)+)\b/g;
 const MONEY_RE = /\(?-?\$?\s*[\d,]+\.\d{2}\)?/g;
 const CODE_RE = /\b(Invoice|Credit|Payment|Refund)\b/i;
 const DATE_RE = /\b(\d{1,2}\/\d{1,2}\/\d{2,4})\b/;
+/** Known Rhee Bros / AR document families used for splitting concatenated PDF text. */
+const DOC_FAMILY = "SJCM|PSI|PSCM|PNC|CM|NSF|INV|CN";
+const DOC_ANCHOR_RE = new RegExp(`\\b((?:${DOC_FAMILY})-[A-Z0-9-]+)\\b`, "gi");
+const DOC_SPLIT_RE = new RegExp(`(?=\\b(?:${DOC_FAMILY})-)`, "i");
 
 export function parseMoneyToken(raw: string): number | null {
   const text = String(raw || "").trim();
@@ -50,9 +54,12 @@ function isLikelyDocument(token: string) {
   const t = token.toUpperCase();
   if (t.startsWith("SO-")) return false;
   if (/^FL\d+$/i.test(t)) return false;
-  if (t === "NET-30" || t === "NET30") return false;
-  // Prefer invoice / credit / deposit style docs.
-  return /^(SJCM|PSI|PSCM|PNC|CM|INV|CN)/i.test(t);
+  if (/^NET-?\d+$/i.test(t)) return false;
+  // Invoice / credit / refund / deposit document families (incl. NSF refunds).
+  if (new RegExp(`^(?:${DOC_FAMILY})-`, "i").test(t)) return true;
+  // Other hyphenated refs with FY/year style segments (future doc types).
+  if (/^[A-Z]{2,}(?:-[A-Z0-9]+)+$/.test(t) && /(?:^|-)FY\d{2}(?:-|$)/i.test(t)) return true;
+  return false;
 }
 
 function pickDocument(tokens: string[]) {
@@ -223,7 +230,7 @@ export function parseStatementText(text: string): ParsedStatement {
 
   // PDF text often wraps or concatenates rows — also split on document anchors.
   const collapsed = raw.replace(/\n+/g, " ");
-  const chunks = collapsed.split(/(?=\b(?:SJCM|PSI|PSCM|PNC|CM)-)/i);
+  const chunks = collapsed.split(DOC_SPLIT_RE);
   for (const chunk of chunks) {
     const parsed = parseStatementLineText(chunk);
     if (parsed) pushUnique(lines, seen, parsed);
@@ -231,8 +238,9 @@ export function parseStatementText(text: string): ParsedStatement {
 
   // Keep statement order by first appearance of each document in text.
   const order: string[] = [];
-  for (const m of collapsed.matchAll(/\b((?:SJCM|PSI|PSCM|PNC|CM)-[A-Z0-9-]+)\b/gi)) {
+  for (const m of collapsed.matchAll(DOC_ANCHOR_RE)) {
     const doc = m[1]!.toUpperCase();
+    if (!isLikelyDocument(doc)) continue;
     if (!order.includes(doc)) order.push(doc);
   }
   lines.sort((a, b) => {
