@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 
 import { defaultSlipAmount, type StatementLineKind } from "@/lib/credit/parseStatement";
+import { MAX_DEPOSIT_SLIP_LINES } from "@/lib/credit/limits";
 import { useCreditAuth } from "./useCreditAuth";
 
 type CreditRow = {
@@ -274,6 +275,10 @@ export function CreditClient() {
       setError("Select documents to export.");
       return;
     }
+    if (payload.lines.length > MAX_DEPOSIT_SLIP_LINES) {
+      setError(`Too many documents selected. Max ${MAX_DEPOSIT_SLIP_LINES} rows.`);
+      return;
+    }
     setExporting(kind);
     setError("");
     try {
@@ -363,7 +368,9 @@ export function CreditClient() {
           </label>
         </div>
         <div className="credit-actions">
-          <span className="credit-meta">Selected total: {money(selectedInvoiceTotal)}</span>
+          <span className="credit-meta">
+            Selected total: {money(selectedInvoiceTotal)} · {selectedRows.length}/{MAX_DEPOSIT_SLIP_LINES} docs
+          </span>
         </div>
       </section>
 
