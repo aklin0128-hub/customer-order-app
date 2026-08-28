@@ -217,6 +217,11 @@
   white-space: nowrap;
 }
 
+.credit-th-check {
+  width: 1%;
+  text-align: center;
+}
+
 .credit-row-actions {
   display: flex;
   align-items: center;

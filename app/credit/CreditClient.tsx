@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 
 import { defaultSlipAmount, type StatementLineKind } from "@/lib/credit/parseStatement";
 import { useCreditAuth } from "./useCreditAuth";
@@ -99,6 +99,16 @@ export function CreditClient() {
   const dragIdRef = useRef<string | null>(null);
 
   const visibleRows = useMemo(() => rows.filter((r) => rowMatchesFilter(r, filter)), [rows, filter]);
+  const allVisibleSelected =
+    visibleRows.length > 0 && visibleRows.every((r) => r.selected);
+  const someVisibleSelected = visibleRows.some((r) => r.selected);
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someVisibleSelected && !allVisibleSelected;
+    }
+  }, [someVisibleSelected, allVisibleSelected]);
 
   const selectedRows = useMemo(() => rows.filter((r) => r.selected), [rows]);
   const selectedInvoiceTotal = useMemo(
@@ -370,7 +380,7 @@ export function CreditClient() {
               + Add row
             </button>
             <button type="button" className="credit-btn ghost" onClick={() => toggleAllVisible(true)}>
-              Select visible
+              Select all
             </button>
             <button type="button" className="credit-btn ghost" onClick={() => toggleAllVisible(false)}>
               Clear
@@ -382,7 +392,17 @@ export function CreditClient() {
           <table className="credit-table">
             <thead>
               <tr>
-                <th />
+                <th className="credit-th-check">
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    disabled={visibleRows.length === 0}
+                    aria-label="Select all"
+                    title="Select all"
+                    onChange={(e) => toggleAllVisible(e.target.checked)}
+                  />
+                </th>
                 <th className="credit-th-actions">Actions</th>
                 <th>Document</th>
                 <th>Code</th>
