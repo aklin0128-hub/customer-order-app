@@ -1,1 +1,1 @@
-export { useAdminAuth, AdminAuthProvider } from "./AdminAuthContext";
+export { useAdminAuth, AdminAuthProvider, hasSavedAdminPassword } from "./AdminAuthContext";

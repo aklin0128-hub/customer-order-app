@@ -69,39 +69,48 @@ export const langButtonStyle = (active: boolean): CSSProperties => ({
 });
 export const modeTabsStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
   gap: 8,
 };
 export const modeButtonStyle = (active: boolean): CSSProperties => ({
-  padding: "10px 6px",
+  padding: "12px 8px",
   borderRadius: 12,
-  border: active ? "1px solid #2563eb" : "1px solid #d1d5db",
-  background: active ? "#eff6ff" : "#ffffff",
-  color: active ? "#1d4ed8" : "#374151",
+  border: active ? "2px solid #2563eb" : "1px solid #93c5fd",
+  background: active ? "#2563eb" : "#eff6ff",
+  color: active ? "#ffffff" : "#1d4ed8",
   fontSize: 12,
   fontWeight: 900,
   cursor: "pointer",
   lineHeight: 1.25,
+  boxShadow: active ? "0 4px 12px rgba(37, 99, 235, 0.28)" : "none",
 });
 export const promoModeButtonStyle = (active: boolean): CSSProperties => ({
   ...modeButtonStyle(active),
-  border: active ? "1px solid #0f766e" : "1px solid #5eead4",
-  background: active ? "#ccfbf1" : "#f0fdfa",
-  color: active ? "#0f766e" : "#115e59",
+  border: active ? "2px solid #0f766e" : "1px solid #5eead4",
+  background: active ? "#0f766e" : "#ccfbf1",
+  color: active ? "#ffffff" : "#0f766e",
+  boxShadow: active ? "0 4px 12px rgba(15, 118, 110, 0.28)" : "none",
 });
 export const clearanceModeButtonStyle = (active: boolean): CSSProperties => ({
   ...modeButtonStyle(active),
-  border: active ? "1px solid #ea580c" : "1px solid #fdba74",
-  background: active ? "#ffedd5" : "#fff7ed",
-  color: active ? "#c2410c" : "#9a3412",
-  fontSize: 11,
+  border: active ? "2px solid #7c3aed" : "1px solid #c4b5fd",
+  background: active ? "#7c3aed" : "#ede9fe",
+  color: active ? "#ffffff" : "#6d28d9",
+  boxShadow: active ? "0 4px 12px rgba(124, 58, 237, 0.28)" : "none",
 });
 export const newItemsModeButtonStyle = (active: boolean): CSSProperties => ({
   ...modeButtonStyle(active),
-  border: active ? "1px solid #ea580c" : "1px solid #fdba74",
-  background: active ? "#ea580c" : "#fff7ed",
+  border: active ? "2px solid #ea580c" : "1px solid #fdba74",
+  background: active ? "#ea580c" : "#ffedd5",
   color: active ? "#ffffff" : "#c2410c",
-  fontSize: 11,
+  boxShadow: active ? "0 4px 12px rgba(234, 88, 12, 0.28)" : "none",
+});
+export const seasonalModeButtonStyle = (active: boolean): CSSProperties => ({
+  ...modeButtonStyle(active),
+  border: active ? "2px solid #d97706" : "1px solid #fcd34d",
+  background: active ? "#d97706" : "#fef3c7",
+  color: active ? "#ffffff" : "#b45309",
+  boxShadow: active ? "0 4px 12px rgba(217, 119, 6, 0.28)" : "none",
 });
 export const qtyButtonStyle: CSSProperties = {
   padding: "6px 0",
@@ -242,6 +251,7 @@ export const catalogNameStyle: CSSProperties = {
   fontSize: 12,
   color: "#4b5563",
   lineHeight: 1.3,
+  minHeight: 31,
   maxHeight: 36,
   overflow: "hidden",
   display: "-webkit-box",
