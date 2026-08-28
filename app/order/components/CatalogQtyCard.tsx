@@ -29,7 +29,23 @@ import {
   promoTagStyle,
   justAddedTagStyle,
 } from "../orderStyles";
+import { resolveCatalogUpc } from "@/lib/catalogUpc";
+import { getCatalogItemBySku } from "../catalogUtils";
 import { ProductImage } from "./ProductImage";
+import { UpcBarcode } from "./UpcBarcode";
+
+function InvoicePriceLine({ text }: { text: string }) {
+  const idx = text.indexOf(": ");
+  if (idx > 0) {
+    return (
+      <>
+        <span className="catalog-qty-card-invoice-price-label">{text.slice(0, idx)}</span>
+        <span className="catalog-qty-card-invoice-price-value">{text.slice(idx + 2)}</span>
+      </>
+    );
+  }
+  return <span className="catalog-qty-card-invoice-price-value">{text}</span>;
+}
 
 export function CatalogQtyCard({
   item,
@@ -37,6 +53,7 @@ export function CatalogQtyCard({
   promoNote,
   promoPrice,
   invoicePrice,
+  reserveInvoicePrice,
   promoDetails,
   promoDealLabel,
   promoDealDetail,
@@ -54,6 +71,12 @@ export function CatalogQtyCard({
   unavailableNote,
   showAdminEdit,
   editLabel = "Edit",
+  favorite,
+  favoriteLabel,
+  onToggleFavorite,
+  lastOrderedLabel,
+  onOpenHistory,
+  showUpc,
   palletLabel,
   justAddedLabel,
   /** Show catalog import date (New items tab). */
@@ -78,6 +101,8 @@ export function CatalogQtyCard({
   promoPrice?: string;
   /** Per-customer latest invoice unit price (when admin enables invoice pricing). */
   invoicePrice?: string;
+  /** Reserve a price row so cards stay even when some SKUs lack a last price. */
+  reserveInvoicePrice?: boolean;
   promoDetails?: string;
   promoDealLabel?: string;
   promoDealDetail?: string;
@@ -95,6 +120,14 @@ export function CatalogQtyCard({
   unavailableNote?: string;
   showAdminEdit?: boolean;
   editLabel?: string;
+  favorite?: boolean;
+  favoriteLabel?: string;
+  onToggleFavorite?: (sku: string) => void;
+  /** e.g. "History" — tappable history entry point. */
+  lastOrderedLabel?: string;
+  onOpenHistory?: (sku: string) => void;
+  /** When true, render UPC/barcode under product info if available. */
+  showUpc?: boolean;
   /** e.g. "Pallet size" / "板数" — shown as `{label}: {value}` */
   palletLabel?: string;
   /** e.g. "JUST ADDED" — shown when admin sets justAdded on the SKU */
@@ -139,7 +172,7 @@ export function CatalogQtyCard({
       ? formatNewItemListPriceDisplay(item.newItemListPrice)
       : "";
   const alignedPriceLayout = Boolean(showNewItemListPrice);
-  const comingSoon = alignedPriceLayout && isComingSoonNewItem(item);
+  const comingSoon = isComingSoonNewItem(item);
   const outOfStock = isProductOutOfStockStamp(item);
   const stamped = comingSoon || outOfStock;
   const orderingBlocked = isProductOrderingBlocked(item);
@@ -147,6 +180,9 @@ export function CatalogQtyCard({
   const storageLabel = showNewItemExtras ? resolveNewItemStorageLabel(item) : undefined;
   const showJustAdded = Boolean(justAddedLabel && !showNewProductBadge && (uniformNewPill || isJustAddedItem(item)));
   const showPinnedJustAdded = Boolean(justAddedLabel && showNewProductBadge && isJustAddedItem(item));
+  const upcDigits = showUpc
+    ? resolveCatalogUpc(item) || resolveCatalogUpc(getCatalogItemBySku(item.sku || ""))
+    : "";
 
   const badgeRow =
     promoNote || showPinnedJustAdded || showJustAdded || storageLabel || highlight || promoRemaining ? (
@@ -189,7 +225,74 @@ export function CatalogQtyCard({
 
   const productInfo = (
     <div className="catalog-qty-card-meta">
-      <div className="catalog-qty-card-sku">{item.sku}</div>
+      <div className="catalog-qty-card-sku-row">
+        <div className="catalog-qty-card-sku">{item.sku}</div>
+        <div className="catalog-qty-card-sku-actions">
+          {onToggleFavorite ? (
+            <button
+              type="button"
+              className={`catalog-qty-card-favorite${favorite ? " is-on" : ""}`}
+              aria-label={favoriteLabel || (favorite ? "Remove favorite" : "Add favorite")}
+              aria-pressed={Boolean(favorite)}
+              title={favoriteLabel || (favorite ? "Remove favorite" : "Add favorite")}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleFavorite(item.sku);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <svg
+                className="catalog-qty-card-favorite-icon"
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                aria-hidden="true"
+                focusable="false"
+              >
+                {favorite ? (
+                  <path
+                    fill="currentColor"
+                    d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+                  />
+                ) : (
+                  <path
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinejoin="round"
+                    d="m12 3.2 2.35 5.4 5.85.55-4.4 3.85 1.3 5.7L12 15.9l-5.1 3.8 1.3-5.7-4.4-3.85 5.85-.55L12 3.2z"
+                  />
+                )}
+              </svg>
+            </button>
+          ) : null}
+          {showAdminEdit ? (
+            <Link
+              href={`/admin/products?sku=${encodeURIComponent(item.sku)}`}
+              className="catalog-qty-card-edit"
+              prefetch={false}
+              aria-label={editLabel}
+              title={editLabel}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <svg
+                className="catalog-qty-card-edit-icon"
+                viewBox="0 0 24 24"
+                width="15"
+                height="15"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  fill="currentColor"
+                  d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm2.92 2.33H5v-.92l9.06-9.06.92.92L5.92 19.58zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"
+                />
+              </svg>
+            </Link>
+          ) : null}
+        </div>
+      </div>
       <div className="catalog-qty-card-brand">{item.brand || "-"}</div>
       <div className="catalog-qty-card-name" style={catalogNameStyle}>
         {item.name || "-"}
@@ -199,6 +302,50 @@ export function CatalogQtyCard({
         <div className="catalog-qty-card-pallet">
           {palletLabel}: {item.palletSize}
         </div>
+      ) : null}
+      {onOpenHistory || reserveInvoicePrice || invoicePrice ? (
+        <div className="catalog-qty-card-commerce">
+          {onOpenHistory ? (
+            <div className="catalog-qty-card-history-slot">
+              {lastOrderedLabel ? (
+                <button
+                  type="button"
+                  className="catalog-qty-card-last-ordered"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenHistory(item.sku);
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  <span className="catalog-qty-card-last-ordered-text">{lastOrderedLabel}</span>
+                  <span className="catalog-qty-card-last-ordered-chevron" aria-hidden="true">
+                    ›
+                  </span>
+                </button>
+              ) : (
+                <span className="catalog-qty-card-history-placeholder" aria-hidden="true" />
+              )}
+            </div>
+          ) : null}
+          {reserveInvoicePrice || invoicePrice ? (
+            <div className="catalog-qty-card-price-row">
+              {invoicePrice ? (
+                <div className="catalog-qty-card-invoice-price">
+                  <InvoicePriceLine text={invoicePrice} />
+                </div>
+              ) : (
+                <span className="catalog-qty-card-invoice-price-placeholder" aria-hidden="true" />
+              )}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {showUpc ? (
+        upcDigits ? (
+          <UpcBarcode value={upcDigits} />
+        ) : (
+          <div className="catalog-qty-card-upc-wrap catalog-qty-card-upc-wrap--empty" aria-hidden="true" />
+        )
       ) : null}
       {comingDateText ? (
         <div className="catalog-coming-date">
@@ -265,10 +412,6 @@ export function CatalogQtyCard({
         </div>
       ) : null}
       {promoPrice ? <div style={promoPriceStyle}>{promoPrice}</div> : null}
-      {!promoPrice && invoicePrice ? <div style={promoPriceStyle}>{invoicePrice}</div> : null}
-      {promoPrice && invoicePrice ? (
-        <div style={{ ...promoPriceStyle, color: "#1d4ed8", marginTop: promoPrice ? 2 : 0 }}>{invoicePrice}</div>
-      ) : null}
       {promoDetails ? <div className="catalog-qty-card-promo-details">{promoDetails}</div> : null}
       {policyNote ? <div style={clearancePolicyStyle}>{policyNote}</div> : null}
       {hasQty ? <div style={inCartTagStyle}>{inCartLabel}: {qty}</div> : null}
@@ -285,17 +428,6 @@ export function CatalogQtyCard({
         opacity: disabled ? 0.68 : 1,
       }}
     >
-      {showAdminEdit ? (
-        <Link
-          href={`/admin/products?sku=${encodeURIComponent(item.sku)}`}
-          className="catalog-qty-card-edit"
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          {editLabel}
-        </Link>
-      ) : null}
-
       {alignedPriceLayout && badgeRow ? (
         <div className="catalog-qty-card-badge-slot">{badgeRow}</div>
       ) : badgeRow ? (
@@ -304,7 +436,7 @@ export function CatalogQtyCard({
 
       <div
         className={`catalog-card-image-wrap${alignedPriceLayout ? " catalog-card-image-wrap--fixed" : ""}${stamped ? " catalog-card-image-wrap--stamped" : ""}${comingSoon && outOfStock ? " catalog-card-image-wrap--dual-stamped" : ""}`}
-        style={{ paddingTop: alignedPriceLayout ? 0 : badgeRow ? 2 : 0 }}
+        style={{ paddingTop: alignedPriceLayout ? 4 : badgeRow ? 2 : 0 }}
       >
         <ProductImage sku={item.sku} alt={item.name || item.sku} size={96} imageUrl={item.imageUrl} />
         {comingSoon ? <ComingSoonStamp lang={lang} /> : null}

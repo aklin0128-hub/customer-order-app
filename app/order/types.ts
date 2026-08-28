@@ -1,5 +1,7 @@
 export type Lang = "en" | "zh" | "ko" | "vi";
-export type OrderMode = "search" | "catalog" | "promotion" | "clearance" | "newItems";
+
+/** Top-level order shop tabs. Quick order (`search`) stays available but hidden. */
+export type OrderMode = "catalog" | "promotion" | "clearance" | "newItems" | "seasonal" | "search";
 
 export type CatalogItem = {
   sku: string;
@@ -78,11 +80,10 @@ export type CartItem = {
 };
 
 export type OrderHistoryItem = {
-  accountNo: string;
-  storeName: string;
   orderRef: string;
-  items: CartItem[];
-  note?: string;
-  phone?: string;
   createdAt: string;
+  itemCount: number;
+  totalCases: number;
+  note?: string;
+  items: CartItem[];
 };
