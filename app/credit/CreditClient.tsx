@@ -212,7 +212,6 @@ export function CreditClient() {
         storeId,
       },
       lines: exportRows.map((r, index) => ({
-        storeId,
         document: r.document.trim().toUpperCase(),
         amount: r.amount,
         // One check for the whole slip — put it on the first line; PDF/XLSX dedupe identical checks.
