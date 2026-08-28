@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { readCustomerSession, saveCustomerSession } from "@/lib/customerSession";
+
 import "./login.css";
 
 type Lang = "en" | "zh" | "ko" | "vi";
@@ -10,7 +12,7 @@ type Lang = "en" | "zh" | "ko" | "vi";
 const copy = {
   en: {
     title: "Store Ordering",
-    subtitle: "Sign in for promotions, clearance deals, and easy ordering.",
+    subtitle: "Sign in for promotions, Near Date Sale deals, and easy ordering.",
     brandName: "Store Portal",
     accountNumber: "Account number",
     password: "Password",
@@ -23,11 +25,12 @@ const copy = {
     emptyPassword: "Please enter your password.",
     showPassword: "Show",
     hidePassword: "Hide",
+    rememberMe: "Remember me on this device",
     welcomeBack: "Welcome back",
     lastAccountHint: "Last signed-in account loaded.",
-    footer: "Promotions · Clearance · Draft auto-save · EN / 中文 / 한국어 / Tiếng Việt",
+    footer: "Promotions · Near Date Sale · Draft auto-save · EN / 中文 / 한국어 / Tiếng Việt",
     featPromo: "Promotions",
-    featClearance: "Clearance",
+    featClearance: "Near Date Sale",
     featCatalog: "Catalog order",
     featSearch: "Quick order",
     featDraft: "Save draft",
@@ -47,6 +50,7 @@ const copy = {
     emptyPassword: "请输入密码。",
     showPassword: "显示",
     hidePassword: "隐藏",
+    rememberMe: "在此设备上记住我",
     welcomeBack: "欢迎回来",
     lastAccountHint: "已填入上次登录的账号。",
     footer: "促销 · 临期特价 · 自动保存草稿 · 多语言",
@@ -71,6 +75,7 @@ const copy = {
     emptyPassword: "비밀번호를 입력하세요.",
     showPassword: "표시",
     hidePassword: "숨기기",
+    rememberMe: "이 기기에서 기억하기",
     welcomeBack: "다시 오신 것을 환영합니다",
     lastAccountHint: "마지막 로그인 계정이 입력되었습니다.",
     footer: "프로모션 · 임박 특가 · 임시 저장 · 다국어",
@@ -95,6 +100,7 @@ const copy = {
     emptyPassword: "Vui lòng nhập mật khẩu.",
     showPassword: "Hiện",
     hidePassword: "Ẩn",
+    rememberMe: "Ghi nhớ trên thiết bị này",
     welcomeBack: "Chào mừng trở lại",
     lastAccountHint: "Đã điền mã khách lần đăng nhập trước.",
     footer: "Khuyến mãi · Thanh lý · Tự lưu nháp · Đa ngôn ngữ",
@@ -124,10 +130,11 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [hadSavedAccount, setHadSavedAccount] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
-    if (sessionStorage.getItem("customer_logged_in") === "true") {
+    if (readCustomerSession()) {
       router.replace("/order");
       return;
     }
@@ -201,12 +208,14 @@ export default function LoginPage() {
         return;
       }
 
-      sessionStorage.setItem("customer_logged_in", "true");
-      sessionStorage.setItem("customer_account_no", data.customer.accountNo);
-      sessionStorage.setItem("customer_store_name", data.customer.storeName || "");
-      sessionStorage.setItem("customer_order_email", data.customer.orderEmail || "elin@rheebros.com");
-
-      localStorage.setItem("last_account_no", data.customer.accountNo);
+      saveCustomerSession(
+        {
+          accountNo: data.customer.accountNo,
+          storeName: data.customer.storeName || "",
+          orderEmail: data.customer.orderEmail || "elin@rheebros.com",
+        },
+        rememberMe
+      );
 
       router.push("/order");
     } catch {
@@ -322,6 +331,26 @@ export default function LoginPage() {
                   </button>
                 </div>
               </div>
+
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#374151",
+                  cursor: "pointer",
+                  userSelect: "none",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
+                {t.rememberMe}
+              </label>
 
               {error ? (
                 <div style={errorBoxStyle} role="alert">
