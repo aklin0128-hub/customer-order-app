@@ -12,10 +12,9 @@ export function buildDepositSlipWorkbook(opts: {
 }): ArrayBuffer {
   const seenChecks = new Set<string>();
   const rows: Array<Array<string | number>> = [
-    ["PNC BANK CHECK DEPOSIT (SE)"],
+    ["PNC BANK CHECK DEPOSIT (SE)", `STORE ID: ${String(opts.meta.storeId || "").trim().toUpperCase()}`],
     [
       `Name: ${opts.meta.name || ""}`,
-      `Store ID: ${opts.meta.storeId || ""}`,
       `Date: ${opts.meta.date || ""}`,
       `Code: ${opts.meta.code || ""}`,
     ],

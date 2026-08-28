@@ -319,10 +319,14 @@ export function CreditClient() {
 
       <section className="credit-card">
         <h2>2. Deposit slip header</h2>
-        <div className="credit-grid">
-          <label>
+        <div className="credit-grid credit-grid-header">
+          <label className="credit-store-id">
             Store ID
-            <input value={storeId} onChange={(e) => setStoreId(e.target.value.toUpperCase())} placeholder="FL287" />
+            <input
+              value={storeId}
+              onChange={(e) => setStoreId(e.target.value.toUpperCase())}
+              placeholder="FL287"
+            />
           </label>
           <label>
             Name

@@ -38,11 +38,11 @@ export async function buildDepositSlipPdf(opts: {
   const pageWidth = 792; // landscape letter
   const pageHeight = 612;
   const margin = 24;
-  const headerBlock = 52;
+  const headerBlock = 58;
   const colHeaderBlock = 22;
   const footerReserve = 34;
 
-  // No per-row STORE ID — show once in the yellow header.
+  // No per-row STORE ID — show once, large, in the yellow header.
   const cols = [260, 120, 120, 120, 110];
   const headers = ["INVOICE #", "Invoice Amount", "Check NO", "Deposit Amount", "Check date"];
 
@@ -58,13 +58,43 @@ export async function buildDepositSlipPdf(opts: {
   let pageLineCount = 0;
 
   const drawHeader = () => {
+    const storeLabel = String(opts.meta.storeId || "").trim().toUpperCase() || "—";
+    const headerH = 48;
     page.drawRectangle({
       x: margin,
-      y: y - 40,
+      y: y - headerH,
       width: pageWidth - margin * 2,
-      height: 40,
+      height: headerH,
       color: rgb(1, 0.95, 0.2),
     });
+
+    // Store ID badge — right side, high contrast
+    const badgeW = 168;
+    const badgeH = 36;
+    const badgeX = pageWidth - margin - 10 - badgeW;
+    const badgeY = y - headerH + 6;
+    page.drawRectangle({
+      x: badgeX,
+      y: badgeY,
+      width: badgeW,
+      height: badgeH,
+      color: rgb(0.75, 0.05, 0.05),
+    });
+    page.drawText("STORE ID", {
+      x: badgeX + 10,
+      y: badgeY + 24,
+      size: 8,
+      font: bold,
+      color: rgb(1, 0.92, 0.92),
+    });
+    page.drawText(storeLabel.slice(0, 14), {
+      x: badgeX + 10,
+      y: badgeY + 8,
+      size: 16,
+      font: bold,
+      color: rgb(1, 1, 1),
+    });
+
     page.drawText(opts.meta.title || "PNC BANK CHECK DEPOSIT (SE)", {
       x: margin + 10,
       y: y - 16,
@@ -74,26 +104,20 @@ export async function buildDepositSlipPdf(opts: {
     });
     page.drawText(`Name: ${opts.meta.name || ""}`, {
       x: margin + 10,
-      y: y - 32,
+      y: y - 36,
       size: 9,
       font,
       color: rgb(0.1, 0.1, 0.1),
     });
-    page.drawText(`Store ID: ${opts.meta.storeId || ""}`, {
-      x: margin + 200,
-      y: y - 32,
-      size: 9,
-      font,
-    });
     page.drawText(`Date: ${opts.meta.date || ""}`, {
-      x: margin + 360,
-      y: y - 32,
+      x: margin + 220,
+      y: y - 36,
       size: 9,
       font,
     });
     page.drawText(`Code: ${opts.meta.code || ""}`, {
-      x: margin + 520,
-      y: y - 32,
+      x: margin + 380,
+      y: y - 36,
       size: 9,
       font,
     });
