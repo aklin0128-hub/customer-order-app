@@ -14,9 +14,6 @@ type CreditRow = {
   remainingCredit: number;
   amount: number;
   selected: boolean;
-  checkNo: string;
-  depositAmount: string;
-  checkDate: string;
 };
 
 function money(n: number) {
@@ -121,9 +118,6 @@ export function CreditClient() {
             remainingCredit,
             amount: defaultSlipAmount({ remainingDebit, remainingCredit }),
             selected: false,
-            checkNo: "",
-            depositAmount: "",
-            checkDate: "",
           };
         }
       );
@@ -149,35 +143,6 @@ export function CreditClient() {
     setRows((prev) => prev.map((r) => (ids.has(r.id) ? { ...r, selected: checked } : r)));
   };
 
-  const applyCheckToSelected = () => {
-    if (!selectedRows.length) {
-      setError("Select at least one document first.");
-      return;
-    }
-    if (!checkNo.trim()) {
-      setError("Enter a check number.");
-      return;
-    }
-    setError("");
-    const deposit =
-      checkAmount.trim() ||
-      String(Math.round(selectedInvoiceTotal * 100) / 100);
-    const dateIso = checkDate || todayInput();
-    setRows((prev) =>
-      prev.map((r) =>
-        r.selected
-          ? {
-              ...r,
-              checkNo: checkNo.trim(),
-              depositAmount: deposit,
-              checkDate: toDisplayDate(dateIso),
-            }
-          : r
-      )
-    );
-    setMessage(`Applied check #${checkNo.trim()} to ${selectedRows.length} documents.`);
-  };
-
   const autoFillCheckAmount = () => {
     setCheckAmount(String(Math.round(selectedInvoiceTotal * 100) / 100));
   };
@@ -193,11 +158,12 @@ export function CreditClient() {
         remainingCredit: 0,
         amount: 0,
         selected: true,
-        checkNo: "",
-        depositAmount: "",
-        checkDate: "",
       },
     ]);
+  };
+
+  const deleteRow = (id: string) => {
+    setRows((prev) => prev.filter((r) => r.id !== id));
   };
 
   const moveRow = (id: string, direction: -1 | 1) => {
@@ -230,6 +196,13 @@ export function CreditClient() {
 
   const exportPayload = () => {
     const exportRows = rows.filter((r) => r.selected && r.document.trim());
+    const sharedCheckNo = checkNo.trim();
+    const deposit =
+      checkAmount.trim() !== ""
+        ? Number(checkAmount)
+        : Math.round(selectedInvoiceTotal * 100) / 100;
+    const sharedCheckDate = toDisplayDate(checkDate || todayInput());
+
     return {
       meta: {
         title: "PNC BANK CHECK DEPOSIT (SE)",
@@ -238,13 +211,14 @@ export function CreditClient() {
         date: toDisplayDate(slipDate),
         storeId,
       },
-      lines: exportRows.map((r) => ({
+      lines: exportRows.map((r, index) => ({
         storeId,
         document: r.document.trim().toUpperCase(),
         amount: r.amount,
-        checkNo: r.checkNo,
-        depositAmount: r.depositAmount === "" ? null : Number(r.depositAmount),
-        checkDate: r.checkDate,
+        // One check for the whole slip — put it on the first line; PDF/XLSX dedupe identical checks.
+        checkNo: index === 0 ? sharedCheckNo : "",
+        depositAmount: index === 0 && sharedCheckNo ? deposit : null,
+        checkDate: index === 0 && sharedCheckNo ? sharedCheckDate : "",
       })),
     };
   };
@@ -316,10 +290,9 @@ export function CreditClient() {
       </section>
 
       <section className="credit-card">
-        <h2>3. Apply check to selected</h2>
+        <h2>3. Check (one for this deposit)</h2>
         <p className="credit-hint">
-          Tick documents below, enter check info, then Apply. One check can cover many invoices (like your
-          deposit sheet).
+          Usually one check covers all selected documents. Enter it once here — it is applied on download.
         </p>
         <div className="credit-grid">
           <label>
@@ -345,10 +318,7 @@ export function CreditClient() {
           </label>
         </div>
         <div className="credit-actions">
-          <button type="button" className="credit-btn" onClick={applyCheckToSelected}>
-            Apply check to selected ({selectedRows.length})
-          </button>
-          <span className="credit-meta">Selected invoice total: {money(selectedInvoiceTotal)}</span>
+          <span className="credit-meta">Selected total: {money(selectedInvoiceTotal)}</span>
         </div>
       </section>
 
@@ -384,15 +354,13 @@ export function CreditClient() {
                 <th>Remaining Debits</th>
                 <th>Remaining Credits</th>
                 <th>Slip Amount</th>
-                <th>Check NO</th>
-                <th>Deposit Amt</th>
-                <th>Check date</th>
+                <th />
               </tr>
             </thead>
             <tbody>
               {visibleRows.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="credit-empty">
+                  <td colSpan={8} className="credit-empty">
                     Upload a statement to begin.
                   </td>
                 </tr>
@@ -464,41 +432,14 @@ export function CreditClient() {
                       />
                     </td>
                     <td>
-                      <input
-                        className="credit-cell"
-                        value={row.checkNo}
-                        onChange={(e) =>
-                          setRows((prev) =>
-                            prev.map((r) => (r.id === row.id ? { ...r, checkNo: e.target.value } : r))
-                          )
-                        }
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="credit-cell amount"
-                        value={row.depositAmount}
-                        onChange={(e) =>
-                          setRows((prev) =>
-                            prev.map((r) =>
-                              r.id === row.id
-                                ? { ...r, depositAmount: e.target.value.replace(/[^0-9.-]/g, "") }
-                                : r
-                            )
-                          )
-                        }
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="credit-cell"
-                        value={row.checkDate}
-                        onChange={(e) =>
-                          setRows((prev) =>
-                            prev.map((r) => (r.id === row.id ? { ...r, checkDate: e.target.value } : r))
-                          )
-                        }
-                      />
+                      <button
+                        type="button"
+                        className="credit-btn danger"
+                        aria-label="Delete row"
+                        onClick={() => deleteRow(row.id)}
+                      >
+                        Delete
+                      </button>
                     </td>
                   </tr>
                 ))

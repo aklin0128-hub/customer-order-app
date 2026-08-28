@@ -143,6 +143,18 @@
   background: #fff;
 }
 
+.credit-btn.danger {
+  background: #fff;
+  border-color: #fecaca;
+  color: #b91c1c;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.credit-btn.danger:hover {
+  background: #fef2f2;
+}
+
 .credit-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -176,7 +188,7 @@
 .credit-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 980px;
+  min-width: 720px;
   font-size: 12px;
 }
 
