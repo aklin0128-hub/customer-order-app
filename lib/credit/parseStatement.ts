@@ -89,6 +89,41 @@ function round2(n: number) {
 }
 
 /**
+ * OCR often drops hyphens: "NSF FY25 00139", "SJCM GU FY25 04330".
+ * Re-join known document shapes before matching.
+ */
+export function normalizeStatementDocs(text: string) {
+  let out = String(text || "");
+  // SJCM TR FY25 04330 → SJCM-TR-FY25-04330
+  out = out.replace(
+    new RegExp(`\\b(${DOC_FAMILY})\\s+([A-Z]{1,4})\\s+(FY\\d{2})\\s+(\\d{3,})\\b`, "gi"),
+    (_, a, b, c, d) =>
+      `${String(a).toUpperCase()}-${String(b).toUpperCase()}-${String(c).toUpperCase()}-${d}`
+  );
+  // NSF FY25 00139 → NSF-FY25-00139
+  out = out.replace(
+    new RegExp(`\\b(${DOC_FAMILY})\\s+(FY\\d{2})\\s+(\\d{3,})\\b`, "gi"),
+    (_, a, b, c) => `${String(a).toUpperCase()}-${String(b).toUpperCase()}-${c}`
+  );
+  // PSI 0155832 → PSI-0155832
+  out = out.replace(
+    new RegExp(`\\b(${DOC_FAMILY})\\s+(\\d{5,})\\b`, "gi"),
+    (_, a, b) => `${String(a).toUpperCase()}-${b}`
+  );
+  return out;
+}
+
+/** Strip statement footer that PDF text often glues onto the last document row. */
+export function stripStatementFooter(text: string) {
+  return String(text || "")
+    .replace(/\bStatement\s+Balance\b[\s\S]*$/i, "")
+    .replace(/\bTotal\s+Debits\b[\s\S]*$/i, "")
+    .replace(/\bTotal\s+Credits\b[\s\S]*$/i, "")
+    .replace(/\bAged\s+Amounts\b[\s\S]*$/i, "")
+    .trim();
+}
+
+/**
  * Statement columns: Original | Remaining Debits | Remaining Credits | Balance
  * Empty remaining cells are omitted by PDF/OCR, so the trailing amount is usually Balance.
  * Use Code to decide debit vs credit; never treat Balance as a remaining amount.
@@ -153,12 +188,18 @@ export function resolveRemainingAmounts(
  * Expected pieces: Document … Code … amounts (remaining debit / credit), then Balance.
  */
 export function parseStatementLineText(line: string): ParsedStatementLine | null {
-  const raw = String(line || "").replace(/\s+/g, " ").trim();
+  let raw = normalizeStatementDocs(String(line || "")).replace(/\s+/g, " ").trim();
   if (!raw) return null;
-  if (/statement\s+aging|days\s+overdue|aged\s+amounts/i.test(raw)) return null;
+  if (/statement\s+aging|days\s+overdue|aged\s+amounts/i.test(raw) && !CODE_RE.test(raw)) {
+    return null;
+  }
   if (/remaining\s+debits\s+remaining\s+credits/i.test(raw)) return null;
   if (/^document\b/i.test(raw) && /remaining/i.test(raw)) return null;
-  if (/statement\s+balance|total\s+debits|total\s+credits/i.test(raw)) return null;
+  // Pure footer rows only — do not drop document rows with trailing "Statement Balance".
+  if (/^(statement\s+balance|total\s+debits|total\s+credits)\b/i.test(raw)) return null;
+
+  raw = stripStatementFooter(raw);
+  if (!raw) return null;
 
   const docs = [...raw.matchAll(DOC_RE)].map((m) => m[1]!.toUpperCase());
   const document = pickDocument(docs);
@@ -214,7 +255,7 @@ function pushUnique(lines: ParsedStatementLine[], seen: Set<string>, parsed: Par
 }
 
 export function parseStatementText(text: string): ParsedStatement {
-  const raw = String(text || "").replace(/\r/g, "\n");
+  const raw = normalizeStatementDocs(String(text || "").replace(/\r/g, "\n"));
   const accountNo = extractHeaderField(raw, ["Account No\\.?", "Account #", "Account"]);
   const salesCode = extractHeaderField(raw, ["Sales Code"]);
   const salesName = extractHeaderField(raw, ["Sales Name"]);
@@ -229,7 +270,7 @@ export function parseStatementText(text: string): ParsedStatement {
   }
 
   // PDF text often wraps or concatenates rows — also split on document anchors.
-  const collapsed = raw.replace(/\n+/g, " ");
+  const collapsed = stripStatementFooter(raw.replace(/\n+/g, " "));
   const chunks = collapsed.split(DOC_SPLIT_RE);
   for (const chunk of chunks) {
     const parsed = parseStatementLineText(chunk);

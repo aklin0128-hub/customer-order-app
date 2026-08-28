@@ -131,6 +131,54 @@ SJCM-GU-FY27-00225 8/25/2026 Credit (244.80) 244.80 88,597.11
   assert.equal(parsed.lines[parsed.lines.length - 1]!.document, "SJCM-GU-FY27-00225");
 });
 
+test("FL83 collapsed PDF with Statement Balance footer keeps all 19 rows", () => {
+  const body = `
+PSI-0155832 FL83 SO-0658729 9/3/2025 Net 45 Invoice 16,007.81 0.01 0.01
+PSI-0159706 FL83 SO-0663373 10/22/2025 Net 45 Invoice 7,988.62 164.09 164.10
+SJCM-TR-FY25-04330 1/16/2026 Credit (230.30) 230.30 (66.20)
+PSI-0167382 FL83 SO-0671794 1/31/2026 Net 45 Invoice 10,140.79 114.97 48.77
+SJCM-GU-FY25-03571 2/3/2026 Credit (246.00) 246.00 (197.23)
+SJCM-JA-FY25-01952 3/11/2026 Credit (48.17) 48.17 (245.40)
+NSF FY25 00139 3/24/2026 Refund 35.00 35.00 (210.40)
+PSI-0174971 FL83 SO-0680439 5/8/2026 Net 45 Invoice 17,731.44 17,731.44 17,521.04
+SJCM-JA-FY25-02720 5/18/2026 Credit (163.50) 163.50 17,357.54
+SJCM-JA-FY25-02776 5/19/2026 Credit (100.00) 100.00 17,257.54
+PSI-0176120 FL83 SO-0681763 5/23/2026 Net 45 Invoice 10,559.37 10,559.37 27,816.91
+PSI-0178181 FL83 SO-0684340 6/19/2026 Net 45 Invoice 14,150.87 14,150.87 41,967.78
+SJCM-JA-FY27-00045 7/6/2026 Credit (160.00) 160.00 41,807.78
+PSI-0179415 FL83 SO-0685371 7/7/2026 Net 45 Invoice 9,052.00 9,052.00 50,859.78
+PSI-0180322 FL83 SO-0686508 7/17/2026 Net 45 Invoice 12,820.11 12,820.11 63,679.89
+SJCM-CU-FY27-00079 7/21/2026 Credit (93.00) 93.00 63,586.89
+SJCM-CU-FY27-00119 7/22/2026 Credit (120.00) 120.00 63,466.89
+PSI-0182420 FL83 SO-0688977 8/14/2026 Net 45 Invoice 25,375.02 25,375.02 88,841.91
+SJCM-GU-FY27-00225 8/25/2026 Credit (244.80) 244.80 88,597.11
+Statement Balance 88,597.11 Total Debits 89,972.88 Total Credits 1,375.77
+`.replace(/\n+/g, " ");
+  const parsed = parseStatementText(body);
+  assert.equal(parsed.lines.length, 19);
+  assert.ok(parsed.lines.some((l) => l.document === "NSF-FY25-00139"));
+  assert.ok(parsed.lines.some((l) => l.document === "SJCM-GU-FY27-00225"));
+});
+
+test("last credit survives Statement Balance footer glued by PDF extract", () => {
+  const line =
+    "SJCM-GU-FY27-00225 8/25/2026 Credit (244.80) 244.80 88,597.11 Statement Balance 88,597.11 Total Debits";
+  const parsed = parseStatementLineText(line);
+  assert.ok(parsed);
+  assert.equal(parsed!.document, "SJCM-GU-FY27-00225");
+  assert.equal(parsed!.remainingCredit, 244.8);
+});
+
+test("OCR-spaced NSF FY25 00139 is normalized and parsed", () => {
+  const parsed = parseStatementText(
+    "SJCM-JA-FY25-01952 3/11/2026 Credit (48.17) 48.17 (245.40) NSF FY25 00139 3/24/2026 Refund 35.00 35.00 (210.40) PSI-0174971 FL83 SO-0680439 5/8/2026 Net 45 Invoice 17,731.44 17,731.44 17,521.04"
+  );
+  assert.equal(parsed.lines.length, 3);
+  const nsf = parsed.lines.find((l) => l.document === "NSF-FY25-00139");
+  assert.ok(nsf);
+  assert.equal(nsf!.remainingDebit, 35);
+});
+
 test("defaultSlipAmount uses signed remaining amounts", () => {
   assert.equal(defaultSlipAmount({ remainingDebit: 100, remainingCredit: 0 }), 100);
   assert.equal(defaultSlipAmount({ remainingDebit: 0, remainingCredit: 25 }), -25);
