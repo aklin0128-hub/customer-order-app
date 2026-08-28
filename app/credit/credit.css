@@ -208,8 +208,28 @@
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  min-width: 720px;
+  min-width: 760px;
   font-size: 12px;
+}
+
+.credit-table col.credit-col-check {
+  width: 36px;
+}
+
+.credit-table col.credit-col-actions {
+  width: 118px;
+}
+
+.credit-table col.credit-col-document {
+  width: auto;
+}
+
+.credit-table col.credit-col-code {
+  width: 72px;
+}
+
+.credit-table col.credit-col-money {
+  width: 132px;
 }
 
 .credit-table th {
@@ -233,12 +253,10 @@
 }
 
 .credit-th-actions {
-  width: 118px;
   white-space: nowrap;
 }
 
 .credit-th-check {
-  width: 36px;
   text-align: center;
 }
 
@@ -246,32 +264,21 @@
   text-align: center;
 }
 
-.credit-th-document {
-  width: 34%;
-}
-
-.credit-th-code {
-  width: 88px;
-}
-
-.credit-th-money {
-  width: 140px;
-}
-
-.credit-table th.credit-th-money {
-  text-align: right;
-}
-
-.credit-td-document {
-  width: 34%;
-}
-
 .credit-td-code {
-  width: 88px;
   white-space: nowrap;
 }
 
-.credit-table td.credit-money {
+.credit-table thead th.credit-th-money,
+.credit-table tbody td.credit-money {
+  text-align: right;
+  padding-left: 8px;
+  padding-right: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.credit-money-head {
+  display: block;
+  width: 100%;
   text-align: right;
 }
 
@@ -402,7 +409,6 @@
 }
 
 .credit-money {
-  width: 140px;
   text-align: right;
   font-variant-numeric: tabular-nums;
   font-weight: 700;

@@ -401,6 +401,14 @@ export function CreditClient() {
 
         <div className="credit-table-wrap">
           <table className="credit-table">
+            <colgroup>
+              <col className="credit-col-check" />
+              <col className="credit-col-actions" />
+              <col className="credit-col-document" />
+              <col className="credit-col-code" />
+              <col className="credit-col-money" />
+              <col className="credit-col-money" />
+            </colgroup>
             <thead>
               <tr>
                 <th className="credit-th-check">
@@ -417,8 +425,12 @@ export function CreditClient() {
                 <th className="credit-th-actions">Actions</th>
                 <th className="credit-th-document">Document</th>
                 <th className="credit-th-code">Code</th>
-                <th className="credit-th-money">Remaining Debits</th>
-                <th className="credit-th-money">Remaining Credits</th>
+                <th className="credit-th-money">
+                  <span className="credit-money-head">Remaining Debits</span>
+                </th>
+                <th className="credit-th-money">
+                  <span className="credit-money-head">Remaining Credits</span>
+                </th>
               </tr>
             </thead>
             <tbody>
