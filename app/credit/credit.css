@@ -188,7 +188,7 @@
 .credit-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 720px;
+  min-width: 640px;
   font-size: 12px;
 }
 
@@ -212,39 +212,117 @@
   background: #ecfeff;
 }
 
-.credit-cell {
-  width: 100%;
-  min-width: 90px;
-  padding: 6px 8px;
+.credit-th-actions {
+  width: 1%;
+  white-space: nowrap;
 }
 
-.credit-cell.amount {
-  min-width: 88px;
-  text-align: right;
-}
-
-.credit-move {
+.credit-row-actions {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 6px;
 }
 
-.credit-move-btn {
-  width: 28px;
-  height: 22px;
-  border: 1px solid #cbd5e1;
+.credit-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
   background: #fff;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 900;
-  line-height: 1;
+  color: #64748b;
   cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.credit-icon-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
   color: #334155;
 }
 
+.credit-icon-btn.danger {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background: #fff;
+}
+
+.credit-icon-btn.danger:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+.credit-move {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.credit-move-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-right: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.credit-move-btn:last-child {
+  border-right: none;
+}
+
+.credit-move-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
 .credit-move-btn:disabled {
-  opacity: 0.35;
+  opacity: 0.28;
   cursor: not-allowed;
+}
+
+.credit-code {
+  display: inline-block;
+  font-weight: 800;
+  color: #334155;
+}
+
+.credit-code-credit {
+  color: #b91c1c;
+}
+
+.credit-code-invoice {
+  color: #0f766e;
+}
+
+.credit-money {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.credit-money-credit {
+  color: #b91c1c;
+}
+
+.credit-cell {
+  width: 100%;
+  min-width: 140px;
+  padding: 6px 8px;
 }
 
 .credit-empty {

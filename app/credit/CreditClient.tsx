@@ -12,7 +12,6 @@ type CreditRow = {
   date?: string;
   remainingDebit: number;
   remainingCredit: number;
-  amount: number;
   selected: boolean;
 };
 
@@ -79,7 +78,11 @@ export function CreditClient() {
 
   const selectedRows = useMemo(() => rows.filter((r) => r.selected), [rows]);
   const selectedInvoiceTotal = useMemo(
-    () => selectedRows.reduce((sum, r) => sum + r.amount, 0),
+    () =>
+      selectedRows.reduce(
+        (sum, r) => sum + defaultSlipAmount({ remainingDebit: r.remainingDebit, remainingCredit: r.remainingCredit }),
+        0
+      ),
     [selectedRows]
   );
 
@@ -116,7 +119,6 @@ export function CreditClient() {
             date: line.date,
             remainingDebit,
             remainingCredit,
-            amount: defaultSlipAmount({ remainingDebit, remainingCredit }),
             selected: false,
           };
         }
@@ -156,7 +158,6 @@ export function CreditClient() {
         code: "Invoice",
         remainingDebit: 0,
         remainingCredit: 0,
-        amount: 0,
         selected: true,
       },
     ]);
@@ -213,7 +214,10 @@ export function CreditClient() {
       },
       lines: exportRows.map((r, index) => ({
         document: r.document.trim().toUpperCase(),
-        amount: r.amount,
+        amount: defaultSlipAmount({
+          remainingDebit: r.remainingDebit,
+          remainingCredit: r.remainingCredit,
+        }),
         // One check for the whole slip — put it on the first line; PDF/XLSX dedupe identical checks.
         checkNo: index === 0 ? sharedCheckNo : "",
         depositAmount: index === 0 && sharedCheckNo ? deposit : null,
@@ -347,19 +351,17 @@ export function CreditClient() {
             <thead>
               <tr>
                 <th />
-                <th>Move</th>
+                <th className="credit-th-actions">Actions</th>
                 <th>Document</th>
                 <th>Code</th>
                 <th>Remaining Debits</th>
                 <th>Remaining Credits</th>
-                <th>Slip Amount</th>
-                <th />
               </tr>
             </thead>
             <tbody>
               {visibleRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="credit-empty">
+                  <td colSpan={6} className="credit-empty">
                     Upload a statement to begin.
                   </td>
                 </tr>
@@ -378,25 +380,51 @@ export function CreditClient() {
                       />
                     </td>
                     <td>
-                      <div className="credit-move">
+                      <div className="credit-row-actions">
                         <button
                           type="button"
-                          className="credit-move-btn"
-                          aria-label="Move up"
-                          disabled={index === 0}
-                          onClick={() => moveRow(row.id, -1)}
+                          className="credit-icon-btn danger"
+                          aria-label="Delete row"
+                          title="Delete"
+                          onClick={() => deleteRow(row.id)}
                         >
-                          ↑
+                          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                            <path
+                              fill="currentColor"
+                              d="M6 2h4l.5 1H13v1.5H3V3h2.5L6 2zm1 4v5H6V6h1zm3 0v5H9V6h1zM4.5 4.5h7l-.6 8.2a1 1 0 0 1-1 .8H6.1a1 1 0 0 1-1-.8L4.5 4.5z"
+                            />
+                          </svg>
                         </button>
-                        <button
-                          type="button"
-                          className="credit-move-btn"
-                          aria-label="Move down"
-                          disabled={index === visibleRows.length - 1}
-                          onClick={() => moveRow(row.id, 1)}
-                        >
-                          ↓
-                        </button>
+                        <div className="credit-move" role="group" aria-label="Reorder">
+                          <button
+                            type="button"
+                            className="credit-move-btn"
+                            aria-label="Move up"
+                            disabled={index === 0}
+                            onClick={() => moveRow(row.id, -1)}
+                          >
+                            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                              <path
+                                fill="currentColor"
+                                d="M8 4.2 3.6 8.6l1.1 1.1L8 6.4l3.3 3.3 1.1-1.1L8 4.2z"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            className="credit-move-btn"
+                            aria-label="Move down"
+                            disabled={index === visibleRows.length - 1}
+                            onClick={() => moveRow(row.id, 1)}
+                          >
+                            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                              <path
+                                fill="currentColor"
+                                d="M8 11.8l4.4-4.4-1.1-1.1L8 9.6 4.7 6.3 3.6 7.4 8 11.8z"
+                              />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     </td>
                     <td>
@@ -412,33 +440,14 @@ export function CreditClient() {
                         }
                       />
                     </td>
-                    <td>{row.code}</td>
-                    <td>{row.remainingDebit ? money(row.remainingDebit) : ""}</td>
-                    <td>{row.remainingCredit ? money(row.remainingCredit) : ""}</td>
                     <td>
-                      <input
-                        className="credit-cell amount"
-                        value={String(row.amount)}
-                        onChange={(e) =>
-                          setRows((prev) =>
-                            prev.map((r) =>
-                              r.id === row.id
-                                ? { ...r, amount: Number(e.target.value.replace(/[^0-9.-]/g, "")) || 0 }
-                                : r
-                            )
-                          )
-                        }
-                      />
+                      <span className={`credit-code credit-code-${row.code.toLowerCase()}`}>{row.code}</span>
                     </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="credit-btn danger"
-                        aria-label="Delete row"
-                        onClick={() => deleteRow(row.id)}
-                      >
-                        Delete
-                      </button>
+                    <td className="credit-money">
+                      {row.remainingDebit ? money(row.remainingDebit) : ""}
+                    </td>
+                    <td className="credit-money credit-money-credit">
+                      {row.remainingCredit ? money(row.remainingCredit) : ""}
                     </td>
                   </tr>
                 ))
