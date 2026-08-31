@@ -36,6 +36,7 @@ import {
   getPromotionDealHighlight,
   generateOrderRef,
   getCatalogItemBySku,
+  withCatalogCardFields,
   getDisplayStatus,
   getStatusBadgeStyle,
   formatOrderNotAvailableMessage,
@@ -2250,9 +2251,7 @@ export default function OrderPage() {
                   const bogoPack = soldOut ? null : getPromoBogoPackSize(item);
                   const catalogItem = getCatalogItemBySku(sku) || item;
                   const notOrderable = !isOrderableItem(catalogItem);
-                  const cardItem = catalogItem.palletSize
-                    ? { ...item, palletSize: catalogItem.palletSize }
-                    : item;
+                  const cardItem = withCatalogCardFields(item, catalogItem);
                   return (
                     <CatalogQtyCard
                       key={item.sku}
@@ -2323,9 +2322,7 @@ export default function OrderPage() {
                   const remainingLabel = soldOut ? t.clearanceSoldOut : item.remainingQty !== null && item.remainingQty !== undefined ? `${t.clearanceRemaining}: ${item.remainingQty}` : undefined;
                   const catalogItem = getCatalogItemBySku(sku) || item;
                   const notOrderable = !isOrderableItem(catalogItem);
-                  const cardItem = catalogItem.palletSize
-                    ? { ...item, palletSize: catalogItem.palletSize }
-                    : item;
+                  const cardItem = withCatalogCardFields(item, catalogItem);
                   return (
                     <CatalogQtyCard key={item.sku} item={cardItem} qty={qty}
                       palletLabel={t.pallet}

@@ -644,7 +644,7 @@ export default function AdminProductsPage() {
       <Panel title="Bulk tools">
         <details>
           <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 900, color: "#2563eb" }}>
-            Upload today_update.xlsx (status, UPC, pallet size)
+            Upload today_update.xlsx (status, UPC, pallet, inventory)
           </summary>
           <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
             <input
@@ -655,8 +655,8 @@ export default function AdminProductsPage() {
               disabled={uploadingStatusXlsx}
             />
             <p style={{ margin: 0, fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>
-              Reads <strong>PID/SKU</strong>, <strong>Status</strong>, <strong>UPC</strong>, <strong>PL</strong>, and other Export columns.
-              Unknown SKUs are created in Redis. Status <strong>NEW</strong> is not customer “New items”.
+              Reads <strong>PID/SKU</strong>, <strong>Status</strong>, <strong>UPC</strong>, <strong>PL</strong>, and <strong>INV</strong>.
+              Inventory 0 or below shows “may be out of stock”; below 50 shows “low inventory”. Unknown SKUs are created in Redis. Status <strong>NEW</strong> is not customer “New items”.
             </p>
             {uploadingStatusXlsx ? <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: "#2563eb" }}>Uploading and updating status...</p> : null}
             {statusUploadResult ? (
