@@ -219,6 +219,16 @@ export function getCatalogItemBySku(sku: string) {
   return catalog.find((item) => item.sku?.toUpperCase() === sku.toUpperCase());
 }
 
+/** Overlay catalog pallet / inventory onto promo or clearance rows. */
+export function withCatalogCardFields<T extends CatalogItem>(item: T, catalogItem?: CatalogItem | null): T {
+  const src = catalogItem || item;
+  return {
+    ...item,
+    ...(src.palletSize ? { palletSize: src.palletSize } : {}),
+    ...(src.inventory !== undefined && src.inventory !== null ? { inventory: src.inventory } : {}),
+  };
+}
+
 /** Digits only — for barcode / UPC scanner input. */
 export function normalizeScanDigits(value: unknown) {
   return String(value ?? "").replace(/\D/g, "");

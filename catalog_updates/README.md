@@ -8,6 +8,7 @@ Expected columns (in addition to existing fields):
 |--------|---------|
 | **UPC** | `upc` (digits only, e.g. `081652000020`) |
 | **PL** | `palletSize` (板数；列名也可用 `PALLETSIZE`，与 PL 相同) |
+| **INV** / **INV (10)** | `inventory` (on-hand). **≤ 0** → “可能没货” / May be out of stock (hint only). **1–49** → Low inventory. **≥ 50** → no label. |
 
 After saving a file with UPC / pallet columns:
 
@@ -28,4 +29,4 @@ Or full rebuild from Excel (status, inventory, UPC, pallet, etc.):
 npm run catalog:rebuild
 ```
 
-Admin **Products → Upload today_update.xlsx** applies **Status**, **UPC**, and **pallet size** to Redis overrides, and **creates new Redis products** for SKUs not already in the catalog.
+Admin **Products → Upload today_update.xlsx** applies **Status**, **UPC**, **pallet size**, and **inventory** to Redis overrides, and **creates new Redis products** for SKUs not already in the catalog. Inventory cues do not block ordering.

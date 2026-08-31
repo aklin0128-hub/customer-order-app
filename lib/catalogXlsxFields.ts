@@ -77,7 +77,8 @@ export function parsePalletSizeFromXlsxRow(row: Record<string, unknown>) {
 
 function safeXlsxNumber(value: unknown) {
   if (value === undefined || value === null || value === "") return undefined;
-  const num = Number(value);
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const num = Number(String(value).replace(/,/g, "").trim());
   return Number.isFinite(num) ? num : undefined;
 }
 
@@ -141,7 +142,7 @@ export function parseProductFieldsFromXlsxRow(
   const palletSize = parsePalletSizeFromXlsxRow(row);
   if (palletSize) product.palletSize = palletSize;
 
-  const inventory = safeXlsxNumber(getXlsxCell(row, ["INV (10)", "INV(10)", "INV"]));
+  const inventory = parseInventoryFromXlsxRow(row);
   if (inventory !== undefined) product.inventory = inventory;
 
   const bp = safeXlsxNumber(getXlsxCell(row, ["BP"]));
@@ -165,11 +166,24 @@ export function parseProductFieldsFromXlsxRow(
   return product;
 }
 
+export function parseInventoryFromXlsxRow(row: Record<string, unknown>) {
+  const keys = ["INV (10)", "INV(10)", "INV", "Inventory", "INVENTORY", "On Hand", "QTY"];
+  for (const key of keys) {
+    if (row[key] !== undefined && row[key] !== null && row[key] !== "") {
+      const n = safeXlsxNumber(row[key]);
+      if (n !== undefined) return n;
+    }
+  }
+  const fromHeader = safeXlsxNumber(getXlsxCell(row, keys));
+  return fromHeader;
+}
+
 export function hasXlsxProductUpdate(row: Record<string, unknown>) {
   const status = getXlsxCell(row, ["Status", "STATUS", "Item Status"]);
   const upc = parseUpcFromXlsxRow(row);
   const palletSize = parsePalletSizeFromXlsxRow(row);
-  return Boolean(status || upc || palletSize);
+  const inventory = parseInventoryFromXlsxRow(row);
+  return Boolean(status || upc || palletSize || inventory !== undefined);
 }
 
 /** Enough row data to create a brand-new SKU (looser than update-only rows). */

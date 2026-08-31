@@ -44,6 +44,7 @@ type UploadPreview = {
   upc?: string;
   palletSize?: string;
   name?: string;
+  inventory?: number;
 };
 
 function checkAdmin(req: Request) {
@@ -56,6 +57,7 @@ function previewFromProduct(product: Product): UploadPreview {
     ...(product.status ? { status: product.status } : {}),
     ...(product.upc ? { upc: product.upc } : {}),
     ...(product.palletSize ? { palletSize: product.palletSize } : {}),
+    ...(product.inventory !== undefined ? { inventory: product.inventory } : {}),
     ...(product.name ? { name: product.name } : {}),
   };
 }
@@ -65,6 +67,7 @@ function formatPreviewLabel(item: UploadPreview) {
     item.status,
     item.upc ? `UPC ${item.upc}` : "",
     item.palletSize ? `PL ${item.palletSize}` : "",
+    item.inventory !== undefined ? `INV ${item.inventory}` : "",
     item.name ? item.name : "",
   ].filter(Boolean);
   return `${item.sku} → ${parts.join(" · ") || "—"}`;
@@ -127,7 +130,7 @@ export async function POST(req: Request) {
         continue;
       }
       if (isKnown && !hasXlsxProductUpdate(row)) {
-        skipped.push(`${sku} (missing status/UPC/pallet)`);
+        skipped.push(`${sku} (missing status/UPC/pallet/inventory)`);
         continue;
       }
 
@@ -162,6 +165,7 @@ export async function POST(req: Request) {
       if (fields.status) patch.status = fields.status;
       if (fields.upc) patch.upc = fields.upc;
       if (fields.palletSize) patch.palletSize = fields.palletSize;
+      if (fields.inventory !== undefined) patch.inventory = fields.inventory;
 
       await saveRedisProduct(patch);
       updated.push(previewFromProduct(patch));
