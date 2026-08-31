@@ -40,6 +40,8 @@ export type CatalogItem = {
   newItemComingSoon?: boolean;
   /** Admin flag: show OUT OF STOCK stamp and block ordering on all order tabs. */
   outOfStock?: boolean;
+  /** On-hand cases from today_update.xlsx INV column. */
+  inventory?: number;
 };
 
 export type PromoPriceTier = {

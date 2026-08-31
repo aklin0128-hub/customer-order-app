@@ -37,6 +37,7 @@ import {
   getPromotionDealHighlight,
   generateOrderRef,
   getCatalogItemBySku,
+  withCatalogCardFields,
   getDisplayStatus,
   getStatusBadgeStyle,
   formatOrderNotAvailableMessage,
@@ -2965,12 +2966,7 @@ export default function OrderPage() {
                   const bogoPack = soldOut ? null : getPromoBogoPackSize(item);
                   const catalogItem = getCatalogItemBySku(sku) || item;
                   const notOrderable = !isOrderableItem(catalogItem);
-                  const cardItem = {
-                    ...item,
-                    ...(catalogItem.palletSize ? { palletSize: catalogItem.palletSize } : {}),
-                    upc: catalogItem.upc || (item as { upc?: string }).upc,
-                    barcode: catalogItem.barcode || (item as { barcode?: string }).barcode,
-                  };
+                  const cardItem = withCatalogCardFields(item, catalogItem);
                   return (
                     <CatalogQtyCard
                       key={item.sku}
@@ -3042,12 +3038,7 @@ export default function OrderPage() {
                   const remainingLabel = soldOut ? t.clearanceSoldOut : item.remainingQty !== null && item.remainingQty !== undefined ? `${t.clearanceRemaining}: ${item.remainingQty}` : undefined;
                   const catalogItem = getCatalogItemBySku(sku) || item;
                   const notOrderable = !isOrderableItem(catalogItem);
-                  const cardItem = {
-                    ...item,
-                    ...(catalogItem.palletSize ? { palletSize: catalogItem.palletSize } : {}),
-                    upc: catalogItem.upc || (item as { upc?: string }).upc,
-                    barcode: catalogItem.barcode || (item as { barcode?: string }).barcode,
-                  };
+                  const cardItem = withCatalogCardFields(item, catalogItem);
                   return (
                     <CatalogQtyCard key={item.sku} item={cardItem} qty={qty}
                       palletLabel={t.pallet}

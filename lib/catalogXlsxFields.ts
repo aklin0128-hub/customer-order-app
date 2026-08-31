@@ -110,9 +110,8 @@ export function parseSkuFromXlsxRow(row: Record<string, unknown>) {
   return getXlsxCell(row, SKU_KEYS).toUpperCase();
 }
 
-/** Full product fields from an Export sheet row (same columns as catalog rebuild). */
 export function parseInventoryFromXlsxRow(row: Record<string, unknown>) {
-  const keys = ["INV (10)", "INV(10)", "INV", "Inventory", "INVENTORY", "On Hand", "ONHAND"];
+  const keys = ["INV (10)", "INV(10)", "INV", "Inventory", "INVENTORY", "On Hand", "ONHAND", "QTY"];
   for (const key of keys) {
     if (row[key] !== undefined && row[key] !== null && row[key] !== "") {
       return safeXlsxNumber(row[key]);
@@ -141,6 +140,7 @@ export function parseInventoryFromXlsxRow(row: Record<string, unknown>) {
   return undefined;
 }
 
+/** Full product fields from an Export sheet row (same columns as catalog rebuild). */
 export function parseProductFieldsFromXlsxRow(
   row: Record<string, unknown>,
   sku: string

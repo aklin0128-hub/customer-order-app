@@ -57,7 +57,7 @@ function previewFromProduct(product: Product): UploadPreview {
     ...(product.status ? { status: product.status } : {}),
     ...(product.upc ? { upc: product.upc } : {}),
     ...(product.palletSize ? { palletSize: product.palletSize } : {}),
-    ...(typeof product.inventory === "number" ? { inventory: product.inventory } : {}),
+    ...(product.inventory !== undefined ? { inventory: product.inventory } : {}),
     ...(product.name ? { name: product.name } : {}),
   };
 }
@@ -67,7 +67,7 @@ function formatPreviewLabel(item: UploadPreview) {
     item.status,
     item.upc ? `UPC ${item.upc}` : "",
     item.palletSize ? `PL ${item.palletSize}` : "",
-    typeof item.inventory === "number" ? `INV ${item.inventory}` : "",
+    item.inventory !== undefined ? `INV ${item.inventory}` : "",
     item.name ? item.name : "",
   ].filter(Boolean);
   return `${item.sku} → ${parts.join(" · ") || "—"}`;
@@ -130,7 +130,7 @@ export async function POST(req: Request) {
         continue;
       }
       if (isKnown && !hasXlsxProductUpdate(row)) {
-        skipped.push(`${sku} (missing status/UPC/pallet/INV)`);
+        skipped.push(`${sku} (missing status/UPC/pallet/inventory)`);
         continue;
       }
 

@@ -1,3 +1,4 @@
+import { parseInventoryNumber } from "@/lib/inventoryCue";
 import { isOrderableCatalogStatus } from "@/lib/orderableCatalog";
 import { scoreCatalogTextSearch } from "@/lib/catalogTextSearch";
 
@@ -13,6 +14,7 @@ export type CatalogBrowseItem = {
   category?: string;
   palletSize?: string;
   imageUrl?: string;
+  inventory?: number;
 };
 
 export function compareSkuAsc(a: string, b: string) {
@@ -43,6 +45,7 @@ export function toCatalogBrowseItem(raw: Record<string, unknown>): CatalogBrowse
     category: raw.category ? String(raw.category) : undefined,
     palletSize: raw.palletSize ? String(raw.palletSize) : undefined,
     imageUrl,
+    inventory: parseInventoryNumber(raw.inventory),
   };
 }
 

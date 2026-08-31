@@ -25,7 +25,20 @@ test("mapProductsToCatalogBrowse strips non-catalog fields", () => {
   assert.equal(items.length, 1);
   assert.equal(items[0]?.sku, "ABC123");
   assert.equal(items[0]?.name, "Rice");
+  assert.equal(items[0]?.inventory, 100);
   assert.equal("bp" in (items[0] || {}), false);
+});
+
+test("mapProductsToCatalogBrowse keeps inventory 0 and drops null", () => {
+  const items = mapProductsToCatalogBrowse(
+    [
+      { sku: "A1", inventory: 0 },
+      { sku: "A2", inventory: null },
+    ],
+    { availableOnly: false }
+  );
+  assert.equal(items[0]?.inventory, 0);
+  assert.equal(items[1]?.inventory, undefined);
 });
 
 test("mapProductsToCatalogBrowse keeps NORMAL* and TBD; hides READYTOORDER", () => {

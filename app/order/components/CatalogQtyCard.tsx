@@ -10,6 +10,7 @@ import {
   isComingSoonNewItem,
 } from "@/lib/comingSoonBadge";
 import { isProductOrderingBlocked, isProductOutOfStockStamp } from "@/lib/productAvailability";
+import { inventoryCueKind, inventoryCueLabel } from "@/lib/inventoryCue";
 import { resolveNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import { getDisplayStatus, getStatusBadgeStyle, isJustAddedItem, isOrderableItem } from "../catalogUtils";
 import type { CatalogItem, Lang } from "../types";
@@ -175,6 +176,8 @@ export function CatalogQtyCard({
   const comingSoon = isComingSoonNewItem(item);
   const outOfStock = isProductOutOfStockStamp(item);
   const stamped = comingSoon || outOfStock;
+  const rawInventoryCue = inventoryCueKind(item.inventory);
+  const inventoryCue = rawInventoryCue === "maybe_oos" && outOfStock ? null : rawInventoryCue;
   const orderingBlocked = isProductOrderingBlocked(item);
   const showNewItemExtras = Boolean(showNewProductBadge || showNewItemListPrice);
   const storageLabel = showNewItemExtras ? resolveNewItemStorageLabel(item) : undefined;
@@ -301,6 +304,11 @@ export function CatalogQtyCard({
       {item.palletSize && palletLabel ? (
         <div className="catalog-qty-card-pallet">
           {palletLabel}: {item.palletSize}
+        </div>
+      ) : null}
+      {inventoryCue ? (
+        <div className={`catalog-inventory-cue catalog-inventory-cue--${inventoryCue === "maybe_oos" ? "oos" : "low"}`}>
+          {inventoryCueLabel(inventoryCue, lang)}
         </div>
       ) : null}
       {onOpenHistory || reserveInvoicePrice || invoicePrice ? (
