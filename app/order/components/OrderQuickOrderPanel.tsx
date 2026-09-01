@@ -10,7 +10,7 @@ import {
 import { formatNewItemComingDate } from "@/lib/catalogNewItems";
 import { getComingSoonBadgeLabel, isComingSoonNewItem } from "@/lib/comingSoonBadge";
 import { isProductOrderingBlocked } from "@/lib/productAvailability";
-import { inventoryCueKind, inventoryCueLabel } from "@/lib/inventoryCue";
+import { inventoryCueKindForItem, inventoryCueLabel } from "@/lib/inventoryCue";
 import { copy } from "../orderCopy";
 import { stepButtonStyle, stepInputStyle } from "../orderStyles";
 import type { CartItem, CatalogItem, Lang } from "../types";
@@ -146,7 +146,7 @@ export function OrderQuickOrderPanel({
       ? formatNewItemComingDate(item.newItemComingDate, lang)
       : null;
     const canAdd = canOrder && !isProductOrderingBlocked(item);
-    const inventoryCue = inventoryCueKind(item.inventory);
+    const inventoryCue = inventoryCueKindForItem(item);
 
     return (
       <div key={item.sku} className={`order-quick-match-wrap${isActive ? " is-active" : ""}`}>

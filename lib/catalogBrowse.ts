@@ -15,6 +15,8 @@ export type CatalogBrowseItem = {
   palletSize?: string;
   imageUrl?: string;
   inventory?: number;
+  outOfStock?: boolean;
+  seasonalEtaDate?: string;
 };
 
 export function compareSkuAsc(a: string, b: string) {
@@ -46,6 +48,8 @@ export function toCatalogBrowseItem(raw: Record<string, unknown>): CatalogBrowse
     palletSize: raw.palletSize ? String(raw.palletSize) : undefined,
     imageUrl,
     inventory: parseInventoryNumber(raw.inventory),
+    outOfStock: raw.outOfStock === true ? true : undefined,
+    seasonalEtaDate: raw.seasonalEtaDate ? String(raw.seasonalEtaDate) : undefined,
   };
 }
 

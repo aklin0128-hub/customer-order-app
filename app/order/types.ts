@@ -42,6 +42,8 @@ export type CatalogItem = {
   outOfStock?: boolean;
   /** On-hand cases from today_update.xlsx INV column. */
   inventory?: number;
+  /** Seasonal tab ETA (YYYY-MM-DD). */
+  seasonalEtaDate?: string;
 };
 
 export type PromoPriceTier = {

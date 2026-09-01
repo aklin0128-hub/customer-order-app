@@ -6,7 +6,8 @@ import { catalogCardStyle, catalogNameStyle } from "@/app/order/orderStyles";
 import type { Lang } from "@/app/order/types";
 
 import { displayCatalogStatus, type CatalogBrowseItem } from "@/lib/catalogBrowse";
-import { inventoryCueKind, inventoryCueLabel } from "@/lib/inventoryCue";
+import { inventoryCueKindForItem, inventoryCueLabel } from "@/lib/inventoryCue";
+import { isDiscontinuedStatus } from "@/lib/orderableCatalog";
 
 export function CatalogInfoCard({
   item,
@@ -26,8 +27,8 @@ export function CatalogInfoCard({
   const name = lang === "ko" && item.name_k ? item.name_k : item.name || "—";
   const status = displayCatalogStatus(item.status);
   const upc = item.upc || item.barcode;
-  const disabled = status === "DISCONTINUED";
-  const inventoryCue = inventoryCueKind(item.inventory);
+  const disabled = isDiscontinuedStatus(item.status);
+  const inventoryCue = inventoryCueKindForItem(item);
 
   return (
     <article

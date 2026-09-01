@@ -20,6 +20,14 @@ export function isOrderableCatalogStatus(status?: string | null) {
   return tokens.includes("NORMAL");
 }
 
+export function isDiscontinuedStatus(status?: string | null) {
+  const s = String(status || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s_-]+/g, "");
+  return s === "DISCONTINUED";
+}
+
 export function isReadyToOrderStatus(status?: string | null) {
   const s = String(status || "")
     .trim()

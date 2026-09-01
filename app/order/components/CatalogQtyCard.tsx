@@ -10,7 +10,8 @@ import {
   isComingSoonNewItem,
 } from "@/lib/comingSoonBadge";
 import { isProductOrderingBlocked, isProductOutOfStockStamp } from "@/lib/productAvailability";
-import { inventoryCueKind, inventoryCueLabel } from "@/lib/inventoryCue";
+import { inventoryCueKindForItem, inventoryCueLabel } from "@/lib/inventoryCue";
+import { isDiscontinuedStatus } from "@/lib/orderableCatalog";
 import { resolveNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import { getDisplayStatus, getStatusBadgeStyle, isJustAddedItem, isOrderableItem } from "../catalogUtils";
 import type { CatalogItem, Lang } from "../types";
@@ -176,8 +177,8 @@ export function CatalogQtyCard({
   const comingSoon = isComingSoonNewItem(item);
   const outOfStock = isProductOutOfStockStamp(item);
   const stamped = comingSoon || outOfStock;
-  const rawInventoryCue = inventoryCueKind(item.inventory);
-  const inventoryCue = rawInventoryCue === "maybe_oos" && outOfStock ? null : rawInventoryCue;
+  const discontinued = isDiscontinuedStatus(item.status);
+  const inventoryCue = inventoryCueKindForItem(item);
   const orderingBlocked = isProductOrderingBlocked(item);
   const showNewItemExtras = Boolean(showNewProductBadge || showNewItemListPrice);
   const storageLabel = showNewItemExtras ? resolveNewItemStorageLabel(item) : undefined;
@@ -385,7 +386,7 @@ export function CatalogQtyCard({
           {getDisplayStatus(item.status)}
         </span>
       ) : null}
-      {unavailableNote ? (
+      {unavailableNote && !discontinued ? (
         <div
           style={{
             marginTop: 4,

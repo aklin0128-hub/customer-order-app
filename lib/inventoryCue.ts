@@ -1,3 +1,8 @@
+import { isComingSoonNewItem, type NewItemStampFields } from "@/lib/comingSoonBadge";
+import { isDiscontinuedStatus } from "@/lib/orderableCatalog";
+import { isProductOutOfStockStamp } from "@/lib/productAvailability";
+import { isSeasonalEtaPending } from "@/lib/seasonalEta";
+
 export type InventoryCueKind = "maybe_oos" | "low" | null;
 
 export type InventoryCueLang = "en" | "zh" | "ko" | "vi";
@@ -19,6 +24,25 @@ export function inventoryCueKind(inventory: unknown): InventoryCueKind {
   if (n <= 0) return "maybe_oos";
   if (n < LOW_INVENTORY_BELOW) return "low";
   return null;
+}
+
+export type InventoryCueItem = NewItemStampFields & {
+  inventory?: unknown;
+  status?: string;
+  outOfStock?: boolean;
+  seasonalEtaDate?: string | null;
+};
+
+/**
+ * Hide inventory pills when a stronger status already explains the card:
+ * discontinued, out-of-stock stamp, coming soon, or Seasonal ETA not yet reached.
+ */
+export function inventoryCueKindForItem(item: InventoryCueItem, now = new Date()): InventoryCueKind {
+  if (isDiscontinuedStatus(item.status)) return null;
+  if (isProductOutOfStockStamp(item)) return null;
+  if (isComingSoonNewItem(item)) return null;
+  if (isSeasonalEtaPending(item.seasonalEtaDate, now)) return null;
+  return inventoryCueKind(item.inventory);
 }
 
 export function inventoryCueLabel(kind: InventoryCueKind, lang: InventoryCueLang = "en"): string {

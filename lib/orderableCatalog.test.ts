@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   isCustomerVisibleCatalogStatus,
+  isDiscontinuedStatus,
   isOrderableCatalogStatus,
   isReadyToOrderStatus,
 } from "./orderableCatalog";
@@ -29,4 +30,11 @@ test("READYTOORDER is hidden from customer catalog visibility", () => {
   assert.equal(isCustomerVisibleCatalogStatus("READYTOORDER"), false);
   assert.equal(isCustomerVisibleCatalogStatus("NORMAL"), true);
   assert.equal(isCustomerVisibleCatalogStatus("TBD"), true);
+});
+
+test("DISCONTINUED matches spaced or underscored status", () => {
+  assert.equal(isDiscontinuedStatus("DISCONTINUED"), true);
+  assert.equal(isDiscontinuedStatus("Discontinued"), true);
+  assert.equal(isDiscontinuedStatus("DISCONTINUED "), true);
+  assert.equal(isDiscontinuedStatus("NORMAL"), false);
 });
