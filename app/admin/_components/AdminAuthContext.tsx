@@ -42,7 +42,7 @@ function readSavedAdminPassword() {
   }
 }
 
-function clearSavedAdminPassword() {
+export function clearSavedAdminPassword() {
   try {
     sessionStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(STORAGE_KEY);
@@ -52,9 +52,52 @@ function clearSavedAdminPassword() {
   }
 }
 
+export function persistAdminPassword(password: string, rememberMe = true) {
+  const trimmed = password.trim();
+  try {
+    clearSavedAdminPassword();
+    if (rememberMe) {
+      localStorage.setItem(STORAGE_KEY, trimmed);
+      localStorage.setItem(REMEMBER_KEY, "1");
+    } else {
+      sessionStorage.setItem(STORAGE_KEY, trimmed);
+      localStorage.setItem(REMEMBER_KEY, "0");
+    }
+    sessionStorage.setItem(STORAGE_KEY, trimmed);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Used outside AdminAuthProvider (e.g. order page admin edit links). */
 export function hasSavedAdminPassword() {
   return Boolean(readSavedAdminPassword());
+}
+
+export function getSavedAdminPassword() {
+  return readSavedAdminPassword();
+}
+
+export async function verifyAdminPassword(
+  password: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const trimmed = password.trim();
+  if (!trimmed) return { ok: false, error: "Password required." };
+
+  try {
+    const res = await fetch("/api/admin/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: trimmed }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, error: String(data?.error || "Invalid admin password.") };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Login failed." };
+  }
 }
 
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
@@ -97,29 +140,12 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/admin/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: trimmed }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data?.error || "Invalid admin password.");
+      const result = await verifyAdminPassword(trimmed);
+      if (!result.ok) {
+        throw new Error(result.error);
       }
 
-      clearSavedAdminPassword();
-      if (rememberMe) {
-        localStorage.setItem(STORAGE_KEY, trimmed);
-        localStorage.setItem(REMEMBER_KEY, "1");
-      } else {
-        sessionStorage.setItem(STORAGE_KEY, trimmed);
-        localStorage.setItem(REMEMBER_KEY, "0");
-      }
-      // Keep sessionStorage in sync for pages that read it directly.
-      sessionStorage.setItem(STORAGE_KEY, trimmed);
-
+      persistAdminPassword(trimmed, rememberMe);
       setPassword(trimmed);
       setAuthed(true);
       return true;

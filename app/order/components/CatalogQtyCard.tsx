@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { formatCatalogAddedDateForItem, formatNewItemComingDate, formatNewItemPublishedDate } from "@/lib/catalogNewItems";
 import { formatNewItemListPriceDisplay } from "@/lib/newItemListPrice";
@@ -13,6 +14,8 @@ import { isProductOrderingBlocked, isProductOutOfStockStamp } from "@/lib/produc
 import { inventoryCueKindForItem, inventoryCueLabel } from "@/lib/inventoryCue";
 import { isDiscontinuedStatus } from "@/lib/orderableCatalog";
 import { resolveNewItemStorageLabel } from "@/lib/newItemStorageLabel";
+import { CATEGORY_OPTIONS } from "@/lib/catalogMainCategories";
+import { readProductCategories } from "@/lib/productCategories";
 import { getDisplayStatus, getStatusBadgeStyle, isJustAddedItem, isOrderableItem } from "../catalogUtils";
 import type { CatalogItem, Lang } from "../types";
 import {
@@ -73,6 +76,9 @@ export function CatalogQtyCard({
   unavailableNote,
   showAdminEdit,
   editLabel = "Edit",
+  onAdminCategoryChange,
+  adminCategoryLabel,
+  adminCategoryAutoLabel = "AUTO",
   favorite,
   favoriteLabel,
   onToggleFavorite,
@@ -122,6 +128,10 @@ export function CatalogQtyCard({
   unavailableNote?: string;
   showAdminEdit?: boolean;
   editLabel?: string;
+  /** Admin: save category from the order card without opening Products. */
+  onAdminCategoryChange?: (sku: string, category: string) => void | Promise<void>;
+  adminCategoryLabel?: string;
+  adminCategoryAutoLabel?: string;
   favorite?: boolean;
   favoriteLabel?: string;
   onToggleFavorite?: (sku: string) => void;
@@ -146,6 +156,8 @@ export function CatalogQtyCard({
   showNewProductBadge?: boolean;
   listPriceLabel?: string;
 }) {
+  const [draftCategory, setDraftCategory] = useState<string | null>(null);
+  const [categorySaving, setCategorySaving] = useState(false);
   const addedDateText =
     showAddedDate && addedDateLabel ? formatCatalogAddedDateForItem(item, lang) : null;
   const publishedDateText =
@@ -187,6 +199,23 @@ export function CatalogQtyCard({
   const upcDigits = showUpc
     ? resolveCatalogUpc(item) || resolveCatalogUpc(getCatalogItemBySku(item.sku || ""))
     : "";
+  const explicitCategory = readProductCategories(item)[0] || "";
+  const categorySelectValue = draftCategory ?? explicitCategory;
+  const showAdminCategory = Boolean(showAdminEdit && onAdminCategoryChange);
+
+  const saveAdminCategory = async (next: string) => {
+    if (!onAdminCategoryChange || next === explicitCategory) return;
+    setDraftCategory(next);
+    setCategorySaving(true);
+    try {
+      await onAdminCategoryChange(item.sku, next);
+    } catch {
+      setDraftCategory(null);
+    } finally {
+      setCategorySaving(false);
+      setDraftCategory(null);
+    }
+  };
 
   const badgeRow =
     promoNote || showPinnedJustAdded || showJustAdded || storageLabel || highlight || promoRemaining ? (
@@ -297,6 +326,31 @@ export function CatalogQtyCard({
           ) : null}
         </div>
       </div>
+      {showAdminCategory ? (
+        <label
+          className="catalog-qty-card-admin-cat"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <span className="catalog-qty-card-admin-cat-label">{adminCategoryLabel || "Cat"}</span>
+          <select
+            className="catalog-qty-card-admin-cat-select"
+            value={categorySelectValue}
+            disabled={categorySaving}
+            aria-label={adminCategoryLabel || "Category"}
+            onChange={(e) => {
+              void saveAdminCategory(e.target.value);
+            }}
+          >
+            <option value="">{adminCategoryAutoLabel}</option>
+            {CATEGORY_OPTIONS.filter((c) => c !== "ALL").map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       <div className="catalog-qty-card-brand">{item.brand || "-"}</div>
       <div className="catalog-qty-card-name" style={catalogNameStyle}>
         {item.name || "-"}

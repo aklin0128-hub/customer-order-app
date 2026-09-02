@@ -50,6 +50,9 @@ export function CatalogVirtualGrid({
   invoicePriceLabelForSku,
   onAdjust,
   onUpdateQty,
+  onAdminCategoryChange,
+  adminCategoryLabel,
+  adminCategoryAutoLabel,
 }: {
   /** Remount virtualizer when switching catalog modes (catalog vs new items, etc.). */
   gridKey?: string;
@@ -82,6 +85,9 @@ export function CatalogVirtualGrid({
   invoicePriceLabelForSku?: (sku: string) => string | undefined;
   onAdjust: (sku: string, delta: number) => void;
   onUpdateQty: (sku: string, value: string) => void;
+  onAdminCategoryChange?: (sku: string, category: string) => void | Promise<void>;
+  adminCategoryLabel?: string;
+  adminCategoryAutoLabel?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(() =>
@@ -249,6 +255,9 @@ export function CatalogVirtualGrid({
                     invoicePrice={invoicePriceLabelForSku?.(sku)}
                     onAdjust={onAdjust}
                     onUpdateQty={onUpdateQty}
+                    onAdminCategoryChange={onAdminCategoryChange}
+                    adminCategoryLabel={adminCategoryLabel}
+                    adminCategoryAutoLabel={adminCategoryAutoLabel}
                   />
                 );
               })}

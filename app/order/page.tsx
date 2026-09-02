@@ -9,6 +9,7 @@ import { CATEGORY_OPTIONS } from "@/lib/inferCategory";
 
 import { CatalogVirtualGrid } from "./components/CatalogVirtualGrid";
 import { CatalogQtyCard } from "./components/CatalogQtyCard";
+import { OrderAdminBar } from "./components/OrderAdminBar";
 import { OrderCartModal } from "./components/OrderCartModal";
 import { OrderBarcodeScanner } from "./components/OrderBarcodeScanner";
 import { OrderFloatingCartFab } from "./components/OrderFloatingCartFab";
@@ -20,12 +21,18 @@ import { OrderInput } from "./components/OrderInput";
 import { OrderReviewModal } from "./components/OrderReviewModal";
 import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
 import { ProductImage } from "./components/ProductImage";
-import { replaceCatalog, catalog } from "./catalogState";
+import { replaceCatalog, catalog, patchCatalogItem, patchSkuFields } from "./catalogState";
 import { isProductOrderingBlocked } from "@/lib/productAvailability";
 import { compareCatalogByNewestImport, compareCatalogForDisplay, formatNewItemComingDate } from "@/lib/catalogNewItems";
 import { isSeasonalEtaPending } from "@/lib/seasonalItems";
 import { clearCustomerSession, readCustomerSession, updateCustomerOrderEmail } from "@/lib/customerSession";
-import { hasSavedAdminPassword } from "@/app/admin/_components/useAdminAuth";
+import {
+  hasSavedAdminPassword,
+  getSavedAdminPassword,
+  persistAdminPassword,
+  clearSavedAdminPassword,
+  verifyAdminPassword,
+} from "@/app/admin/_components/useAdminAuth";
 import {
   formatBrandLabel,
   formatClearanceDetails,
@@ -225,6 +232,11 @@ export default function OrderPage() {
   const [clearanceItems, setClearanceItems] = useState<ClearanceItem[]>([]);
   const [clearanceLoading, setClearanceLoading] = useState(false);
   const [showAdminEditLinks, setShowAdminEditLinks] = useState(false);
+  const [adminLoginOpen, setAdminLoginOpen] = useState(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState("");
+  const [adminRemember, setAdminRemember] = useState(true);
+  const [adminLoginError, setAdminLoginError] = useState("");
+  const [adminLoginLoading, setAdminLoginLoading] = useState(false);
   const [stickyPanelOpen, setStickyPanelOpen] = useState(readInitialStickyPanelOpen);
   const isMobileViewport = useMobileViewport();
 
@@ -368,6 +380,75 @@ export default function OrderPage() {
       transientMsgTimerRef.current = null;
     }, ms);
   }, []);
+
+  const loginAdminOnOrder = useCallback(async () => {
+    if (adminLoginLoading) return;
+    setAdminLoginLoading(true);
+    setAdminLoginError("");
+    const result = await verifyAdminPassword(adminPasswordInput);
+    if (!result.ok) {
+      setAdminLoginError(result.error);
+      setAdminLoginLoading(false);
+      return;
+    }
+    persistAdminPassword(adminPasswordInput, adminRemember);
+    setShowAdminEditLinks(true);
+    setAdminLoginOpen(false);
+    setAdminPasswordInput("");
+    setAdminLoginLoading(false);
+  }, [adminLoginLoading, adminPasswordInput, adminRemember]);
+
+  const logoutAdminOnOrder = useCallback(() => {
+    clearSavedAdminPassword();
+    setShowAdminEditLinks(false);
+    setAdminLoginOpen(false);
+    setAdminPasswordInput("");
+    setAdminLoginError("");
+  }, []);
+
+  const handleAdminCategoryChange = useCallback(
+    async (sku: string, category: string) => {
+      const password = getSavedAdminPassword();
+      if (!password) {
+        setShowAdminEditLinks(false);
+        throw new Error("Admin login required.");
+      }
+
+      const res = await fetch("/api/admin/products", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": password,
+        },
+        body: JSON.stringify({ sku, category }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showTransientToast(String(data?.error || t.adminCategoryFailed));
+        throw new Error(String(data?.error || t.adminCategoryFailed));
+      }
+
+      const product = data?.product as
+        | {
+            category?: string;
+            categories?: string[];
+            newItemStorageLabel?: CatalogItem["newItemStorageLabel"];
+          }
+        | undefined;
+      const patch = {
+        category: product?.category ?? "",
+        categories: Array.isArray(product?.categories) ? product.categories : category ? [category] : [],
+        ...(product?.newItemStorageLabel ? { newItemStorageLabel: product.newItemStorageLabel } : {}),
+      };
+      patchCatalogItem(sku, patch);
+      setSeasonalItems((prev) => patchSkuFields(prev, sku, patch));
+      setPromotionItems((prev) => patchSkuFields(prev, sku, patch));
+      setClearanceItems((prev) => patchSkuFields(prev, sku, patch));
+      setCatalogVersion((v) => v + 1);
+      showTransientToast(t.adminCategorySaved, 1800);
+    },
+    [showTransientToast, t.adminCategoryFailed, t.adminCategorySaved]
+  );
 
   const toggleFavorite = useCallback(
     (sku: string) => {
@@ -2233,6 +2314,38 @@ export default function OrderPage() {
     };
   };
 
+  const adminCardProps = {
+    showAdminEdit: showAdminEditLinks,
+    onAdminCategoryChange: showAdminEditLinks ? handleAdminCategoryChange : undefined,
+    adminCategoryLabel: t.category,
+    adminCategoryAutoLabel: t.adminCategoryAuto,
+  };
+
+  const renderAdminBar = () => (
+    <OrderAdminBar
+      t={t}
+      loggedIn={showAdminEditLinks}
+      open={adminLoginOpen}
+      onToggle={() => {
+        setAdminLoginError("");
+        setAdminLoginOpen((prev) => !prev);
+      }}
+      password={adminPasswordInput}
+      onPasswordChange={(value) => {
+        setAdminPasswordInput(value);
+        if (adminLoginError) setAdminLoginError("");
+      }}
+      remember={adminRemember}
+      onRememberChange={setAdminRemember}
+      loading={adminLoginLoading}
+      error={adminLoginError}
+      onLogin={() => {
+        void loginAdminOnOrder();
+      }}
+      onLogout={logoutAdminOnOrder}
+    />
+  );
+
   const renderModeTabs = () => (
     <div className="order-mode-tabs" role="tablist" aria-label="Order mode">
       <button
@@ -2405,6 +2518,7 @@ export default function OrderPage() {
           </button>
         </div>
       </div>
+      {renderAdminBar()}
 
       {renderMobileModeTags()}
 
@@ -2672,6 +2786,7 @@ export default function OrderPage() {
               {t.logout}
             </button>
           </div>
+          {renderAdminBar()}
           {showCustomerInfo ? (
             <div className="order-customer-fields">
               <OrderInput fullWidth label={t.phone} value={phone} onChange={setPhone} placeholder="" />
@@ -2860,7 +2975,7 @@ export default function OrderPage() {
                       inCartLabel={t.inCart}
                       promoBadgeLabel={t.newItems}
                       editLabel={t.editProduct}
-                      showAdminEdit={showAdminEditLinks}
+                      {...adminCardProps}
                       showNewItemListPrice
                       showNewProductBadge
                       showPublishedDate
@@ -2918,7 +3033,7 @@ export default function OrderPage() {
                       inCartLabel={t.inCart}
                       promoBadgeLabel={t.seasonalBadge}
                       editLabel={t.editProduct}
-                      showAdminEdit={showAdminEditLinks}
+                      {...adminCardProps}
                       showComingDate={Boolean(etaDate)}
                       comingDateLabel={t.etaDate}
                       lang={lang}
@@ -2987,7 +3102,7 @@ export default function OrderPage() {
                       inCartLabel={t.inCart}
                       promoBadgeLabel={t.promoBadge}
                       editLabel={t.editProduct}
-                      showAdminEdit={showAdminEditLinks}
+                      {...adminCardProps}
                       highlight
                       disabled={soldOut || notOrderable}
                       unavailableNote={
@@ -3048,7 +3163,7 @@ export default function OrderPage() {
                       promoPrice={priceLabel} promoDetails={detailsLabel} promoRemaining={remainingLabel}
                       policyNote={soldOut ? undefined : t.clearanceNoReturn}
                       inCartLabel={t.inCart} promoBadgeLabel={t.clearanceBadge} editLabel={t.editProduct}
-                      showAdminEdit={showAdminEditLinks} highlight disabled={soldOut || notOrderable}
+                      {...adminCardProps} highlight disabled={soldOut || notOrderable}
                       unavailableNote={
                         notOrderable ? formatOrderNotAvailableMessage(sku, catalogItem.status, t) : undefined
                       }
@@ -3107,7 +3222,7 @@ export default function OrderPage() {
                       palletLabel={t.pallet}
                       justAddedLabel={t.justAdded}
                       lang={lang}
-                      showAdminEdit={showAdminEditLinks}
+                      {...adminCardProps}
                       showNewProductBadge={showItemNewBadge}
                       disabled={!canOrder}
                       unavailableNote={
