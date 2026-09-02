@@ -205,7 +205,7 @@ export function isOrderableItem(item?: CatalogItem | null) {
   return isOrderableCatalogStatus(item?.status);
 }
 
-/** Hide Ready-to-Order SKUs from customer catalog browsing. */
+/** Hide Ready-to-Order and Seasonal SKUs from Catalog browsing. */
 export function isCustomerVisibleCatalogItem(item?: CatalogItem | null) {
   return Boolean(item?.sku) && isCustomerVisibleCatalogStatus(item?.status);
 }

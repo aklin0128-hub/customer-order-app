@@ -1,5 +1,5 @@
 import { parseInventoryNumber } from "@/lib/inventoryCue";
-import { isOrderableCatalogStatus } from "@/lib/orderableCatalog";
+import { isCustomerVisibleCatalogStatus, isOrderableCatalogStatus } from "@/lib/orderableCatalog";
 import { scoreCatalogTextSearch } from "@/lib/catalogTextSearch";
 
 export type CatalogBrowseItem = {
@@ -54,7 +54,9 @@ export function toCatalogBrowseItem(raw: Record<string, unknown>): CatalogBrowse
 }
 
 export function filterAvailableCatalogBrowseItems(items: CatalogBrowseItem[]): CatalogBrowseItem[] {
-  return items.filter((item) => isOrderableCatalogStatus(item.status));
+  return items.filter(
+    (item) => isOrderableCatalogStatus(item.status) && isCustomerVisibleCatalogStatus(item.status)
+  );
 }
 
 export function mapProductsToCatalogBrowse(

@@ -1132,8 +1132,8 @@ export default function OrderPage() {
   );
 
   const seasonalCatalogItems = useMemo(() => {
-    // Curated Seasonal list must stay visible even when SKUs are READYTOORDER
-    // (hidden from Catalog) or when "Available only" is on.
+    // Curated Seasonal list must stay visible even when SKUs are SEASONAL or
+    // READYTOORDER (hidden from Catalog) or when "Available only" is on.
     const bySku = new Map(
       catalog.map((item) => [String(item.sku || "").toUpperCase(), item])
     );
@@ -1209,6 +1209,7 @@ export default function OrderPage() {
       invoiceFrequentSkus
         .map((sku) => getCatalogItemBySku(sku))
         .filter((item): item is CatalogItem => Boolean(item))
+        .filter((item) => isCustomerVisibleCatalogItem(item))
         .filter((item) => (showAvailableOnly ? passesAvailableFilter(item) : true))
         .slice(0, 14),
     [invoiceFrequentSkus, showAvailableOnly, catalogVersion]

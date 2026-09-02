@@ -41,13 +41,14 @@ test("mapProductsToCatalogBrowse keeps inventory 0 and drops null", () => {
   assert.equal(items[1]?.inventory, undefined);
 });
 
-test("mapProductsToCatalogBrowse keeps NORMAL* and TBD; hides READYTOORDER", () => {
+test("mapProductsToCatalogBrowse keeps NORMAL* and TBD; hides READYTOORDER and SEASONAL", () => {
   const items = mapProductsToCatalogBrowse([
     { sku: "A1", status: "NORMAL" },
     { sku: "A2", status: "DISCONTINUED" },
     { sku: "A3", status: "TBD" },
     { sku: "A4", status: "READYTOORDER" },
     { sku: "A5", status: "NORMAL_NOBR" },
+    { sku: "A6", status: "SEASONAL" },
   ]);
   assert.deepEqual(
     items.map((item) => item.sku),

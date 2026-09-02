@@ -5,7 +5,7 @@
  * - SEASONAL (in-season items; also used by the curated Seasonal tab)
  *
  * READYTOORDER and DISCONTINUED (etc.) are not orderable.
- * READYTOORDER items should also be hidden from customer catalog browsing.
+ * READYTOORDER and SEASONAL items are hidden from Catalog (order Seasonal from the Seasonal tab).
  */
 export function isOrderableCatalogStatus(status?: string | null) {
   const s = String(status || "")
@@ -36,7 +36,15 @@ export function isReadyToOrderStatus(status?: string | null) {
   return s === "READYTOORDER";
 }
 
-/** Hide Ready-to-Order SKUs from customer-facing catalog lists. */
+export function isSeasonalStatus(status?: string | null) {
+  const s = String(status || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s_-]+/g, "");
+  return s === "SEASONAL";
+}
+
+/** Hide Ready-to-Order and Seasonal SKUs from the Catalog tab (Seasonal tab still lists them). */
 export function isCustomerVisibleCatalogStatus(status?: string | null) {
-  return !isReadyToOrderStatus(status);
+  return !isReadyToOrderStatus(status) && !isSeasonalStatus(status);
 }
