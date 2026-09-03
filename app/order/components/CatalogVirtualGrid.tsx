@@ -5,8 +5,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import {
   catalogColumnCountForWidth,
-  catalogGridGapPx,
+  catalogColGapPx,
   catalogRowEstimatePx,
+  catalogRowGapPx,
 } from "../catalogGridLayout";
 import { catalogVirtualScrollStyle } from "../orderStyles";
 import type { CatalogItem, Lang } from "../types";
@@ -49,6 +50,9 @@ export function CatalogVirtualGrid({
   invoicePriceLabelForSku,
   onAdjust,
   onUpdateQty,
+  onAdminCategoryChange,
+  adminCategoryLabel,
+  adminCategoryAutoLabel,
 }: {
   /** Remount virtualizer when switching catalog modes (catalog vs new items, etc.). */
   gridKey?: string;
@@ -81,6 +85,9 @@ export function CatalogVirtualGrid({
   invoicePriceLabelForSku?: (sku: string) => string | undefined;
   onAdjust: (sku: string, delta: number) => void;
   onUpdateQty: (sku: string, value: string) => void;
+  onAdminCategoryChange?: (sku: string, category: string) => void | Promise<void>;
+  adminCategoryLabel?: string;
+  adminCategoryAutoLabel?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(() =>
@@ -113,7 +120,8 @@ export function CatalogVirtualGrid({
     return 4;
   }, [width]);
 
-  const rowGap = useMemo(() => catalogGridGapPx(columnCount), [columnCount]);
+  const colGap = catalogColGapPx();
+  const rowGap = catalogRowGapPx();
   const rowEstimate = useMemo(() => catalogRowEstimatePx(columnCount), [columnCount]);
 
   const rowCount = Math.max(1, Math.ceil(items.length / columnCount));
@@ -122,6 +130,7 @@ export function CatalogVirtualGrid({
     count: rowCount,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowEstimate,
+    // Fixed gap between measured rows — stays even if a row remeasures short.
     gap: rowGap,
     overscan: 3,
     measureElement,
@@ -196,8 +205,10 @@ export function CatalogVirtualGrid({
                 transform: `translateY(${vr.start}px)`,
                 display: "grid",
                 gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
-                alignItems: "stretch",
-                columnGap: rowGap,
+                alignItems: "start",
+                columnGap: colGap,
+                rowGap: 0,
+                boxSizing: "border-box",
               }}
             >
               {rowItems.map((item) => {
@@ -244,6 +255,9 @@ export function CatalogVirtualGrid({
                     invoicePrice={invoicePriceLabelForSku?.(sku)}
                     onAdjust={onAdjust}
                     onUpdateQty={onUpdateQty}
+                    onAdminCategoryChange={onAdminCategoryChange}
+                    adminCategoryLabel={adminCategoryLabel}
+                    adminCategoryAutoLabel={adminCategoryAutoLabel}
                   />
                 );
               })}

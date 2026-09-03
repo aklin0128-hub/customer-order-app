@@ -25,18 +25,34 @@ test("mapProductsToCatalogBrowse strips non-catalog fields", () => {
   assert.equal(items.length, 1);
   assert.equal(items[0]?.sku, "ABC123");
   assert.equal(items[0]?.name, "Rice");
+  assert.equal(items[0]?.inventory, 100);
   assert.equal("bp" in (items[0] || {}), false);
 });
 
-test("mapProductsToCatalogBrowse keeps only orderable statuses by default", () => {
+test("mapProductsToCatalogBrowse keeps inventory 0 and drops null", () => {
+  const items = mapProductsToCatalogBrowse(
+    [
+      { sku: "A1", inventory: 0 },
+      { sku: "A2", inventory: null },
+    ],
+    { availableOnly: false }
+  );
+  assert.equal(items[0]?.inventory, 0);
+  assert.equal(items[1]?.inventory, undefined);
+});
+
+test("mapProductsToCatalogBrowse keeps NORMAL* and TBD; hides READYTOORDER and SEASONAL", () => {
   const items = mapProductsToCatalogBrowse([
     { sku: "A1", status: "NORMAL" },
     { sku: "A2", status: "DISCONTINUED" },
     { sku: "A3", status: "TBD" },
+    { sku: "A4", status: "READYTOORDER" },
+    { sku: "A5", status: "NORMAL_NOBR" },
+    { sku: "A6", status: "SEASONAL" },
   ]);
   assert.deepEqual(
     items.map((item) => item.sku),
-    ["A1", "A3"]
+    ["A1", "A3", "A5"]
   );
 });
 
@@ -47,4 +63,13 @@ test("filterCatalogBrowseItems matches sku and upc digits", () => {
   ];
   assert.deepEqual(filterCatalogBrowseItems(items, "00002D").map((item) => item.sku), ["00002D"]);
   assert.deepEqual(filterCatalogBrowseItems(items, "81652000020").map((item) => item.sku), ["00002D"]);
+});
+
+test("filterCatalogBrowseItems matches brand plus partial name", () => {
+  const items = [
+    { sku: "08444K", brand: "SAMYANG", name: "CARBONARA BULDAK RAMEN (BIG BOWL)" },
+    { sku: "00002D", brand: "OTHER", name: "RICE" },
+  ];
+  const hits = filterCatalogBrowseItems(items, "samyang carbo");
+  assert.deepEqual(hits.map((item) => item.sku), ["08444K"]);
 });
