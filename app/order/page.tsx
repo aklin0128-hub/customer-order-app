@@ -22,6 +22,7 @@ import { OrderReviewModal } from "./components/OrderReviewModal";
 import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
 import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog, patchCatalogItem, patchSkuFields } from "./catalogState";
+import { ADMIN_UNLOCK_TAP_COUNT, ADMIN_UNLOCK_TAP_WINDOW_MS, isAdminUnlockSearch } from "./adminUnlock";
 import { isProductOrderingBlocked } from "@/lib/productAvailability";
 import { compareCatalogByNewestImport, compareCatalogForDisplay, formatNewItemComingDate } from "@/lib/catalogNewItems";
 import { isSeasonalEtaPending } from "@/lib/seasonalItems";
@@ -174,6 +175,8 @@ export default function OrderPage() {
   const lastCloudUpdatedAtRef = useRef("");
   const favoriteUpdatedAtRef = useRef(0);
   const favoriteDirtyRef = useRef(false);
+  const adminUnlockTapsRef = useRef(0);
+  const adminUnlockTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [lang, setLang] = useState<Lang>("en");
   const [mode, setMode] = useState<OrderMode>("catalog");
@@ -232,7 +235,7 @@ export default function OrderPage() {
   const [clearanceItems, setClearanceItems] = useState<ClearanceItem[]>([]);
   const [clearanceLoading, setClearanceLoading] = useState(false);
   const [showAdminEditLinks, setShowAdminEditLinks] = useState(false);
-  const [adminLoginOpen, setAdminLoginOpen] = useState(false);
+  const [adminUnlockOpen, setAdminUnlockOpen] = useState(false);
   const [adminPasswordInput, setAdminPasswordInput] = useState("");
   const [adminRemember, setAdminRemember] = useState(true);
   const [adminLoginError, setAdminLoginError] = useState("");
@@ -393,7 +396,7 @@ export default function OrderPage() {
     }
     persistAdminPassword(adminPasswordInput, adminRemember);
     setShowAdminEditLinks(true);
-    setAdminLoginOpen(false);
+    setAdminUnlockOpen(false);
     setAdminPasswordInput("");
     setAdminLoginLoading(false);
   }, [adminLoginLoading, adminPasswordInput, adminRemember]);
@@ -401,10 +404,25 @@ export default function OrderPage() {
   const logoutAdminOnOrder = useCallback(() => {
     clearSavedAdminPassword();
     setShowAdminEditLinks(false);
-    setAdminLoginOpen(false);
+    setAdminUnlockOpen(false);
     setAdminPasswordInput("");
     setAdminLoginError("");
   }, []);
+
+  const tapAdminUnlock = useCallback(() => {
+    if (showAdminEditLinks || adminUnlockOpen) return;
+    adminUnlockTapsRef.current += 1;
+    if (adminUnlockTapTimerRef.current) clearTimeout(adminUnlockTapTimerRef.current);
+    if (adminUnlockTapsRef.current >= ADMIN_UNLOCK_TAP_COUNT) {
+      adminUnlockTapsRef.current = 0;
+      setAdminUnlockOpen(true);
+      return;
+    }
+    adminUnlockTapTimerRef.current = setTimeout(() => {
+      adminUnlockTapsRef.current = 0;
+      adminUnlockTapTimerRef.current = null;
+    }, ADMIN_UNLOCK_TAP_WINDOW_MS);
+  }, [showAdminEditLinks, adminUnlockOpen]);
 
   const handleAdminCategoryChange = useCallback(
     async (sku: string, category: string) => {
@@ -521,6 +539,9 @@ export default function OrderPage() {
       setShowAdminEditLinks(hasSavedAdminPassword());
     };
     syncAdminEdit();
+    if (isAdminUnlockSearch(window.location.search)) {
+      setAdminUnlockOpen(true);
+    }
 
     const onVisible = () => {
       if (document.visibilityState === "visible") syncAdminEdit();
@@ -2321,30 +2342,28 @@ export default function OrderPage() {
     adminCategoryAutoLabel: t.adminCategoryAuto,
   };
 
-  const renderAdminBar = () => (
-    <OrderAdminBar
-      t={t}
-      loggedIn={showAdminEditLinks}
-      open={adminLoginOpen}
-      onToggle={() => {
-        setAdminLoginError("");
-        setAdminLoginOpen((prev) => !prev);
-      }}
-      password={adminPasswordInput}
-      onPasswordChange={(value) => {
-        setAdminPasswordInput(value);
-        if (adminLoginError) setAdminLoginError("");
-      }}
-      remember={adminRemember}
-      onRememberChange={setAdminRemember}
-      loading={adminLoginLoading}
-      error={adminLoginError}
-      onLogin={() => {
-        void loginAdminOnOrder();
-      }}
-      onLogout={logoutAdminOnOrder}
-    />
-  );
+  const renderAdminBar = () => {
+    if (!showAdminEditLinks && !adminUnlockOpen) return null;
+    return (
+      <OrderAdminBar
+        t={t}
+        loggedIn={showAdminEditLinks}
+        password={adminPasswordInput}
+        onPasswordChange={(value) => {
+          setAdminPasswordInput(value);
+          if (adminLoginError) setAdminLoginError("");
+        }}
+        remember={adminRemember}
+        onRememberChange={setAdminRemember}
+        loading={adminLoginLoading}
+        error={adminLoginError}
+        onLogin={() => {
+          void loginAdminOnOrder();
+        }}
+        onLogout={logoutAdminOnOrder}
+      />
+    );
+  };
 
   const renderModeTabs = () => (
     <div className="order-mode-tabs" role="tablist" aria-label="Order mode">
@@ -2485,7 +2504,7 @@ export default function OrderPage() {
   const renderMobileShopHeader = () => (
     <div className="order-shop-header">
       <div className="order-shop-header-top">
-        <div className="order-shop-store">
+        <div className="order-shop-store" onClick={tapAdminUnlock}>
           <span className="order-shop-store-name">{storeName}</span>
           <span className="order-shop-store-id">{accountNo}</span>
         </div>
@@ -2748,7 +2767,7 @@ export default function OrderPage() {
         <section style={cardStyle} className="order-top-card order-compact-card">
           <div className="order-header-bar">
             <div className="order-header-main">
-              <div className="order-top-title-line">
+              <div className="order-top-title-line" onClick={tapAdminUnlock}>
                 <span className="order-top-title">{t.title}</span>
                 <span className="order-top-meta">
                   {accountNo} · {storeName}
