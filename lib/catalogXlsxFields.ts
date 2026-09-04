@@ -77,7 +77,10 @@ export function parsePalletSizeFromXlsxRow(row: Record<string, unknown>) {
 
 function safeXlsxNumber(value: unknown) {
   if (value === undefined || value === null || value === "") return undefined;
-  const num = Number(value);
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const text = String(value).trim().replace(/,/g, "");
+  if (!text) return undefined;
+  const num = Number(text);
   return Number.isFinite(num) ? num : undefined;
 }
 
@@ -105,6 +108,36 @@ const SKU_KEYS = ["PID", "SKU", "Item No.", "Item No", "No.", "No", "Item", "Ite
 
 export function parseSkuFromXlsxRow(row: Record<string, unknown>) {
   return getXlsxCell(row, SKU_KEYS).toUpperCase();
+}
+
+export function parseInventoryFromXlsxRow(row: Record<string, unknown>) {
+  const keys = ["INV (10)", "INV(10)", "INV", "Inventory", "INVENTORY", "On Hand", "ONHAND", "QTY"];
+  for (const key of keys) {
+    if (row[key] !== undefined && row[key] !== null && row[key] !== "") {
+      return safeXlsxNumber(row[key]);
+    }
+  }
+
+  const normalized = new Map(
+    Object.keys(row).map((k) => [k.trim().toUpperCase().replace(/\s+/g, " "), k])
+  );
+  for (const key of keys) {
+    const actual = normalized.get(key.trim().toUpperCase());
+    if (actual != null && row[actual] !== undefined && row[actual] !== null && row[actual] !== "") {
+      return safeXlsxNumber(row[actual]);
+    }
+  }
+
+  // Headers like "INV (10)" / "INV(12)" — any column starting with INV
+  for (const [norm, actual] of normalized) {
+    if (/^INV(\s*\(\d+\))?$/.test(norm) || norm === "INVENTORY" || norm === "ONHAND") {
+      if (row[actual] !== undefined && row[actual] !== null && row[actual] !== "") {
+        return safeXlsxNumber(row[actual]);
+      }
+    }
+  }
+
+  return undefined;
 }
 
 /** Full product fields from an Export sheet row (same columns as catalog rebuild). */
@@ -141,7 +174,7 @@ export function parseProductFieldsFromXlsxRow(
   const palletSize = parsePalletSizeFromXlsxRow(row);
   if (palletSize) product.palletSize = palletSize;
 
-  const inventory = safeXlsxNumber(getXlsxCell(row, ["INV (10)", "INV(10)", "INV"]));
+  const inventory = parseInventoryFromXlsxRow(row);
   if (inventory !== undefined) product.inventory = inventory;
 
   const bp = safeXlsxNumber(getXlsxCell(row, ["BP"]));
@@ -169,7 +202,8 @@ export function hasXlsxProductUpdate(row: Record<string, unknown>) {
   const status = getXlsxCell(row, ["Status", "STATUS", "Item Status"]);
   const upc = parseUpcFromXlsxRow(row);
   const palletSize = parsePalletSizeFromXlsxRow(row);
-  return Boolean(status || upc || palletSize);
+  const inventory = parseInventoryFromXlsxRow(row);
+  return Boolean(status || upc || palletSize || inventory !== undefined);
 }
 
 /** Enough row data to create a brand-new SKU (looser than update-only rows). */
