@@ -1746,6 +1746,11 @@
   contain-intrinsic-size: auto 280px;
 }
 
+.order-catalog-virtual-row .catalog-qty-card {
+  content-visibility: visible;
+  contain-intrinsic-size: none;
+}
+
 .catalog-qty-card-sku-row {
   display: flex;
   align-items: center;

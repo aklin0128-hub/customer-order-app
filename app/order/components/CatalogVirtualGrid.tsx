@@ -1,7 +1,7 @@
 "use client";
 
 import { measureElement, useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 
 import {
   catalogColumnCountForWidth,
@@ -13,6 +13,25 @@ import { catalogVirtualScrollStyle } from "../orderStyles";
 import type { CatalogItem, Lang } from "../types";
 import { isProductOrderingBlocked } from "@/lib/productAvailability";
 import { CatalogQtyCard } from "./CatalogQtyCard";
+
+type CatalogCardExtras = Partial<
+  Pick<
+    ComponentProps<typeof CatalogQtyCard>,
+    | "favorite"
+    | "favoriteLabel"
+    | "onToggleFavorite"
+    | "lastOrderedLabel"
+    | "onOpenHistory"
+    | "showUpc"
+    | "invoicePrice"
+    | "reserveInvoicePrice"
+    | "lang"
+    | "showAdminEdit"
+    | "onAdminCategoryChange"
+    | "adminCategoryLabel"
+    | "adminCategoryAutoLabel"
+  >
+>;
 
 function readScrollContainerWidth(el: HTMLElement | null) {
   if (!el) return 0;
@@ -48,6 +67,7 @@ export function CatalogVirtualGrid({
   canOrderItem,
   orderBlockedMessage,
   invoicePriceLabelForSku,
+  extraCardProps,
   onAdjust,
   onUpdateQty,
   onAdminCategoryChange,
@@ -83,6 +103,7 @@ export function CatalogVirtualGrid({
   canOrderItem?: (item: CatalogItem) => boolean;
   orderBlockedMessage?: (item: CatalogItem) => string;
   invoicePriceLabelForSku?: (sku: string) => string | undefined;
+  extraCardProps?: (sku: string) => CatalogCardExtras;
   onAdjust: (sku: string, delta: number) => void;
   onUpdateQty: (sku: string, value: string) => void;
   onAdminCategoryChange?: (sku: string, category: string) => void | Promise<void>;
@@ -132,7 +153,7 @@ export function CatalogVirtualGrid({
     estimateSize: () => rowEstimate,
     // Fixed gap between measured rows — stays even if a row remeasures short.
     gap: rowGap,
-    overscan: 3,
+    overscan: 4,
     measureElement,
   });
 
@@ -142,41 +163,9 @@ export function CatalogVirtualGrid({
 
   useLayoutEffect(() => {
     rowVirtualizer.measure();
-    const t1 = window.requestAnimationFrame(() => {
-      rowVirtualizer.measure();
-      window.requestAnimationFrame(() => rowVirtualizer.measure());
-    });
-    const delayed = [120, 400, 900].map((ms) => window.setTimeout(() => rowVirtualizer.measure(), ms));
-    return () => {
-      window.cancelAnimationFrame(t1);
-      delayed.forEach((id) => window.clearTimeout(id));
-    };
+    const frame = window.requestAnimationFrame(() => rowVirtualizer.measure());
+    return () => window.cancelAnimationFrame(frame);
   }, [items.length, columnCount, gridKey, width, rowEstimate, rowVirtualizer]);
-
-  useLayoutEffect(() => {
-    const root = scrollRef.current;
-    if (!root) return;
-
-    const remeasure = () => rowVirtualizer.measure();
-    const resizeObserver = new ResizeObserver(remeasure);
-    const observeRows = () => {
-      resizeObserver.disconnect();
-      root.querySelectorAll(".order-catalog-virtual-row").forEach((row) => resizeObserver.observe(row));
-      root.querySelectorAll(".catalog-qty-card").forEach((card) => resizeObserver.observe(card));
-      remeasure();
-    };
-
-    observeRows();
-    const mutationObserver = new MutationObserver(observeRows);
-    mutationObserver.observe(root, { childList: true, subtree: true });
-    root.addEventListener("load", remeasure, true);
-
-    return () => {
-      resizeObserver.disconnect();
-      mutationObserver.disconnect();
-      root.removeEventListener("load", remeasure, true);
-    };
-  }, [items.length, columnCount, gridKey, rowVirtualizer]);
 
   if (items.length === 0) return null;
 
@@ -205,7 +194,7 @@ export function CatalogVirtualGrid({
                 transform: `translateY(${vr.start}px)`,
                 display: "grid",
                 gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
-                alignItems: "start",
+                alignItems: "stretch",
                 columnGap: colGap,
                 rowGap: 0,
                 boxSizing: "border-box",
@@ -258,6 +247,7 @@ export function CatalogVirtualGrid({
                     onAdminCategoryChange={onAdminCategoryChange}
                     adminCategoryLabel={adminCategoryLabel}
                     adminCategoryAutoLabel={adminCategoryAutoLabel}
+                    {...extraCardProps?.(sku)}
                   />
                 );
               })}
