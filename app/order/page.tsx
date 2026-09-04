@@ -3249,44 +3249,30 @@ export default function OrderPage() {
                 ) : null}
               </div>
             ) : (
-              <div className="order-catalog-css-grid">
-                {orderableCatalogItems.map((item) => {
-                  const sku = item.sku?.toUpperCase() || "";
-                  const qty = catalogQtyMap[sku] || "";
-                  const isWeekly = promoSkuSet.has(sku);
-                  const showItemNewBadge = isNewItem(item);
-                  const promoNote = showItemNewBadge
-                    ? undefined
-                    : isWeekly
-                      ? t.promoBadge
-                      : undefined;
-                  const canOrder = isOrderableItem(item) && !isProductOrderingBlocked(item);
-                  return (
-                    <CatalogQtyCard
-                      key={item.sku}
-                      item={item}
-                      qty={qty}
-                      promoNote={promoNote}
-                      inCartLabel={t.inCart}
-                      promoBadgeLabel={t.promoBadge}
-                      highlight={Boolean(isWeekly)}
-                      editLabel={t.editProduct}
-                      palletLabel={t.pallet}
-                      justAddedLabel={t.justAdded}
-                      lang={lang}
-                      {...adminCardProps}
-                      showNewProductBadge={showItemNewBadge}
-                      disabled={!canOrder}
-                      unavailableNote={
-                        !canOrder ? formatOrderNotAvailableMessage(item.sku || "", item.status, t) : undefined
-                      }
-                      onAdjust={adjustCatalogQty}
-                      onUpdateQty={updateCatalogQty}
-                      {...favoriteCardProps(sku)}
-                    />
-                  );
-                })}
-              </div>
+              <CatalogVirtualGrid
+                gridKey={`catalog:${categoryFilters.join(",")}:${brandFilter}:${catalogSearch}:${catalogShowFavoritesOnly}:${catalogShowSelectedOnly}:${catalogShowRecommendedOnly}:${showAvailableOnly}`}
+                items={orderableCatalogItems}
+                catalogQtyMap={catalogQtyMap}
+                invoicePriceLabelForSku={invoicePriceLabelForSku}
+                inCartLabel={t.inCart}
+                palletLabel={t.pallet}
+                justAddedLabel={t.justAdded}
+                promoBadgeLabel={t.promoBadge}
+                weeklyPickSkus={promoSkuSet}
+                showNewProductBadge
+                newProductBadgeChecker={isNewItem}
+                editLabel={t.editProduct}
+                lang={lang}
+                showAdminEdit={showAdminEditLinks}
+                onAdminCategoryChange={adminCardProps.onAdminCategoryChange}
+                adminCategoryLabel={adminCardProps.adminCategoryLabel}
+                adminCategoryAutoLabel={adminCardProps.adminCategoryAutoLabel}
+                canOrderItem={isOrderableItem}
+                orderBlockedMessage={(item) => formatOrderNotAvailableMessage(item.sku || "", item.status, t)}
+                extraCardProps={favoriteCardProps}
+                onAdjust={adjustCatalogQty}
+                onUpdateQty={updateCatalogQty}
+              />
             )}
           </section>
         )}
