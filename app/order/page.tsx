@@ -360,10 +360,21 @@ export default function OrderPage() {
   const toggleCategoryFilter = (cat: string) => {
     if (cat === "ALL") {
       setCategoryFilters([]);
-      return;
+    } else {
+      // Single-select: picking one category clears any other.
+      setCategoryFilters((prev) => (prev.length === 1 && prev[0] === cat ? [] : [cat]));
     }
-    // Single-select: picking one category clears any other.
-    setCategoryFilters((prev) => (prev.length === 1 && prev[0] === cat ? [] : [cat]));
+    if (isMobileViewport) setCatalogFiltersOpen(false);
+  };
+
+  const clearCatalogFilters = () => {
+    setCategoryFilters([]);
+    setBrandFilter("ALL");
+    setCatalogShowRecommendedOnly(false);
+    setCatalogShowFavoritesOnly(false);
+    setCatalogShowSelectedOnly(false);
+    setCatalogSearch("");
+    setCatalogFiltersOpen(false);
   };
 
   const categoryAllActive = categoryFilters.length === 0;
@@ -2304,18 +2315,20 @@ export default function OrderPage() {
         {t.favoritesOnly} ({favoriteItemCount})
       </button>
       {renderUpcToggle()}
-      <label className="order-sticky-filter-check">
-        <input
-          type="checkbox"
-          checked={catalogShowSelectedOnly}
-          onChange={(e) => setCatalogShowSelectedOnly(e.target.checked)}
-        />
+      <button
+        type="button"
+        onClick={() => setCatalogShowSelectedOnly((prev) => !prev)}
+        style={categoryButtonStyle(catalogShowSelectedOnly)}
+      >
         {t.selectedOnly} ({cartItemCount})
-      </label>
-      <label className="order-sticky-filter-check">
-        <input type="checkbox" checked={showAvailableOnly} onChange={(e) => setShowAvailableOnly(e.target.checked)} />
+      </button>
+      <button
+        type="button"
+        onClick={() => setShowAvailableOnly((prev) => !prev)}
+        style={categoryButtonStyle(showAvailableOnly)}
+      >
         {t.availableOnly}
-      </label>
+      </button>
     </div>
   );
 
@@ -2585,6 +2598,8 @@ export default function OrderPage() {
         </div>
       ) : null}
 
+      {renderCatalogCategoryRow()}
+
       {mode === "search" ? (
         <div className="order-shop-search-row order-shop-quick-composer">
           <label className="order-shop-search-field">
@@ -2668,6 +2683,31 @@ export default function OrderPage() {
 
   const showCatalogSearch = mode === "catalog" && stickyPanelOpen && !isMobileViewport;
 
+  const renderCatalogCategoryRow = () =>
+    mode === "catalog" ? (
+      <div className="order-catalog-cat-row" role="group" aria-label={t.category}>
+        {categoryOptions.map((cat) => {
+          const active = cat === "ALL" ? categoryAllActive : categoryFilters.includes(cat);
+          return (
+            <button
+              key={cat}
+              type="button"
+              className={`order-catalog-cat-chip${active ? " is-active" : ""}`}
+              onClick={() => toggleCategoryFilter(cat)}
+              aria-pressed={active}
+            >
+              {cat}
+            </button>
+          );
+        })}
+        {activeCatalogFilterCount > 0 || catalogSearch.trim() ? (
+          <button type="button" className="order-catalog-cat-chip order-catalog-cat-chip--clear" onClick={clearCatalogFilters}>
+            {t.clearFilters}
+          </button>
+        ) : null}
+      </div>
+    ) : null;
+
   const renderCatalogFiltersPanel = () =>
     catalogFiltersOpen && mode === "catalog" ? (
       <div className="order-sticky-filters">
@@ -2675,30 +2715,16 @@ export default function OrderPage() {
         <div className="order-sticky-catalog-meta order-sticky-catalog-meta--in-filters">
           {t.selected}: {cartItemCount} · {t.showing} {orderableCatalogItems.length} {t.catalogCount}
         </div>
-        <div style={filterBlockStyle}>
-          <div style={filterLabelStyle}>{t.category}</div>
-          <div style={categoryBarStyle} className="order-category-filters">
-            {categoryOptions.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => toggleCategoryFilter(cat)}
-                style={categoryButtonStyle(cat === "ALL" ? categoryAllActive : categoryFilters.includes(cat))}
-                aria-pressed={cat === "ALL" ? categoryAllActive : categoryFilters.includes(cat)}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {(brandSplit.topBrands.length > 0 || brandSplit.moreBrands.length > 0) ? (
           <div style={filterBlockStyle}>
             <div style={filterLabelStyle}>{t.brand}</div>
             <div style={categoryBarStyle}>
               <button
                 type="button"
-                onClick={() => setBrandFilter("ALL")}
+                onClick={() => {
+                  setBrandFilter("ALL");
+                  if (isMobileViewport) setCatalogFiltersOpen(false);
+                }}
                 style={categoryButtonStyle(brandFilter === "ALL")}
               >
                 {t.allBrands}
@@ -2707,7 +2733,10 @@ export default function OrderPage() {
                 <button
                   key={brand}
                   type="button"
-                  onClick={() => setBrandFilter(brand)}
+                  onClick={() => {
+                    setBrandFilter(brand);
+                    if (isMobileViewport) setCatalogFiltersOpen(false);
+                  }}
                   style={categoryButtonStyle(brandFilter === brand)}
                 >
                   {formatBrandLabel(brand)}
@@ -2717,7 +2746,10 @@ export default function OrderPage() {
                 <select
                   aria-label={t.moreBrandsPick}
                   value={brandFilter !== "ALL" && brandSplit.moreBrands.includes(brandFilter) ? brandFilter : ""}
-                  onChange={(e) => setBrandFilter(e.target.value ? e.target.value : "ALL")}
+                  onChange={(e) => {
+                    setBrandFilter(e.target.value ? e.target.value : "ALL");
+                    if (isMobileViewport) setCatalogFiltersOpen(false);
+                  }}
                   style={brandSelectStyle}
                 >
                   <option value="">{t.moreBrandsPick}</option>
@@ -2836,6 +2868,7 @@ export default function OrderPage() {
             {renderModeTabs()}
 
             {showCatalogSearch ? renderCatalogSearchRow() : null}
+            {renderCatalogCategoryRow()}
             {renderCatalogFiltersPanel()}
 
             {stickyPanelOpen ? (

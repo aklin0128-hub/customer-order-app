@@ -424,6 +424,8 @@ export const categoryButtonStyle = (active: boolean): CSSProperties => ({
   fontWeight: 900,
   cursor: "pointer",
   whiteSpace: "nowrap",
+  minHeight: 40,
+  touchAction: "manipulation",
 });
 
 export { justAddedBadgeStyle as justAddedTagStyle } from "@/lib/justAddedBadge";
@@ -439,6 +441,7 @@ export const brandSelectStyle: CSSProperties = {
   cursor: "pointer",
   maxWidth: 200,
   minWidth: 120,
+  minHeight: 40,
   flexShrink: 0,
 };
 export const fixedSubmitBarStyle: CSSProperties = {

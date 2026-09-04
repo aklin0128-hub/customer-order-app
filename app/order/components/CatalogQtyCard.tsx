@@ -532,7 +532,13 @@ export function CatalogQtyCard({
 
       <div className="catalog-qty-card-stepper">
         <div style={catalogStepperStyle}>
-          <button type="button" onClick={() => onAdjust(item.sku, -1)} disabled={disabled || orderingBlocked} style={catalogStepBtnStyle}>
+          <button
+            type="button"
+            className="catalog-qty-step-btn"
+            onClick={() => onAdjust(item.sku, -1)}
+            disabled={disabled || orderingBlocked}
+            style={catalogStepBtnStyle}
+          >
             −
           </button>
           <input
@@ -543,7 +549,13 @@ export function CatalogQtyCard({
             disabled={disabled || orderingBlocked}
             style={{ ...catalogStepInputStyle, opacity: disabled || orderingBlocked ? 0.5 : 1 }}
           />
-          <button type="button" onClick={() => onAdjust(item.sku, 1)} disabled={disabled || orderingBlocked} style={catalogStepBtnStyle}>
+          <button
+            type="button"
+            className="catalog-qty-step-btn"
+            onClick={() => onAdjust(item.sku, 1)}
+            disabled={disabled || orderingBlocked}
+            style={catalogStepBtnStyle}
+          >
             +
           </button>
         </div>
