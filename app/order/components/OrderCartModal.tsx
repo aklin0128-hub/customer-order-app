@@ -23,6 +23,8 @@ export function OrderCartModal({
   onAdjustQty,
   onQtyInput,
   onRemove,
+  onRemoveUnavailable,
+  unavailableItems = [],
   nudge,
   tools,
 }: {
@@ -40,6 +42,8 @@ export function OrderCartModal({
   onAdjustQty: (sku: string, delta: number, nhItems?: boolean) => void;
   onQtyInput: (sku: string, value: string, nhItems?: boolean) => void;
   onRemove: (sku: string, nhItems?: boolean) => void;
+  onRemoveUnavailable?: () => void;
+  unavailableItems?: Array<{ sku: string; status: string; nhItems?: boolean }>;
   nudge?: ReactNode;
   tools?: ReactNode;
 }) {
@@ -92,6 +96,8 @@ export function OrderCartModal({
           onAdjustQty={onAdjustQty}
           onQtyInput={onQtyInput}
           onRemove={onRemove}
+          onRemoveUnavailable={onRemoveUnavailable}
+          unavailableItems={unavailableItems}
           nudge={nudge}
           tools={tools}
         />
