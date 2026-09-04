@@ -362,7 +362,7 @@ export default function AdminInvoicesPage() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      setMsg("Downloaded latest invoice prices (newest invoice per account + SKU).");
+      setMsg("Downloaded latest invoice prices (account, SKU, price, last price date).");
       setMsgTone("success");
     } catch (err: unknown) {
       setMsg(err instanceof Error ? err.message : "Failed to export latest prices.");
