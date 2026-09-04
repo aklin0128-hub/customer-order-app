@@ -109,10 +109,9 @@ test("buildLatestInvoicePricesFromImports keeps price from newest invoice that c
   ]);
 });
 
-test("invoiceLatestPricesToCsv outputs only account, sku, price columns", () => {
+test("invoiceLatestPricesToCsv includes lastPriceDate as the fourth column", () => {
   const csv = invoiceLatestPricesToCsv([
     { account: "FL1", sku: "ABC", price: 9.99, invoiceDate: "2026-04-01" },
   ]);
-  assert.equal(csv, '"account","sku","price"\n"FL1","ABC","9.99"');
-  assert.equal(csv.includes("invoice"), false);
+  assert.equal(csv, '"account","sku","price","lastPriceDate"\n"FL1","ABC","9.99","2026-04-01"');
 });
