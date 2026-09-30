@@ -447,7 +447,7 @@ export default function AdminInvoicesPage() {
           ) : null}
         </div>
         <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
-          Latest price CSV: one row per account + SKU with columns account, sku, price only. Re-parse saved imports to refresh prices after parser updates without deleting or re-uploading.
+          Latest price CSV: one row per account + SKU with columns account, sku, price, lastPriceDate. Re-parse saved imports to refresh dates and prices after parser updates without deleting or re-uploading.
         </p>
       </section>
 
@@ -540,7 +540,8 @@ export default function AdminInvoicesPage() {
           <h2 style={panelTitle}>Last successful result</h2>
           <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 10 }}>
             Account: <strong>{lastRecord.accountNo || "(none)"}</strong> · Invoice:{" "}
-            <strong>{lastRecord.invoiceNo || "(none)"}</strong> · Method:{" "}
+            <strong>{lastRecord.invoiceNo || "(none)"}</strong> · Date:{" "}
+            <strong>{lastRecord.invoiceDate || "not detected"}</strong> · Method:{" "}
             <strong>{lastRecord.extractMethod}</strong> · Chars extracted:{" "}
             <strong>{parsedChars}</strong> · Blob:{" "}
             <button
@@ -735,7 +736,7 @@ export default function AdminInvoicesPage() {
                       {row.invoiceNo || "—"} · {row.accountNo || "no acct"} · {row.lineCount} lines
                     </div>
                     <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
-                      {new Date(row.uploadedAt).toLocaleString()} · {row.extractMethod}
+                      Invoice {row.invoiceDate || "date not detected"} · uploaded {new Date(row.uploadedAt).toLocaleString()} · {row.extractMethod}
                     </div>
                   </div>
                   <button
