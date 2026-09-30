@@ -88,15 +88,25 @@ export async function POST(req: Request) {
     const catalogBySku = new Map(
       catalogProducts.map((p) => [String(p.sku || "").trim().toUpperCase(), p])
     );
-    const notOrderable = cleanedItems.filter((item) => {
-      const product = catalogBySku.get(item.sku);
-      return !product || !isOrderableCatalogStatus(product.status);
-    });
+    const notOrderable = cleanedItems
+      .map((item) => {
+        const product = catalogBySku.get(item.sku);
+        if (product && isOrderableCatalogStatus(product.status)) return null;
+        return {
+          sku: item.sku,
+          status: product
+            ? String(product.status || "").trim().toUpperCase() || "UNAVAILABLE"
+            : "NOT FOUND",
+        };
+      })
+      .filter(Boolean) as Array<{ sku: string; status: string }>;
     if (notOrderable.length > 0) {
       const skus = notOrderable.map((i) => i.sku).join(", ");
       return NextResponse.json(
         {
-          error: `These items are not available to order (only NORMAL, NORMAL NOBR, TBD): ${skus}`,
+          error: `These items are not available to order (only NORMAL / NORMAL_* / TBD): ${skus}`,
+          code: "UNAVAILABLE_ITEMS",
+          unavailableItems: notOrderable,
         },
         { status: 400 }
       );
@@ -150,7 +160,7 @@ export async function POST(req: Request) {
         `Ref: ${finalOrderRef}`,
         `Items: ${cleanedItems.length}`,
         ...(clearanceLineCount > 0
-          ? [`Clearance (${CLEARANCE_ORDER_EMAIL_TAG}): ${clearanceLineCount}`, ``]
+          ? [`Near Date Sale (${CLEARANCE_ORDER_EMAIL_TAG}): ${clearanceLineCount}`, ``]
           : []),
         ...cleanedItems.map((item) => formatOrderLine(item)),
       ].join("\n"),

@@ -1,4 +1,10 @@
 import catalogData from "@/data/catalog_sku_master_extracted.json";
+import { getAllCustomers, normalizeAccountNo } from "@/lib/customers";
+import {
+  isMarketRegionId,
+  marketRegionLabel,
+  type MarketRegionId,
+} from "@/lib/customerRegion";
 import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
 import { redis } from "@/lib/redis";
 
@@ -23,6 +29,8 @@ type SkuAccumulator = {
   accounts: Set<string>;
   accountQty: Map<string, number>;
 };
+
+export type TopSkuRegionFilter = MarketRegionId | "all" | "multi";
 
 export type TopSkuRow = {
   rank: number;
@@ -49,8 +57,30 @@ export type TopSkusResult = {
     orderAccountCount: number;
     days: number | null;
     limit: number;
+    region: TopSkuRegionFilter;
+    regionLabel: string;
+    regionAccountCount: number | null;
   };
 };
+
+export function normalizeTopSkuRegion(value: unknown): TopSkuRegionFilter {
+  const raw = String(value || "")
+    .trim()
+    .toLowerCase();
+  if (!raw || raw === "all") return "all";
+  if (raw === "multi" || raw === "multi-city" || raw === "multicity") return "multi";
+  if (raw === "jax" || raw === "jacksonville") return "jacksonville";
+  if (raw === "mia") return "miami";
+  if (raw === "orl") return "orlando";
+  if (raw === "mlb" || raw === "mel") return "melbourne";
+  if (isMarketRegionId(raw)) return raw;
+  return "all";
+}
+
+export function topSkuRegionLabel(region: TopSkuRegionFilter) {
+  if (region === "all" || region === "multi") return "All / Multi-city";
+  return marketRegionLabel(region);
+}
 
 function cleanSku(value: unknown) {
   return String(value || "").trim().toUpperCase();
@@ -146,24 +176,41 @@ async function buildProductMap(skus: string[]) {
   return map;
 }
 
+async function buildRegionAccountSet(region: TopSkuRegionFilter): Promise<Set<string> | null> {
+  if (region === "all" || region === "multi") return null;
+  const customers = await getAllCustomers();
+  return new Set(
+    customers
+      .filter((c) => c.region === region)
+      .map((c) => normalizeAccountNo(c.accountNo))
+      .filter(Boolean)
+  );
+}
+
 export async function getTopSkus(options?: {
   days?: number;
   limit?: number;
+  region?: TopSkuRegionFilter | string;
 }): Promise<TopSkusResult> {
   const days = Number(options?.days || 0);
   const since = sinceFromDays(days);
   const limit = Math.min(500, Math.max(1, Number(options?.limit) || 100));
+  const region = normalizeTopSkuRegion(options?.region);
+  const allowedAccounts = await buildRegionAccountSet(region);
 
   const map = new Map<string, SkuAccumulator>();
   const imports = (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
+  let matchedImportCount = 0;
 
   for (const record of imports) {
-    const acct = String(record.accountNo || "").trim().toUpperCase();
+    const acct = normalizeAccountNo(record.accountNo || "");
     if (!acct) continue;
+    if (allowedAccounts && !allowedAccounts.has(acct)) continue;
 
     const effectiveDate = parseDate(record.invoiceDate) || parseDate(record.uploadedAt);
     if (!inRange(effectiveDate, since)) continue;
 
+    matchedImportCount += 1;
     for (const line of record.lines || []) {
       const sku = cleanSku(line.sku);
       const qty = parseQty(line.qty);
@@ -180,20 +227,25 @@ export async function getTopSkus(options?: {
     }))
   );
 
+  let matchedOrderAccounts = 0;
   for (const { accountNo: keyAccountNo, entries } of histories) {
+    let accountUsed = false;
     for (const entry of entries) {
-      const entryAccountNo = String(entry.accountNo || keyAccountNo).trim().toUpperCase();
+      const entryAccountNo = normalizeAccountNo(entry.accountNo || keyAccountNo);
       if (!entryAccountNo) continue;
+      if (allowedAccounts && !allowedAccounts.has(entryAccountNo)) continue;
 
       const entryDate = parseDate(entry.createdAt);
       if (!inRange(entryDate, since)) continue;
 
+      accountUsed = true;
       for (const item of entry.items || []) {
         const sku = cleanSku(item.sku);
         const qty = parseQty(item.qty);
         addPurchase(map, sku, entryAccountNo, qty, "order");
       }
     }
+    if (accountUsed) matchedOrderAccounts += 1;
   }
 
   const sorted = Array.from(map.values())
@@ -243,10 +295,13 @@ export async function getTopSkus(options?: {
       totalQty: totalInvoiceQty + totalOrderQty,
       invoiceQty: totalInvoiceQty,
       orderQty: totalOrderQty,
-      importCount: imports.length,
-      orderAccountCount: histories.length,
+      importCount: allowedAccounts ? matchedImportCount : imports.length,
+      orderAccountCount: allowedAccounts ? matchedOrderAccounts : histories.length,
       days: since ? days : null,
       limit,
+      region,
+      regionLabel: topSkuRegionLabel(region),
+      regionAccountCount: allowedAccounts ? allowedAccounts.size : null,
     },
   };
 }

@@ -1,5 +1,5 @@
 /**
- * Merge UPC + pallet size from catalog_updates/today_update.xlsx into
+ * Merge UPC, pallet size, and inventory from catalog_updates/today_update.xlsx into
  * data/catalog_sku_master_extracted.json (keeps other fields unchanged).
  */
 const fs = require("fs");
@@ -64,6 +64,17 @@ function parsePalletSize(row) {
   return formatPalletSize(getAny(row, ["PL", "PALLETSIZE"]));
 }
 
+function parseInventory(row) {
+  const keys = ["INV (10)", "INV(10)", "INV", "Inventory", "INVENTORY", "On Hand", "QTY"];
+  for (const key of keys) {
+    if (row[key] !== undefined && row[key] !== null && row[key] !== "") {
+      const n = typeof row[key] === "number" ? row[key] : Number(String(row[key]).replace(/,/g, "").trim());
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return undefined;
+}
+
 function main() {
   if (!fs.existsSync(INPUT_XLSX)) {
     throw new Error(`Input file not found: ${INPUT_XLSX}`);
@@ -97,13 +108,15 @@ function main() {
 
     const upc = parseUpc(row);
     const palletSize = parsePalletSize(row);
-    bySku.set(sku, { upc, palletSize });
+    const inventory = parseInventory(row);
+    bySku.set(sku, { upc, palletSize, inventory });
   }
 
   const catalog = JSON.parse(fs.readFileSync(CATALOG_JSON, "utf8"));
   const knownSkus = new Set(catalog.map((item) => safeString(item.sku).toUpperCase()).filter(Boolean));
   let upcCount = 0;
   let palletCount = 0;
+  let inventoryCount = 0;
   let newSkuCount = 0;
 
   const next = catalog.map((item) => {
@@ -124,6 +137,10 @@ function main() {
       merged.palletSize = patch.palletSize;
       palletCount += 1;
     }
+    if (patch.inventory !== undefined) {
+      merged.inventory = patch.inventory;
+      inventoryCount += 1;
+    }
     return merged;
   });
 
@@ -135,7 +152,7 @@ function main() {
   fs.writeFileSync(CATALOG_JSON, `${JSON.stringify(next, null, 2)}\n`, "utf8");
 
   console.log(`First-time import stamp on ${newSkuCount} SKU(s) (${importedAt}).`);
-  console.log(`Updated UPC on ${upcCount}, pallet on ${palletCount}.`);
+  console.log(`Updated UPC on ${upcCount}, pallet on ${palletCount}, inventory on ${inventoryCount}.`);
   console.log(`XLSX SKUs in file: ${bySku.size}`);
   console.log(CATALOG_JSON);
 }

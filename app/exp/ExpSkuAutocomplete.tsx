@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { ExpOfflinePack } from "@/lib/expOfflinePack";
+import { suggestExpOffline } from "@/lib/expOfflinePack";
 import { useExpAuth } from "./useExpAuth";
 
 export type SkuSuggestRow = { sku: string; name: string };
@@ -13,6 +15,8 @@ export function ExpSkuAutocomplete({
   placeholder = "Type SKU or product name…",
   disabled,
   onEnter,
+  offlinePack = null,
+  preferOffline = false,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -20,6 +24,8 @@ export function ExpSkuAutocomplete({
   placeholder?: string;
   disabled?: boolean;
   onEnter?: () => void;
+  offlinePack?: ExpOfflinePack | null;
+  preferOffline?: boolean;
 }) {
   const { authed, expHeaders } = useExpAuth();
   const [results, setResults] = useState<SkuSuggestRow[]>([]);
@@ -34,6 +40,15 @@ export function ExpSkuAutocomplete({
         setResults([]);
         return;
       }
+
+      if (preferOffline && offlinePack) {
+        const local = suggestExpOffline(offlinePack, query, 15);
+        setResults(local);
+        setOpen(local.length > 0);
+        setActiveIdx(-1);
+        return;
+      }
+
       try {
         const params = new URLSearchParams({ q: query.trim(), limit: "15" });
         const res = await fetch(`/api/exp/sku-suggest?${params}`, { headers: expHeaders() });
@@ -42,12 +57,23 @@ export function ExpSkuAutocomplete({
           setResults(json.results || []);
           setOpen(true);
           setActiveIdx(-1);
+          return;
         }
       } catch {
-        setResults([]);
+        /* fall through to offline */
       }
+
+      if (offlinePack) {
+        const local = suggestExpOffline(offlinePack, query, 15);
+        setResults(local);
+        setOpen(local.length > 0);
+        setActiveIdx(-1);
+        return;
+      }
+
+      setResults([]);
     },
-    [authed, expHeaders]
+    [authed, expHeaders, offlinePack, preferOffline]
   );
 
   useEffect(() => {
