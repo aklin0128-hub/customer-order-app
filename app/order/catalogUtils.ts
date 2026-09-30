@@ -1,7 +1,8 @@
 import { catalog } from "./catalogState";
 
 import { isCatalogNewItem, isJustAddedItem as isJustAddedCatalogItem } from "@/lib/catalogNewItems";
-import { isOrderableCatalogStatus } from "@/lib/orderableCatalog";
+import { scoreCatalogTextSearch } from "@/lib/catalogTextSearch";
+import { isOrderableCatalogStatus, isCustomerVisibleCatalogStatus, isReadyToOrderStatus } from "@/lib/orderableCatalog";
 import { formatMoneyPrice, formatPromoTierPricesLine, getApplicablePromoTier } from "@/lib/promoFormat";
 import type { PromoPriceTier } from "@/lib/promotions";
 
@@ -59,31 +60,47 @@ export type PromotionDealHighlight = {
   simplePrice?: string;
 };
 
+function formatSimplePromoPriceLabel(
+  promoPrice: string | undefined,
+  t: Pick<PromoCopyStrings, "promoPrice">
+) {
+  const simple = String(promoPrice || "").trim();
+  if (!simple) return undefined;
+  const display = simple.startsWith("$") ? simple : formatMoneyPrice(simple);
+  return `${t.promoPrice}: ${display}`;
+}
+
 /** BOGO and volume tiers use the amber deal highlight; simple price uses promo price line. */
 export function getPromotionDealHighlight(
   item: Pick<PromotionItem, "buyQty" | "getQtyFree" | "priceTiers" | "promoPrice">,
   t: PromoCopyStrings
 ): PromotionDealHighlight {
   const bogo = formatPromoBuyXGetY(item, t);
-  if (bogo) return { headline: bogo };
+  if (bogo) {
+    return {
+      headline: bogo,
+      simplePrice: formatSimplePromoPriceLabel(item.promoPrice, t),
+    };
+  }
 
   const tierLine = formatPromoVolumeTiersLine(item, t.casesAbbr);
   if (tierLine) {
     return { headline: t.promoVolumeTiers, detail: tierLine };
   }
 
-  const simple = String(item.promoPrice || "").trim();
-  if (!simple) return {};
-
-  const display = simple.startsWith("$") ? simple : formatMoneyPrice(simple);
-  return { simplePrice: `${t.promoPrice}: ${display}` };
+  const simplePrice = formatSimplePromoPriceLabel(item.promoPrice, t);
+  if (!simplePrice) return {};
+  return { simplePrice };
 }
 
 export function formatPromotionDealReviewLabel(highlight: PromotionDealHighlight) {
   if (highlight.headline && highlight.detail) {
     return `${highlight.headline}\n${highlight.detail}`;
   }
-  return highlight.headline || highlight.detail || "";
+  if (highlight.headline && highlight.simplePrice) {
+    return `${highlight.headline}\n${highlight.simplePrice}`;
+  }
+  return highlight.headline || highlight.detail || highlight.simplePrice || "";
 }
 
 export function formatPromotionPriceLabel(
@@ -188,17 +205,66 @@ export function isOrderableItem(item?: CatalogItem | null) {
   return isOrderableCatalogStatus(item?.status);
 }
 
+/** Hide Ready-to-Order and Seasonal SKUs from Catalog browsing. */
+export function isCustomerVisibleCatalogItem(item?: CatalogItem | null) {
+  return Boolean(item?.sku) && isCustomerVisibleCatalogStatus(item?.status);
+}
+
+export function isReadyToOrderItem(item?: CatalogItem | null) {
+  return isReadyToOrderStatus(item?.status);
+}
+
 /** @deprecated Use isOrderableItem — kept for existing imports. */
 export function isNormalItem(item?: CatalogItem | null) {
   return isOrderableItem(item);
 }
 
 export function formatOrderNotAvailableMessage(
-  _sku: string,
-  _status: string | undefined,
-  t: { orderNotAvailable: string }
+  sku: string,
+  status: string | undefined,
+  t: { orderNotAvailable: string; statusWarning: string; unavailableMissingSku?: string }
 ) {
+  const cleanSku = String(sku || "").trim().toUpperCase();
+  const rawStatus = String(status || "").trim().toUpperCase();
+  // Prefer customer-safe display status; never echo READYTOORDER.
+  const display =
+    getDisplayStatus(status) ||
+    (rawStatus && !isReadyToOrderStatus(rawStatus) ? rawStatus : "");
+
+  if (cleanSku && display === "NOT FOUND" && t.unavailableMissingSku) {
+    return t.unavailableMissingSku.replace("{sku}", cleanSku);
+  }
+  if (cleanSku && display) {
+    return t.statusWarning.replace("{sku}", cleanSku).replace("{status}", display);
+  }
+  if (cleanSku) {
+    return t.statusWarning.replace("{sku}", cleanSku).replace("{status}", "UNAVAILABLE");
+  }
   return t.orderNotAvailable;
+}
+
+/** Cart / submit lines that the API will reject (missing catalog row or non-orderable status). */
+export function getUnavailableSubmitLines<T extends { sku: string; nhItems?: boolean; qty?: string }>(
+  items: T[]
+): Array<T & { status: string }> {
+  const out: Array<T & { status: string }> = [];
+  for (const item of items) {
+    const cleanSku = String(item.sku || "").trim().toUpperCase();
+    if (!cleanSku) continue;
+    const catalogItem = getCatalogItemBySku(cleanSku);
+    if (!catalogItem) {
+      out.push({ ...item, sku: cleanSku, status: "NOT FOUND" });
+      continue;
+    }
+    if (!isOrderableItem(catalogItem)) {
+      out.push({
+        ...item,
+        sku: cleanSku,
+        status: getDisplayStatus(catalogItem.status) || String(catalogItem.status || "UNAVAILABLE").toUpperCase(),
+      });
+    }
+  }
+  return out;
 }
 
 export function isNewItem(item?: CatalogItem | null) {
@@ -212,11 +278,25 @@ export function isJustAddedItem(item?: CatalogItem | null) {
 export function getDisplayStatus(status?: string) {
   const s = String(status || "").trim().toUpperCase();
   if (!s || s === "INV") return "";
+  // Never surface Ready-to-Order wording to customers.
+  if (isReadyToOrderStatus(s)) return "";
   return s;
 }
 
 export function getCatalogItemBySku(sku: string) {
   return catalog.find((item) => item.sku?.toUpperCase() === sku.toUpperCase());
+}
+
+/** Overlay catalog pallet / inventory onto promo or clearance rows. */
+export function withCatalogCardFields<T extends CatalogItem>(item: T, catalogItem?: CatalogItem | null): T {
+  const src = catalogItem || item;
+  return {
+    ...item,
+    ...(src.palletSize ? { palletSize: src.palletSize } : {}),
+    ...(src.inventory !== undefined && src.inventory !== null ? { inventory: src.inventory } : {}),
+    upc: src.upc || item.upc,
+    barcode: src.barcode || item.barcode,
+  };
 }
 
 /** Digits only — for barcode / UPC scanner input. */
@@ -321,75 +401,15 @@ function catalogSearchTokens(value: string) {
     .filter(Boolean);
 }
 
-/** Drop spaces and punctuation so `o tube`, `o!tube`, and `otube` match the same text. */
-function catalogSearchCompact(value?: string | null) {
-  return catalogSearchTokens(value || "").join("");
-}
-
-function catalogNameHasWordStartingWith(name: string, q: string) {
-  return catalogSearchTokens(name).some((token) => token.startsWith(q));
-}
-
-function catalogTokensMatchInOrder(haystackTokens: string[], needleTokens: string[]) {
-  if (needleTokens.length === 0) return false;
-  let index = 0;
-  for (const needle of needleTokens) {
-    while (index < haystackTokens.length && !haystackTokens[index].startsWith(needle)) {
-      index += 1;
-    }
-    if (index >= haystackTokens.length) return false;
-    index += 1;
-  }
-  return true;
-}
-
 export function scoreCatalogSearchQuery(item: CatalogItem, query: string) {
   const raw = query.trim();
   if (!raw) return -1;
 
-  const q = raw.toUpperCase();
-  const qCompact = catalogSearchCompact(raw);
-  const qTokens = catalogSearchTokens(raw);
+  // UPC / barcode scan matches beat plain text ranks.
+  if (catalogItemMatchesScanCode(item, raw)) return 850;
+  if (catalogItemScanCodeStartsWith(item, raw)) return 800;
 
-  const sku = item.sku?.toUpperCase() || "";
-  const name = item.name?.toUpperCase() || "";
-  const brand = item.brand?.toUpperCase() || "";
-  const barcode = item.barcode?.toUpperCase() || "";
-  const upc = item.upc?.toUpperCase() || "";
-  const size = item.size?.toUpperCase() || "";
-
-  const skuCompact = catalogSearchCompact(item.sku);
-  const nameCompact = catalogSearchCompact(item.name);
-  const brandCompact = catalogSearchCompact(item.brand);
-  const sizeCompact = catalogSearchCompact(item.size);
-  const nameTokens = catalogSearchTokens(name);
-  const brandTokens = catalogSearchTokens(brand);
-
-  if (sku === q || (qCompact && skuCompact === qCompact)) return 1000;
-  if (sku.startsWith(q) || (qCompact && skuCompact.startsWith(qCompact))) return 900;
-  if (catalogItemMatchesScanCode(item, raw) || barcode === q || upc === q) return 850;
-  if (catalogItemScanCodeStartsWith(item, raw) || barcode.startsWith(q) || upc.startsWith(q)) return 800;
-  if (sku.includes(q) || (qCompact.length >= 2 && skuCompact.includes(qCompact))) return 700;
-
-  if (qCompact.length >= 2 && nameCompact.startsWith(qCompact)) return 580;
-  if (qCompact.length >= 2 && brandCompact.startsWith(qCompact)) return 570;
-  if (qCompact.length >= 2 && nameCompact.includes(qCompact)) return 560;
-  if (qTokens.length >= 2 && catalogTokensMatchInOrder(nameTokens, qTokens)) return 540;
-  if (qCompact.length >= 2 && brandCompact.includes(qCompact)) return 530;
-
-  if (brand.startsWith(q) || (qCompact.length === 1 && brandCompact.startsWith(qCompact))) return 600;
-  if (catalogNameHasWordStartingWith(name, qTokens[0] || q)) return 550;
-  if (q.length >= 2 && name.startsWith(q)) return 520;
-  if (q.length >= 2 && brand.includes(q)) return 480;
-  if (q.length >= 2 && (name.includes(q) || size.includes(q) || sizeCompact.includes(qCompact))) return 450;
-  if (qTokens.length >= 2 && catalogTokensMatchInOrder(brandTokens, qTokens)) return 440;
-
-  if (q.length >= 1 && /[^\x00-\x7F]/.test(q)) {
-    if (name.includes(q) || brand.includes(q)) return 400;
-  }
-
-  if (q.length >= 3 && (barcode.includes(q) || upc.includes(q))) return 200;
-  return -1;
+  return scoreCatalogTextSearch(item, raw);
 }
 
 export function generateOrderRef(accountNo: string) {

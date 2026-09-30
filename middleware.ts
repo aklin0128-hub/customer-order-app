@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { checkAdminRequest, getAdminPassword } from "@/lib/adminAuth";
+import { checkCompRequest } from "@/lib/compAuth";
+import { checkCreditRequest } from "@/lib/creditAuth";
 import { checkExpRequest } from "@/lib/expAuth";
 
 export function middleware(request: NextRequest) {
@@ -11,6 +13,26 @@ export function middleware(request: NextRequest) {
       return NextResponse.next();
     }
     if (!checkExpRequest(request)) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    }
+    return NextResponse.next();
+  }
+
+  if (path.startsWith("/api/comp")) {
+    if (path === "/api/comp/verify") {
+      return NextResponse.next();
+    }
+    if (!checkCompRequest(request)) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    }
+    return NextResponse.next();
+  }
+
+  if (path.startsWith("/api/credit")) {
+    if (path === "/api/credit/verify") {
+      return NextResponse.next();
+    }
+    if (!checkCreditRequest(request)) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
     return NextResponse.next();
@@ -40,5 +62,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/api/admin/:path*", "/api/exp/:path*"],
+  matcher: ["/api/admin/:path*", "/api/exp/:path*", "/api/comp/:path*", "/api/credit/:path*"],
 };

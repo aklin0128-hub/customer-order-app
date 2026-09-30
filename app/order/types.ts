@@ -1,5 +1,7 @@
 export type Lang = "en" | "zh" | "ko" | "vi";
-export type OrderMode = "search" | "catalog" | "promotion" | "clearance" | "newItems";
+
+/** Top-level order shop tabs. Quick order (`search`) stays available but hidden. */
+export type OrderMode = "catalog" | "promotion" | "clearance" | "newItems" | "seasonal" | "search";
 
 export type CatalogItem = {
   sku: string;
@@ -38,6 +40,10 @@ export type CatalogItem = {
   newItemComingSoon?: boolean;
   /** Admin flag: show OUT OF STOCK stamp and block ordering on all order tabs. */
   outOfStock?: boolean;
+  /** On-hand cases from today_update.xlsx INV column. */
+  inventory?: number;
+  /** Seasonal tab ETA (YYYY-MM-DD). */
+  seasonalEtaDate?: string;
 };
 
 export type PromoPriceTier = {
@@ -78,11 +84,10 @@ export type CartItem = {
 };
 
 export type OrderHistoryItem = {
-  accountNo: string;
-  storeName: string;
   orderRef: string;
-  items: CartItem[];
-  note?: string;
-  phone?: string;
   createdAt: string;
+  itemCount: number;
+  totalCases: number;
+  note?: string;
+  items: CartItem[];
 };
