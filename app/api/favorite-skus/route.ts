@@ -66,6 +66,12 @@ export async function POST(req: Request) {
     let saved: FavoriteSkusPayload = incoming;
     if (existing && existing.updatedAt > incoming.updatedAt) {
       saved = existing;
+    } else if (
+      existing &&
+      existing.skus.length === incoming.skus.length &&
+      existing.skus.every((sku, index) => sku === incoming.skus[index])
+    ) {
+      saved = existing;
     } else {
       await redis.set(key, saved);
     }

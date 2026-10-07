@@ -4,8 +4,10 @@ import { test } from "node:test";
 import {
   aggregateDeviceCarts,
   buildCatalogQtyMapFromDraft,
+  cloudDraftsEquivalent,
   countDraftItems,
   deviceQtyForSharedTotal,
+  draftSaveFingerprint,
   markSkuRemovedInDraft,
   mergeOrderDrafts,
   normalizeOrderDraft,
@@ -461,4 +463,63 @@ test("buildCatalogQtyMapFromDraft uses cart lines when catalogQtyMap is empty", 
   });
   assert.deepEqual(map, { "0013D": "2" });
   assert.equal(countDraftItems({ cart: [{ sku: "0013d", qty: "2" }], catalogQtyMap: {} }), 1);
+});
+
+test("draftSaveFingerprint ignores updatedAt and qty key order", () => {
+  const a = draftSaveFingerprint({
+    storeName: "Store",
+    phone: "555",
+    note: "hi",
+    orderEmail: "a@b.com",
+    catalogQtyMap: { "00200": "1", "00100": "2" },
+    deviceQtyMap: { "00100": "2" },
+  });
+  const b = draftSaveFingerprint({
+    storeName: "Store",
+    phone: "555",
+    note: "hi",
+    orderEmail: "a@b.com",
+    catalogQtyMap: { "00100": "2", "00200": "1" },
+    deviceQtyMap: { "00100": "2" },
+  });
+  assert.equal(a, b);
+  assert.notEqual(
+    a,
+    draftSaveFingerprint({
+      storeName: "Store",
+      phone: "555",
+      note: "hi",
+      orderEmail: "a@b.com",
+      catalogQtyMap: { "00100": "3", "00200": "1" },
+      deviceQtyMap: { "00100": "3" },
+    })
+  );
+});
+
+test("cloudDraftsEquivalent ignores timestamps when carts match", () => {
+  const a = {
+    accountNo: "FL111",
+    storeName: "Store",
+    phone: "555",
+    catalogQtyMap: { RICE: "2" },
+    deviceCarts: {
+      A: { catalogQtyMap: { RICE: "2" }, updatedAt: "2026-08-05T01:00:00.000Z" },
+    },
+    updatedAt: "2026-08-05T01:00:00.000Z",
+  };
+  const b = {
+    accountNo: "FL111",
+    storeName: "Store",
+    phone: "555",
+    catalogQtyMap: { RICE: "2" },
+    deviceCarts: {
+      A: { catalogQtyMap: { RICE: "2" }, updatedAt: "2026-08-05T09:00:00.000Z" },
+    },
+    updatedAt: "2026-08-05T09:00:00.000Z",
+  };
+  assert.equal(cloudDraftsEquivalent(a, b), true);
+  assert.equal(
+    cloudDraftsEquivalent(a, { ...b, catalogQtyMap: { RICE: "3" }, deviceCarts: { A: { catalogQtyMap: { RICE: "3" }, updatedAt: b.updatedAt } } }),
+    false
+  );
 });

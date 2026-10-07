@@ -1,4 +1,5 @@
 import {
+  cloudDraftsEquivalent,
   resolveCollaborativeCloudSave,
   normalizeOrderDraft,
   type OrderDraftPayload,
@@ -62,8 +63,18 @@ export async function POST(req: Request) {
       });
     }
 
+    if (existing && cloudDraftsEquivalent(resolved, existing)) {
+      return NextResponse.json({
+        success: true,
+        message: "Cloud draft unchanged.",
+        draft: existing,
+      });
+    }
+
     await redis.set(`draft:${accountNo}`, resolved);
-    await indexDraftAccount(accountNo);
+    if (!existing) {
+      await indexDraftAccount(accountNo);
+    }
 
     return NextResponse.json({
       success: true,

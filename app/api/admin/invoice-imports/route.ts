@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { del } from "@vercel/blob";
 import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
 import { bustAnalyticsCache } from "@/lib/analyticsCache";
+import { refreshInvoiceLatestPricesCache } from "@/lib/invoiceLatestPrices";
 import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
@@ -104,11 +105,10 @@ export async function DELETE(req: Request) {
       }
     }
 
-    await redis.set(
-      IMPORT_LIST_KEY,
-      list.filter((item) => item.id !== id)
-    );
+    const nextList = list.filter((item) => item.id !== id);
+    await redis.set(IMPORT_LIST_KEY, nextList);
     bustAnalyticsCache();
+    await refreshInvoiceLatestPricesCache(nextList);
 
     return NextResponse.json({
       success: true,

@@ -1,6 +1,6 @@
 /** Short-lived in-memory cache on the server (per Vercel instance). */
 
-const DEFAULT_TTL_MS = 120_000;
+const DEFAULT_TTL_MS = 300_000;
 
 type Entry = { expires: number; data: unknown };
 

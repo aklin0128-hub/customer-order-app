@@ -84,6 +84,66 @@ export function countDraftItems(draft: OrderDraftPayload | null | undefined) {
   return Object.keys(buildCatalogQtyMapFromDraft(draft)).length;
 }
 
+function sortedQtyEntries(raw?: Record<string, string> | null) {
+  return Object.entries(positiveQtyMap(raw)).sort(([a], [b]) => a.localeCompare(b));
+}
+
+/** Stable cart/contact signature — ignores updatedAt so idle autosaves can skip Redis. */
+export function draftSaveFingerprint(input: {
+  storeName?: string;
+  phone?: string;
+  note?: string;
+  orderEmail?: string;
+  catalogQtyMap?: Record<string, string>;
+  deviceQtyMap?: Record<string, string>;
+  removedSkus?: Record<string, string>;
+}): string {
+  return JSON.stringify({
+    storeName: String(input.storeName || "").trim(),
+    phone: String(input.phone || "").trim(),
+    note: String(input.note || "").trim(),
+    orderEmail: String(input.orderEmail || "").trim(),
+    qty: sortedQtyEntries(input.catalogQtyMap),
+    device: sortedQtyEntries(input.deviceQtyMap),
+    removed: Object.keys(normalizeRemovedSkus(input.removedSkus)).sort(),
+  });
+}
+
+function qtyMapsEqual(a?: Record<string, string> | null, b?: Record<string, string> | null) {
+  const left = positiveQtyMap(a);
+  const right = positiveQtyMap(b);
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  for (const sku of keys) {
+    if (left[sku] !== right[sku]) return false;
+  }
+  return true;
+}
+
+/** True when carts/contacts match; ignores timestamps so unchanged saves skip Redis SET. */
+export function cloudDraftsEquivalent(
+  a: OrderDraftPayload | null | undefined,
+  b: OrderDraftPayload | null | undefined
+): boolean {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  if (String(a.phone || "").trim() !== String(b.phone || "").trim()) return false;
+  if (String(a.note || "").trim() !== String(b.note || "").trim()) return false;
+  if (String(a.storeName || "").trim() !== String(b.storeName || "").trim()) return false;
+  if (String(a.orderEmail || "").trim() !== String(b.orderEmail || "").trim()) return false;
+  if (!qtyMapsEqual(buildCatalogQtyMapFromDraft(a), buildCatalogQtyMapFromDraft(b))) return false;
+
+  const aDevices = normalizeDeviceCarts(a.deviceCarts);
+  const bDevices = normalizeDeviceCarts(b.deviceCarts);
+  const ids = new Set([...Object.keys(aDevices), ...Object.keys(bDevices)]);
+  for (const id of ids) {
+    if (!qtyMapsEqual(aDevices[id]?.catalogQtyMap, bDevices[id]?.catalogQtyMap)) return false;
+  }
+
+  const aRemoved = Object.keys(normalizeRemovedSkus(a.removedSkus)).sort().join(",");
+  const bRemoved = Object.keys(normalizeRemovedSkus(b.removedSkus)).sort().join(",");
+  return aRemoved === bRemoved;
+}
+
 export function normalizeRemovedSkus(
   raw: Record<string, string> | null | undefined
 ): Record<string, string> {

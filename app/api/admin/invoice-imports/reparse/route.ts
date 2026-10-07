@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { bustAnalyticsCache } from "@/lib/analyticsCache";
+import { refreshInvoiceLatestPricesCache } from "@/lib/invoiceLatestPrices";
 import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
 import { reparseInvoiceImportRecord } from "@/lib/invoice/reparseInvoiceImport";
 import { redis } from "@/lib/redis";
@@ -60,6 +61,7 @@ export async function POST(req: Request) {
     if (updated.length > 0) {
       await redis.set(IMPORT_LIST_KEY, list);
       bustAnalyticsCache();
+      await refreshInvoiceLatestPricesCache(list);
     }
 
     return NextResponse.json({
