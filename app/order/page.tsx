@@ -3284,9 +3284,7 @@ export default function OrderPage() {
                       policyNote={soldOut ? undefined : t.clearanceNoReturn}
                       inCartLabel={t.inCart} promoBadgeLabel={t.clearanceBadge} editLabel={t.editProduct}
                       {...adminCardProps} highlight disabled={soldOut || notOrderable}
-                      unavailableNote={
-                        notOrderable ? formatOrderNotAvailableMessage(sku, catalogItem.status, t) : undefined
-                      }
+                      hideInventoryStatus
                       onAdjust={adjustClearanceQty} onUpdateQty={updateClearanceQty}
                       {...favoriteCardProps(sku)} />
                   );
