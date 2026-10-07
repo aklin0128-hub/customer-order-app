@@ -69,8 +69,10 @@ import {
 import {
   buildCatalogQtyMapFromDraft,
   cartItemsFromQtyMap,
+  cloudDraftsEquivalent,
   countDraftItems,
   deviceQtyForSharedTotal,
+  draftSaveFingerprint,
   ensureDeviceCarts,
   getOrCreateOrderDeviceId,
   markSkuReaddedInDraft,
@@ -173,6 +175,8 @@ export default function OrderPage() {
   const cartDirtyRef = useRef(false);
   const lastLocalEditAtRef = useRef(0);
   const lastCloudUpdatedAtRef = useRef("");
+  const lastSavedDraftFingerprintRef = useRef("");
+  const lastPostedPhoneRef = useRef<string | null>(null);
   const favoriteUpdatedAtRef = useRef(0);
   const favoriteDirtyRef = useRef(false);
   const adminUnlockTapsRef = useRef(0);
@@ -832,6 +836,11 @@ export default function OrderPage() {
         deviceQtyMapRef.current = {};
         lastCloudUpdatedAtRef.current = "";
         cartDirtyRef.current = false;
+        lastSavedDraftFingerprintRef.current = draftSaveFingerprint({
+          catalogQtyMap: {},
+          deviceQtyMap: {},
+        });
+        lastPostedPhoneRef.current = "";
       } else {
         const merged = mergeOrderDrafts(localParsed, cloudParsed);
         if (merged) {
@@ -840,18 +849,31 @@ export default function OrderPage() {
             showTransientToast(t.loadedDraft);
           }
 
-          try {
-            await fetch("/api/save-draft", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                ...merged,
-                deviceId: deviceIdRef.current,
-                deviceQtyMap: deviceQtyMapRef.current,
-                allowClear: countDraftItems(merged) === 0,
-              }),
-            });
-          } catch {}
+          lastSavedDraftFingerprintRef.current = draftSaveFingerprint({
+            storeName: merged.storeName,
+            phone: merged.phone,
+            note: merged.note,
+            orderEmail: merged.orderEmail,
+            catalogQtyMap: buildCatalogQtyMapFromDraft(merged),
+            deviceQtyMap: deviceQtyMapRef.current,
+            removedSkus: merged.removedSkus,
+          });
+          lastPostedPhoneRef.current = String(merged.phone || "").trim();
+
+          if (!cloudParsed || !cloudDraftsEquivalent(merged, cloudParsed)) {
+            try {
+              await fetch("/api/save-draft", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  ...merged,
+                  deviceId: deviceIdRef.current,
+                  deviceQtyMap: deviceQtyMapRef.current,
+                  allowClear: countDraftItems(merged) === 0,
+                }),
+              });
+            } catch {}
+          }
         }
       }
 
@@ -937,85 +959,102 @@ export default function OrderPage() {
         removedSkus: cloudDraftRef.current?.removedSkus,
         allowClear,
       };
+      const fingerprint = draftSaveFingerprint({
+        storeName: draft.storeName,
+        phone: draft.phone,
+        note: draft.note,
+        orderEmail: draft.orderEmail,
+        catalogQtyMap,
+        deviceQtyMap: deviceQtyMapRef.current,
+        removedSkus: cloudDraftRef.current?.removedSkus,
+      });
 
-      try {
-        const res = await fetch("/api/save-draft", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(saveBody),
-        });
-        if (!res.ok) throw new Error("save failed");
-        const data = await res.json();
-        if (data?.draft) {
-          const normalized = ensureDeviceCarts(data.draft) || normalizeOrderDraft(accountNo, data.draft);
-          // Newer local edits while this save was in flight — keep UI; next autosave will sync.
-          if (lastLocalEditAtRef.current > editAt) {
-            const localRemoved = cloudDraftRef.current?.removedSkus || {};
-            let merged: OrderDraftPayload = normalized;
-            for (const [sku, at] of Object.entries(localRemoved)) {
-              if (!catalogQtyMap[sku]) {
-                merged = markSkuRemovedInDraft(merged, sku, at) || merged;
-              }
-            }
-            cloudDraftRef.current = merged;
-            return;
-          }
-          cloudDraftRef.current = normalized;
-          deviceQtyMapRef.current = {
-            ...(normalized.deviceCarts?.[deviceId]?.catalogQtyMap || {}),
-          };
-          lastCloudUpdatedAtRef.current = String(normalized.updatedAt || "");
-          cartDirtyRef.current = false;
-          localStorage.setItem(`draft_${accountNo}`, JSON.stringify(normalized));
-          const shared = buildCatalogQtyMapFromDraft(normalized);
-          setCatalogQtyMap((prev) => {
-            const same =
-              Object.keys(prev).length === Object.keys(shared).length &&
-              Object.entries(shared).every(([sku, qty]) => prev[sku] === qty);
-            return same ? prev : shared;
-          });
-          setCart((prev) => {
-            const clearance = Object.fromEntries(
-              prev.filter((item) => item.nhItems).map((item) => [item.sku.toUpperCase(), item.qty])
-            );
-            const next = buildCartDisplayItems({ catalog: shared, clearance });
-            const same =
-              prev.length === next.length &&
-              next.every((item, index) => {
-                const old = prev[index];
-                return (
-                  old &&
-                  old.sku === item.sku &&
-                  old.qty === item.qty &&
-                  Boolean(old.nhItems) === Boolean(item.nhItems)
-                );
-              });
-            return same ? prev : next;
-          });
-        }
-      } catch {
+      if (fingerprint !== lastSavedDraftFingerprintRef.current) {
         try {
-          await fetch("/api/save-draft", {
+          const res = await fetch("/api/save-draft", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(saveBody),
           });
+          if (!res.ok) throw new Error("save failed");
+          lastSavedDraftFingerprintRef.current = fingerprint;
+          const data = await res.json();
+          if (data?.draft) {
+            const normalized = ensureDeviceCarts(data.draft) || normalizeOrderDraft(accountNo, data.draft);
+            // Newer local edits while this save was in flight — keep UI; next autosave will sync.
+            if (lastLocalEditAtRef.current > editAt) {
+              const localRemoved = cloudDraftRef.current?.removedSkus || {};
+              let merged: OrderDraftPayload = normalized;
+              for (const [sku, at] of Object.entries(localRemoved)) {
+                if (!catalogQtyMap[sku]) {
+                  merged = markSkuRemovedInDraft(merged, sku, at) || merged;
+                }
+              }
+              cloudDraftRef.current = merged;
+              return;
+            }
+            cloudDraftRef.current = normalized;
+            deviceQtyMapRef.current = {
+              ...(normalized.deviceCarts?.[deviceId]?.catalogQtyMap || {}),
+            };
+            lastCloudUpdatedAtRef.current = String(normalized.updatedAt || "");
+            cartDirtyRef.current = false;
+            localStorage.setItem(`draft_${accountNo}`, JSON.stringify(normalized));
+            const shared = buildCatalogQtyMapFromDraft(normalized);
+            setCatalogQtyMap((prev) => {
+              const same =
+                Object.keys(prev).length === Object.keys(shared).length &&
+                Object.entries(shared).every(([sku, qty]) => prev[sku] === qty);
+              return same ? prev : shared;
+            });
+            setCart((prev) => {
+              const clearance = Object.fromEntries(
+                prev.filter((item) => item.nhItems).map((item) => [item.sku.toUpperCase(), item.qty])
+              );
+              const next = buildCartDisplayItems({ catalog: shared, clearance });
+              const same =
+                prev.length === next.length &&
+                next.every((item, index) => {
+                  const old = prev[index];
+                  return (
+                    old &&
+                    old.sku === item.sku &&
+                    old.qty === item.qty &&
+                    Boolean(old.nhItems) === Boolean(item.nhItems)
+                  );
+                });
+              return same ? prev : next;
+            });
+          }
         } catch {
-          /* localStorage backup already written above */
+          try {
+            await fetch("/api/save-draft", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(saveBody),
+            });
+            lastSavedDraftFingerprintRef.current = fingerprint;
+          } catch {
+            /* localStorage backup already written above */
+          }
         }
       }
 
-      try {
-        await fetch("/api/customer-profile", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            accountNo,
-            phone: phone.trim(),
-          }),
-        });
-      } catch {}
-    }, 700);
+      const phoneTrim = phone.trim();
+      if (lastPostedPhoneRef.current !== phoneTrim) {
+        try {
+          await fetch("/api/customer-profile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              accountNo,
+              phone: phoneTrim,
+            }),
+          });
+          lastPostedPhoneRef.current = phoneTrim;
+        } catch {}
+      }
+    }, 4000);
 
     return () => clearTimeout(timer);
   }, [ready, accountNo, storeName, phone, orderEmail, note, cart, catalogQtyMap, autoLoaded]);
@@ -1045,7 +1084,17 @@ export default function OrderPage() {
 
       localStorage.setItem(`draft_${snapshot.accountNo}`, JSON.stringify(payload));
 
-      if (typeof navigator.sendBeacon === "function") {
+      const fingerprint = draftSaveFingerprint({
+        storeName: payload.storeName,
+        phone: payload.phone,
+        note: payload.note,
+        orderEmail: payload.orderEmail,
+        catalogQtyMap: snapshot.catalogQtyMap || payload.catalogQtyMap,
+        deviceQtyMap: deviceQtyMapRef.current,
+        removedSkus: cloudDraftRef.current?.removedSkus,
+      });
+
+      if (fingerprint !== lastSavedDraftFingerprintRef.current && typeof navigator.sendBeacon === "function") {
         const body = JSON.stringify({
           ...payload,
           desiredSharedQtyMap: snapshot.catalogQtyMap || payload.catalogQtyMap,
@@ -1056,6 +1105,25 @@ export default function OrderPage() {
           allowClear: countDraftItems(payload) === 0,
         });
         navigator.sendBeacon("/api/save-draft", new Blob([body], { type: "application/json" }));
+        lastSavedDraftFingerprintRef.current = fingerprint;
+      }
+
+      const phoneTrim = String(snapshot.phone || "").trim();
+      if (lastPostedPhoneRef.current !== phoneTrim) {
+        try {
+          void fetch("/api/customer-profile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              accountNo: snapshot.accountNo,
+              phone: phoneTrim,
+            }),
+            keepalive: true,
+          });
+          lastPostedPhoneRef.current = phoneTrim;
+        } catch {
+          /* ignore */
+        }
       }
     };
 
@@ -1187,7 +1255,7 @@ export default function OrderPage() {
       void pullFavoriteSkus();
     };
 
-    const timer = setInterval(pullShared, 4000);
+    const timer = setInterval(pullShared, 12000);
     const onVisible = () => {
       if (document.visibilityState === "visible") pullShared();
     };

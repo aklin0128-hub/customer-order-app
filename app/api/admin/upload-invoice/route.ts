@@ -14,6 +14,7 @@ import {
 import { resolveInvoiceCaseUnitPrice } from "@/lib/invoice/invoiceCaseUnitPrice";
 import { parseInvoiceText } from "@/lib/invoice/parseInvoiceText";
 import { bustAnalyticsCache } from "@/lib/analyticsCache";
+import { refreshInvoiceLatestPricesCache } from "@/lib/invoiceLatestPrices";
 import { findDuplicateInvoiceImport } from "@/lib/invoiceDedup";
 import { prependOrderHistory } from "@/lib/orderHistory";
 import { incrementPromotionSoldFromInvoice } from "@/lib/promotions";
@@ -195,6 +196,7 @@ export async function POST(req: Request) {
     const nextList = [record, ...list];
     await redis.set(IMPORT_LIST_KEY, nextList);
     bustAnalyticsCache();
+    await refreshInvoiceLatestPricesCache(nextList);
 
     const suggestedRegion = guessRegionFromText(
       [storeName, parsed.accountNo, accountNo].filter(Boolean).join(" ")

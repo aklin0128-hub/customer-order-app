@@ -7,7 +7,12 @@ import {
   parseProductFieldsFromXlsxRow,
   parseSkuFromXlsxRow,
 } from "@/lib/catalogXlsxFields";
-import { listRedisProductSkus, productRedisKey, saveRedisProduct } from "@/lib/productRedisStore";
+import {
+  invalidateProductOverridesSnapshot,
+  listRedisProductSkus,
+  productRedisKey,
+  saveRedisProduct,
+} from "@/lib/productRedisStore";
 import { redis } from "@/lib/redis";
 import { bustServerDataCache, SERVER_CACHE } from "@/lib/serverDataCache";
 
@@ -149,7 +154,7 @@ export async function POST(req: Request) {
           updatedAt: now,
         };
 
-        await saveRedisProduct(product);
+        await saveRedisProduct(product, { skipSnapshotInvalidate: true });
         knownSkus.add(sku);
         created.push(previewFromProduct(product));
         continue;
@@ -169,10 +174,11 @@ export async function POST(req: Request) {
       if (fields.name) patch.name = fields.name;
       if (fields.brand) patch.brand = fields.brand;
 
-      await saveRedisProduct(patch);
+      await saveRedisProduct(patch, { skipSnapshotInvalidate: true });
       updated.push(previewFromProduct(patch));
     }
 
+    await invalidateProductOverridesSnapshot();
     bustServerDataCache(SERVER_CACHE.catalog);
     bustServerDataCache(SERVER_CACHE.showcase);
 
