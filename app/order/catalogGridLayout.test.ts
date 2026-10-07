@@ -8,6 +8,7 @@ import {
   catalogColumnCountForWidth,
   catalogColGapPx,
   catalogRowGapPx,
+  catalogVirtualRowKey,
   CATALOG_ROW_GAP_PX,
 } from "./catalogGridLayout";
 
@@ -33,4 +34,12 @@ test("column count scales with container width", () => {
 test("catalog order lists items through the virtual grid", () => {
   assert.match(orderPageSrc, /<CatalogVirtualGrid[\s\S]*items=\{orderableCatalogItems\}/);
   assert.doesNotMatch(orderPageSrc, /orderableCatalogItems\.map\(/);
+});
+
+test("catalogVirtualRowKey changes when a search replaces row SKUs", () => {
+  const all = [{ sku: "00001" }, { sku: "00002" }, { sku: "00003" }, { sku: "00004" }];
+  const melon = [{ sku: "11026K" }, { sku: "05501" }];
+  assert.equal(catalogVirtualRowKey(all, 0, 2), "0:00001|00002");
+  assert.equal(catalogVirtualRowKey(melon, 0, 2), "0:11026K|05501");
+  assert.notEqual(catalogVirtualRowKey(all, 0, 2), catalogVirtualRowKey(melon, 0, 2));
 });

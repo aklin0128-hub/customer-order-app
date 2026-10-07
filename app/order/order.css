@@ -2044,7 +2044,7 @@
 }
 
 .order-catalog-virtual-row[data-index] {
-  z-index: 1;
+  z-index: auto;
 }
 
 .catalog-qty-card-top-badges {

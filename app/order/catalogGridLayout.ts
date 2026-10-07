@@ -45,6 +45,21 @@ export function catalogRowStridePx() {
 }
 
 /** Column count from container width — scales up on wide screens, down on narrow. */
+/** Stable virtual-row identity so a search/filter does not reuse stale measured rows. */
+export function catalogVirtualRowKey(
+  items: Array<{ sku?: string }>,
+  rowIndex: number,
+  columnCount: number
+) {
+  const cols = Math.max(1, columnCount);
+  const start = rowIndex * cols;
+  const skus = items
+    .slice(start, start + cols)
+    .map((item) => String(item.sku || "").trim().toUpperCase())
+    .filter(Boolean);
+  return `${rowIndex}:${skus.join("|") || "empty"}`;
+}
+
 export function catalogColumnCountForWidth(rawWidth: number): number {
   const width =
     rawWidth > 0

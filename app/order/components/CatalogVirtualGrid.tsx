@@ -8,6 +8,7 @@ import {
   catalogColGapPx,
   catalogRowEstimatePx,
   catalogRowGapPx,
+  catalogVirtualRowKey,
 } from "../catalogGridLayout";
 import { catalogVirtualScrollStyle } from "../orderStyles";
 import type { CatalogItem, Lang } from "../types";
@@ -39,7 +40,11 @@ function readScrollContainerWidth(el: HTMLElement | null) {
   return w > 0 ? w : 0;
 }
 
-export function CatalogVirtualGrid({
+export function CatalogVirtualGrid(props: Parameters<typeof CatalogVirtualGridBody>[0]) {
+  return <CatalogVirtualGridBody key={props.gridKey || "catalog"} {...props} />;
+}
+
+function CatalogVirtualGridBody({
   gridKey,
   items,
   catalogQtyMap,
@@ -146,11 +151,16 @@ export function CatalogVirtualGrid({
   const rowEstimate = useMemo(() => catalogRowEstimatePx(columnCount), [columnCount]);
 
   const rowCount = Math.max(1, Math.ceil(items.length / columnCount));
+  const itemsSignature = useMemo(
+    () => items.map((item) => String(item.sku || "").toUpperCase()).join("|"),
+    [items]
+  );
 
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowEstimate,
+    getItemKey: (index) => catalogVirtualRowKey(items, index, columnCount),
     // Fixed gap between measured rows — stays even if a row remeasures short.
     gap: rowGap,
     overscan: 4,
@@ -165,13 +175,12 @@ export function CatalogVirtualGrid({
     rowVirtualizer.measure();
     const frame = window.requestAnimationFrame(() => rowVirtualizer.measure());
     return () => window.cancelAnimationFrame(frame);
-  }, [items.length, columnCount, gridKey, width, rowEstimate, rowVirtualizer]);
+  }, [items.length, itemsSignature, columnCount, gridKey, width, rowEstimate, rowVirtualizer]);
 
   if (items.length === 0) return null;
 
   return (
     <div
-      key={gridKey}
       ref={scrollRef}
       className="order-catalog-virtual-scroll"
       style={catalogVirtualScrollStyle}
@@ -198,6 +207,7 @@ export function CatalogVirtualGrid({
                 columnGap: colGap,
                 rowGap: 0,
                 boxSizing: "border-box",
+                zIndex: rowCount - vr.index,
               }}
             >
               {rowItems.map((item) => {
