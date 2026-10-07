@@ -116,17 +116,24 @@ function CatalogVirtualGridBody({
   adminCategoryAutoLabel?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(() =>
-    typeof window !== "undefined" ? Math.max(0, window.innerWidth - 32) : 0
-  );
+  const [boxSize, setBoxSize] = useState(() => ({
+    width: typeof window !== "undefined" ? Math.max(0, window.innerWidth - 32) : 0,
+    height: 0,
+  }));
+  const width = boxSize.width;
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
     const measure = () => {
-      const next = readScrollContainerWidth(el);
-      if (next > 0) setWidth(next);
+      const nextWidth = readScrollContainerWidth(el);
+      const nextHeight = el.clientHeight || el.offsetHeight || 0;
+      setBoxSize((prev) => {
+        const width = nextWidth > 0 ? nextWidth : prev.width;
+        if (prev.width === width && prev.height === nextHeight) return prev;
+        return { width, height: nextHeight };
+      });
     };
 
     measure();
@@ -176,7 +183,7 @@ function CatalogVirtualGridBody({
     rowVirtualizer.measure();
     const frame = window.requestAnimationFrame(() => rowVirtualizer.measure());
     return () => window.cancelAnimationFrame(frame);
-  }, [items.length, itemsSignature, columnCount, gridKey, width, rowEstimate, rowVirtualizer]);
+  }, [items.length, itemsSignature, columnCount, gridKey, boxSize.width, boxSize.height, rowEstimate, rowVirtualizer]);
 
   if (items.length === 0) return null;
 
@@ -186,7 +193,14 @@ function CatalogVirtualGridBody({
       className="order-catalog-virtual-scroll"
       style={catalogVirtualScrollStyle}
     >
-      <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative", width: "100%" }}>
+      <div
+        style={{
+          height: Math.max(rowVirtualizer.getTotalSize(), boxSize.height),
+          minHeight: "100%",
+          position: "relative",
+          width: "100%",
+        }}
+      >
         {rowVirtualizer.getVirtualItems().map((vr) => {
           const rowStart = vr.index * columnCount;
           const rowItems = items.slice(rowStart, rowStart + columnCount);

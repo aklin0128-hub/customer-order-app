@@ -10,6 +10,8 @@ export const CATALOG_MIN_COLUMNS = 2;
 
 /** Initial virtual-row height estimate; rows are measured from tallest card content. */
 export const CATALOG_ROW_HEIGHT_PX = 300;
+/** Catalog list box is at least one full card row, then grows to fill the viewport. */
+export const CATALOG_SCROLL_MIN_HEIGHT_PX = 400;
 
 export function catalogRowEstimatePx(columnCount: number): number {
   // Prefer a slightly tall first-paint estimate so search result rows (often

@@ -11,6 +11,7 @@ import {
   catalogRowGapPx,
   catalogVirtualRowKey,
   CATALOG_ROW_GAP_PX,
+  CATALOG_SCROLL_MIN_HEIGHT_PX,
 } from "./catalogGridLayout";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -50,19 +51,21 @@ test("two-column row estimate leaves room for a full catalog card", () => {
   assert.ok(catalogRowEstimatePx(2) >= 400);
 });
 
-test("catalog virtual scroll box defaults to the max viewport slot", () => {
+test("catalog virtual scroll box fills remaining viewport for a one-row search", () => {
+  assert.equal(CATALOG_SCROLL_MIN_HEIGHT_PX, 400);
   assert.match(
     orderCss,
-    /\.order-catalog-virtual-scroll\s*\{[^}]*min-height:\s*calc\(100dvh - 220px\)/
+    /\.order-shop-card--listing:has\(\.order-catalog-virtual-scroll\)\s*\{[^}]*flex:\s*1 1 auto/
   );
   assert.match(
     orderCss,
-    /\.order-catalog-virtual-scroll\s*\{[^}]*height:\s*calc\(100dvh - 220px\)/
+    /\.order-catalog-virtual-scroll\s*\{[^}]*flex:\s*1 1 auto/
   );
   assert.match(
     orderCss,
-    /\.order-page--mobile-shop \.order-catalog-virtual-scroll\s*\{[^}]*min-height:\s*calc\(100dvh - 156px\)/
+    /\.order-catalog-virtual-scroll\s*\{[^}]*min-height:\s*400px/
   );
+  assert.match(virtualGridSrc, /minHeight:\s*"100%"/);
   assert.match(orderStylesSrc, /export const catalogVirtualScrollStyle/);
   assert.doesNotMatch(orderStylesSrc, /catalogVirtualScrollStyle[\s\S]*maxHeight:/);
 });
