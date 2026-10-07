@@ -20,6 +20,8 @@ export async function redisSaddChunks(indexKey: string, members: string[]) {
   const unique = [...new Set(members.map((m) => String(m || "").trim()).filter(Boolean))];
   for (let i = 0; i < unique.length; i += REDIS_SADD_CHUNK) {
     const chunk = unique.slice(i, i + REDIS_SADD_CHUNK);
-    if (chunk.length) await redis.sadd(indexKey, ...chunk);
+    const first = chunk[0];
+    if (!first) continue;
+    await redis.sadd(indexKey, first, ...chunk.slice(1));
   }
 }
