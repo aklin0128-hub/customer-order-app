@@ -12,18 +12,20 @@ export const CATALOG_MIN_COLUMNS = 2;
 export const CATALOG_ROW_HEIGHT_PX = 300;
 
 export function catalogRowEstimatePx(columnCount: number): number {
+  // Prefer a slightly tall first-paint estimate so search result rows (often
+  // 1–2 cards) do not overlap the + button before measureElement runs.
   const content =
     columnCount <= 2
-      ? 320
+      ? 380
       : columnCount <= 3
-        ? 290
+        ? 350
         : columnCount <= 4
-          ? 280
+          ? 330
           : columnCount <= 6
-            ? 270
+            ? 310
             : columnCount <= 8
-              ? 260
-              : 250;
+              ? 290
+              : 270;
   return content + CATALOG_ROW_GAP_PX;
 }
 

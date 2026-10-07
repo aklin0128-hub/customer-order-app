@@ -2035,16 +2035,18 @@
   white-space: nowrap;
 }
 
-.order-catalog-virtual-row {
-  overflow: visible;
-  align-items: start;
-  isolation: isolate;
-  box-sizing: border-box;
-  grid-auto-rows: min-content;
+.order-catalog-virtual-scroll {
+  height: calc(100dvh - 220px);
+  min-height: calc(100dvh - 220px);
+  max-height: calc(100dvh - 220px);
 }
 
-.order-catalog-virtual-row[data-index] {
-  z-index: auto;
+.order-catalog-virtual-row {
+  overflow: visible;
+  align-items: stretch;
+  isolation: isolate;
+  box-sizing: border-box;
+  grid-auto-rows: minmax(min-content, auto);
 }
 
 .catalog-qty-card-top-badges {
@@ -3168,7 +3170,7 @@
 .order-page.is-fullscreen .order-catalog-virtual-scroll,
 .order-page:fullscreen .order-catalog-virtual-scroll {
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 0 !important;
   height: auto !important;
   max-height: none !important;
   overflow: auto;
@@ -3443,6 +3445,8 @@
   }
 
   .order-catalog-virtual-scroll {
+    height: calc(100dvh - 200px);
+    min-height: calc(100dvh - 200px);
     max-height: calc(100dvh - 200px);
   }
 
@@ -3962,6 +3966,8 @@
 }
 
 .order-page--mobile-shop .order-catalog-virtual-scroll {
+  height: calc(100dvh - 156px);
+  min-height: calc(100dvh - 156px);
   max-height: calc(100dvh - 156px);
 }
 
