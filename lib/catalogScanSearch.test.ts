@@ -72,6 +72,12 @@ test("scoreCatalogSearchQuery matches brand and partial name like samyang carbo"
   assert.ok(scoreCatalogSearchQuery(item, "samyang") >= 480);
 });
 
+test("scoreCatalogSearchQuery matches melon in product names", () => {
+  assert.ok(scoreCatalogSearchQuery({ sku: "11026K", name: "MELON FLAVORED MILK" }, "melon") >= 450);
+  assert.ok(scoreCatalogSearchQuery({ sku: "05501", name: "MELON KICK (S)" }, "MELON") >= 450);
+  assert.ok(scoreCatalogSearchQuery({ sku: "11024K", name: "TARO FLAVORED MILK" }, "melon") < 0);
+});
+
 test("catalogSearchQueryFromScan returns SKU when UPC matches catalog", () => {
   assert.equal(catalogSearchQueryFromScan("081652000020"), "00002D");
   assert.equal(catalogSearchQueryFromScan("81652000020"), "00002D");

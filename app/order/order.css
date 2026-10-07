@@ -4,6 +4,10 @@
   background: #f1f5f9;
   padding: 12px 10px calc(var(--order-footer-h) + env(safe-area-inset-bottom, 0px));
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  box-sizing: border-box;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
 .order-page--mobile-shop {
@@ -21,6 +25,8 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .order-compact-card {
@@ -86,6 +92,7 @@
 
 .order-top-card {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
 }
 
 .order-sticky-bar {
@@ -93,6 +100,7 @@
   top: 0;
   z-index: 45;
   margin: 0 0 4px;
+  flex-shrink: 0;
 }
 
 .order-sticky-bar-inner {
@@ -1015,6 +1023,14 @@
 
 .order-shop-card:has(.order-catalog-virtual-scroll) {
   padding-top: 4px !important;
+}
+
+.order-shop-card--listing:has(.order-catalog-virtual-scroll) {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .order-clearance-bulk-row {
@@ -2035,16 +2051,23 @@
   white-space: nowrap;
 }
 
-.order-catalog-virtual-row {
-  overflow: visible;
-  align-items: start;
-  isolation: isolate;
-  box-sizing: border-box;
-  grid-auto-rows: min-content;
+.order-catalog-virtual-scroll {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 400px;
+  height: auto;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-.order-catalog-virtual-row[data-index] {
-  z-index: 1;
+.order-catalog-virtual-row {
+  overflow: visible;
+  align-items: stretch;
+  isolation: isolate;
+  box-sizing: border-box;
+  grid-auto-rows: minmax(min-content, auto);
 }
 
 .catalog-qty-card-top-badges {
@@ -3165,10 +3188,16 @@
   overflow: hidden;
 }
 
+.order-page.is-fullscreen .order-shop-card--listing,
+.order-page:fullscreen .order-shop-card--listing {
+  flex: 1 1 auto;
+  max-height: none;
+}
+
 .order-page.is-fullscreen .order-catalog-virtual-scroll,
 .order-page:fullscreen .order-catalog-virtual-scroll {
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 0 !important;
   height: auto !important;
   max-height: none !important;
   overflow: auto;
@@ -3443,7 +3472,7 @@
   }
 
   .order-catalog-virtual-scroll {
-    max-height: calc(100dvh - 200px);
+    min-height: 360px;
   }
 
   .catalog-qty-card-stepper {
@@ -3962,7 +3991,7 @@
 }
 
 .order-page--mobile-shop .order-catalog-virtual-scroll {
-  max-height: calc(100dvh - 156px);
+  min-height: 360px;
 }
 
 .order-sticky-catalog-chips--in-filters {

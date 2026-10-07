@@ -1466,6 +1466,10 @@ export default function OrderPage() {
         const aNormal = isOrderableItem(a);
         const bNormal = isOrderableItem(b);
         if (aNormal !== bNormal) return aNormal ? -1 : 1;
+        if (q) {
+          const scoreDiff = scoreCatalogSearchQuery(b, q) - scoreCatalogSearchQuery(a, q);
+          if (scoreDiff) return scoreDiff;
+        }
         return compareCatalogForDisplay(a, b);
       });
   }, [

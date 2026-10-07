@@ -10,20 +10,24 @@ export const CATALOG_MIN_COLUMNS = 2;
 
 /** Initial virtual-row height estimate; rows are measured from tallest card content. */
 export const CATALOG_ROW_HEIGHT_PX = 300;
+/** Catalog list box is at least one full card row, then grows to fill the viewport. */
+export const CATALOG_SCROLL_MIN_HEIGHT_PX = 400;
 
 export function catalogRowEstimatePx(columnCount: number): number {
+  // Prefer a slightly tall first-paint estimate so search result rows (often
+  // 1–2 cards) do not overlap the + button before measureElement runs.
   const content =
     columnCount <= 2
-      ? 320
+      ? 380
       : columnCount <= 3
-        ? 290
+        ? 350
         : columnCount <= 4
-          ? 280
+          ? 330
           : columnCount <= 6
-            ? 270
+            ? 310
             : columnCount <= 8
-              ? 260
-              : 250;
+              ? 290
+              : 270;
   return content + CATALOG_ROW_GAP_PX;
 }
 
@@ -45,6 +49,21 @@ export function catalogRowStridePx() {
 }
 
 /** Column count from container width — scales up on wide screens, down on narrow. */
+/** Stable virtual-row identity so a search/filter does not reuse stale measured rows. */
+export function catalogVirtualRowKey(
+  items: Array<{ sku?: string }>,
+  rowIndex: number,
+  columnCount: number
+) {
+  const cols = Math.max(1, columnCount);
+  const start = rowIndex * cols;
+  const skus = items
+    .slice(start, start + cols)
+    .map((item) => String(item.sku || "").trim().toUpperCase())
+    .filter(Boolean);
+  return `${rowIndex}:${skus.join("|") || "empty"}`;
+}
+
 export function catalogColumnCountForWidth(rawWidth: number): number {
   const width =
     rawWidth > 0

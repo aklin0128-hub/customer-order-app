@@ -8,6 +8,7 @@ import {
   catalogColGapPx,
   catalogRowEstimatePx,
   catalogRowGapPx,
+  catalogVirtualRowKey,
 } from "../catalogGridLayout";
 import { catalogVirtualScrollStyle } from "../orderStyles";
 import type { CatalogItem, Lang } from "../types";
@@ -39,7 +40,11 @@ function readScrollContainerWidth(el: HTMLElement | null) {
   return w > 0 ? w : 0;
 }
 
-export function CatalogVirtualGrid({
+export function CatalogVirtualGrid(props: Parameters<typeof CatalogVirtualGridBody>[0]) {
+  return <CatalogVirtualGridBody key={props.gridKey || "catalog"} {...props} />;
+}
+
+function CatalogVirtualGridBody({
   gridKey,
   items,
   catalogQtyMap,
@@ -111,17 +116,24 @@ export function CatalogVirtualGrid({
   adminCategoryAutoLabel?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(() =>
-    typeof window !== "undefined" ? Math.max(0, window.innerWidth - 32) : 0
-  );
+  const [boxSize, setBoxSize] = useState(() => ({
+    width: typeof window !== "undefined" ? Math.max(0, window.innerWidth - 32) : 0,
+    height: 0,
+  }));
+  const width = boxSize.width;
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
     const measure = () => {
-      const next = readScrollContainerWidth(el);
-      if (next > 0) setWidth(next);
+      const nextWidth = readScrollContainerWidth(el);
+      const nextHeight = el.clientHeight || el.offsetHeight || 0;
+      setBoxSize((prev) => {
+        const width = nextWidth > 0 ? nextWidth : prev.width;
+        if (prev.width === width && prev.height === nextHeight) return prev;
+        return { width, height: nextHeight };
+      });
     };
 
     measure();
@@ -146,13 +158,19 @@ export function CatalogVirtualGrid({
   const rowEstimate = useMemo(() => catalogRowEstimatePx(columnCount), [columnCount]);
 
   const rowCount = Math.max(1, Math.ceil(items.length / columnCount));
+  const itemsSignature = useMemo(
+    () => items.map((item) => String(item.sku || "").toUpperCase()).join("|"),
+    [items]
+  );
 
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowEstimate,
+    getItemKey: (index) => catalogVirtualRowKey(items, index, columnCount),
     // Fixed gap between measured rows — stays even if a row remeasures short.
     gap: rowGap,
+    paddingEnd: rowGap,
     overscan: 4,
     measureElement,
   });
@@ -165,18 +183,24 @@ export function CatalogVirtualGrid({
     rowVirtualizer.measure();
     const frame = window.requestAnimationFrame(() => rowVirtualizer.measure());
     return () => window.cancelAnimationFrame(frame);
-  }, [items.length, columnCount, gridKey, width, rowEstimate, rowVirtualizer]);
+  }, [items.length, itemsSignature, columnCount, gridKey, boxSize.width, boxSize.height, rowEstimate, rowVirtualizer]);
 
   if (items.length === 0) return null;
 
   return (
     <div
-      key={gridKey}
       ref={scrollRef}
       className="order-catalog-virtual-scroll"
       style={catalogVirtualScrollStyle}
     >
-      <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative", width: "100%" }}>
+      <div
+        style={{
+          height: Math.max(rowVirtualizer.getTotalSize(), boxSize.height),
+          minHeight: "100%",
+          position: "relative",
+          width: "100%",
+        }}
+      >
         {rowVirtualizer.getVirtualItems().map((vr) => {
           const rowStart = vr.index * columnCount;
           const rowItems = items.slice(rowStart, rowStart + columnCount);
@@ -191,6 +215,7 @@ export function CatalogVirtualGrid({
                 top: 0,
                 left: 0,
                 width: "100%",
+                minHeight: vr.size,
                 transform: `translateY(${vr.start}px)`,
                 display: "grid",
                 gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
@@ -198,6 +223,7 @@ export function CatalogVirtualGrid({
                 columnGap: colGap,
                 rowGap: 0,
                 boxSizing: "border-box",
+                zIndex: rowCount - vr.index,
               }}
             >
               {rowItems.map((item) => {
