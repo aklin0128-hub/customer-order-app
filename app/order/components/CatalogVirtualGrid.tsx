@@ -9,6 +9,7 @@ import {
   catalogRowEstimatePx,
   catalogRowGapPx,
   catalogVirtualRowKey,
+  measureCatalogVirtualRow,
 } from "../catalogGridLayout";
 import { catalogVirtualScrollStyle } from "../orderStyles";
 import type { CatalogItem, Lang } from "../types";
@@ -172,7 +173,8 @@ function CatalogVirtualGridBody({
     gap: rowGap,
     paddingEnd: rowGap,
     overscan: 4,
-    measureElement,
+    measureElement: (element, entry, instance) =>
+      measureCatalogVirtualRow(element) || measureElement(element, entry, instance),
   });
 
   useEffect(() => {

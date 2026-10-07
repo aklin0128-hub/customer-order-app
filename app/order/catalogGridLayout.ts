@@ -14,21 +14,40 @@ export const CATALOG_ROW_HEIGHT_PX = 300;
 export const CATALOG_SCROLL_MIN_HEIGHT_PX = 400;
 
 export function catalogRowEstimatePx(columnCount: number): number {
-  // Prefer a slightly tall first-paint estimate so search result rows (often
-  // 1–2 cards) do not overlap the + button before measureElement runs.
+  // Wide desktop rows used to estimate ~270px while cards (history / inventory /
+  // stepper) are ~380px. A short estimate plus height:100% cards overflow into
+  // the next row on first catalog paint.
   const content =
     columnCount <= 2
-      ? 380
+      ? 400
       : columnCount <= 3
-        ? 350
+        ? 390
         : columnCount <= 4
-          ? 330
-          : columnCount <= 6
-            ? 310
-            : columnCount <= 8
-              ? 290
-              : 270;
+          ? 380
+          : 370;
   return content + CATALOG_ROW_GAP_PX;
+}
+
+/** Row height including overflowing card content (cards are overflow:visible). */
+export function measureCatalogVirtualRow(element: {
+  scrollHeight: number;
+  getBoundingClientRect: () => { height: number };
+  children?: ArrayLike<{ scrollHeight?: number; getBoundingClientRect?: () => { height: number } }>;
+}) {
+  const box = element.getBoundingClientRect().height || 0;
+  const scroll = element.scrollHeight || 0;
+  let childMax = 0;
+  const children = element.children;
+  if (children) {
+    for (let i = 0; i < children.length; i += 1) {
+      const child = children[i];
+      const childBox = child.getBoundingClientRect?.().height || 0;
+      const childScroll = child.scrollHeight || 0;
+      if (childBox > childMax) childMax = childBox;
+      if (childScroll > childMax) childMax = childScroll;
+    }
+  }
+  return Math.max(box, scroll, childMax);
 }
 
 export function catalogColGapPx() {

@@ -1765,6 +1765,8 @@
 .order-catalog-virtual-row .catalog-qty-card {
   content-visibility: visible;
   contain-intrinsic-size: none;
+  height: auto;
+  min-height: 100%;
 }
 
 .catalog-qty-card-sku-row {
@@ -2067,7 +2069,7 @@
   align-items: stretch;
   isolation: isolate;
   box-sizing: border-box;
-  grid-auto-rows: minmax(min-content, auto);
+  grid-auto-rows: min-content;
 }
 
 .catalog-qty-card-top-badges {
