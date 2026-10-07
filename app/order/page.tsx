@@ -138,6 +138,8 @@ import type {
 
 /** Temporary: hide Quick order tab until we re-enable it. */
 const QUICK_ORDER_ENABLED = false;
+/** Temporary: hide Seasonal tab until we re-enable it. */
+const SEASONAL_TAB_ENABLED = false;
 
 const ORDER_LANG_LABELS: Record<Lang, string> = {
   en: "EN",
@@ -602,7 +604,7 @@ export default function OrderPage() {
   }, [ready]);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !SEASONAL_TAB_ENABLED) return;
 
     const loadSeasonal = async () => {
       setSeasonalLoading(true);
@@ -652,8 +654,10 @@ export default function OrderPage() {
     const savedDeals = localStorage.getItem("order_deals_sub");
     const savedPicks = localStorage.getItem("order_picks_sub");
 
-    // Migrate legacy modes into Catalog / Promotions / Near Date / New items / Seasonal.
-    if (
+    // Migrate legacy modes into Catalog / Promotions / Near Date / New items.
+    if (savedMode === "seasonal" && !SEASONAL_TAB_ENABLED) {
+      setMode("catalog");
+    } else if (
       savedMode === "catalog" ||
       savedMode === "promotion" ||
       savedMode === "clearance" ||
@@ -664,7 +668,7 @@ export default function OrderPage() {
     } else if (savedMode === "deals") {
       setMode(savedDeals === "clearance" ? "clearance" : "promotion");
     } else if (savedMode === "picks") {
-      setMode(savedPicks === "seasonal" ? "seasonal" : "newItems");
+      setMode(savedPicks === "seasonal" && SEASONAL_TAB_ENABLED ? "seasonal" : "newItems");
     } else if (savedMode === "vegesFruits") {
       setMode("newItems");
     } else {
@@ -678,7 +682,9 @@ export default function OrderPage() {
   };
 
   const changeMode = (next: OrderMode) => {
-    const resolved = !QUICK_ORDER_ENABLED && next === "search" ? "catalog" : next;
+    let resolved = next;
+    if (!QUICK_ORDER_ENABLED && resolved === "search") resolved = "catalog";
+    if (!SEASONAL_TAB_ENABLED && resolved === "seasonal") resolved = "catalog";
     setMode(resolved);
     localStorage.setItem("order_mode", resolved);
     if (resolved !== "catalog") setCatalogFiltersOpen(false);
@@ -2491,6 +2497,7 @@ export default function OrderPage() {
         {t.newItemsMode}
         {newItemCount > 0 ? ` (${newItemCount})` : ""}
       </button>
+      {SEASONAL_TAB_ENABLED ? (
       <button
         type="button"
         role="tab"
@@ -2502,6 +2509,7 @@ export default function OrderPage() {
         {t.seasonalMode}
         {seasonalCount > 0 ? ` (${seasonalCount})` : ""}
       </button>
+      ) : null}
       {QUICK_ORDER_ENABLED ? (
         <button
           type="button"
@@ -2558,6 +2566,7 @@ export default function OrderPage() {
         {t.newItemsMode}
         {newItemCount > 0 ? ` (${newItemCount})` : ""}
       </button>
+      {SEASONAL_TAB_ENABLED ? (
       <button
         type="button"
         role="tab"
@@ -2568,6 +2577,7 @@ export default function OrderPage() {
         {t.seasonalMode}
         {seasonalCount > 0 ? ` (${seasonalCount})` : ""}
       </button>
+      ) : null}
       {QUICK_ORDER_ENABLED ? (
         <button
           type="button"
@@ -3284,9 +3294,7 @@ export default function OrderPage() {
                       policyNote={soldOut ? undefined : t.clearanceNoReturn}
                       inCartLabel={t.inCart} promoBadgeLabel={t.clearanceBadge} editLabel={t.editProduct}
                       {...adminCardProps} highlight disabled={soldOut || notOrderable}
-                      unavailableNote={
-                        notOrderable ? formatOrderNotAvailableMessage(sku, catalogItem.status, t) : undefined
-                      }
+                      hideInventoryStatus
                       onAdjust={adjustClearanceQty} onUpdateQty={updateClearanceQty}
                       {...favoriteCardProps(sku)} />
                   );

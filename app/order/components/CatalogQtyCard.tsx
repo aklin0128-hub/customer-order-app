@@ -102,6 +102,7 @@ export function CatalogQtyCard({
   /** New-items tab: blue Costco-style New badge below image. */
   showNewProductBadge,
   listPriceLabel,
+  hideInventoryStatus,
 }: {
   item: CatalogItem;
   qty: string;
@@ -155,6 +156,8 @@ export function CatalogQtyCard({
   showNewItemListPrice?: boolean;
   showNewProductBadge?: boolean;
   listPriceLabel?: string;
+  /** Near Date Sale: hide catalog inventory cues, status badges, and OOS stamps. */
+  hideInventoryStatus?: boolean;
 }) {
   const [draftCategory, setDraftCategory] = useState<string | null>(null);
   const [categorySaving, setCategorySaving] = useState(false);
@@ -187,10 +190,10 @@ export function CatalogQtyCard({
       : "";
   const alignedPriceLayout = Boolean(showNewItemListPrice);
   const comingSoon = isComingSoonNewItem(item);
-  const outOfStock = isProductOutOfStockStamp(item);
+  const outOfStock = hideInventoryStatus ? false : isProductOutOfStockStamp(item);
   const stamped = comingSoon || outOfStock;
   const discontinued = isDiscontinuedStatus(item.status);
-  const inventoryCue = inventoryCueKindForItem(item);
+  const inventoryCue = hideInventoryStatus ? null : inventoryCueKindForItem(item);
   const orderingBlocked = isProductOrderingBlocked(item);
   const showNewItemExtras = Boolean(showNewProductBadge || showNewItemListPrice);
   const storageLabel = showNewItemExtras ? resolveNewItemStorageLabel(item) : undefined;
@@ -425,7 +428,7 @@ export function CatalogQtyCard({
           {addedDateLabel}: {addedDateText}
         </div>
       ) : null}
-      {!isOrderableItem(item) && getDisplayStatus(item.status) ? (
+      {!hideInventoryStatus && !isOrderableItem(item) && getDisplayStatus(item.status) ? (
         <span
           style={{
             display: "inline-block",
@@ -440,7 +443,7 @@ export function CatalogQtyCard({
           {getDisplayStatus(item.status)}
         </span>
       ) : null}
-      {unavailableNote && !discontinued ? (
+      {unavailableNote && !discontinued && !hideInventoryStatus ? (
         <div
           style={{
             marginTop: 4,
