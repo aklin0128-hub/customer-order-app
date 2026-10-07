@@ -10,6 +10,7 @@ import {
   catalogRowEstimatePx,
   catalogRowGapPx,
   catalogVirtualRowKey,
+  measureCatalogVirtualRow,
   CATALOG_ROW_GAP_PX,
   CATALOG_SCROLL_MIN_HEIGHT_PX,
 } from "./catalogGridLayout";
@@ -47,8 +48,22 @@ test("catalogVirtualRowKey changes when a search replaces row SKUs", () => {
   assert.notEqual(catalogVirtualRowKey(all, 0, 2), catalogVirtualRowKey(melon, 0, 2));
 });
 
-test("two-column row estimate leaves room for a full catalog card", () => {
+test("row estimates stay tall enough on wide desktop catalogs", () => {
   assert.ok(catalogRowEstimatePx(2) >= 400);
+  assert.ok(catalogRowEstimatePx(12) >= 390);
+  assert.ok(catalogRowEstimatePx(14) >= 390);
+});
+
+test("measureCatalogVirtualRow uses overflowing card height", () => {
+  const row = {
+    scrollHeight: 290,
+    getBoundingClientRect: () => ({ height: 290 }),
+    children: [
+      { scrollHeight: 290, getBoundingClientRect: () => ({ height: 290 }) },
+      { scrollHeight: 388, getBoundingClientRect: () => ({ height: 290 }) },
+    ],
+  };
+  assert.equal(measureCatalogVirtualRow(row), 388);
 });
 
 test("catalog virtual scroll box fills remaining viewport for a one-row search", () => {
@@ -73,5 +88,10 @@ test("catalog virtual scroll box fills remaining viewport for a one-row search",
 test("catalog virtual grid remounts and rekeys when search results change", () => {
   assert.match(virtualGridSrc, /key=\{props\.gridKey \|\| "catalog"\}/);
   assert.match(virtualGridSrc, /getItemKey:\s*\(index\)\s*=>\s*catalogVirtualRowKey/);
+  assert.match(virtualGridSrc, /measureCatalogVirtualRow/);
   assert.match(orderPageSrc, /gridKey=\{`catalog:/);
+  assert.match(
+    orderCss,
+    /\.order-catalog-virtual-row \.catalog-qty-card\s*\{[^}]*height:\s*auto/
+  );
 });
