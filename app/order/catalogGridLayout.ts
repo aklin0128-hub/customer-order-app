@@ -12,6 +12,8 @@ export const CATALOG_MIN_COLUMNS = 2;
 export const CATALOG_ROW_HEIGHT_PX = 300;
 /** Catalog list box is at least one full card row, then grows to fill the viewport. */
 export const CATALOG_SCROLL_MIN_HEIGHT_PX = 400;
+/** Extra virtual rows around the viewport. Keep low — 14-column desktops render many cards per row. */
+export const CATALOG_VIRTUAL_OVERSCAN = 2;
 
 export function catalogRowEstimatePx(columnCount: number): number {
   // Wide desktop rows used to estimate ~270px while cards (history / inventory /
@@ -28,26 +30,26 @@ export function catalogRowEstimatePx(columnCount: number): number {
   return content + CATALOG_ROW_GAP_PX;
 }
 
-/** Row height including overflowing card content (cards are overflow:visible). */
+/** Row height including overflowing card content (cards are overflow:visible).
+ *  Prefer offset/scrollHeight so open-catalog measure does not flush layout
+ *  with getBoundingClientRect on every child. */
 export function measureCatalogVirtualRow(element: {
   scrollHeight: number;
-  getBoundingClientRect: () => { height: number };
-  children?: ArrayLike<{ scrollHeight?: number; getBoundingClientRect?: () => { height: number } }>;
+  offsetHeight?: number;
+  getBoundingClientRect?: () => { height: number };
+  children?: ArrayLike<{ scrollHeight?: number; offsetHeight?: number }>;
 }) {
-  const box = element.getBoundingClientRect().height || 0;
-  const scroll = element.scrollHeight || 0;
-  let childMax = 0;
+  let maxH = Math.max(element.offsetHeight || 0, element.scrollHeight || 0);
   const children = element.children;
   if (children) {
     for (let i = 0; i < children.length; i += 1) {
       const child = children[i];
-      const childBox = child.getBoundingClientRect?.().height || 0;
-      const childScroll = child.scrollHeight || 0;
-      if (childBox > childMax) childMax = childBox;
-      if (childScroll > childMax) childMax = childScroll;
+      const h = Math.max(child.offsetHeight || 0, child.scrollHeight || 0);
+      if (h > maxH) maxH = h;
     }
   }
-  return Math.max(box, scroll, childMax);
+  if (maxH) return maxH;
+  return element.getBoundingClientRect?.().height || 0;
 }
 
 export function catalogColGapPx() {

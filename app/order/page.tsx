@@ -2410,7 +2410,7 @@ export default function OrderPage() {
     </div>
   );
 
-  const favoriteCardProps = (sku: string) => {
+  const favoriteCardProps = useCallback((sku: string) => {
     const cleanSku = sku.toUpperCase();
     const isFavorite = favoriteSkuSet.has(cleanSku);
     const latest = getLatestSkuOrderHistoryEntry(skuOrderHistoryIndex.get(cleanSku));
@@ -2424,7 +2424,18 @@ export default function OrderPage() {
       invoicePrice: invoicePriceLabelForSku(cleanSku),
       reserveInvoicePrice: invoicePricingEnabled,
     };
-  };
+  }, [
+    favoriteSkuSet,
+    invoicePriceLabelForSku,
+    invoicePricingEnabled,
+    openSkuHistory,
+    showUpc,
+    skuOrderHistoryIndex,
+    t.addFavorite,
+    t.historyLink,
+    t.removeFavorite,
+    toggleFavorite,
+  ]);
 
   const adminCardProps = {
     showAdminEdit: showAdminEditLinks,
