@@ -4,6 +4,7 @@ import { measureElement, useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 
 import {
+  CATALOG_VIRTUAL_OVERSCAN,
   catalogColumnCountForWidth,
   catalogColGapPx,
   catalogRowEstimatePx,
@@ -39,6 +40,14 @@ function readScrollContainerWidth(el: HTMLElement | null) {
   if (!el) return 0;
   const w = el.clientWidth || el.offsetWidth;
   return w > 0 ? w : 0;
+}
+
+function measureVirtualRowElement(
+  element: Element,
+  entry: ResizeObserverEntry | undefined,
+  instance: Parameters<typeof measureElement>[2]
+) {
+  return measureCatalogVirtualRow(element as HTMLElement) || measureElement(element, entry, instance);
 }
 
 export function CatalogVirtualGrid(props: Parameters<typeof CatalogVirtualGridBody>[0]) {
@@ -117,24 +126,17 @@ function CatalogVirtualGridBody({
   adminCategoryAutoLabel?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [boxSize, setBoxSize] = useState(() => ({
-    width: typeof window !== "undefined" ? Math.max(0, window.innerWidth - 32) : 0,
-    height: 0,
-  }));
-  const width = boxSize.width;
+  const [width, setWidth] = useState(() =>
+    typeof window !== "undefined" ? Math.max(0, window.innerWidth - 32) : 0
+  );
 
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
     const measure = () => {
-      const nextWidth = readScrollContainerWidth(el);
-      const nextHeight = el.clientHeight || el.offsetHeight || 0;
-      setBoxSize((prev) => {
-        const width = nextWidth > 0 ? nextWidth : prev.width;
-        if (prev.width === width && prev.height === nextHeight) return prev;
-        return { width, height: nextHeight };
-      });
+      const next = readScrollContainerWidth(el);
+      if (next > 0) setWidth((prev) => (prev === next ? prev : next));
     };
 
     measure();
@@ -159,10 +161,6 @@ function CatalogVirtualGridBody({
   const rowEstimate = useMemo(() => catalogRowEstimatePx(columnCount), [columnCount]);
 
   const rowCount = Math.max(1, Math.ceil(items.length / columnCount));
-  const itemsSignature = useMemo(
-    () => items.map((item) => String(item.sku || "").toUpperCase()).join("|"),
-    [items]
-  );
 
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
@@ -172,9 +170,8 @@ function CatalogVirtualGridBody({
     // Fixed gap between measured rows — stays even if a row remeasures short.
     gap: rowGap,
     paddingEnd: rowGap,
-    overscan: 4,
-    measureElement: (element, entry, instance) =>
-      measureCatalogVirtualRow(element) || measureElement(element, entry, instance),
+    overscan: CATALOG_VIRTUAL_OVERSCAN,
+    measureElement: measureVirtualRowElement,
   });
 
   useEffect(() => {
@@ -183,9 +180,7 @@ function CatalogVirtualGridBody({
 
   useLayoutEffect(() => {
     rowVirtualizer.measure();
-    const frame = window.requestAnimationFrame(() => rowVirtualizer.measure());
-    return () => window.cancelAnimationFrame(frame);
-  }, [items.length, itemsSignature, columnCount, gridKey, boxSize.width, boxSize.height, rowEstimate, rowVirtualizer]);
+  }, [items.length, columnCount, gridKey, rowEstimate, rowVirtualizer]);
 
   if (items.length === 0) return null;
 
@@ -197,7 +192,7 @@ function CatalogVirtualGridBody({
     >
       <div
         style={{
-          height: Math.max(rowVirtualizer.getTotalSize(), boxSize.height),
+          height: rowVirtualizer.getTotalSize(),
           minHeight: "100%",
           position: "relative",
           width: "100%",

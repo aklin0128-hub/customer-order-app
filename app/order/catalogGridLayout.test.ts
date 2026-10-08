@@ -13,6 +13,7 @@ import {
   measureCatalogVirtualRow,
   CATALOG_ROW_GAP_PX,
   CATALOG_SCROLL_MIN_HEIGHT_PX,
+  CATALOG_VIRTUAL_OVERSCAN,
 } from "./catalogGridLayout";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -57,13 +58,19 @@ test("row estimates stay tall enough on wide desktop catalogs", () => {
 test("measureCatalogVirtualRow uses overflowing card height", () => {
   const row = {
     scrollHeight: 290,
-    getBoundingClientRect: () => ({ height: 290 }),
+    offsetHeight: 290,
     children: [
-      { scrollHeight: 290, getBoundingClientRect: () => ({ height: 290 }) },
-      { scrollHeight: 388, getBoundingClientRect: () => ({ height: 290 }) },
+      { scrollHeight: 290, offsetHeight: 290 },
+      { scrollHeight: 388, offsetHeight: 290 },
     ],
   };
   assert.equal(measureCatalogVirtualRow(row), 388);
+});
+
+test("catalog virtual overscan stays low so a wide grid does not mount too many cards", () => {
+  assert.equal(CATALOG_VIRTUAL_OVERSCAN, 2);
+  assert.match(virtualGridSrc, /overscan:\s*CATALOG_VIRTUAL_OVERSCAN/);
+  assert.doesNotMatch(virtualGridSrc, /items\.map\(\(item\) => String\(item\.sku/);
 });
 
 test("catalog virtual scroll box fills remaining viewport for a one-row search", () => {
@@ -90,6 +97,7 @@ test("catalog virtual grid remounts and rekeys when search results change", () =
   assert.match(virtualGridSrc, /getItemKey:\s*\(index\)\s*=>\s*catalogVirtualRowKey/);
   assert.match(virtualGridSrc, /measureCatalogVirtualRow/);
   assert.match(orderPageSrc, /gridKey=\{`catalog:/);
+  assert.match(orderPageSrc, /const favoriteCardProps = useCallback/);
   assert.match(
     orderCss,
     /\.order-catalog-virtual-row \.catalog-qty-card\s*\{[^}]*height:\s*auto/
