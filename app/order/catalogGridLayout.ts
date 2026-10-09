@@ -1,6 +1,6 @@
 /** Shared catalog grid sizing for virtual + CSS grids */
 export const CATALOG_COL_GAP_PX = 4;
-/** Fixed vertical space between catalog rows (included in measured row height). */
+/** Vertical space between catalog rows. Applied by the virtualizer `gap`, not the row estimate. */
 export const CATALOG_ROW_GAP_PX = 20;
 /** @deprecated use CATALOG_COL_GAP_PX — kept for older imports */
 export const CATALOG_GRID_GAP_PX = CATALOG_COL_GAP_PX;
@@ -16,39 +16,33 @@ export const CATALOG_SCROLL_MIN_HEIGHT_PX = 400;
 export const CATALOG_VIRTUAL_OVERSCAN = 2;
 
 export function catalogRowEstimatePx(columnCount: number): number {
-  // Wide desktop rows used to estimate ~270px while cards (history / inventory /
-  // stepper) are ~380px. A short estimate plus height:100% cards overflow into
-  // the next row on first catalog paint.
-  const content =
-    columnCount <= 2
-      ? 400
-      : columnCount <= 3
-        ? 390
-        : columnCount <= 4
-          ? 380
-          : 370;
-  return content + CATALOG_ROW_GAP_PX;
+  // Two-column phones have shorter cards (68px image). A 400px estimate plus
+  // virtualizer gap left a large blank band between mobile rows.
+  if (columnCount <= 2) return 312;
+  if (columnCount <= 3) return 340;
+  if (columnCount <= 4) return 360;
+  return 370;
 }
 
-/** Row height including overflowing card content (cards are overflow:visible).
- *  Prefer offset/scrollHeight so open-catalog measure does not flush layout
- *  with getBoundingClientRect on every child. */
+/** Row height from card content, not a minHeight-stretched row box. */
 export function measureCatalogVirtualRow(element: {
   scrollHeight: number;
   offsetHeight?: number;
   getBoundingClientRect?: () => { height: number };
   children?: ArrayLike<{ scrollHeight?: number; offsetHeight?: number }>;
 }) {
-  let maxH = Math.max(element.offsetHeight || 0, element.scrollHeight || 0);
+  let childMax = 0;
   const children = element.children;
   if (children) {
     for (let i = 0; i < children.length; i += 1) {
       const child = children[i];
       const h = Math.max(child.offsetHeight || 0, child.scrollHeight || 0);
-      if (h > maxH) maxH = h;
+      if (h > childMax) childMax = h;
     }
   }
-  if (maxH) return maxH;
+  if (childMax) return childMax;
+  const box = Math.max(element.offsetHeight || 0, element.scrollHeight || 0);
+  if (box) return box;
   return element.getBoundingClientRect?.().height || 0;
 }
 

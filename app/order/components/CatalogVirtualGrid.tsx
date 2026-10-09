@@ -212,7 +212,6 @@ function CatalogVirtualGridBody({
                 top: 0,
                 left: 0,
                 width: "100%",
-                minHeight: vr.size,
                 transform: `translateY(${vr.start}px)`,
                 display: "grid",
                 gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
