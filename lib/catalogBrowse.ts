@@ -1,4 +1,6 @@
-import { isOrderableCatalogStatus } from "@/lib/orderableCatalog";
+import { parseInventoryNumber } from "@/lib/inventoryCue";
+import { isCustomerVisibleCatalogStatus, isOrderableCatalogStatus } from "@/lib/orderableCatalog";
+import { scoreCatalogTextSearch } from "@/lib/catalogTextSearch";
 
 export type CatalogBrowseItem = {
   sku: string;
@@ -12,6 +14,9 @@ export type CatalogBrowseItem = {
   category?: string;
   palletSize?: string;
   imageUrl?: string;
+  inventory?: number;
+  outOfStock?: boolean;
+  seasonalEtaDate?: string;
 };
 
 export function compareSkuAsc(a: string, b: string) {
@@ -42,11 +47,16 @@ export function toCatalogBrowseItem(raw: Record<string, unknown>): CatalogBrowse
     category: raw.category ? String(raw.category) : undefined,
     palletSize: raw.palletSize ? String(raw.palletSize) : undefined,
     imageUrl,
+    inventory: parseInventoryNumber(raw.inventory),
+    outOfStock: raw.outOfStock === true ? true : undefined,
+    seasonalEtaDate: raw.seasonalEtaDate ? String(raw.seasonalEtaDate) : undefined,
   };
 }
 
 export function filterAvailableCatalogBrowseItems(items: CatalogBrowseItem[]): CatalogBrowseItem[] {
-  return items.filter((item) => isOrderableCatalogStatus(item.status));
+  return items.filter(
+    (item) => isOrderableCatalogStatus(item.status) && isCustomerVisibleCatalogStatus(item.status)
+  );
 }
 
 export function mapProductsToCatalogBrowse(
@@ -65,21 +75,14 @@ export function mapProductsToCatalogBrowse(
 }
 
 export function filterCatalogBrowseItems(items: CatalogBrowseItem[], query: string): CatalogBrowseItem[] {
-  const q = query.trim().toUpperCase();
+  const q = query.trim();
   if (!q) return items;
 
-  const digits = q.replace(/\D/g, "");
-
-  return items.filter((item) => {
-    if (item.sku.includes(q)) return true;
-    if (item.name?.toUpperCase().includes(q)) return true;
-    if (item.name_k?.toUpperCase().includes(q)) return true;
-    if (item.brand?.toUpperCase().includes(q)) return true;
-    if (item.category?.toUpperCase().includes(q)) return true;
-    if (digits && item.upc?.replace(/\D/g, "").includes(digits)) return true;
-    if (digits && item.barcode?.replace(/\D/g, "").includes(digits)) return true;
-    return false;
-  });
+  return items
+    .map((item) => ({ item, score: scoreCatalogTextSearch(item, q) }))
+    .filter((row) => row.score >= 0)
+    .sort((a, b) => b.score - a.score || a.item.sku.localeCompare(b.item.sku))
+    .map((row) => row.item);
 }
 
 export function displayCatalogStatus(status?: string) {

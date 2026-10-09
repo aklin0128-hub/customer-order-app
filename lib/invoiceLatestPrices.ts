@@ -1,6 +1,7 @@
 import { cleanSku, formatDate, loadInvoiceImports, parseDate } from "@/lib/analyticsCommon";
 import { resolveInvoiceCaseUnitPrice } from "@/lib/invoice/invoiceCaseUnitPrice";
 import type { InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
+import { redis } from "@/lib/redis";
 import {
   invoiceDateLabel,
   invoiceRecencyKey,
@@ -87,17 +88,52 @@ export function buildLatestInvoicePricesFromImports(
     );
 }
 
+export const INVOICE_LATEST_PRICES_KEY = "invoicePrices:latest";
+
+export function filterLatestPriceRows(
+  rows: InvoiceLatestPriceRow[],
+  options?: { since?: Date | null; accountNo?: string }
+): InvoiceLatestPriceRow[] {
+  const accountFilter = String(options?.accountNo || "").trim().toUpperCase();
+  const sinceMs = options?.since?.getTime() ?? null;
+  if (!accountFilter && sinceMs == null) return rows;
+
+  return rows.filter((row) => {
+    if (accountFilter && row.account !== accountFilter) return false;
+    if (sinceMs != null) {
+      const parsed = parseDate(row.invoiceDate);
+      if (!parsed || parsed.getTime() < sinceMs) return false;
+    }
+    return true;
+  });
+}
+
+export async function refreshInvoiceLatestPricesCache(imports: InvoiceImportRecord[]) {
+  const rows = buildLatestInvoicePricesFromImports(imports);
+  await redis.set(INVOICE_LATEST_PRICES_KEY, rows);
+}
+
+async function loadInvoiceLatestPriceRows(): Promise<InvoiceLatestPriceRow[]> {
+  const cached = await redis.get<InvoiceLatestPriceRow[]>(INVOICE_LATEST_PRICES_KEY);
+  if (Array.isArray(cached)) return cached;
+
+  const imports = await loadInvoiceImports();
+  const rows = buildLatestInvoicePricesFromImports(imports);
+  await redis.set(INVOICE_LATEST_PRICES_KEY, rows);
+  return rows;
+}
+
 export async function getInvoiceLatestPrices(options?: {
   since?: Date | null;
   accountNo?: string;
 }): Promise<InvoiceLatestPriceRow[]> {
-  const imports = await loadInvoiceImports();
-  return buildLatestInvoicePricesFromImports(imports, options);
+  const rows = await loadInvoiceLatestPriceRows();
+  return filterLatestPriceRows(rows, options);
 }
 
 export function invoiceLatestPricesToCsv(rows: InvoiceLatestPriceRow[]): string {
-  const header = ["account", "sku", "price"];
-  const body = rows.map((row) => [row.account, row.sku, row.price.toFixed(2)]);
+  const header = ["account", "sku", "price", "lastPriceDate"];
+  const body = rows.map((row) => [row.account, row.sku, row.price.toFixed(2), row.invoiceDate || ""]);
   return [header, ...body]
     .map((line) => line.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
     .join("\n");

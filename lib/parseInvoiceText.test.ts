@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseInvoiceText } from "./invoice/parseInvoiceText";
+import { extractInvoiceDate, parseInvoiceText } from "./invoice/parseInvoiceText";
 
 function linePrice(raw: string) {
   const parsed = parseInvoiceText(raw);
@@ -177,4 +177,60 @@ test("parseInvoiceText still reads short numeric item# on product rows when suff
   const line = lineParsed("8180 BRAND NAME 15 LB 10 Case Dry 13.00 1.30 130.00");
   assert.equal(line.sku, "8180");
   assert.equal(line.qty, 10);
+});
+
+test("extractInvoiceDate reads same-line invoice date and ignores due date", () => {
+  assert.equal(extractInvoiceDate("Invoice Date: 9/15/2026 Due Date: 10/15/2026"), "2026-09-15");
+  assert.equal(extractInvoiceDate("Invoice Date 09-15-26"), "2026-09-15");
+  assert.equal(extractInvoiceDate("Invoice Date 09.15.2026"), "2026-09-15");
+});
+
+test("extractInvoiceDate reads first date after Invoice Date / Due Date header row", () => {
+  const date = extractInvoiceDate(`
+Invoice No PSI-0176747
+Customer No FL410
+Invoice Date          Due Date
+09/15/2026            10/15/2026
+No. Brand Description Size Qty. UM Type Unit Each Total
+00012D RICE 10 Case Dry 13.00 1.30 130.00
+`);
+  assert.equal(date, "2026-09-15");
+});
+
+test("extractInvoiceDate does not use due date when invoice date is missing", () => {
+  assert.equal(extractInvoiceDate("Invoice Date Due Date: 10/15/2026"), null);
+});
+
+test("parseInvoiceText stores ISO invoice date from header row", () => {
+  const parsed = parseInvoiceText(`
+Invoice No PSI-0176747
+Customer No FL410
+Invoice Date Due Date
+9/4/2026 10/4/2026
+No. Brand Description Size Qty. UM Type Unit Each Total
+00012D RICE 10 Case Dry 13.00 1.30 130.00
+Subtotal 130.00
+`);
+  assert.equal(parsed.invoiceDate, "2026-09-04");
+  assert.equal(parsed.lines[0]?.unitPrice, 13);
+});
+
+test("parseInvoiceText reads unit/each/total when Type column is missing", () => {
+  const line = lineParsed("00012D RHEECHUN BROWN RICE 15 LB 10 Case 13.00 1.30 130.00");
+  assert.equal(line.qty, 10);
+  assert.equal(line.unitPrice, 13);
+  assert.equal(line.lineTotal, 130);
+});
+
+test("parseInvoiceText reads unit and total when Each column is missing", () => {
+  const line = lineParsed("00012D RHEECHUN BROWN RICE 15 LB 10 Case Dry 13.00 130.00");
+  assert.equal(line.qty, 10);
+  assert.equal(line.unitPrice, 13);
+  assert.equal(line.lineTotal, 130);
+});
+
+test("parseInvoiceText reads one-decimal unit prices", () => {
+  const line = lineParsed("10495K RHEEBROS NOODLE RAMEN 12 Case Dry 45.5 3.79 546.00");
+  assert.equal(line.unitPrice, 45.5);
+  assert.equal(line.lineTotal, 546);
 });

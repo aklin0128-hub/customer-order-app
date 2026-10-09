@@ -12,7 +12,7 @@ export async function GET() {
       success: true,
       ...data,
     });
-    res.headers.set("Cache-Control", "public, s-maxage=120, stale-while-revalidate=600");
+    res.headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
     return res;
   } catch (error: any) {
     return NextResponse.json(
