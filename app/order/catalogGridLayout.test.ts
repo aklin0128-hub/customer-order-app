@@ -90,6 +90,22 @@ test("catalog virtual overscan stays low so a wide grid does not mount too many 
   assert.doesNotMatch(virtualGridSrc, /items\.map\(\(item\) => String\(item\.sku/);
 });
 
+test("catalog category bar stays a compact single row", () => {
+  assert.match(orderPageSrc, /className="order-catalog-toolbar"/);
+  assert.match(
+    orderCss,
+    /\.order-catalog-cat-row\s*\{[^}]*flex-wrap:\s*nowrap/
+  );
+  assert.match(
+    orderCss,
+    /\.order-catalog-cat-chip\s*\{[^}]*min-height:\s*28px/
+  );
+  assert.match(
+    orderCss,
+    /@media \(min-width: 768px\)\s*\{[^}]*\.order-catalog-toolbar\s*\{[^}]*flex-direction:\s*row/
+  );
+});
+
 test("catalog list follows the page scroll like New items", () => {
   assert.match(virtualGridSrc, /useWindowVirtualizer/);
   assert.match(virtualGridSrc, /embedScroll/);

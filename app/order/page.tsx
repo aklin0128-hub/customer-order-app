@@ -2960,8 +2960,12 @@ export default function OrderPage() {
               <>
             {renderModeTabs()}
 
-            {showCatalogSearch ? renderCatalogSearchRow() : null}
-            {renderCatalogCategoryRow()}
+            {mode === "catalog" ? (
+              <div className="order-catalog-toolbar">
+                {showCatalogSearch ? renderCatalogSearchRow() : null}
+                {renderCatalogCategoryRow()}
+              </div>
+            ) : null}
             {renderCatalogFiltersPanel()}
 
             {stickyPanelOpen ? (
