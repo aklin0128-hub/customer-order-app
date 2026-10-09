@@ -9,10 +9,10 @@ import {
   catalogColGapPx,
   catalogRowEstimatePx,
   catalogRowGapPx,
+  catalogListDocumentTop,
   catalogVirtualRowKey,
   measureCatalogVirtualRow,
   CATALOG_ROW_GAP_PX,
-  CATALOG_SCROLL_MIN_HEIGHT_PX,
   CATALOG_VIRTUAL_OVERSCAN,
 } from "./catalogGridLayout";
 
@@ -90,30 +90,44 @@ test("catalog virtual overscan stays low so a wide grid does not mount too many 
   assert.doesNotMatch(virtualGridSrc, /items\.map\(\(item\) => String\(item\.sku/);
 });
 
-test("catalog virtual scroll box fills remaining viewport for a one-row search", () => {
-  assert.equal(CATALOG_SCROLL_MIN_HEIGHT_PX, 400);
+test("catalog list follows the page scroll like New items", () => {
+  assert.match(virtualGridSrc, /useWindowVirtualizer/);
+  assert.match(virtualGridSrc, /embedScroll/);
   assert.match(
     orderCss,
-    /\.order-shop-card--listing:has\(\.order-catalog-virtual-scroll\)\s*\{[^}]*flex:\s*1 1 auto/
+    /\.order-catalog-virtual-scroll\s*\{[^}]*overflow:\s*visible/
   );
   assert.match(
     orderCss,
-    /\.order-catalog-virtual-scroll\s*\{[^}]*flex:\s*1 1 auto/
+    /\.order-shop-card--listing:has\(\.order-catalog-virtual-scroll\)\s*\{[^}]*overflow:\s*visible/
   );
-  assert.match(
-    orderCss,
-    /\.order-catalog-virtual-scroll\s*\{[^}]*min-height:\s*400px/
-  );
-  assert.match(virtualGridSrc, /minHeight:\s*"100%"/);
-  assert.match(orderStylesSrc, /export const catalogVirtualScrollStyle/);
-  assert.doesNotMatch(orderStylesSrc, /catalogVirtualScrollStyle[\s\S]*maxHeight:/);
+  assert.match(orderStylesSrc, /overflow:\s*"visible"/);
+  assert.doesNotMatch(orderStylesSrc, /catalogVirtualScrollStyle[\s\S]*overflow:\s*"auto"/);
+});
+
+test("catalogListDocumentTop adds scrollY to the list top", () => {
+  const el = { getBoundingClientRect: () => ({ top: 120 }) };
+  const prev = globalThis.window;
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: { scrollY: 80 },
+  });
+  try {
+    assert.equal(catalogListDocumentTop(el), 200);
+    assert.equal(catalogListDocumentTop(null), 0);
+  } finally {
+    if (prev) {
+      Object.defineProperty(globalThis, "window", { configurable: true, value: prev });
+    }
+  }
 });
 
 test("catalog virtual grid remounts and rekeys when search results change", () => {
-  assert.match(virtualGridSrc, /key=\{props\.gridKey \|\| "catalog"\}/);
+  assert.match(virtualGridSrc, /key=\{`\$\{props\.gridKey \|\| "catalog"\}:\$\{mode\}`\}/);
   assert.match(virtualGridSrc, /getItemKey:\s*\(index\)\s*=>\s*catalogVirtualRowKey/);
   assert.match(virtualGridSrc, /measureCatalogVirtualRow/);
   assert.match(orderPageSrc, /gridKey=\{`catalog:/);
+  assert.match(orderPageSrc, /embedScroll=\{fullscreen\}/);
   assert.match(orderPageSrc, /const favoriteCardProps = useCallback/);
   assert.match(
     orderCss,

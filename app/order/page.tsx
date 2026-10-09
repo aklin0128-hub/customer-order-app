@@ -3341,6 +3341,7 @@ export default function OrderPage() {
               </div>
             ) : (
               <CatalogVirtualGrid
+                embedScroll={fullscreen}
                 gridKey={`catalog:${categoryFilters.join(",")}:${brandFilter}:${catalogSearch}:${catalogShowFavoritesOnly}:${catalogShowSelectedOnly}:${catalogShowRecommendedOnly}:${showAvailableOnly}`}
                 items={orderableCatalogItems}
                 catalogQtyMap={catalogQtyMap}
