@@ -618,12 +618,10 @@ export const submittedOrderListStyle: CSSProperties = {
   maxHeight: "min(42vh, 340px)",
 };
 
-/** Scroll area for virtualized catalog grid. Height comes from CSS so a short search
- *  (one row of melon results) still uses the max viewport slot instead of clipping. */
+/** Catalog list follows the page scroll (same as New items). */
 export const catalogVirtualScrollStyle: CSSProperties = {
   width: "100%",
-  overflow: "auto",
+  overflow: "visible",
   marginTop: 0,
-  WebkitOverflowScrolling: "touch",
   boxSizing: "border-box",
 };

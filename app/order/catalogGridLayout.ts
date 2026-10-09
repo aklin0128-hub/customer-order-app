@@ -54,6 +54,12 @@ export function catalogRowGapPx() {
   return CATALOG_ROW_GAP_PX;
 }
 
+/** Document Y of a catalog list so window virtualization can offset rows. */
+export function catalogListDocumentTop(el: { getBoundingClientRect: () => { top: number } } | null) {
+  if (!el || typeof window === "undefined") return 0;
+  return el.getBoundingClientRect().top + window.scrollY;
+}
+
 /** @deprecated use catalogColGapPx */
 export function catalogGridGapPx(_columnCount?: number) {
   return CATALOG_COL_GAP_PX;
