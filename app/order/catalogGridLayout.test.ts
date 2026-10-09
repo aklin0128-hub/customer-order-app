@@ -106,6 +106,29 @@ test("catalog category bar stays a compact single row", () => {
   );
 });
 
+test("catalog cards stay under the sticky directory bar while scrolling", () => {
+  assert.match(orderCss, /\.order-sticky-bar\s*\{[^}]*z-index:\s*80/);
+  assert.match(
+    orderCss,
+    /\.order-shop-card--listing:has\(\.order-catalog-virtual-scroll\)\s*\{[^}]*isolation:\s*isolate/
+  );
+});
+
+test("near date promo cards grow with content instead of overlapping the stepper", () => {
+  assert.match(
+    orderCss,
+    /\.catalog-qty-card--promo-layout\s*\{[^}]*content-visibility:\s*visible/
+  );
+  assert.match(
+    orderCss,
+    /\.catalog-qty-card--promo-layout \.catalog-qty-card-fill\s*\{[^}]*flex:\s*1 0 auto/
+  );
+  assert.match(
+    orderCss,
+    /\.catalog-qty-card--promo-layout \{\s*min-height:\s*0/
+  );
+});
+
 test("catalog list follows the page scroll like New items", () => {
   assert.match(virtualGridSrc, /useWindowVirtualizer/);
   assert.match(virtualGridSrc, /embedScroll/);

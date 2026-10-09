@@ -98,7 +98,7 @@
 .order-sticky-bar {
   position: sticky;
   top: 0;
-  z-index: 45;
+  z-index: 80;
   margin: 0 0 4px;
   flex-shrink: 0;
 }
@@ -1030,6 +1030,9 @@
   display: block;
   min-height: 0;
   overflow: visible;
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
 }
 
 .order-clearance-bulk-row {
@@ -2319,11 +2322,17 @@
   font-weight: 600;
 }
 
+.catalog-qty-card--promo-layout {
+  height: auto;
+  content-visibility: visible;
+  contain-intrinsic-size: none;
+}
+
 .catalog-qty-card--promo-layout .catalog-qty-card-fill {
-  flex: 1;
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  min-height: auto;
   gap: 4px;
 }
 
@@ -2367,7 +2376,10 @@
 
 .catalog-qty-card--promo-layout .catalog-qty-card-stepper {
   margin-top: 6px;
-  padding-top: 0;
+  padding-top: 4px;
+  position: relative;
+  z-index: 1;
+  background: inherit;
 }
 
 .catalog-qty-card--promo-layout .catalog-promo-deal-tiers {
@@ -3366,6 +3378,11 @@
     min-height: 248px;
   }
 
+  .catalog-qty-card--promo-layout {
+    min-height: 0;
+    height: auto;
+  }
+
   .catalog-card-image-wrap {
     height: 68px;
     min-height: 68px;
@@ -3495,6 +3512,7 @@
 
 .order-page--mobile-shop .order-sticky-bar {
   margin-bottom: 4px;
+  background: #f1f5f9;
 }
 
 .order-page--mobile-shop .order-sticky-bar-inner {
