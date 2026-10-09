@@ -49,10 +49,15 @@ test("catalogVirtualRowKey changes when a search replaces row SKUs", () => {
   assert.notEqual(catalogVirtualRowKey(all, 0, 2), catalogVirtualRowKey(melon, 0, 2));
 });
 
-test("row estimates stay tall enough on wide desktop catalogs", () => {
-  assert.ok(catalogRowEstimatePx(2) >= 400);
-  assert.ok(catalogRowEstimatePx(12) >= 390);
-  assert.ok(catalogRowEstimatePx(14) >= 390);
+test("two-column mobile estimate stays near a compact card", () => {
+  assert.ok(catalogRowEstimatePx(2) >= 300);
+  assert.ok(catalogRowEstimatePx(2) <= 330);
+  assert.equal(catalogRowEstimatePx(2), 312);
+});
+
+test("wide desktop estimates stay tall enough to avoid overlap", () => {
+  assert.ok(catalogRowEstimatePx(12) >= 360);
+  assert.ok(catalogRowEstimatePx(14) >= 360);
 });
 
 test("measureCatalogVirtualRow uses overflowing card height", () => {
@@ -65,6 +70,18 @@ test("measureCatalogVirtualRow uses overflowing card height", () => {
     ],
   };
   assert.equal(measureCatalogVirtualRow(row), 388);
+});
+
+test("measureCatalogVirtualRow ignores a stretched row minHeight", () => {
+  const row = {
+    scrollHeight: 420,
+    offsetHeight: 420,
+    children: [
+      { scrollHeight: 312, offsetHeight: 312 },
+      { scrollHeight: 300, offsetHeight: 300 },
+    ],
+  };
+  assert.equal(measureCatalogVirtualRow(row), 312);
 });
 
 test("catalog virtual overscan stays low so a wide grid does not mount too many cards", () => {
@@ -102,4 +119,5 @@ test("catalog virtual grid remounts and rekeys when search results change", () =
     orderCss,
     /\.order-catalog-virtual-row \.catalog-qty-card\s*\{[^}]*height:\s*auto/
   );
+  assert.doesNotMatch(virtualGridSrc, /minHeight:\s*vr\.size/);
 });
