@@ -5,7 +5,7 @@ import {
   marketRegionLabel,
   type MarketRegionId,
 } from "@/lib/customerRegion";
-import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
+import { loadInvoiceImports } from "@/lib/analyticsCommon";
 import { redis } from "@/lib/redis";
 
 type Product = {
@@ -199,7 +199,7 @@ export async function getTopSkus(options?: {
   const allowedAccounts = await buildRegionAccountSet(region);
 
   const map = new Map<string, SkuAccumulator>();
-  const imports = (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
+  const imports = await loadInvoiceImports();
   let matchedImportCount = 0;
 
   for (const record of imports) {

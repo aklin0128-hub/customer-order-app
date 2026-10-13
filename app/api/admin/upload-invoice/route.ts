@@ -7,10 +7,11 @@ import { put } from "@vercel/blob";
 import { resolveInvoiceLineSku } from "@/lib/invoice/catalogSku";
 import { extractInvoiceText } from "@/lib/invoice/extractText";
 import {
-  IMPORT_LIST_KEY,
   type InvoiceImportRecord,
   type InvoiceLineWithCatalog,
 } from "@/lib/invoice/invoiceImportRecord";
+import { compactInvoiceLines } from "@/lib/invoice/invoiceImportCompact";
+import { prependInvoiceImport } from "@/lib/invoice/invoiceImportStore";
 import { resolveInvoiceCaseUnitPrice } from "@/lib/invoice/invoiceCaseUnitPrice";
 import { parseInvoiceText } from "@/lib/invoice/parseInvoiceText";
 import { bustAnalyticsCache } from "@/lib/analyticsCache";
@@ -20,7 +21,6 @@ import { prependOrderHistory } from "@/lib/orderHistory";
 import { incrementPromotionSoldFromInvoice } from "@/lib/promotions";
 import { guessRegionFromText } from "@/lib/regionGuess";
 import { mergeRecentItems } from "@/lib/recentItems";
-import { redis } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -172,7 +172,8 @@ export async function POST(req: Request) {
       mimeType: mime,
       extractMethod: method,
       lineCount: linesWithFlags.length,
-      lines: linesWithFlags,
+      lines: compactInvoiceLines(linesWithFlags),
+      unknownSkus,
       warnings: [...parsed.warnings],
       appliedToHistory,
     };
@@ -191,12 +192,9 @@ export async function POST(req: Request) {
       record.warnings.push("Applied to history skipped (unchecked in form).");
     }
 
-    const list =
-      (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
-    const nextList = [record, ...list];
-    await redis.set(IMPORT_LIST_KEY, nextList);
+    await prependInvoiceImport(record);
     bustAnalyticsCache();
-    await refreshInvoiceLatestPricesCache(nextList);
+    await refreshInvoiceLatestPricesCache();
 
     const suggestedRegion = guessRegionFromText(
       [storeName, parsed.accountNo, accountNo].filter(Boolean).join(" ")

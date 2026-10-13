@@ -1,5 +1,4 @@
-import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
-import { redis } from "@/lib/redis";
+import { loadInvoiceImportSummaries } from "@/lib/invoice/invoiceImportStore";
 
 export type InvoiceDuplicateMatch = {
   id: string;
@@ -18,7 +17,7 @@ export async function findDuplicateInvoiceImport(input: {
   const invoiceDate = String(input.invoiceDate || "").trim();
   if (!acct || (!invoiceNo && !invoiceDate)) return null;
 
-  const imports = (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
+  const imports = await loadInvoiceImportSummaries();
   for (const row of imports) {
     if (String(row.accountNo || "").trim().toUpperCase() !== acct) continue;
     const sameNo =
