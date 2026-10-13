@@ -108,8 +108,8 @@ export function filterLatestPriceRows(
   });
 }
 
-export async function refreshInvoiceLatestPricesCache(imports: InvoiceImportRecord[]) {
-  const rows = buildLatestInvoicePricesFromImports(imports);
+export async function refreshInvoiceLatestPricesCache(imports?: InvoiceImportRecord[]) {
+  const rows = buildLatestInvoicePricesFromImports(imports ?? (await loadInvoiceImports()));
   await redis.set(INVOICE_LATEST_PRICES_KEY, rows);
 }
 

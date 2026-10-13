@@ -1,10 +1,12 @@
 import { matchesQuery, paginateList, parseAdminListQuery } from "@/lib/adminListQuery";
 import { NextResponse } from "next/server";
 import { del } from "@vercel/blob";
-import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
 import { bustAnalyticsCache } from "@/lib/analyticsCache";
+import {
+  deleteInvoiceImport,
+  loadInvoiceImportSummaries,
+} from "@/lib/invoice/invoiceImportStore";
 import { refreshInvoiceLatestPricesCache } from "@/lib/invoiceLatestPrices";
-import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +24,7 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const query = parseAdminListQuery(url, 30);
-    const list = (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
+    const list = await loadInvoiceImportSummaries();
 
     const unknownSkuSet = new Set<string>();
     let last30Days = 0;
@@ -34,6 +36,7 @@ export async function GET(req: Request) {
       if (new Date(row.uploadedAt).getTime() >= cutoff) last30Days += 1;
       if (!row.accountNo?.trim()) missingAccount += 1;
       if (!row.lineCount) zeroLines += 1;
+      for (const sku of row.unknownSkus || []) unknownSkuSet.add(String(sku).toUpperCase());
       for (const line of row.lines || []) {
         if (!line.inCatalog && line.sku) unknownSkuSet.add(line.sku.toUpperCase());
       }
@@ -46,9 +49,11 @@ export async function GET(req: Request) {
 
     filtered.sort((a, b) => String(b.uploadedAt || "").localeCompare(String(a.uploadedAt || "")));
 
-    const summaries = filtered.map(({ lines, ...rest }) => ({
+    const summaries = filtered.map(({ lines, unknownSkus, ...rest }) => ({
       ...rest,
-      unknownSkuCount: (lines || []).filter((l) => !l.inCatalog && l.sku).length,
+      unknownSkuCount:
+        unknownSkus?.length ||
+        (lines || []).filter((l) => !l.inCatalog && l.sku).length,
     }));
 
     const page = paginateList(summaries, query);
@@ -89,10 +94,9 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Missing import id." }, { status: 400 });
     }
 
-    const list = (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
-    const target = list.find((item) => item.id === id);
+    const removed = await deleteInvoiceImport(id);
 
-    if (!target) {
+    if (!removed.found || !removed.record) {
       return NextResponse.json({ error: "Invoice import not found." }, { status: 404 });
     }
 
@@ -105,10 +109,8 @@ export async function DELETE(req: Request) {
       }
     }
 
-    const nextList = list.filter((item) => item.id !== id);
-    await redis.set(IMPORT_LIST_KEY, nextList);
     bustAnalyticsCache();
-    await refreshInvoiceLatestPricesCache(nextList);
+    await refreshInvoiceLatestPricesCache();
 
     return NextResponse.json({
       success: true,

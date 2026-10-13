@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 
 import { bustAnalyticsCache } from "@/lib/analyticsCache";
 import { refreshInvoiceLatestPricesCache } from "@/lib/invoiceLatestPrices";
-import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
+import type { InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
+import { loadInvoiceImportSummaries, saveInvoiceImportList } from "@/lib/invoice/invoiceImportStore";
 import { reparseInvoiceImportRecord } from "@/lib/invoice/reparseInvoiceImport";
-import { redis } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing import id." }, { status: 400 });
     }
 
-    const list = (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
+    const list = await loadInvoiceImportSummaries();
     const updated: InvoiceImportRecord[] = [];
     const errors: { id: string; error: string }[] = [];
 
@@ -59,9 +59,9 @@ export async function POST(req: Request) {
     }
 
     if (updated.length > 0) {
-      await redis.set(IMPORT_LIST_KEY, list);
+      await saveInvoiceImportList(list);
       bustAnalyticsCache();
-      await refreshInvoiceLatestPricesCache(list);
+      await refreshInvoiceLatestPricesCache();
     }
 
     return NextResponse.json({
