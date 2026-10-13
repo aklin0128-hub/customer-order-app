@@ -95,8 +95,9 @@ export async function DELETE(req: Request) {
     }
 
     const removed = await deleteInvoiceImport(id);
+    const target = removed.record;
 
-    if (!removed.found || !removed.record) {
+    if (!removed.found || !target) {
       return NextResponse.json({ error: "Invoice import not found." }, { status: 404 });
     }
 
