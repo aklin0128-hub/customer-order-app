@@ -114,5 +114,6 @@ test("invoice upload persists through the split import store", () => {
   assert.match(uploadSrc, /prependInvoiceImport/);
   assert.doesNotMatch(uploadSrc, /redis\.set\(\s*IMPORT_LIST_KEY/);
   assert.match(importsRouteSrc, /saveInvoiceImportList|deleteInvoiceImport/);
+  assert.match(importsRouteSrc, /const target = removed\.record/);
   assert.match(analyticsSrc, /loadInvoiceImportsWithLines/);
 });
