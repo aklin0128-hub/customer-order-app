@@ -71,8 +71,11 @@ export default function AdminInventoryPage() {
   const { authed, adminHeaders } = useAdminAuth();
 
   const [meta, setMeta] = useState<InventoryMeta | null>(null);
+  const [statusEtaMeta, setStatusEtaMeta] = useState<InventoryMeta | null>(null);
+  const [statusEtaAvailableInvCount, setStatusEtaAvailableInvCount] = useState<number | null>(null);
   const [loadedRows, setLoadedRows] = useState(0);
   const [file, setFile] = useState<File | null>(null);
+  const [statusEtaFile, setStatusEtaFile] = useState<File | null>(null);
   const [sku, setSku] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [onlyFuture, setOnlyFuture] = useState(false);
@@ -96,6 +99,22 @@ export default function AdminInventoryPage() {
     if (!res.ok) throw new Error(data?.error || "Failed to load inventory info.");
     setMeta(data.meta || null);
     setLoadedRows(Number(data.loadedRows) || 0);
+
+    try {
+      const etaRes = await fetch("/api/admin/inventory-status-eta", {
+        cache: "no-store",
+        headers: adminHeaders(),
+      });
+      const etaData = await etaRes.json();
+      if (etaRes.ok) {
+        setStatusEtaMeta(etaData.meta || null);
+        setStatusEtaAvailableInvCount(
+          typeof etaData.availableInvCount === "number" ? etaData.availableInvCount : null
+        );
+      }
+    } catch {
+      /* optional second dataset */
+    }
   }, [adminHeaders]);
 
   useEffect(() => {
@@ -168,6 +187,36 @@ export default function AdminInventoryPage() {
     }
   };
 
+  const uploadStatusEta = async () => {
+    if (!statusEtaFile) {
+      notify("Choose a status/ETA spreadsheet first.", "error");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const form = new FormData();
+      form.append("file", statusEtaFile);
+
+      const res = await fetch("/api/admin/inventory-status-eta", {
+        method: "POST",
+        headers: adminHeaders(),
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Upload failed.");
+
+      setStatusEtaMeta(data.meta || null);
+      setStatusEtaFile(null);
+      notify(data.message || "Status/ETA file uploaded.");
+      await loadMeta();
+    } catch (err: unknown) {
+      notify(err instanceof Error ? err.message : "Upload failed.", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const searchSku = async () => {
     const q = sku.trim();
     if (!q) {
@@ -208,20 +257,26 @@ export default function AdminInventoryPage() {
   return (
     <AdminPage
       active="inventory"
-      title="Inventory expiry"
-      subtitle="Internal only — upload Friday By Item CSV or Excel. Stores do not see this."
+      title="Inventory expiry & ETA"
+      subtitle="Upload By Item (EXP lots) and status+ETA spreadsheet. Used by internal /exp lookup."
     >
       <StatGrid
         items={[
-          { label: "Last upload", value: meta ? formatUploadedAt(meta.uploadedAt) : "None" },
-          { label: "Lots loaded", value: meta?.rowCount ?? loadedRows },
-          { label: "Unique SKUs", value: meta?.skuCount ?? "—" },
-          { label: "Source file", value: meta?.fileName || "—" },
+          { label: "EXP last upload", value: meta ? formatUploadedAt(meta.uploadedAt) : "None" },
+          { label: "EXP lots / SKUs", value: meta ? `${meta.rowCount} / ${meta.skuCount}` : "—" },
+          {
+            label: "ETA last upload",
+            value: statusEtaMeta ? formatUploadedAt(statusEtaMeta.uploadedAt) : "None",
+          },
+          {
+            label: "ETA PIDs",
+            value: statusEtaMeta?.skuCount ?? "—",
+          },
         ]}
       />
 
       <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
-        <Panel title="Upload weekly file">
+        <Panel title="Upload weekly By Item (expiry lots)">
           <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 12px", lineHeight: 1.45 }}>
             Upload the <strong>By Item</strong> sheet as <strong>.xlsx</strong> or <strong>.csv</strong>.
             Column titles should match your export:
@@ -246,6 +301,35 @@ export default function AdminInventoryPage() {
             <BtnSecondary onClick={() => void loadMeta()} disabled={busy}>
               Refresh
             </BtnSecondary>
+          </BtnRow>
+        </Panel>
+
+        <Panel title="Upload status + ETA (for /exp)">
+          <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 12px", lineHeight: 1.45 }}>
+            Spreadsheet for coworker <code>/exp</code> lookup. Columns:{" "}
+            <code>PID</code>, <code>Description</code>, <code>Status</code> (or Stauts), <code>Aval. INV</code>,{" "}
+            <code>Port ETA</code>, <code>Inbound QTY</code>. Continuation rows with blank PID inherit the product
+            above. Last upload:{" "}
+            <strong>{statusEtaMeta ? formatUploadedAt(statusEtaMeta.uploadedAt) : "None"}</strong>
+            {statusEtaMeta ? ` · ${statusEtaMeta.skuCount} PIDs` : ""}.
+            {statusEtaMeta && statusEtaAvailableInvCount === 0 ? (
+              <span style={{ display: "block", marginTop: 8, color: "#b45309", fontWeight: 700 }}>
+                INVENTORY / Aval. INV is empty — re-upload Excel. Column can be named Aval. INV or INVENTORY
+                (merged cells OK).
+              </span>
+            ) : null}
+          </p>
+          <label style={labelStyle}>CSV or Excel file</label>
+          <input
+            type="file"
+            accept=".csv,text/csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+            onChange={(e) => setStatusEtaFile(e.target.files?.[0] || null)}
+            style={{ ...inputStyle, marginBottom: 12 }}
+          />
+          <BtnRow>
+            <BtnPrimary onClick={uploadStatusEta} disabled={busy || !statusEtaFile}>
+              {busy ? "Uploading…" : "Upload status/ETA"}
+            </BtnPrimary>
           </BtnRow>
         </Panel>
 

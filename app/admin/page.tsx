@@ -226,7 +226,7 @@ export default function AdminDashboardPage() {
             </section>
 
             <section style={panel}>
-              <h2 style={panelTitle}>Clearance — expiring soon</h2>
+              <h2 style={panelTitle}>Near Date Sale — expiring soon</h2>
               {data.clearanceUrgent.length ? (
                 <ul style={{ margin: "0 0 10px", paddingLeft: 18, fontSize: 13, lineHeight: 1.55 }}>
                   {data.clearanceUrgent.map((c) => (
@@ -241,7 +241,7 @@ export default function AdminDashboardPage() {
                 <p style={{ fontSize: 13, color: "#6b7280" }}>Nothing urgent.</p>
               )}
               <Link href="/admin/clearance">
-                <BtnSecondary>Open clearance</BtnSecondary>
+                <BtnSecondary>Open Near Date Sale</BtnSecondary>
               </Link>
             </section>
 

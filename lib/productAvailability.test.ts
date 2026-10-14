@@ -14,3 +14,9 @@ test("new-item-only flags still work without general outOfStock", () => {
   assert.equal(isProductOutOfStockStamp(comingSoon), false);
   assert.equal(isProductOrderingBlocked(comingSoon), true);
 });
+
+test("general outOfStock covers catalog and new-item stamp surfaces", () => {
+  const item = { isNew: true, outOfStock: true, newItemComingSoon: false };
+  assert.equal(isProductOutOfStockStamp(item), true);
+  assert.equal(isProductOrderingBlocked(item), true);
+});

@@ -11,6 +11,8 @@ export type NewItemStampFields = {
   isNew?: boolean;
   newItemOutOfStock?: boolean;
   newItemComingSoon?: boolean;
+  /** General catalog out-of-stock — also shows on /new/ when the item is marked new. */
+  outOfStock?: boolean;
 };
 
 export function getComingSoonBadgeLabel(lang: ComingSoonBadgeLang) {
@@ -25,9 +27,10 @@ export function isComingSoonNewItem(item?: NewItemStampFields | null) {
   return Boolean(item.newItemOutOfStock);
 }
 
-/** Out of stock stamp for new-item cards. */
+/** Out of stock stamp for new-item cards (/new/ and New items tab). */
 export function isNewItemOutOfStockStamp(item?: NewItemStampFields | null) {
   if (!item?.isNew) return false;
+  if (Boolean(item.outOfStock)) return true;
   if (typeof item.newItemComingSoon === "boolean") return Boolean(item.newItemOutOfStock);
   // Legacy records only had the coming-soon meaning for this flag.
   return false;

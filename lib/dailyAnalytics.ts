@@ -36,7 +36,7 @@ export function formatDigestEmail(snapshot: DailyAnalyticsSnapshot) {
     `Orders (7d): ${k.ordersLast7Days}`,
     `At risk: ${h.atRisk} · Silent: ${h.silent}`,
     `Stale carts: ${k.staleCarts} · Unknown SKUs: ${k.unknownSkuCount}`,
-    `Active promos: ${k.activePromotions} · Clearance: ${k.activeClearance}`,
+    `Active promos: ${k.activePromotions} · Near Date Sale: ${k.activeClearance}`,
     "",
     `Open dashboard: ${process.env.NEXT_PUBLIC_APP_URL || ""}/admin`,
   ].join("\n");

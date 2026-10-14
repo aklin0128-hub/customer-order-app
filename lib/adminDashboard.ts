@@ -138,7 +138,7 @@ export async function getAdminDashboardKpis(): Promise<AdminDashboardKpis> {
   if (clearanceUrgent.length > 0) {
     alerts.push({
       id: "clearance",
-      label: "Clearance expiring soon",
+      label: "Near Date Sale expiring soon",
       count: clearanceUrgent.length,
       href: "/admin/clearance",
       tone: "warn",

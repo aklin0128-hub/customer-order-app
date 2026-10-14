@@ -1,29 +1,90 @@
 /** Shared catalog grid sizing for virtual + CSS grids */
-export const CATALOG_GRID_GAP_PX = 8;
-export const CATALOG_MIN_CARD_WIDTH_PX = 168;
-export const CATALOG_MAX_COLUMNS = 12;
+export const CATALOG_COL_GAP_PX = 4;
+/** Vertical space between catalog rows. Applied by the virtualizer `gap`, not the row estimate. */
+export const CATALOG_ROW_GAP_PX = 20;
+/** @deprecated use CATALOG_COL_GAP_PX — kept for older imports */
+export const CATALOG_GRID_GAP_PX = CATALOG_COL_GAP_PX;
+export const CATALOG_MIN_CARD_WIDTH_PX = 152;
+export const CATALOG_MAX_COLUMNS = 14;
 export const CATALOG_MIN_COLUMNS = 2;
 
 /** Initial virtual-row height estimate; rows are measured from tallest card content. */
-export const CATALOG_ROW_HEIGHT_PX = 360;
+export const CATALOG_ROW_HEIGHT_PX = 300;
+/** Catalog list box is at least one full card row, then grows to fill the viewport. */
+export const CATALOG_SCROLL_MIN_HEIGHT_PX = 400;
+/** Extra virtual rows around the viewport. Keep low — 14-column desktops render many cards per row. */
+export const CATALOG_VIRTUAL_OVERSCAN = 2;
 
 export function catalogRowEstimatePx(columnCount: number): number {
-  if (columnCount <= 2) return 360;
-  if (columnCount <= 3) return 320;
-  if (columnCount <= 4) return 330;
-  if (columnCount <= 6) return 340;
-  return CATALOG_ROW_HEIGHT_PX;
+  // Two-column phones have shorter cards (68px image). A 400px estimate plus
+  // virtualizer gap left a large blank band between mobile rows.
+  if (columnCount <= 2) return 312;
+  if (columnCount <= 3) return 340;
+  if (columnCount <= 4) return 360;
+  return 370;
 }
 
-export function catalogGridGapPx(columnCount: number): number {
-  return columnCount <= 2 ? 6 : CATALOG_GRID_GAP_PX;
+/** Row height from card content, not a minHeight-stretched row box. */
+export function measureCatalogVirtualRow(element: {
+  scrollHeight: number;
+  offsetHeight?: number;
+  getBoundingClientRect?: () => { height: number };
+  children?: ArrayLike<{ scrollHeight?: number; offsetHeight?: number }>;
+}) {
+  let childMax = 0;
+  const children = element.children;
+  if (children) {
+    for (let i = 0; i < children.length; i += 1) {
+      const child = children[i];
+      const h = Math.max(child.offsetHeight || 0, child.scrollHeight || 0);
+      if (h > childMax) childMax = h;
+    }
+  }
+  if (childMax) return childMax;
+  const box = Math.max(element.offsetHeight || 0, element.scrollHeight || 0);
+  if (box) return box;
+  return element.getBoundingClientRect?.().height || 0;
+}
+
+export function catalogColGapPx() {
+  return CATALOG_COL_GAP_PX;
+}
+
+export function catalogRowGapPx() {
+  return CATALOG_ROW_GAP_PX;
+}
+
+/** Document Y of a catalog list so window virtualization can offset rows. */
+export function catalogListDocumentTop(el: { getBoundingClientRect: () => { top: number } } | null) {
+  if (!el || typeof window === "undefined") return 0;
+  return el.getBoundingClientRect().top + window.scrollY;
+}
+
+/** @deprecated use catalogColGapPx */
+export function catalogGridGapPx(_columnCount?: number) {
+  return CATALOG_COL_GAP_PX;
 }
 
 export function catalogRowStridePx() {
-  return CATALOG_ROW_HEIGHT_PX + CATALOG_GRID_GAP_PX;
+  return CATALOG_ROW_HEIGHT_PX + CATALOG_ROW_GAP_PX;
 }
 
 /** Column count from container width — scales up on wide screens, down on narrow. */
+/** Stable virtual-row identity so a search/filter does not reuse stale measured rows. */
+export function catalogVirtualRowKey(
+  items: Array<{ sku?: string }>,
+  rowIndex: number,
+  columnCount: number
+) {
+  const cols = Math.max(1, columnCount);
+  const start = rowIndex * cols;
+  const skus = items
+    .slice(start, start + cols)
+    .map((item) => String(item.sku || "").trim().toUpperCase())
+    .filter(Boolean);
+  return `${rowIndex}:${skus.join("|") || "empty"}`;
+}
+
 export function catalogColumnCountForWidth(rawWidth: number): number {
   const width =
     rawWidth > 0
@@ -34,7 +95,7 @@ export function catalogColumnCountForWidth(rawWidth: number): number {
 
   if (width <= 0) return CATALOG_MIN_COLUMNS;
 
-  const slot = CATALOG_MIN_CARD_WIDTH_PX + CATALOG_GRID_GAP_PX;
-  const cols = Math.floor((width + CATALOG_GRID_GAP_PX) / slot);
+  const slot = CATALOG_MIN_CARD_WIDTH_PX + CATALOG_COL_GAP_PX;
+  const cols = Math.floor((width + CATALOG_COL_GAP_PX) / slot);
   return Math.max(CATALOG_MIN_COLUMNS, Math.min(CATALOG_MAX_COLUMNS, cols));
 }

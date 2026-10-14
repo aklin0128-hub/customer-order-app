@@ -24,6 +24,7 @@ export function AdminPage({
 }) {
   const { ready, authed, error, loading, login, logout } = useAdminAuth();
   const [passwordInput, setPasswordInput] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
 
   if (!ready) return null;
 
@@ -34,9 +35,11 @@ export function AdminPage({
         subtitle={loginSubtitle || subtitle || "Sign in to continue."}
         password={passwordInput}
         onPasswordChange={setPasswordInput}
+        rememberMe={rememberMe}
+        onRememberMeChange={setRememberMe}
         error={error}
         loading={loading}
-        onSubmit={() => void login(passwordInput)}
+        onSubmit={() => void login(passwordInput, rememberMe)}
       />
     );
   }

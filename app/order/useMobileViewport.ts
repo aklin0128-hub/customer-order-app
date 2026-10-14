@@ -1,19 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
+
+function subscribeMaxWidth(maxWidth: number, onStoreChange: () => void) {
+  const mq = window.matchMedia(`(max-width: ${maxWidth}px)`);
+  mq.addEventListener("change", onStoreChange);
+  return () => mq.removeEventListener("change", onStoreChange);
+}
 
 export function useMobileViewport(maxWidth = 767) {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${maxWidth}px)`);
-    const apply = () => setIsMobile(mq.matches);
-    apply();
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
-  }, [maxWidth]);
-
-  return isMobile;
+  return useSyncExternalStore(
+    (onStoreChange) => subscribeMaxWidth(maxWidth, onStoreChange),
+    () => window.matchMedia(`(max-width: ${maxWidth}px)`).matches,
+    () => false
+  );
 }
 
 export function readInitialStickyPanelOpen() {

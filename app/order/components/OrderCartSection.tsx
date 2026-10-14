@@ -2,7 +2,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 
-import { getCatalogItemBySku } from "../catalogUtils";
+import { getCatalogItemBySku, isOrderableItem } from "../catalogUtils";
 import { copy } from "../orderCopy";
 import { clearancePolicyStyle } from "../orderStyles";
 import type { CartItem, Lang } from "../types";
@@ -19,6 +19,8 @@ export function OrderCartSection({
   onAdjustQty,
   onQtyInput,
   onRemove,
+  onRemoveUnavailable,
+  unavailableItems = [],
   nhItemsSkus,
   nudge,
   tools,
@@ -34,10 +36,15 @@ export function OrderCartSection({
   onAdjustQty: (sku: string, delta: number, nhItems?: boolean) => void;
   onQtyInput: (sku: string, value: string, nhItems?: boolean) => void;
   onRemove: (sku: string, nhItems?: boolean) => void;
+  onRemoveUnavailable?: () => void;
+  unavailableItems?: Array<{ sku: string; status: string; nhItems?: boolean }>;
   nudge?: ReactNode;
   tools?: ReactNode;
 }) {
   const t = copy[lang];
+  const unavailableKey = new Set(
+    unavailableItems.map((item) => `${item.sku.toUpperCase()}::${item.nhItems ? "nh" : "cat"}`)
+  );
 
   const nameClampStyle: CSSProperties = {
     fontSize: 12,
@@ -86,6 +93,52 @@ export function OrderCartSection({
 
       {expanded && nudge ? nudge : null}
 
+      {expanded && unavailableItems.length > 0 ? (
+        <div
+          style={{
+            margin: "0 0 10px",
+            border: "1px solid #fca5a5",
+            background: "#fef2f2",
+            color: "#991b1b",
+            borderRadius: 12,
+            padding: 10,
+            fontSize: 12,
+            lineHeight: 1.45,
+          }}
+        >
+          <div style={{ fontWeight: 900 }}>{t.unavailableInCartTitle}</div>
+          <div style={{ marginTop: 4 }}>{t.unavailableInCartHint}</div>
+          <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 3 }}>
+            {unavailableItems.slice(0, 12).map((item) => (
+              <div key={`${item.sku}-${item.nhItems ? "nh" : "cat"}`} style={{ fontWeight: 800 }}>
+                • {item.sku}
+                {item.status ? ` — ${item.status}` : ""}
+              </div>
+            ))}
+            {unavailableItems.length > 12 ? <div>• …</div> : null}
+          </div>
+          {onRemoveUnavailable ? (
+            <button
+              type="button"
+              onClick={onRemoveUnavailable}
+              style={{
+                marginTop: 8,
+                border: "1px solid #fecaca",
+                background: "#fff",
+                color: "#b91c1c",
+                borderRadius: 999,
+                padding: "8px 12px",
+                fontSize: 12,
+                fontWeight: 900,
+                cursor: "pointer",
+              }}
+            >
+              {t.removeUnavailable}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {expanded ? (
         <div className={onClose ? "order-cart-modal-scroll" : undefined}>
           {items.length === 0 ? (
@@ -94,9 +147,17 @@ export function OrderCartSection({
             <div className="order-cart-list">
               {items.map((item) => {
                 const catalogItem = getCatalogItemBySku(item.sku);
+                const cleanSku = item.sku.toUpperCase();
                 const lineKey = `${item.sku}-${item.nhItems ? "nh" : "cat"}`;
+                const lineUnavailable =
+                  unavailableKey.has(`${cleanSku}::${item.nhItems ? "nh" : "cat"}`) ||
+                  (catalogItem ? !isOrderableItem(catalogItem) : true);
                 return (
-                  <div key={lineKey} className="order-cart-row">
+                  <div
+                    key={lineKey}
+                    className="order-cart-row"
+                    style={lineUnavailable ? { borderColor: "#fca5a5", background: "#fef2f2" } : undefined}
+                  >
                     <ProductImage sku={item.sku} alt={item.sku} size={48} imageUrl={catalogItem?.imageUrl} />
                     <div className="order-cart-row-info">
                       <div className="order-cart-row-sku">{item.sku}</div>
@@ -104,6 +165,18 @@ export function OrderCartSection({
                         <div style={nameClampStyle}>
                           {catalogItem.brand ? `${catalogItem.brand} · ` : ""}
                           {catalogItem.name || ""}
+                        </div>
+                      ) : null}
+                      {lineUnavailable ? (
+                        <div className="order-cart-row-note is-warn" style={{ color: "#b91c1c", fontWeight: 800 }}>
+                          {catalogItem
+                            ? t.statusWarning
+                                .replace("{sku}", cleanSku)
+                                .replace(
+                                  "{status}",
+                                  String(catalogItem.status || "").trim().toUpperCase() || "UNAVAILABLE"
+                                )
+                            : t.unavailableMissingSku.replace("{sku}", cleanSku)}
                         </div>
                       ) : null}
                       {catalogItem?.limitedQty ? (
