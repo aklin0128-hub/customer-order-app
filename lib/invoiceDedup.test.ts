@@ -4,7 +4,11 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { duplicateKeyForInvoice, groupDuplicateInvoiceImports } from "./invoiceDedup";
+import {
+  duplicateKeyForInvoice,
+  formatDuplicateSkipMessage,
+  groupDuplicateInvoiceImports,
+} from "./invoiceDedup";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const invoicesPageSrc = readFileSync(join(here, "../app/admin/invoices/page.tsx"), "utf8");
@@ -12,6 +16,7 @@ const duplicatesRouteSrc = readFileSync(
   join(here, "../app/api/admin/invoice-imports/duplicates/route.ts"),
   "utf8"
 );
+const uploadSrc = readFileSync(join(here, "../app/api/admin/upload-invoice/route.ts"), "utf8");
 
 function row(over: {
   id: string;
@@ -86,4 +91,35 @@ test("invoices page Check duplicates uses the duplicates API", () => {
   assert.match(invoicesPageSrc, /Check duplicates/);
   assert.match(invoicesPageSrc, /\/api\/admin\/invoice-imports\/duplicates/);
   assert.match(duplicatesRouteSrc, /listDuplicateInvoiceImports/);
+});
+
+test("formatDuplicateSkipMessage names the existing invoice", () => {
+  assert.equal(
+    formatDuplicateSkipMessage({
+      accountNo: "FL11",
+      invoiceNo: "PSI-018609",
+      invoiceDate: "10/10/2026",
+      existing: {
+        id: "old",
+        uploadedAt: "2026-10-01T12:00:00.000Z",
+        invoiceNo: "PSI-018609",
+        invoiceDate: "10/10/2026",
+      },
+    }),
+    "Skipped duplicate PSI-018609 for FL11 — already uploaded 2026-10-01 (PSI-018609)."
+  );
+});
+
+test("upload-invoice skips saving when a duplicate is found", () => {
+  const skipIdx = uploadSrc.indexOf("if (duplicate)");
+  const prependIdx = uploadSrc.indexOf("await prependInvoiceImport");
+  const putIdx = uploadSrc.indexOf("await put(");
+  assert.ok(skipIdx > 0, "expected duplicate skip branch");
+  assert.ok(prependIdx > skipIdx, "duplicate skip must happen before prependInvoiceImport");
+  assert.ok(putIdx > skipIdx, "duplicate skip must happen before blob put");
+  assert.match(uploadSrc, /skipped:\s*true/);
+  assert.match(uploadSrc, /formatDuplicateSkipMessage/);
+  assert.doesNotMatch(uploadSrc, /skipped counting lines toward promotion/);
+  assert.match(invoicesPageSrc, /skippedDuplicate/);
+  assert.match(invoicesPageSrc, /skipped \(duplicate\)/);
 });

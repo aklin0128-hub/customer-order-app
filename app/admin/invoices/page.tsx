@@ -34,9 +34,18 @@ type ImportRecord = {
   appliedToHistory: boolean;
 };
 
+type DuplicateSkip = {
+  id: string;
+  uploadedAt: string;
+  invoiceNo: string | null;
+  invoiceDate: string | null;
+};
+
 type BatchUploadResult = {
   fileName: string;
   record?: ImportRecord;
+  skippedDuplicate?: DuplicateSkip;
+  skipMessage?: string;
   unknownSkus: string[];
   parsedChars: number;
   error?: string;
@@ -174,6 +183,19 @@ export default function AdminInvoicesPage() {
           const data = await res.json();
           if (!res.ok) throw new Error(data?.error || "Upload failed.");
 
+          if (data.skipped && data.duplicateWarning) {
+            const result: BatchUploadResult = {
+              fileName: selectedFile.name,
+              skippedDuplicate: data.duplicateWarning as DuplicateSkip,
+              skipMessage: String(data.message || "Skipped duplicate invoice."),
+              unknownSkus: [],
+              parsedChars: Number(data.parsedTextChars || 0),
+            };
+            results.push(result);
+            setBatchResults([...results]);
+            continue;
+          }
+
           const rec = data.record as ImportRecord;
           const result: BatchUploadResult = {
             fileName: selectedFile.name,
@@ -198,10 +220,14 @@ export default function AdminInvoicesPage() {
       }
 
       const successCount = results.filter((r) => r.record).length;
-      const failedCount = results.length - successCount;
+      const skippedCount = results.filter((r) => r.skippedDuplicate).length;
+      const failedCount = results.filter((r) => r.error).length;
       const combinedUnknown = Array.from(new Set(results.flatMap((r) => r.unknownSkus)));
       setUnknownSkus(combinedUnknown);
-      setMsg(`Invoice upload complete: ${successCount} succeeded, ${failedCount} failed.`);
+      const parts = [`${successCount} saved`];
+      if (skippedCount) parts.push(`${skippedCount} skipped (duplicate)`);
+      if (failedCount) parts.push(`${failedCount} failed`);
+      setMsg(`Invoice upload complete: ${parts.join(", ")}.`);
       setMsgTone(failedCount ? "error" : "success");
       await loadImports();
       setFiles([]);
@@ -748,6 +774,9 @@ export default function AdminInvoicesPage() {
           >
             {busy ? "Processing…" : files.length > 1 ? `Upload & parse ${files.length} files` : "Upload & parse"}
           </button>
+          <p style={{ margin: 0, fontSize: 12, color: "#6b7280", lineHeight: 1.45 }}>
+            Same account + invoice # (or same date if no number) is skipped automatically. Batch results will say which files were skipped.
+          </p>
         </div>
       </section>
 
@@ -759,24 +788,30 @@ export default function AdminInvoicesPage() {
               <div
                 key={result.fileName}
                 style={{
-                  border: result.error ? "1px solid #fecaca" : "1px solid #bbf7d0",
-                  background: result.error ? "#fef2f2" : "#f0fdf4",
+                  border: result.error
+                    ? "1px solid #fecaca"
+                    : result.skippedDuplicate
+                      ? "1px solid #fcd34d"
+                      : "1px solid #bbf7d0",
+                  background: result.error ? "#fef2f2" : result.skippedDuplicate ? "#fffbeb" : "#f0fdf4",
                   borderRadius: 12,
                   padding: 10,
                   fontSize: 13,
-                  color: result.error ? "#991b1b" : "#166534",
+                  color: result.error ? "#991b1b" : result.skippedDuplicate ? "#92400e" : "#166534",
                 }}
               >
                 <div style={{ fontWeight: 900 }}>{result.fileName}</div>
                 {result.error ? (
                   <div style={{ marginTop: 4 }}>{result.error}</div>
+                ) : result.skippedDuplicate ? (
+                  <div style={{ marginTop: 4 }}>
+                    {result.skipMessage ||
+                      `Skipped duplicate ${result.skippedDuplicate.invoiceNo || "invoice"} — already uploaded.`}
+                  </div>
                 ) : result.record ? (
                   <div style={{ marginTop: 4 }}>
                     {result.record.accountNo || "no acct"} · {result.record.invoiceNo || "no invoice #"} · {result.record.lineCount} lines · {result.parsedChars} chars
                     {result.unknownSkus.length ? ` · Unknown: ${result.unknownSkus.join(", ")}` : ""}
-                    {result.record.warnings.some((warning) => warning.toLowerCase().includes("duplicate"))
-                      ? " · Duplicate of an existing import"
-                      : ""}
                   </div>
                 ) : null}
               </div>

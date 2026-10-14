@@ -111,6 +111,23 @@ export async function listDuplicateInvoiceImports(): Promise<{
   return { groupCount: groups.length, extraCount, groups };
 }
 
+export function formatDuplicateSkipMessage(input: {
+  accountNo?: string | null;
+  invoiceNo?: string | null;
+  invoiceDate?: string | null;
+  existing: InvoiceDuplicateMatch;
+}): string {
+  const invoice = normalizeInvoiceNo(input.invoiceNo) || "no invoice #";
+  const account = normalizeAccount(input.accountNo) || "no account";
+  const when = input.existing.uploadedAt
+    ? String(input.existing.uploadedAt).slice(0, 10)
+    : "earlier";
+  const existingNo = normalizeInvoiceNo(input.existing.invoiceNo);
+  const existingDate = normalizeInvoiceDate(input.existing.invoiceDate);
+  const existingLabel = existingNo || existingDate || input.existing.id;
+  return `Skipped duplicate ${invoice} for ${account} — already uploaded ${when} (${existingLabel}).`;
+}
+
 export async function findDuplicateInvoiceImport(input: {
   accountNo: string;
   invoiceNo?: string | null;

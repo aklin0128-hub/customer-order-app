@@ -16,7 +16,7 @@ import { resolveInvoiceCaseUnitPrice } from "@/lib/invoice/invoiceCaseUnitPrice"
 import { parseInvoiceText } from "@/lib/invoice/parseInvoiceText";
 import { bustAnalyticsCache } from "@/lib/analyticsCache";
 import { refreshInvoiceLatestPricesCache } from "@/lib/invoiceLatestPrices";
-import { findDuplicateInvoiceImport } from "@/lib/invoiceDedup";
+import { findDuplicateInvoiceImport, formatDuplicateSkipMessage } from "@/lib/invoiceDedup";
 import { prependOrderHistory } from "@/lib/orderHistory";
 import { incrementPromotionSoldFromInvoice } from "@/lib/promotions";
 import { guessRegionFromText } from "@/lib/regionGuess";
@@ -78,6 +78,26 @@ export async function POST(req: Request) {
           invoiceDate: parsed.invoiceDate,
         })
       : null;
+
+    if (duplicate) {
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        reason: "duplicate",
+        message: formatDuplicateSkipMessage({
+          accountNo,
+          invoiceNo: parsed.invoiceNo,
+          invoiceDate: parsed.invoiceDate,
+          existing: duplicate,
+        }),
+        accountNo,
+        invoiceNo: parsed.invoiceNo,
+        invoiceDate: parsed.invoiceDate,
+        parsedTextChars: text.length,
+        unknownSkus: [],
+        duplicateWarning: duplicate,
+      });
+    }
 
     const linesWithFlags: InvoiceLineWithCatalog[] = await Promise.all(
       parsed.lines.map(async (line) => {
@@ -144,8 +164,7 @@ export async function POST(req: Request) {
     }
 
     // Limited promo qty: count invoice lines when invoice date is inside the promo window.
-    // Skip duplicates so re-uploads do not double-count.
-    if (!duplicate && linesWithFlags.length > 0) {
+    if (linesWithFlags.length > 0) {
       const promoItems = linesWithFlags
         .map((line) => ({
           sku: line.sku,
@@ -178,12 +197,6 @@ export async function POST(req: Request) {
       appliedToHistory,
     };
 
-    if (duplicate) {
-      record.warnings.push(
-        "Duplicate invoice — skipped counting lines toward promotion limited qty."
-      );
-    }
-
     if (!accountNo) {
       record.warnings.unshift("No customer account resolved — skipped updating order history / recent items.");
     } else if (linesWithFlags.length === 0) {
@@ -205,7 +218,6 @@ export async function POST(req: Request) {
       record,
       parsedTextChars: text.length,
       unknownSkus,
-      duplicateWarning: duplicate,
       suggestedRegion: suggestedRegion || null,
     });
   } catch (error: any) {
