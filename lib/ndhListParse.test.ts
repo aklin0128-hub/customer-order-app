@@ -144,7 +144,7 @@ test("NDH pages wire upload and order tab", () => {
   assert.doesNotMatch(publicPage, /showcase-card/);
   assert.match(orderPage, /changeMode\("ndh"\)/);
   assert.match(orderPage, /\/api\/ndh/);
-  assert.match(sendOrder, /NDH_ORDER_EMAIL_TAG/);
+  assert.match(sendOrder, /splitOrderLinesForEmail/);
   assert.match(sendOrder, /incrementNdhSold/);
 });
 
