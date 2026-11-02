@@ -95,6 +95,11 @@ test("NDH pages wire upload and order tab", () => {
   assert.match(adminPage, /\/api\/admin\/ndh\/upload/);
   assert.match(uploadRoute, /parseNdhUpload/);
   assert.match(publicPage, /\/api\/ndh/);
+  assert.match(publicPage, /CatalogQtyCard/);
+  assert.match(publicPage, /order-promo-grid/);
+  assert.match(publicPage, /hideQtyControls/);
+  assert.doesNotMatch(publicPage, /showcase-grid/);
+  assert.doesNotMatch(publicPage, /showcase-card/);
   assert.match(orderPage, /changeMode\("ndh"\)/);
   assert.match(orderPage, /\/api\/ndh/);
   assert.match(sendOrder, /NDH_ORDER_EMAIL_TAG/);
