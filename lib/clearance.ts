@@ -303,7 +303,7 @@ export function validateClearanceInput(input: {
   }
 
   if (!clearancePrice) {
-    return { error: "Clearance price is required." };
+    return { error: "Near Date Sale price is required." };
   }
 
   if (startDate && !parseDateOnly(startDate)) {

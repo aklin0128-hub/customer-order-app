@@ -32,8 +32,7 @@ function clampPosition(pos: Position, size = getFabSize()): Position {
 function defaultPosition(): Position {
   const size = getFabSize();
   const marginY = window.innerWidth >= 768 ? 24 : 16;
-  const marginX =
-    window.innerWidth >= 768 ? Math.max(24, (window.innerWidth - 1040) / 2 + 24) : 14;
+  const marginX = window.innerWidth >= 768 ? 24 : 14;
   return clampPosition(
     {
       x: window.innerWidth - size - marginX,

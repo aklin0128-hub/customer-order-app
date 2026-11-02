@@ -1,0 +1,32 @@
+.ndh-public-page .new-logo {
+  background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+  box-shadow: 0 6px 16px rgba(190, 18, 60, 0.28);
+}
+
+.ndh-public-page .new-lang-btn.is-active {
+  background: #be123c;
+}
+
+.ndh-public-page .new-sign-in-btn {
+  background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+  box-shadow: 0 8px 20px rgba(190, 18, 60, 0.35);
+}
+
+.ndh-public-page .order-promo-grid {
+  margin-top: 16px;
+}
+
+@media (max-width: 767px) {
+  .ndh-public-page .order-promo-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 6px;
+    row-gap: 12px;
+    gap: unset;
+  }
+}
+
+@media (hover: hover) {
+  .ndh-public-page .new-sign-in-btn:hover {
+    box-shadow: 0 10px 24px rgba(190, 18, 60, 0.42);
+  }
+}

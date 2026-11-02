@@ -9,22 +9,31 @@ import { CATEGORY_OPTIONS } from "@/lib/inferCategory";
 
 import { CatalogVirtualGrid } from "./components/CatalogVirtualGrid";
 import { CatalogQtyCard } from "./components/CatalogQtyCard";
+import { OrderAdminBar } from "./components/OrderAdminBar";
 import { OrderCartModal } from "./components/OrderCartModal";
 import { OrderBarcodeScanner } from "./components/OrderBarcodeScanner";
 import { OrderFloatingCartFab } from "./components/OrderFloatingCartFab";
 import { OrderPastOrdersModal } from "./components/OrderPastOrdersModal";
 import { OrderQuickOrderPanel } from "./components/OrderQuickOrderPanel";
 import { OrderQuickPicksStrip } from "./components/OrderQuickPicksStrip";
-import { OrderShopNudge } from "./components/OrderShopNudge";
-import { RecommendedStrip } from "./components/RecommendedStrip";
+import { SkuOrderHistoryModal } from "./components/SkuOrderHistoryModal";
 import { OrderInput } from "./components/OrderInput";
 import { OrderReviewModal } from "./components/OrderReviewModal";
 import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
-import { buildClearanceUpsellLines } from "./salesFlow";
 import { ProductImage } from "./components/ProductImage";
-import { replaceCatalog, catalog } from "./catalogState";
+import { replaceCatalog, catalog, patchCatalogItem, patchSkuFields } from "./catalogState";
+import { ADMIN_UNLOCK_TAP_COUNT, ADMIN_UNLOCK_TAP_WINDOW_MS, isAdminUnlockSearch } from "./adminUnlock";
 import { isProductOrderingBlocked } from "@/lib/productAvailability";
-import { compareCatalogByNewestImport, compareCatalogForDisplay } from "@/lib/catalogNewItems";
+import { compareCatalogByNewestImport, compareCatalogForDisplay, formatNewItemComingDate } from "@/lib/catalogNewItems";
+import { isSeasonalEtaPending } from "@/lib/seasonalItems";
+import { clearCustomerSession, readCustomerSession, updateCustomerOrderEmail } from "@/lib/customerSession";
+import {
+  hasSavedAdminPassword,
+  getSavedAdminPassword,
+  persistAdminPassword,
+  clearSavedAdminPassword,
+  verifyAdminPassword,
+} from "@/app/admin/_components/useAdminAuth";
 import {
   formatBrandLabel,
   formatClearanceDetails,
@@ -36,9 +45,11 @@ import {
   getPromotionDealHighlight,
   generateOrderRef,
   getCatalogItemBySku,
+  withCatalogCardFields,
   getDisplayStatus,
   getStatusBadgeStyle,
   formatOrderNotAvailableMessage,
+  getUnavailableSubmitLines,
   findCatalogItemByScanCode,
   catalogSearchQueryFromScan,
   isOrderSearchQtyAdjustKey,
@@ -46,6 +57,8 @@ import {
   resolveQuickSearchTargetItem,
   isNewItem,
   isOrderableItem,
+  isReadyToOrderItem,
+  isCustomerVisibleCatalogItem,
   scoreCatalogSearchQuery,
 } from "./catalogUtils";
 import { DEFAULT_ORDER_EMAIL, isValidOrderEmail, resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
@@ -56,12 +69,30 @@ import {
 import {
   buildCatalogQtyMapFromDraft,
   cartItemsFromQtyMap,
-  cloudDraftHasMoreItems,
+  cloudDraftsEquivalent,
   countDraftItems,
+  deviceQtyForSharedTotal,
+  draftSaveFingerprint,
+  ensureDeviceCarts,
+  getOrCreateOrderDeviceId,
+  markSkuReaddedInDraft,
+  markSkuRemovedInDraft,
   mergeOrderDrafts,
   normalizeOrderDraft,
   type OrderDraftPayload,
 } from "@/lib/orderDraft";
+import {
+  loadFavoriteSkusPayload,
+  mergeFavoriteSkusPayloads,
+  normalizeFavoriteSku,
+  saveFavoriteSkusPayload,
+  toggleFavoriteSku,
+  type FavoriteSkusPayload,
+} from "@/lib/favoriteSkus";
+import {
+  buildSkuOrderHistoryIndex,
+  getLatestSkuOrderHistoryEntry,
+} from "@/lib/skuOrderHistory";
 import {
   applyQtyDelta,
   applyQtySet,
@@ -69,11 +100,17 @@ import {
   countCartLines,
   countTotalCases,
   expandOrderSubmitLines,
+  cartLineKind,
+  cartLinePoolKey,
   getCatalogQty,
   getClearanceQty,
+  getNdhQty,
+  ndhSkuSet,
   nhItemsSkuSet,
   type QtyMaps,
+  type QtySource,
 } from "@/lib/orderNhItems";
+import { ndhListingKey } from "@/lib/ndhListParse";
 import { copy } from "./orderCopy";
 import { readInitialStickyPanelOpen, useMobileViewport } from "./useMobileViewport";
 import {
@@ -86,15 +123,29 @@ import {
   filterLabelStyle,
   limitedBadgeStyle,
   modeButtonStyle,
-  newItemsModeButtonStyle,
-  primarySmallButtonStyle,
-  clearanceModeButtonStyle,
   promoModeButtonStyle,
+  ndhModeButtonStyle,
+  newItemsModeButtonStyle,
+  seasonalModeButtonStyle,
+  primarySmallButtonStyle,
   secondaryButtonStyle,
   smallButtonStyle,
   submitButtonStyle,
 } from "./orderStyles";
-import type { CartItem, CatalogItem, ClearanceItem, Lang, OrderHistoryItem, OrderMode, PromotionItem } from "./types";
+import type {
+  CartItem,
+  CatalogItem,
+  ClearanceItem,
+  Lang,
+  OrderHistoryItem,
+  OrderMode,
+  PromotionItem,
+} from "./types";
+
+/** Temporary: hide Quick order tab until we re-enable it. */
+const QUICK_ORDER_ENABLED = false;
+/** Temporary: hide Seasonal tab until we re-enable it. */
+const SEASONAL_TAB_ENABLED = false;
 
 const ORDER_LANG_LABELS: Record<Lang, string> = {
   en: "EN",
@@ -106,6 +157,34 @@ const ORDER_LANG_LABELS: Record<Lang, string> = {
 
 const categoryOptions = CATEGORY_OPTIONS;
 
+function saleMapsFromCart(prev: CartItem[]) {
+  const clearance: Record<string, string> = {};
+  const ndh: Record<string, string> = {};
+  for (const item of prev) {
+    const sku = item.sku.toUpperCase();
+    if (item.ndh) ndh[ndhListingKey(sku, item.expiryDate)] = item.qty;
+    else if (item.nhItems) clearance[sku] = item.qty;
+  }
+  return { clearance, ndh };
+}
+
+function cartRowsEqual(prev: CartItem[], next: CartItem[]) {
+  return (
+    prev.length === next.length &&
+    next.every((item, index) => {
+      const old = prev[index];
+      return (
+        Boolean(old) &&
+        old.sku === item.sku &&
+        old.qty === item.qty &&
+        Boolean(old.nhItems) === Boolean(item.nhItems) &&
+        Boolean(old.ndh) === Boolean(item.ndh) &&
+        String(old.expiryDate || "") === String(item.expiryDate || "")
+      );
+    })
+  );
+}
+
 export default function OrderPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -114,6 +193,7 @@ export default function OrderPage() {
   const submitLockRef = useRef(false);
   const autoLoadedRef = useRef(false);
   const clearanceFetchedRef = useRef(false);
+  const ndhFetchedRef = useRef(false);
   const transientMsgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addSkuToCartRef = useRef<(sku: string, qty?: string) => void>(() => {});
   const qtyInputRef = useRef("");
@@ -126,9 +206,21 @@ export default function OrderPage() {
     cart: [] as CartItem[],
     catalogQtyMap: {} as Record<string, string>,
   });
+  const deviceIdRef = useRef("");
+  const cloudDraftRef = useRef<OrderDraftPayload | null>(null);
+  const deviceQtyMapRef = useRef<Record<string, string>>({});
+  const cartDirtyRef = useRef(false);
+  const lastLocalEditAtRef = useRef(0);
+  const lastCloudUpdatedAtRef = useRef("");
+  const lastSavedDraftFingerprintRef = useRef("");
+  const lastPostedPhoneRef = useRef<string | null>(null);
+  const favoriteUpdatedAtRef = useRef(0);
+  const favoriteDirtyRef = useRef(false);
+  const adminUnlockTapsRef = useRef(0);
+  const adminUnlockTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [lang, setLang] = useState<Lang>("en");
-  const [mode, setMode] = useState<OrderMode>("promotion");
+  const [mode, setMode] = useState<OrderMode>("catalog");
   const [ready, setReady] = useState(false);
   const [accountNo, setAccountNo] = useState("");
   const [storeName, setStoreName] = useState("");
@@ -142,6 +234,8 @@ export default function OrderPage() {
   const [catalogQtyMap, setCatalogQtyMap] = useState<Record<string, string>>({});
   /** Session-only clearance cart — independent from catalogQtyMap. Not saved in drafts. */
   const [clearanceQtyMap, setClearanceQtyMap] = useState<Record<string, string>>({});
+  /** Session-only NDH cart — independent from catalog and Near Date Sale. Not saved in drafts. */
+  const [ndhQtyMap, setNdhQtyMap] = useState<Record<string, string>>({});
   const [catalogSearch, setCatalogSearch] = useState("");
   const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
   const [brandFilter, setBrandFilter] = useState("ALL");
@@ -153,7 +247,10 @@ export default function OrderPage() {
   const [lastSubmittedItems, setLastSubmittedItems] = useState<CartItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [autoLoaded, setAutoLoaded] = useState(false);
-  const [showAvailableOnly, setShowAvailableOnly] = useState(false);
+  const [showAvailableOnly, setShowAvailableOnly] = useState(true);
+  const [catalogShowFavoritesOnly, setCatalogShowFavoritesOnly] = useState(false);
+  const [favoriteSkus, setFavoriteSkus] = useState<string[]>([]);
+  const [showUpc, setShowUpc] = useState(false);
   const [showCustomerInfo, setShowCustomerInfo] = useState(false);
   const [invoicePricingEnabled, setInvoicePricingEnabled] = useState(false);
   const [invoicePriceEntries, setInvoicePriceEntries] = useState<
@@ -161,6 +258,7 @@ export default function OrderPage() {
   >({});
   const [fullscreen, setFullscreen] = useState(false);
   const [showPastOrders, setShowPastOrders] = useState(false);
+  const [skuHistorySku, setSkuHistorySku] = useState("");
   const [showCart, setShowCart] = useState(false);
   const [catalogShowSelectedOnly, setCatalogShowSelectedOnly] = useState(false);
   const [catalogShowRecommendedOnly, setCatalogShowRecommendedOnly] = useState(false);
@@ -168,12 +266,25 @@ export default function OrderPage() {
   const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false);
   const [recentItems, setRecentItems] = useState<CartItem[]>([]);
   const [orderHistory, setOrderHistory] = useState<OrderHistoryItem[]>([]);
+  const skuOrderHistoryIndex = useMemo(
+    () => buildSkuOrderHistoryIndex(orderHistory),
+    [orderHistory]
+  );
   const [catalogVersion, setCatalogVersion] = useState(0);
   const [promotionItems, setPromotionItems] = useState<PromotionItem[]>([]);
   const [promotionsLoading, setPromotionsLoading] = useState(false);
+  const [seasonalItems, setSeasonalItems] = useState<CatalogItem[]>([]);
+  const [seasonalLoading, setSeasonalLoading] = useState(false);
   const [clearanceItems, setClearanceItems] = useState<ClearanceItem[]>([]);
   const [clearanceLoading, setClearanceLoading] = useState(false);
+  const [ndhItems, setNdhItems] = useState<ClearanceItem[]>([]);
+  const [ndhLoading, setNdhLoading] = useState(false);
   const [showAdminEditLinks, setShowAdminEditLinks] = useState(false);
+  const [adminUnlockOpen, setAdminUnlockOpen] = useState(false);
+  const [adminPasswordInput, setAdminPasswordInput] = useState("");
+  const [adminRemember, setAdminRemember] = useState(true);
+  const [adminLoginError, setAdminLoginError] = useState("");
+  const [adminLoginLoading, setAdminLoginLoading] = useState(false);
   const [stickyPanelOpen, setStickyPanelOpen] = useState(readInitialStickyPanelOpen);
   const isMobileViewport = useMobileViewport();
 
@@ -183,14 +294,132 @@ export default function OrderPage() {
     }
   }, [isMobileViewport, mode]);
 
+  useEffect(() => {
+    if (!accountNo) {
+      setFavoriteSkus([]);
+      setCatalogShowFavoritesOnly(false);
+      favoriteUpdatedAtRef.current = 0;
+      favoriteDirtyRef.current = false;
+      return;
+    }
+
+    let cancelled = false;
+
+    const syncFavorites = async () => {
+      const local = loadFavoriteSkusPayload(accountNo);
+      // Show local immediately so stars paint before the network round-trip.
+      if (local && !cancelled) {
+        setFavoriteSkus(local.skus);
+        favoriteUpdatedAtRef.current = local.updatedAt;
+      }
+
+      let cloud: FavoriteSkusPayload | null = null;
+      try {
+        const res = await fetch(
+          `/api/favorite-skus?accountNo=${encodeURIComponent(accountNo)}`,
+          { method: "GET", cache: "no-store" }
+        );
+        const data = await res.json();
+        if (res.ok && data?.favorites) {
+          cloud = data.favorites as FavoriteSkusPayload;
+        }
+      } catch {
+        /* offline — keep local */
+      }
+      if (cancelled) return;
+
+      const merged = mergeFavoriteSkusPayloads(local, cloud);
+      if (!merged) return;
+
+      setFavoriteSkus(merged.skus);
+      favoriteUpdatedAtRef.current = merged.updatedAt;
+      saveFavoriteSkusPayload(accountNo, merged);
+
+      // Push union / local migration so tablet/desktop share the same list.
+      const sameSkuSet =
+        Boolean(cloud) &&
+        cloud!.skus.length === merged.skus.length &&
+        merged.skus.every((sku) => cloud!.skus.includes(sku));
+      const needsUpload =
+        !cloud || cloud.updatedAt !== merged.updatedAt || !sameSkuSet;
+      if (needsUpload) {
+        try {
+          const res = await fetch("/api/favorite-skus", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              accountNo,
+              skus: merged.skus,
+              updatedAt: merged.updatedAt || Date.now(),
+            }),
+          });
+          const data = await res.json();
+          if (res.ok && data?.favorites && !cancelled) {
+            const saved = data.favorites as FavoriteSkusPayload;
+            setFavoriteSkus(saved.skus);
+            favoriteUpdatedAtRef.current = saved.updatedAt;
+            saveFavoriteSkusPayload(accountNo, saved);
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+
+    void syncFavorites();
+    return () => {
+      cancelled = true;
+    };
+  }, [accountNo]);
+
+  useEffect(() => {
+    try {
+      setShowUpc(localStorage.getItem("order_show_upc") === "1");
+    } catch {
+      setShowUpc(false);
+    }
+  }, []);
+
+  const toggleShowUpc = useCallback(() => {
+    setShowUpc((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("order_show_upc", next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+
+  const favoriteSkuSet = useMemo(
+    () => new Set(favoriteSkus.map((sku) => normalizeFavoriteSku(sku))),
+    [favoriteSkus]
+  );
+
+  const openSkuHistory = useCallback((sku: string) => {
+    const clean = normalizeFavoriteSku(sku);
+    if (clean) setSkuHistorySku(clean);
+  }, []);
+
   const toggleCategoryFilter = (cat: string) => {
     if (cat === "ALL") {
       setCategoryFilters([]);
-      return;
+    } else {
+      // Single-select: picking one category clears any other.
+      setCategoryFilters((prev) => (prev.length === 1 && prev[0] === cat ? [] : [cat]));
     }
-    setCategoryFilters((prev) =>
-      prev.includes(cat) ? prev.filter((value) => value !== cat) : [...prev, cat]
-    );
+    if (isMobileViewport) setCatalogFiltersOpen(false);
+  };
+
+  const clearCatalogFilters = () => {
+    setCategoryFilters([]);
+    setBrandFilter("ALL");
+    setCatalogShowRecommendedOnly(false);
+    setCatalogShowFavoritesOnly(false);
+    setCatalogShowSelectedOnly(false);
+    setCatalogSearch("");
+    setCatalogFiltersOpen(false);
   };
 
   const categoryAllActive = categoryFilters.length === 0;
@@ -210,6 +439,133 @@ export default function OrderPage() {
       transientMsgTimerRef.current = null;
     }, ms);
   }, []);
+
+  const loginAdminOnOrder = useCallback(async () => {
+    if (adminLoginLoading) return;
+    setAdminLoginLoading(true);
+    setAdminLoginError("");
+    const result = await verifyAdminPassword(adminPasswordInput);
+    if (!result.ok) {
+      setAdminLoginError(result.error);
+      setAdminLoginLoading(false);
+      return;
+    }
+    persistAdminPassword(adminPasswordInput, adminRemember);
+    setShowAdminEditLinks(true);
+    setAdminUnlockOpen(false);
+    setAdminPasswordInput("");
+    setAdminLoginLoading(false);
+  }, [adminLoginLoading, adminPasswordInput, adminRemember]);
+
+  const logoutAdminOnOrder = useCallback(() => {
+    clearSavedAdminPassword();
+    setShowAdminEditLinks(false);
+    setAdminUnlockOpen(false);
+    setAdminPasswordInput("");
+    setAdminLoginError("");
+  }, []);
+
+  const tapAdminUnlock = useCallback(() => {
+    if (showAdminEditLinks || adminUnlockOpen) return;
+    adminUnlockTapsRef.current += 1;
+    if (adminUnlockTapTimerRef.current) clearTimeout(adminUnlockTapTimerRef.current);
+    if (adminUnlockTapsRef.current >= ADMIN_UNLOCK_TAP_COUNT) {
+      adminUnlockTapsRef.current = 0;
+      setAdminUnlockOpen(true);
+      return;
+    }
+    adminUnlockTapTimerRef.current = setTimeout(() => {
+      adminUnlockTapsRef.current = 0;
+      adminUnlockTapTimerRef.current = null;
+    }, ADMIN_UNLOCK_TAP_WINDOW_MS);
+  }, [showAdminEditLinks, adminUnlockOpen]);
+
+  const handleAdminCategoryChange = useCallback(
+    async (sku: string, category: string) => {
+      const password = getSavedAdminPassword();
+      if (!password) {
+        setShowAdminEditLinks(false);
+        throw new Error("Admin login required.");
+      }
+
+      const res = await fetch("/api/admin/products", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": password,
+        },
+        body: JSON.stringify({ sku, category }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showTransientToast(String(data?.error || t.adminCategoryFailed));
+        throw new Error(String(data?.error || t.adminCategoryFailed));
+      }
+
+      const product = data?.product as
+        | {
+            category?: string;
+            categories?: string[];
+            newItemStorageLabel?: CatalogItem["newItemStorageLabel"];
+          }
+        | undefined;
+      const patch = {
+        category: product?.category ?? "",
+        categories: Array.isArray(product?.categories) ? product.categories : category ? [category] : [],
+        ...(product?.newItemStorageLabel ? { newItemStorageLabel: product.newItemStorageLabel } : {}),
+      };
+      patchCatalogItem(sku, patch);
+      setSeasonalItems((prev) => patchSkuFields(prev, sku, patch));
+      setPromotionItems((prev) => patchSkuFields(prev, sku, patch));
+      setClearanceItems((prev) => patchSkuFields(prev, sku, patch));
+      setCatalogVersion((v) => v + 1);
+      showTransientToast(t.adminCategorySaved, 1800);
+    },
+    [showTransientToast, t.adminCategoryFailed, t.adminCategorySaved]
+  );
+
+  const toggleFavorite = useCallback(
+    (sku: string) => {
+      const clean = normalizeFavoriteSku(sku);
+      const wasFavorite = favoriteSkuSet.has(clean);
+      const updatedAt = Date.now();
+      favoriteDirtyRef.current = true;
+      favoriteUpdatedAtRef.current = updatedAt;
+      setFavoriteSkus((prev) => {
+        const next = toggleFavoriteSku(prev, sku);
+        if (accountNo) {
+          saveFavoriteSkusPayload(accountNo, { accountNo, skus: next, updatedAt });
+          void fetch("/api/favorite-skus", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ accountNo, skus: next, updatedAt }),
+          })
+            .then(async (res) => {
+              const data = await res.json().catch(() => null);
+              if (!res.ok || !data?.favorites) return;
+              const saved = data.favorites as FavoriteSkusPayload;
+              // Ignore stale responses after a newer local toggle.
+              if (saved.updatedAt < favoriteUpdatedAtRef.current) return;
+              favoriteUpdatedAtRef.current = saved.updatedAt;
+              favoriteDirtyRef.current = false;
+              setFavoriteSkus(saved.skus);
+              saveFavoriteSkusPayload(accountNo, saved);
+            })
+            .catch(() => {
+              /* local cache still has the toggle */
+            });
+        } else {
+          favoriteDirtyRef.current = false;
+        }
+        return next;
+      });
+      showTransientToast(
+        (wasFavorite ? t.favoriteRemoved : t.favoriteAdded).replace("{sku}", clean),
+        2200
+      );
+    },
+    [accountNo, favoriteSkuSet, showTransientToast, t.favoriteAdded, t.favoriteRemoved]
+  );
 
   const dismissFloatingNotice = useCallback(() => {
     if (transientMsgTimerRef.current) {
@@ -236,9 +592,12 @@ export default function OrderPage() {
 
   useEffect(() => {
     const syncAdminEdit = () => {
-      setShowAdminEditLinks(Boolean(sessionStorage.getItem("admin_password")));
+      setShowAdminEditLinks(hasSavedAdminPassword());
     };
     syncAdminEdit();
+    if (isAdminUnlockSearch(window.location.search)) {
+      setAdminUnlockOpen(true);
+    }
 
     const onVisible = () => {
       if (document.visibilityState === "visible") syncAdminEdit();
@@ -284,6 +643,27 @@ export default function OrderPage() {
   }, [ready]);
 
   useEffect(() => {
+    if (!ready || !SEASONAL_TAB_ENABLED) return;
+
+    const loadSeasonal = async () => {
+      setSeasonalLoading(true);
+      try {
+        const res = await fetch("/api/seasonal", { cache: "no-store" });
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.products)) {
+          setSeasonalItems(data.products);
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        setSeasonalLoading(false);
+      }
+    };
+
+    void loadSeasonal();
+  }, [ready]);
+
+  useEffect(() => {
     if (!ready || mode !== "clearance" || clearanceFetchedRef.current) return;
 
     const loadClearance = async () => {
@@ -306,19 +686,69 @@ export default function OrderPage() {
   }, [ready, mode]);
 
   useEffect(() => {
+    if (!ready || mode !== "ndh" || ndhFetchedRef.current) return;
+
+    const loadNdh = async () => {
+      ndhFetchedRef.current = true;
+      setNdhLoading(true);
+      try {
+        const res = await fetch("/api/ndh");
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.products)) {
+          setNdhItems(data.products);
+        }
+      } catch {
+        ndhFetchedRef.current = false;
+      } finally {
+        setNdhLoading(false);
+      }
+    };
+
+    void loadNdh();
+  }, [ready, mode]);
+
+  useEffect(() => {
     const saved = localStorage.getItem("lang") as Lang | null;
     if (saved === "en" || saved === "zh" || saved === "ko" || saved === "vi") setLang(saved);
 
-    const savedMode = localStorage.getItem("order_mode") as OrderMode | null;
-    if (
+    const savedMode = localStorage.getItem("order_mode");
+    const savedDeals = localStorage.getItem("order_deals_sub");
+    const savedPicks = localStorage.getItem("order_picks_sub");
+
+    // Migrate legacy modes into Catalog / Promotions / NDH / New items.
+    if (savedMode === "seasonal" && !SEASONAL_TAB_ENABLED) {
+      setMode("catalog");
+    } else if (savedMode === "clearance" || savedMode === "ndh") {
+      setMode("ndh");
+    } else if (
       savedMode === "catalog" ||
       savedMode === "promotion" ||
-      savedMode === "clearance" ||
-      savedMode === "newItems"
+      savedMode === "newItems" ||
+      savedMode === "seasonal"
     ) {
       setMode(savedMode);
-    } else if (savedMode === "search" || !savedMode) {
-      setMode("promotion");
+    } else if (savedMode === "deals") {
+      setMode(savedDeals === "clearance" || savedDeals === "ndh" ? "ndh" : "promotion");
+    } else if (savedMode === "picks") {
+      setMode(savedPicks === "seasonal" && SEASONAL_TAB_ENABLED ? "seasonal" : "newItems");
+    } else if (savedMode === "vegesFruits") {
+      setMode("newItems");
+    } else {
+      setMode("catalog");
+    }
+
+    const queryMode = new URLSearchParams(window.location.search).get("mode");
+    const resolvedQueryMode = queryMode === "clearance" ? "ndh" : queryMode;
+    if (
+      resolvedQueryMode === "catalog" ||
+      resolvedQueryMode === "promotion" ||
+      resolvedQueryMode === "ndh" ||
+      resolvedQueryMode === "newItems" ||
+      (resolvedQueryMode === "seasonal" && SEASONAL_TAB_ENABLED) ||
+      (resolvedQueryMode === "search" && QUICK_ORDER_ENABLED)
+    ) {
+      setMode(resolvedQueryMode);
+      localStorage.setItem("order_mode", resolvedQueryMode);
     }
   }, []);
 
@@ -328,8 +758,13 @@ export default function OrderPage() {
   };
 
   const changeMode = (next: OrderMode) => {
-    setMode(next);
-    localStorage.setItem("order_mode", next);
+    let resolved = next;
+    if (resolved === "clearance") resolved = "ndh";
+    if (!QUICK_ORDER_ENABLED && resolved === "search") resolved = "catalog";
+    if (!SEASONAL_TAB_ENABLED && resolved === "seasonal") resolved = "catalog";
+    setMode(resolved);
+    localStorage.setItem("order_mode", resolved);
+    if (resolved !== "catalog") setCatalogFiltersOpen(false);
     dismissFloatingNotice();
   };
 
@@ -373,6 +808,12 @@ export default function OrderPage() {
   }, [autoLoaded]);
 
   useEffect(() => {
+    if (!deviceIdRef.current) {
+      deviceIdRef.current = getOrCreateOrderDeviceId();
+    }
+  }, []);
+
+  useEffect(() => {
     draftSnapshotRef.current = {
       accountNo,
       storeName,
@@ -391,19 +832,16 @@ export default function OrderPage() {
   }, [accountNo]);
 
   useEffect(() => {
-    const loggedIn = sessionStorage.getItem("customer_logged_in");
-    const savedAccount = sessionStorage.getItem("customer_account_no");
-    const savedStore = sessionStorage.getItem("customer_store_name");
+    const session = readCustomerSession();
 
-    if (loggedIn !== "true" || !savedAccount) {
+    if (!session?.accountNo) {
       router.replace("/");
       return;
     }
 
-    setAccountNo(savedAccount);
-    setStoreName(savedStore || "");
-    const savedOrderEmail = sessionStorage.getItem("customer_order_email");
-    setOrderEmail(resolveCustomerOrderEmail(savedOrderEmail || ""));
+    setAccountNo(session.accountNo);
+    setStoreName(session.storeName || "");
+    setOrderEmail(resolveCustomerOrderEmail(session.orderEmail || ""));
     setReady(true);
   }, [router]);
 
@@ -424,18 +862,32 @@ export default function OrderPage() {
   useEffect(() => {
     if (!ready || !accountNo || autoLoaded) return;
 
-    const applyDraft = (draft: OrderDraftPayload) => {
-      setPhone(draft.phone || "");
-      setNote(draft.note || "");
-      const map = buildCatalogQtyMapFromDraft(draft);
+    const applySharedDraft = (draft: OrderDraftPayload, opts?: { keepClearance?: boolean }) => {
+      const normalized = ensureDeviceCarts(draft) || normalizeOrderDraft(accountNo, draft);
+      const deviceId = deviceIdRef.current || getOrCreateOrderDeviceId();
+      deviceIdRef.current = deviceId;
+      cloudDraftRef.current = normalized;
+      deviceQtyMapRef.current = {
+        ...(normalized.deviceCarts?.[deviceId]?.catalogQtyMap || {}),
+      };
+      lastCloudUpdatedAtRef.current = String(normalized.updatedAt || "");
+      cartDirtyRef.current = false;
+      setPhone(normalized.phone || "");
+      setNote(normalized.note || "");
+      const map = buildCatalogQtyMapFromDraft(normalized);
       setCatalogQtyMap(map);
-      setClearanceQtyMap({});
+      if (!opts?.keepClearance) setClearanceQtyMap({});
       setCart(cartItemsFromQtyMap(map));
+      localStorage.setItem(`draft_${accountNo}`, JSON.stringify(normalized));
     };
 
     const loadDrafts = async () => {
       let localParsed: OrderDraftPayload | null = null;
       let cloudParsed: OrderDraftPayload | null = null;
+      let cloudExplicitlyEmpty = false;
+      if (!deviceIdRef.current) {
+        deviceIdRef.current = getOrCreateOrderDeviceId();
+      }
 
       const localDraft = localStorage.getItem(`draft_${accountNo}`);
       if (localDraft) {
@@ -447,26 +899,65 @@ export default function OrderPage() {
       try {
         const res = await fetch(`/api/load-draft?accountNo=${encodeURIComponent(accountNo)}`, { method: "GET", cache: "no-store" });
         const data = await res.json();
-        if (res.ok && data?.draft) {
-          cloudParsed = normalizeOrderDraft(accountNo, data.draft);
+        if (res.ok) {
+          if (data?.draft) {
+            cloudParsed = normalizeOrderDraft(accountNo, data.draft);
+          } else {
+            // Cloud draft deleted (other device submitted/cleared) — do not revive from localStorage.
+            cloudExplicitlyEmpty = true;
+          }
         }
       } catch {}
 
-      const merged = mergeOrderDrafts(localParsed, cloudParsed);
-      if (merged) {
-        applyDraft(merged);
-        localStorage.setItem(`draft_${accountNo}`, JSON.stringify(merged));
-        if (countDraftItems(merged) > 0) {
-          showTransientToast(t.loadedDraft);
-        }
-
+      if (cloudExplicitlyEmpty) {
         try {
-          await fetch("/api/save-draft", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...merged, allowClear: false }),
+          localStorage.removeItem(`draft_${accountNo}`);
+        } catch {
+          /* ignore */
+        }
+        cloudDraftRef.current = null;
+        deviceQtyMapRef.current = {};
+        lastCloudUpdatedAtRef.current = "";
+        cartDirtyRef.current = false;
+        lastSavedDraftFingerprintRef.current = draftSaveFingerprint({
+          catalogQtyMap: {},
+          deviceQtyMap: {},
+        });
+        lastPostedPhoneRef.current = "";
+      } else {
+        const merged = mergeOrderDrafts(localParsed, cloudParsed);
+        if (merged) {
+          applySharedDraft(merged);
+          if (countDraftItems(merged) > 0) {
+            showTransientToast(t.loadedDraft);
+          }
+
+          lastSavedDraftFingerprintRef.current = draftSaveFingerprint({
+            storeName: merged.storeName,
+            phone: merged.phone,
+            note: merged.note,
+            orderEmail: merged.orderEmail,
+            catalogQtyMap: buildCatalogQtyMapFromDraft(merged),
+            deviceQtyMap: deviceQtyMapRef.current,
+            removedSkus: merged.removedSkus,
           });
-        } catch {}
+          lastPostedPhoneRef.current = String(merged.phone || "").trim();
+
+          if (!cloudParsed || !cloudDraftsEquivalent(merged, cloudParsed)) {
+            try {
+              await fetch("/api/save-draft", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  ...merged,
+                  deviceId: deviceIdRef.current,
+                  deviceQtyMap: deviceQtyMapRef.current,
+                  allowClear: countDraftItems(merged) === 0,
+                }),
+              });
+            } catch {}
+          }
+        }
       }
 
       try {
@@ -479,7 +970,7 @@ export default function OrderPage() {
           if (profileData?.orderEmail) {
             const resolved = resolveCustomerOrderEmail(profileData.orderEmail);
             setOrderEmail(resolved);
-            sessionStorage.setItem("customer_order_email", resolved);
+            updateCustomerOrderEmail(resolved);
           }
           if (profileData?.invoicePricing) {
             setInvoicePricingEnabled(true);
@@ -516,6 +1007,9 @@ export default function OrderPage() {
   useEffect(() => {
     if (!ready || !accountNo || !autoLoaded) return;
 
+    const deviceId = deviceIdRef.current || getOrCreateOrderDeviceId();
+    deviceIdRef.current = deviceId;
+    const editAt = lastLocalEditAtRef.current;
     const draft = normalizeOrderDraft(accountNo, {
       storeName,
       phone,
@@ -523,74 +1017,114 @@ export default function OrderPage() {
       note,
       cart,
       catalogQtyMap,
+      deviceCarts: {
+        ...(cloudDraftRef.current?.deviceCarts || {}),
+        [deviceId]: {
+          catalogQtyMap: deviceQtyMapRef.current,
+          updatedAt: new Date().toISOString(),
+        },
+      },
+      removedSkus: cloudDraftRef.current?.removedSkus,
+      itemAddedAt: cloudDraftRef.current?.itemAddedAt,
       updatedAt: new Date().toISOString(),
     });
     localStorage.setItem(`draft_${accountNo}`, JSON.stringify(draft));
 
     const timer = setTimeout(async () => {
-      const applyServerDraftIfRicher = (serverDraft: OrderDraftPayload) => {
-        const current = normalizeOrderDraft(accountNo, {
-          storeName,
-          phone,
-          orderEmail,
-          note,
-          cart,
-          catalogQtyMap,
-        });
-        if (!cloudDraftHasMoreItems(current, serverDraft)) return;
-
-        setPhone(serverDraft.phone || "");
-        setNote(serverDraft.note || "");
-        const map = buildCatalogQtyMapFromDraft(serverDraft);
-        setCatalogQtyMap(map);
-        setCart(cartItemsFromQtyMap(map));
-        localStorage.setItem(`draft_${accountNo}`, JSON.stringify(serverDraft));
+      const allowClear = countDraftItems(draft) === 0;
+      const saveBody = {
+        ...draft,
+        // Authoritative shared cart from UI — not re-aggregated peer leftovers.
+        desiredSharedQtyMap: catalogQtyMap,
+        catalogQtyMap,
+        deviceId,
+        deviceQtyMap: deviceQtyMapRef.current,
+        removedSkus: cloudDraftRef.current?.removedSkus,
+        allowClear,
       };
+      const fingerprint = draftSaveFingerprint({
+        storeName: draft.storeName,
+        phone: draft.phone,
+        note: draft.note,
+        orderEmail: draft.orderEmail,
+        catalogQtyMap,
+        deviceQtyMap: deviceQtyMapRef.current,
+        removedSkus: cloudDraftRef.current?.removedSkus,
+      });
 
-      try {
-        const saveBody = {
-          ...draft,
-          allowClear: false,
-        };
-        const res = await fetch("/api/save-draft", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(saveBody),
-        });
-        if (!res.ok) throw new Error("save failed");
-        const data = await res.json();
-        if (data?.draft) {
-          applyServerDraftIfRicher(normalizeOrderDraft(accountNo, data.draft));
-        }
-      } catch {
+      if (fingerprint !== lastSavedDraftFingerprintRef.current) {
         try {
           const res = await fetch("/api/save-draft", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...draft, allowClear: false }),
+            body: JSON.stringify(saveBody),
           });
-          if (res.ok) {
-            const data = await res.json();
-            if (data?.draft) {
-              applyServerDraftIfRicher(normalizeOrderDraft(accountNo, data.draft));
+          if (!res.ok) throw new Error("save failed");
+          lastSavedDraftFingerprintRef.current = fingerprint;
+          const data = await res.json();
+          if (data?.draft) {
+            const normalized = ensureDeviceCarts(data.draft) || normalizeOrderDraft(accountNo, data.draft);
+            // Newer local edits while this save was in flight — keep UI; next autosave will sync.
+            if (lastLocalEditAtRef.current > editAt) {
+              const localRemoved = cloudDraftRef.current?.removedSkus || {};
+              let merged: OrderDraftPayload = normalized;
+              for (const [sku, at] of Object.entries(localRemoved)) {
+                if (!catalogQtyMap[sku]) {
+                  merged = markSkuRemovedInDraft(merged, sku, at) || merged;
+                }
+              }
+              cloudDraftRef.current = merged;
+              return;
             }
+            cloudDraftRef.current = normalized;
+            deviceQtyMapRef.current = {
+              ...(normalized.deviceCarts?.[deviceId]?.catalogQtyMap || {}),
+            };
+            lastCloudUpdatedAtRef.current = String(normalized.updatedAt || "");
+            cartDirtyRef.current = false;
+            localStorage.setItem(`draft_${accountNo}`, JSON.stringify(normalized));
+            const shared = buildCatalogQtyMapFromDraft(normalized);
+            setCatalogQtyMap((prev) => {
+              const same =
+                Object.keys(prev).length === Object.keys(shared).length &&
+                Object.entries(shared).every(([sku, qty]) => prev[sku] === qty);
+              return same ? prev : shared;
+            });
+            setCart((prev) => {
+              const sales = saleMapsFromCart(prev);
+              const next = buildCartDisplayItems({ catalog: shared, ...sales });
+              return cartRowsEqual(prev, next) ? prev : next;
+            });
           }
         } catch {
-          /* localStorage backup already written above */
+          try {
+            await fetch("/api/save-draft", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(saveBody),
+            });
+            lastSavedDraftFingerprintRef.current = fingerprint;
+          } catch {
+            /* localStorage backup already written above */
+          }
         }
       }
 
-      try {
-        await fetch("/api/customer-profile", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            accountNo,
-            phone: phone.trim(),
-          }),
-        });
-      } catch {}
-    }, 700);
+      const phoneTrim = phone.trim();
+      if (lastPostedPhoneRef.current !== phoneTrim) {
+        try {
+          await fetch("/api/customer-profile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              accountNo,
+              phone: phoneTrim,
+            }),
+          });
+          lastPostedPhoneRef.current = phoneTrim;
+        } catch {}
+      }
+    }, 4000);
 
     return () => clearTimeout(timer);
   }, [ready, accountNo, storeName, phone, orderEmail, note, cart, catalogQtyMap, autoLoaded]);
@@ -603,20 +1137,63 @@ export default function OrderPage() {
 
       const snapshot = draftSnapshotRef.current;
       if (!snapshot.accountNo) return;
+      const deviceId = deviceIdRef.current || getOrCreateOrderDeviceId();
 
       const payload = normalizeOrderDraft(snapshot.accountNo, {
         ...snapshot,
+        deviceCarts: {
+          ...(cloudDraftRef.current?.deviceCarts || {}),
+          [deviceId]: {
+            catalogQtyMap: deviceQtyMapRef.current,
+            updatedAt: new Date().toISOString(),
+          },
+        },
+        removedSkus: cloudDraftRef.current?.removedSkus,
         updatedAt: new Date().toISOString(),
       });
 
       localStorage.setItem(`draft_${snapshot.accountNo}`, JSON.stringify(payload));
 
-      if (typeof navigator.sendBeacon === "function") {
+      const fingerprint = draftSaveFingerprint({
+        storeName: payload.storeName,
+        phone: payload.phone,
+        note: payload.note,
+        orderEmail: payload.orderEmail,
+        catalogQtyMap: snapshot.catalogQtyMap || payload.catalogQtyMap,
+        deviceQtyMap: deviceQtyMapRef.current,
+        removedSkus: cloudDraftRef.current?.removedSkus,
+      });
+
+      if (fingerprint !== lastSavedDraftFingerprintRef.current && typeof navigator.sendBeacon === "function") {
         const body = JSON.stringify({
           ...payload,
-          allowClear: false,
+          desiredSharedQtyMap: snapshot.catalogQtyMap || payload.catalogQtyMap,
+          catalogQtyMap: snapshot.catalogQtyMap || payload.catalogQtyMap,
+          deviceId,
+          deviceQtyMap: deviceQtyMapRef.current,
+          removedSkus: cloudDraftRef.current?.removedSkus,
+          allowClear: countDraftItems(payload) === 0,
         });
         navigator.sendBeacon("/api/save-draft", new Blob([body], { type: "application/json" }));
+        lastSavedDraftFingerprintRef.current = fingerprint;
+      }
+
+      const phoneTrim = String(snapshot.phone || "").trim();
+      if (lastPostedPhoneRef.current !== phoneTrim) {
+        try {
+          void fetch("/api/customer-profile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              accountNo: snapshot.accountNo,
+              phone: phoneTrim,
+            }),
+            keepalive: true,
+          });
+          lastPostedPhoneRef.current = phoneTrim;
+        } catch {
+          /* ignore */
+        }
       }
     };
 
@@ -633,6 +1210,113 @@ export default function OrderPage() {
     };
   }, [ready, accountNo]);
 
+  // Pull the shared cart so the other person's adds show up without refresh.
+  useEffect(() => {
+    if (!ready || !accountNo || !autoLoaded) return;
+
+    const pullSharedCart = async () => {
+      if (cartDirtyRef.current) return;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      try {
+        const res = await fetch(`/api/load-draft?accountNo=${encodeURIComponent(accountNo)}`, {
+          method: "GET",
+          cache: "no-store",
+        });
+        const data = await res.json();
+        if (!res.ok) return;
+
+        // Peer submitted/cleared — drop local shared cart (keep Near Date Sale session lines).
+        if (!data?.draft) {
+          const hadSharedCart =
+            Boolean(lastCloudUpdatedAtRef.current) ||
+            Boolean(cloudDraftRef.current) ||
+            Object.keys(deviceQtyMapRef.current).length > 0;
+          if (hadSharedCart && !cartDirtyRef.current) {
+            cloudDraftRef.current = null;
+            deviceQtyMapRef.current = {};
+            lastCloudUpdatedAtRef.current = "";
+            cartDirtyRef.current = false;
+            setCatalogQtyMap({});
+            setCart((prev) => {
+              const sales = saleMapsFromCart(prev);
+              return buildCartDisplayItems({ catalog: {}, ...sales });
+            });
+            try {
+              localStorage.removeItem(`draft_${accountNo}`);
+            } catch {
+              /* ignore */
+            }
+          }
+          return;
+        }
+
+        const normalized = ensureDeviceCarts(data.draft) || normalizeOrderDraft(accountNo, data.draft);
+        const updatedAt = String(normalized.updatedAt || "");
+        if (!updatedAt || updatedAt === lastCloudUpdatedAtRef.current) return;
+        if (cartDirtyRef.current) return;
+
+        const deviceId = deviceIdRef.current || getOrCreateOrderDeviceId();
+        cloudDraftRef.current = normalized;
+        deviceQtyMapRef.current = {
+          ...(normalized.deviceCarts?.[deviceId]?.catalogQtyMap || {}),
+        };
+        lastCloudUpdatedAtRef.current = updatedAt;
+        const shared = buildCatalogQtyMapFromDraft(normalized);
+        setCatalogQtyMap((prev) => {
+          const same =
+            Object.keys(prev).length === Object.keys(shared).length &&
+            Object.entries(shared).every(([sku, qty]) => prev[sku] === qty);
+          return same ? prev : shared;
+        });
+        setCart((prev) => {
+          // Keep Near Date / NDH session lines; replace catalog portion via buildCartDisplayItems.
+          const sales = saleMapsFromCart(prev);
+          const next = buildCartDisplayItems({ catalog: shared, ...sales });
+          return cartRowsEqual(prev, next) ? prev : next;
+        });
+        localStorage.setItem(`draft_${accountNo}`, JSON.stringify(normalized));
+      } catch {
+        /* ignore poll errors */
+      }
+    };
+
+    const pullFavoriteSkus = async () => {
+      if (favoriteDirtyRef.current) return;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      try {
+        const res = await fetch(
+          `/api/favorite-skus?accountNo=${encodeURIComponent(accountNo)}`,
+          { method: "GET", cache: "no-store" }
+        );
+        const data = await res.json();
+        if (!res.ok || !data?.favorites) return;
+        const cloud = data.favorites as FavoriteSkusPayload;
+        if (!cloud.updatedAt || cloud.updatedAt <= favoriteUpdatedAtRef.current) return;
+        if (favoriteDirtyRef.current) return;
+        favoriteUpdatedAtRef.current = cloud.updatedAt;
+        setFavoriteSkus(cloud.skus);
+        saveFavoriteSkusPayload(accountNo, cloud);
+      } catch {
+        /* ignore poll errors */
+      }
+    };
+
+    const pullShared = () => {
+      void pullSharedCart();
+      void pullFavoriteSkus();
+    };
+
+    const timer = setInterval(pullShared, 12000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") pullShared();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [ready, accountNo, autoLoaded]);
+
   const normalizedSkuInput = useMemo(() => skuInput.trim().toUpperCase(), [skuInput]);
 
   const matchedItems = useMemo(() => {
@@ -642,6 +1326,7 @@ export default function OrderPage() {
     return catalog
       .map((item) => ({ item, score: scoreCatalogSearchQuery(item, q) }))
       .filter((x) => x.score >= 0)
+      .filter((x) => isCustomerVisibleCatalogItem(x.item))
       .filter((x) => (showAvailableOnly ? passesAvailableFilter(x.item) : true))
       .sort((a, b) => {
         const aNormal = isOrderableItem(a.item);
@@ -655,8 +1340,9 @@ export default function OrderPage() {
   }, [normalizedSkuInput, showAvailableOnly, catalogVersion]);
 
   const catalogBrowseBase = useMemo(() => {
-    if (!showAvailableOnly) return catalog;
-    return catalog.filter((item) => passesAvailableFilter(item));
+    const visible = catalog.filter((item) => isCustomerVisibleCatalogItem(item));
+    if (!showAvailableOnly) return visible;
+    return visible.filter((item) => passesAvailableFilter(item));
   }, [catalogVersion, showAvailableOnly, passesAvailableFilter]);
 
   const brandSplit = useMemo(
@@ -677,6 +1363,21 @@ export default function OrderPage() {
     [catalogBrowseBase]
   );
 
+  const seasonalCatalogItems = useMemo(() => {
+    // Curated Seasonal list must stay visible even when SKUs are SEASONAL or
+    // READYTOORDER (hidden from Catalog) or when "Available only" is on.
+    const bySku = new Map(
+      catalog.map((item) => [String(item.sku || "").toUpperCase(), item])
+    );
+    return seasonalItems.map((row) => {
+      const sku = String(row.sku || "").toUpperCase();
+      const fromCatalog = bySku.get(sku);
+      return fromCatalog ? { ...row, ...fromCatalog, sku } : { ...row, sku };
+    });
+  }, [seasonalItems, catalogVersion]);
+
+  const seasonalCount = seasonalCatalogItems.length;
+
   const [invoiceFrequentSkus, setInvoiceFrequentSkus] = useState<string[]>([]);
 
   useEffect(() => {
@@ -687,6 +1388,9 @@ export default function OrderPage() {
     }
     for (const [sku, qty] of Object.entries(clearanceQtyMap || {})) {
       if (Number(qty) > 0) inCart.add(sku.toUpperCase());
+    }
+    for (const [key, qty] of Object.entries(ndhQtyMap || {})) {
+      if (Number(qty) > 0) inCart.add(key.split("::")[0].toUpperCase());
     }
     for (const row of cart || []) {
       if (Number(row.qty) > 0) inCart.add(String(row.sku || "").toUpperCase());
@@ -703,7 +1407,7 @@ export default function OrderPage() {
         }
       })
       .catch(() => setInvoiceFrequentSkus([]));
-  }, [accountNo, cart, catalogQtyMap, clearanceQtyMap]);
+  }, [accountNo, cart, catalogQtyMap, clearanceQtyMap, ndhQtyMap]);
 
   const recommendedSkuSet = useMemo(() => {
     const skuSet = new Set<string>();
@@ -740,6 +1444,7 @@ export default function OrderPage() {
       invoiceFrequentSkus
         .map((sku) => getCatalogItemBySku(sku))
         .filter((item): item is CatalogItem => Boolean(item))
+        .filter((item) => isCustomerVisibleCatalogItem(item))
         .filter((item) => (showAvailableOnly ? passesAvailableFilter(item) : true))
         .slice(0, 14),
     [invoiceFrequentSkus, showAvailableOnly, catalogVersion]
@@ -764,6 +1469,11 @@ export default function OrderPage() {
     setSkuInput(next.sku || "");
   };
 
+  const favoriteItemCount = useMemo(
+    () => catalogBrowseBase.filter((item) => favoriteSkuSet.has(item.sku?.toUpperCase() || "")).length,
+    [catalogBrowseBase, favoriteSkuSet]
+  );
+
   const activeCatalogFilterCount = useMemo(() => {
     let count = 0;
     if (showAvailableOnly) count += 1;
@@ -771,21 +1481,28 @@ export default function OrderPage() {
     if (brandFilter !== "ALL") count += 1;
     if (catalogShowRecommendedOnly) count += 1;
     if (catalogShowSelectedOnly) count += 1;
+    if (catalogShowFavoritesOnly) count += 1;
     return count;
-  }, [brandFilter, catalogShowRecommendedOnly, catalogShowSelectedOnly, categoryFilters, showAvailableOnly]);
+  }, [
+    brandFilter,
+    catalogShowFavoritesOnly,
+    catalogShowRecommendedOnly,
+    catalogShowSelectedOnly,
+    categoryFilters,
+    showAvailableOnly,
+  ]);
 
   const orderableCatalogItems = useMemo(() => {
     const q = catalogSearch.trim().toUpperCase();
 
     return catalogBrowseBase
       .filter((item) => {
-        if (catalogShowSelectedOnly) {
-          const sku = (item.sku || "").toUpperCase();
-          if (Number(catalogQtyMap[sku] || 0) <= 0) return false;
-        }
+        const sku = (item.sku || "").toUpperCase();
+        if (catalogShowSelectedOnly && Number(catalogQtyMap[sku] || 0) <= 0) return false;
+        if (catalogShowFavoritesOnly && !favoriteSkuSet.has(sku)) return false;
         if (!productMatchesCategoryFilters(item, categoryFilters)) return false;
         if (brandFilter !== "ALL" && !brandMatchesFilter(item.brand, brandFilter)) return false;
-        if (catalogShowRecommendedOnly && !recommendedSkuSet.has(item.sku?.toUpperCase() || "")) return false;
+        if (catalogShowRecommendedOnly && !recommendedSkuSet.has(sku)) return false;
         return true;
       })
       .filter((item) => {
@@ -793,12 +1510,28 @@ export default function OrderPage() {
         return scoreCatalogSearchQuery(item, q) >= 0;
       })
       .sort((a, b) => {
+        // Do not pin favorites to the top — starring would jump the card/scroll.
         const aNormal = isOrderableItem(a);
         const bNormal = isOrderableItem(b);
         if (aNormal !== bNormal) return aNormal ? -1 : 1;
+        if (q) {
+          const scoreDiff = scoreCatalogSearchQuery(b, q) - scoreCatalogSearchQuery(a, q);
+          if (scoreDiff) return scoreDiff;
+        }
         return compareCatalogForDisplay(a, b);
       });
-  }, [catalogSearch, categoryFilters, brandFilter, catalogQtyMap, catalogBrowseBase, catalogShowSelectedOnly, catalogShowRecommendedOnly, recommendedSkuSet]);
+  }, [
+    catalogSearch,
+    categoryFilters,
+    brandFilter,
+    catalogQtyMap,
+    catalogBrowseBase,
+    catalogShowSelectedOnly,
+    catalogShowFavoritesOnly,
+    catalogShowRecommendedOnly,
+    recommendedSkuSet,
+    favoriteSkuSet,
+  ]);
 
   useEffect(() => {
     if (brandFilter !== "ALL" && !isKnownBrandFilter(brandSplit, brandFilter)) {
@@ -807,8 +1540,8 @@ export default function OrderPage() {
   }, [brandFilter, brandSplit]);
 
   const qtyMaps = useMemo(
-    (): QtyMaps => ({ catalog: catalogQtyMap, clearance: clearanceQtyMap }),
-    [catalogQtyMap, clearanceQtyMap]
+    (): QtyMaps => ({ catalog: catalogQtyMap, clearance: clearanceQtyMap, ndh: ndhQtyMap }),
+    [catalogQtyMap, clearanceQtyMap, ndhQtyMap]
   );
 
   const cartDisplayItems = useMemo(() => buildCartDisplayItems(qtyMaps), [qtyMaps]);
@@ -832,7 +1565,11 @@ export default function OrderPage() {
       return true;
     }
     if (isProductOrderingBlocked(catalogItem)) {
-      alert(`${cleanSku}: ${t.orderNotAvailable}`);
+      alert(
+        t.statusWarning
+          .replace("{sku}", cleanSku)
+          .replace("{status}", String(catalogItem.status || "UNAVAILABLE").trim().toUpperCase() || "UNAVAILABLE")
+      );
       return true;
     }
     return false;
@@ -841,18 +1578,68 @@ export default function OrderPage() {
   const applyQtyState = (next: QtyMaps) => {
     setCatalogQtyMap(next.catalog);
     setClearanceQtyMap(next.clearance);
+    setNdhQtyMap(next.ndh || {});
     setCart(buildCartDisplayItems(next));
   };
 
-  const setQtyForSku = (sku: string, value: string, source: "clearance" | "normal" = "normal") => {
+  const syncDeviceContribution = (sku: string, desiredTotal: number) => {
+    const deviceId = deviceIdRef.current || getOrCreateOrderDeviceId();
+    deviceIdRef.current = deviceId;
+    const myQty = deviceQtyForSharedTotal(cloudDraftRef.current, deviceId, sku, desiredTotal);
+    const nextDevice = { ...deviceQtyMapRef.current };
+    if (myQty > 0) nextDevice[sku] = String(myQty);
+    else delete nextDevice[sku];
+    deviceQtyMapRef.current = nextDevice;
+    lastLocalEditAtRef.current = Date.now();
+    cartDirtyRef.current = true;
+
+    // Tombstone + scrub peer slices immediately so autosave/poll cannot revive the line.
+    if (desiredTotal <= 0) {
+      cloudDraftRef.current = markSkuRemovedInDraft(cloudDraftRef.current, sku);
+    } else {
+      cloudDraftRef.current = markSkuReaddedInDraft(cloudDraftRef.current, sku);
+    }
+  };
+
+  /** Keep deviceCarts/tombstones aligned when bulk-updating the shared catalog map. */
+  const syncDeviceContributionsForCatalogMap = (
+    nextCatalog: Record<string, string>,
+    options?: { replace?: boolean }
+  ) => {
+    const replace = Boolean(options?.replace);
+    const previous = {
+      ...buildCatalogQtyMapFromDraft(cloudDraftRef.current),
+      ...catalogQtyMap,
+    };
+
+    if (replace) {
+      for (const sku of Object.keys(previous)) {
+        if (!nextCatalog[sku]) syncDeviceContribution(sku, 0);
+      }
+    }
+
+    for (const [sku, qty] of Object.entries(nextCatalog)) {
+      const cleanSku = sku.trim().toUpperCase();
+      const total = Math.max(0, Math.floor(Number(qty) || 0));
+      if (!cleanSku) continue;
+      if (!replace && previous[cleanSku] === String(total)) continue;
+      syncDeviceContribution(cleanSku, total);
+    }
+  };
+
+  const setQtyForSku = (sku: string, value: string, source: QtySource = "normal", expiryDate?: string) => {
     const cleanSku = sku.trim().toUpperCase();
     const cleanQty = String(value || "").replace(/[^0-9]/g, "");
 
-    if (cleanQty && Number(cleanQty) > 0 && blockAddForSku(cleanSku)) {
+    if (source !== "ndh" && cleanQty && Number(cleanQty) > 0 && blockAddForSku(cleanSku)) {
       return;
     }
 
-    applyQtyState(applyQtySet(qtyMaps, cleanSku, cleanQty, source));
+    if (source === "normal") {
+      syncDeviceContribution(cleanSku, Number(cleanQty) || 0);
+    }
+
+    applyQtyState(applyQtySet(qtyMaps, cleanSku, cleanQty, source, expiryDate));
   };
 
   const getPromoRemainingForSku = (cleanSku: string) => {
@@ -879,6 +1666,22 @@ export default function OrderPage() {
     return item.remainingQty;
   };
 
+  const getNdhRemainingForSku = (cleanSku: string, expiryDate?: string) => {
+    const item = ndhItems.find(
+      (p) =>
+        p.sku?.toUpperCase() === cleanSku &&
+        (!expiryDate || String(p.expiryDate || "") === String(expiryDate || ""))
+    );
+    if (!item) return null;
+    if (item.remainingQty === null || item.remainingQty === undefined) {
+      if (item.clearanceQty && item.clearanceQty > 0) {
+        return Math.max(0, item.clearanceQty - (item.soldQty || 0));
+      }
+      return null;
+    }
+    return item.remainingQty;
+  };
+
   const orderReviewWarnings = useMemo(() => {
     const warnings: string[] = [];
 
@@ -888,8 +1691,20 @@ export default function OrderPage() {
       const catalogItem = getCatalogItemBySku(cleanSku);
 
       if (qty >= 100) warnings.push(t.highQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(qty)));
-      if (catalogItem && !isOrderableItem(catalogItem)) {
-        warnings.push(formatOrderNotAvailableMessage(cleanSku, catalogItem.status, t));
+      // Unavailable / discontinued SKUs are shown in a dedicated review banner.
+
+      if (item.ndh) {
+        const ndhRemaining = getNdhRemainingForSku(cleanSku, item.expiryDate);
+        if (ndhRemaining !== null && qty > ndhRemaining) {
+          warnings.push(t.ndhQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(ndhRemaining)));
+        }
+        const ndh = ndhItems.find(
+          (c) => c.sku?.toUpperCase() === cleanSku && String(c.expiryDate || "") === String(item.expiryDate || "")
+        );
+        if (ndh?.daysUntilExpiry != null && ndh.daysUntilExpiry <= 7 && ndh.daysUntilExpiry >= 0) {
+          warnings.push(`${cleanSku} (${ndh.expiryDate}): NDH expires in ${ndh.daysUntilExpiry} day(s).`);
+        }
+        continue;
       }
 
       if (item.nhItems) {
@@ -935,7 +1750,7 @@ export default function OrderPage() {
 
     return warnings;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qtyMaps, promotionItems, clearanceItems, t]);
+  }, [qtyMaps, promotionItems, clearanceItems, ndhItems, t]);
 
   const promoSkuSet = useMemo(
     () => new Set(promotionItems.map((item) => item.sku?.toUpperCase()).filter(Boolean) as Iterable<string>),
@@ -943,6 +1758,7 @@ export default function OrderPage() {
   );
 
   const nhItemsSkuSetForOrder = useMemo(() => nhItemsSkuSet(qtyMaps), [qtyMaps]);
+  const ndhSkuSetForOrder = useMemo(() => ndhSkuSet(qtyMaps), [qtyMaps]);
 
   const promoDealBySku = useMemo(() => {
     const map: Record<string, string> = {};
@@ -955,31 +1771,6 @@ export default function OrderPage() {
     }
     return map;
   }, [promotionItems, t]);
-
-  const clearanceCartSkuSet = useMemo(() => nhItemsSkuSet(qtyMaps), [qtyMaps]);
-
-  const clearanceUpsellLines = useMemo(
-    () => buildClearanceUpsellLines(lang, clearanceItems, clearanceCartSkuSet, t),
-    [lang, clearanceItems, clearanceCartSkuSet, t]
-  );
-
-  const showNewItemsReviewReminder = useMemo(() => {
-    const catalogLines = expandOrderSubmitLines(qtyMaps).filter((item) => !item.nhItems);
-    if (newItemCount === 0 || catalogLines.length === 0) return false;
-    return catalogLines.every((item) => {
-      const catalogItem = getCatalogItemBySku(item.sku);
-      return !isNewItem(catalogItem);
-    });
-  }, [qtyMaps, newItemCount]);
-
-  const recommendedStripItems = useMemo(() => {
-    if (mode !== "catalog" || catalogShowRecommendedOnly) return [];
-    return catalogBrowseBase
-      .filter((item) => recommendedSkuSet.has((item.sku || "").toUpperCase()))
-      .filter((item) => !isNewItem(item))
-      .filter((item) => Number(catalogQtyMap[(item.sku || "").toUpperCase()] || 0) <= 0)
-      .slice(0, 8);
-  }, [mode, catalogBrowseBase, recommendedSkuSet, catalogQtyMap, catalogShowRecommendedOnly]);
 
   const scrollToCart = () => {
     setShowCart(true);
@@ -1007,14 +1798,18 @@ export default function OrderPage() {
     setQtyForSku(target.sku, qty);
   };
 
-  const adjustQtyForSku = (sku: string, delta: number, source: "clearance" | "normal" = "normal") => {
+  const adjustQtyForSku = (sku: string, delta: number, source: QtySource = "normal", expiryDate?: string) => {
     const cleanSku = sku.trim().toUpperCase();
     const current =
-      source === "clearance" ? getClearanceQty(qtyMaps, cleanSku) : getCatalogQty(qtyMaps, cleanSku);
+      source === "clearance"
+        ? getClearanceQty(qtyMaps, cleanSku)
+        : source === "ndh"
+          ? getNdhQty(qtyMaps, cleanSku, expiryDate)
+          : getCatalogQty(qtyMaps, cleanSku);
     let next = Math.max(0, current + delta);
     let appliedDelta = delta;
 
-    if (delta > 0 && next > 0 && current <= 0 && blockAddForSku(cleanSku)) {
+    if (source !== "ndh" && delta > 0 && next > 0 && current <= 0 && blockAddForSku(cleanSku)) {
       return;
     }
 
@@ -1045,43 +1840,61 @@ export default function OrderPage() {
       }
     }
 
+    if (source === "ndh" && delta > 0) {
+      const ndhRemaining = getNdhRemainingForSku(cleanSku, expiryDate);
+      if (ndhRemaining !== null && next > ndhRemaining) {
+        alert(t.ndhLimitAlert.replace("{sku}", cleanSku).replace("{qty}", String(ndhRemaining)));
+        appliedDelta = ndhRemaining - current;
+        if (appliedDelta <= 0) return;
+        next = current + appliedDelta;
+      }
+    }
+
     if (!appliedDelta) return;
 
-    applyQtyState(applyQtyDelta(qtyMaps, cleanSku, appliedDelta, source));
-  };
-
-  const removeSkuFromOrder = (sku: string, nhItems?: boolean) => {
-    if (nhItems === true) setQtyForSku(sku, "", "clearance");
-    else if (nhItems === false) setQtyForSku(sku, "", "normal");
-    else {
-      let next = applyQtySet(qtyMaps, sku, "", "normal");
-      next = applyQtySet(next, sku, "", "clearance");
-      applyQtyState(next);
+    if (source === "normal") {
+      syncDeviceContribution(cleanSku, next);
     }
+
+    applyQtyState(applyQtyDelta(qtyMaps, cleanSku, appliedDelta, source, expiryDate));
   };
 
-  const adjustCartLineQty = (sku: string, delta: number, nhItems?: boolean) => {
-    adjustQtyForSku(sku, delta, nhItems ? "clearance" : "normal");
+  const removeSkuFromOrder = (sku: string, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => {
+    // Catalog lines omit flags. Only clear the matching pool so removing a
+    // catalog row does not wipe an independent Near Date or NDH line.
+    setQtyForSku(sku, "", cartLineKind({ nhItems, ndh }), expiryDate);
   };
 
-  const updateCartLineQty = (sku: string, value: string, nhItems?: boolean) => {
-    if (nhItems) updateClearanceQty(sku, value);
+  const adjustCartLineQty = (sku: string, delta: number, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => {
+    adjustQtyForSku(sku, delta, cartLineKind({ nhItems, ndh }), expiryDate);
+  };
+
+  const updateCartLineQty = (sku: string, value: string, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => {
+    if (ndh) updateNdhQty(sku, value, expiryDate);
+    else if (nhItems) updateClearanceQty(sku, value);
     else updateCatalogQty(sku, value);
   };
 
   const addAllClearanceOneCase = () => {
+    let next = qtyMaps;
     for (const item of clearanceItems) {
       if (item.remainingQty === 0) continue;
       const sku = item.sku?.toUpperCase();
       if (!sku) continue;
       const catalogItem = getCatalogItemBySku(sku) || item;
       if (!isOrderableItem(catalogItem)) continue;
-      adjustQtyForSku(sku, 1, "clearance");
-    }
-  };
+      if (getClearanceQty(next, sku) <= 0 && blockAddForSku(sku)) continue;
 
-  const addAllMissingClearanceUpsell = () => {
-    for (const line of clearanceUpsellLines) adjustQtyForSku(line.sku, 1, "clearance");
+      const current = getClearanceQty(next, sku);
+      let appliedDelta = 1;
+      const clearanceRemaining = getClearanceRemainingForSku(sku);
+      if (clearanceRemaining !== null && current + 1 > clearanceRemaining) {
+        appliedDelta = clearanceRemaining - current;
+        if (appliedDelta <= 0) continue;
+      }
+      next = applyQtyDelta(next, sku, appliedDelta, "clearance");
+    }
+    applyQtyState(next);
   };
 
   useEffect(() => {
@@ -1244,6 +2057,21 @@ export default function OrderPage() {
     setQtyForSku(cleanSku, clean, "clearance");
   };
 
+  const updateNdhQty = (sku: string, value: string, expiryDate?: string) => {
+    const cleanSku = sku.toUpperCase();
+    const clean = value.replace(/[^0-9]/g, "");
+
+    const ndhRemaining = getNdhRemainingForSku(cleanSku, expiryDate);
+    const requested = Number(clean) || 0;
+    if (ndhRemaining !== null && requested > ndhRemaining) {
+      alert(t.ndhLimitAlert.replace("{sku}", cleanSku).replace("{qty}", String(ndhRemaining)));
+      setQtyForSku(cleanSku, ndhRemaining ? String(ndhRemaining) : "", "ndh", expiryDate);
+      return;
+    }
+
+    setQtyForSku(cleanSku, clean, "ndh", expiryDate);
+  };
+
   const adjustCatalogQty = (sku: string, delta: number) => {
     adjustQtyForSku(sku, delta, "normal");
   };
@@ -1262,6 +2090,10 @@ export default function OrderPage() {
     adjustQtyForSku(sku, delta, "clearance");
   };
 
+  const adjustNdhQty = (sku: string, delta: number, expiryDate?: string) => {
+    adjustQtyForSku(sku, delta, "ndh", expiryDate);
+  };
+
   const reorderItems = (items: CartItem[]) => {
     const valid = items.filter((item) => {
       const sku = String(item.sku || "").trim().toUpperCase();
@@ -1277,24 +2109,32 @@ export default function OrderPage() {
     const orderable = valid.filter((item) => {
       const sku = item.sku.toUpperCase();
       const catalogItem = getCatalogItemBySku(sku);
-      if (!catalogItem || !isOrderableItem(catalogItem)) {
-        alert(formatOrderNotAvailableMessage(sku, catalogItem?.status, t));
-        return false;
-      }
-      return true;
+      return Boolean(catalogItem && isOrderableItem(catalogItem));
     });
+    const skipped = valid.length - orderable.length;
+    if (skipped > 0) {
+      const unavailable = getUnavailableSubmitLines(valid);
+      const detail = unavailable
+        .slice(0, 8)
+        .map((item) => formatOrderNotAvailableMessage(item.sku, item.status, t))
+        .join("\n");
+      alert(`${t.unavailableInCartTitle}\n${detail}${unavailable.length > 8 ? "\n…" : ""}`);
+    }
 
     if (orderable.length === 0) return;
 
-    setCart((prev) => [...prev, ...orderable]);
-    setCatalogQtyMap((prev) => {
-      const next = { ...prev };
-      for (const item of orderable) {
-        const qtyNumber = Number(String(item.qty || "").replace(/[^0-9]/g, ""));
-        if (qtyNumber > 0) next[item.sku.toUpperCase()] = String(Number(next[item.sku.toUpperCase()] || 0) + qtyNumber);
+    const nextCatalog = { ...catalogQtyMap };
+    for (const item of orderable) {
+      const sku = item.sku.toUpperCase();
+      const qtyNumber = Number(String(item.qty || "").replace(/[^0-9]/g, ""));
+      if (qtyNumber > 0) {
+        nextCatalog[sku] = String(Number(nextCatalog[sku] || 0) + qtyNumber);
       }
-      return next;
-    });
+    }
+
+    syncDeviceContributionsForCatalogMap(nextCatalog);
+    setCatalogQtyMap(nextCatalog);
+    setCart(buildCartDisplayItems({ catalog: nextCatalog, clearance: clearanceQtyMap, ndh: ndhQtyMap }));
     showTransientToast(`${orderable.length} ${t.items} added.`);
     // Do not auto-focus SKU input; prevents page from jumping.
   };
@@ -1316,10 +2156,15 @@ export default function OrderPage() {
     setCart([]);
     setCatalogQtyMap({});
     setClearanceQtyMap({});
+    setNdhQtyMap({});
     setShowCart(false);
     setSkuInput("");
     setQtyInput("");
     setSelectedItem(null);
+    deviceQtyMapRef.current = {};
+    cloudDraftRef.current = null;
+    cartDirtyRef.current = false;
+    lastCloudUpdatedAtRef.current = "";
     showTransientToast(t.cleared);
     localStorage.removeItem(`draft_${accountNo}`);
 
@@ -1335,6 +2180,8 @@ export default function OrderPage() {
           note: note.trim(),
           cart: [],
           catalogQtyMap: {},
+          deviceId: deviceIdRef.current || getOrCreateOrderDeviceId(),
+          deviceQtyMap: {},
           allowClear: true,
         }),
       });
@@ -1353,6 +2200,21 @@ export default function OrderPage() {
 
   const getCurrentSubmitItems = () => {
     return expandOrderSubmitLines(qtyMaps);
+  };
+
+  const unavailableSubmitItems = useMemo(
+    () => getUnavailableSubmitLines(expandOrderSubmitLines(qtyMaps)),
+    // catalogVersion refreshes after catalog reload / submit so status changes are picked up
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [qtyMaps, catalogVersion]
+  );
+
+  const removeUnavailableFromOrder = () => {
+    const unavailable = getUnavailableSubmitLines(getCurrentSubmitItems());
+    for (const item of unavailable) {
+      removeSkuFromOrder(item.sku, item.nhItems, item.ndh, item.expiryDate);
+    }
+    return unavailable;
   };
 
   const downloadCsv = () => {
@@ -1416,9 +2278,11 @@ export default function OrderPage() {
         return;
       }
 
+      syncDeviceContributionsForCatalogMap(parsedMap, { replace: true });
       setCatalogQtyMap(parsedMap);
       setClearanceQtyMap({});
-      setCart(parsed);
+      setNdhQtyMap({});
+      setCart(buildCartDisplayItems({ catalog: parsedMap, clearance: {}, ndh: {} }));
       showTransientToast(`${parsed.length} ${t.items} loaded.`);
     } catch (error: any) {
       alert(error?.message || "Failed to read CSV.");
@@ -1428,10 +2292,7 @@ export default function OrderPage() {
   };
 
   const logout = () => {
-    sessionStorage.removeItem("customer_logged_in");
-    sessionStorage.removeItem("customer_account_no");
-    sessionStorage.removeItem("customer_store_name");
-    sessionStorage.removeItem("customer_order_email");
+    clearCustomerSession();
     router.replace("/");
   };
 
@@ -1443,24 +2304,28 @@ export default function OrderPage() {
       return;
     }
 
-    for (const item of items) {
-      const catalogItem = getCatalogItemBySku(item.sku);
-      if (catalogItem && !isOrderableItem(catalogItem)) {
-        alert(formatOrderNotAvailableMessage(item.sku, catalogItem.status, t));
-        return;
-      }
-    }
-
+    // Open review even if some SKUs are discontinued — the modal lists them and
+    // offers remove / remove-and-submit so the customer can finish the order.
     setShowReview(true);
   };
 
-  const submitOrder = async () => {
+  const submitOrder = async (itemsOverride?: CartItem[]) => {
     if (submitLockRef.current || submitting) return;
 
-    const items = getCurrentSubmitItems();
+    const items = itemsOverride ?? getCurrentSubmitItems();
 
     if (items.length === 0) {
       alert(t.addAtLeast);
+      return;
+    }
+
+    const unavailable = getUnavailableSubmitLines(items);
+    if (unavailable.length > 0) {
+      const detail = unavailable
+        .map((item) => formatOrderNotAvailableMessage(item.sku, item.status, t))
+        .join("\n");
+      setSubmitMsg(`${t.unavailableInCartTitle}\n${detail}`);
+      setShowReview(true);
       return;
     }
 
@@ -1493,7 +2358,17 @@ export default function OrderPage() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || t.failedSubmit);
+      if (!res.ok) {
+        if (Array.isArray(data?.unavailableItems) && data.unavailableItems.length > 0) {
+          const detail = data.unavailableItems
+            .map((item: { sku?: string; status?: string }) =>
+              formatOrderNotAvailableMessage(String(item?.sku || ""), item?.status, t)
+            )
+            .join("\n");
+          throw new Error(`${t.unavailableInCartTitle}\n${detail}`);
+        }
+        throw new Error(data?.error || t.failedSubmit);
+      }
 
       setSubmitMsg(`${t.orderSuccess} ${t.ref}: ${ref}`);
       setLastSubmittedRef(ref);
@@ -1502,10 +2377,15 @@ export default function OrderPage() {
       setCart([]);
       setCatalogQtyMap({});
       setClearanceQtyMap({});
+      setNdhQtyMap({});
       setSkuInput("");
       setQtyInput("");
       setSelectedItem(null);
       setNote("");
+      deviceQtyMapRef.current = {};
+      cloudDraftRef.current = null;
+      cartDirtyRef.current = false;
+      lastCloudUpdatedAtRef.current = "";
       localStorage.removeItem(`draft_${accountNo}`);
 
       await fetch("/api/delete-draft", {
@@ -1528,6 +2408,31 @@ export default function OrderPage() {
     }
   };
 
+  const removeUnavailableAndSubmit = () => {
+    const current = getCurrentSubmitItems();
+    const unavailable = getUnavailableSubmitLines(current);
+    if (unavailable.length === 0) {
+      void submitOrder(current);
+      return;
+    }
+
+    const unavailableKey = new Set(unavailable.map((item) => cartLinePoolKey(item)));
+    const remaining = current.filter((item) => !unavailableKey.has(cartLinePoolKey(item)));
+
+    for (const item of unavailable) {
+      removeSkuFromOrder(item.sku, item.nhItems, item.ndh, item.expiryDate);
+    }
+
+    showTransientToast(t.unavailableRemoved.replace("{count}", String(unavailable.length)));
+
+    if (remaining.length === 0) {
+      setSubmitMsg(t.addAtLeast);
+      return;
+    }
+
+    void submitOrder(remaining);
+  };
+
   const renderProductMeta = (item: CatalogItem) => (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 5, overflow: "visible" }}>
       {item.size ? <span style={{ fontSize: 10, color: "#6b7280" }}>{t.size}: {item.size}</span> : null}
@@ -1538,15 +2443,19 @@ export default function OrderPage() {
   );
 
   const stickyModeLabel =
-    mode === "promotion"
-      ? t.promotionMode
-      : mode === "newItems"
-        ? t.newItemsMode
+    mode === "catalog"
+      ? t.catalogMode
+      : mode === "promotion"
+        ? t.promotionMode
         : mode === "clearance"
           ? t.clearanceMode
-          : mode === "catalog"
-            ? t.catalogMode
-            : t.searchMode;
+          : mode === "ndh"
+            ? t.ndhMode
+            : mode === "newItems"
+            ? t.newItemsMode
+            : mode === "seasonal"
+              ? t.seasonalMode
+              : t.searchMode;
 
   const renderCatalogSearchRow = (className = "") => (
     <div className={`order-sticky-search-row${className ? ` ${className}` : ""}`}>
@@ -1571,6 +2480,17 @@ export default function OrderPage() {
     </div>
   );
 
+  const renderUpcToggle = (className = "") => (
+    <button
+      type="button"
+      onClick={toggleShowUpc}
+      className={className || undefined}
+      style={categoryButtonStyle(showUpc)}
+    >
+      {showUpc ? t.hideUpc : t.showUpc}
+    </button>
+  );
+
   const renderCatalogScopeChips = (className = "") => (
     <div className={`order-sticky-catalog-chips${className ? ` ${className}` : ""}`}>
       <button
@@ -1580,29 +2500,106 @@ export default function OrderPage() {
       >
         {t.recommended} ({recommendedItemCount})
       </button>
-      <label className="order-sticky-filter-check">
-        <input
-          type="checkbox"
-          checked={catalogShowSelectedOnly}
-          onChange={(e) => setCatalogShowSelectedOnly(e.target.checked)}
-        />
+      <button
+        type="button"
+        onClick={() => setCatalogShowFavoritesOnly((prev) => !prev)}
+        style={categoryButtonStyle(catalogShowFavoritesOnly)}
+      >
+        {t.favoritesOnly} ({favoriteItemCount})
+      </button>
+      {renderUpcToggle()}
+      <button
+        type="button"
+        onClick={() => setCatalogShowSelectedOnly((prev) => !prev)}
+        style={categoryButtonStyle(catalogShowSelectedOnly)}
+      >
         {t.selectedOnly} ({cartItemCount})
-      </label>
-      <label className="order-sticky-filter-check">
-        <input type="checkbox" checked={showAvailableOnly} onChange={(e) => setShowAvailableOnly(e.target.checked)} />
+      </button>
+      <button
+        type="button"
+        onClick={() => setShowAvailableOnly((prev) => !prev)}
+        style={categoryButtonStyle(showAvailableOnly)}
+      >
         {t.availableOnly}
-      </label>
+      </button>
     </div>
   );
+
+  const favoriteCardProps = useCallback((sku: string) => {
+    const cleanSku = sku.toUpperCase();
+    const isFavorite = favoriteSkuSet.has(cleanSku);
+    const latest = getLatestSkuOrderHistoryEntry(skuOrderHistoryIndex.get(cleanSku));
+    return {
+      favorite: isFavorite,
+      favoriteLabel: isFavorite ? t.removeFavorite : t.addFavorite,
+      onToggleFavorite: toggleFavorite,
+      lastOrderedLabel: latest ? t.historyLink : undefined,
+      onOpenHistory: openSkuHistory,
+      showUpc,
+      invoicePrice: invoicePriceLabelForSku(cleanSku),
+      reserveInvoicePrice: invoicePricingEnabled,
+    };
+  }, [
+    favoriteSkuSet,
+    invoicePriceLabelForSku,
+    invoicePricingEnabled,
+    openSkuHistory,
+    showUpc,
+    skuOrderHistoryIndex,
+    t.addFavorite,
+    t.historyLink,
+    t.removeFavorite,
+    toggleFavorite,
+  ]);
+
+  const adminCardProps = {
+    showAdminEdit: showAdminEditLinks,
+    onAdminCategoryChange: showAdminEditLinks ? handleAdminCategoryChange : undefined,
+    adminCategoryLabel: t.category,
+    adminCategoryAutoLabel: t.adminCategoryAuto,
+  };
+
+  const renderAdminBar = () => {
+    if (!showAdminEditLinks && !adminUnlockOpen) return null;
+    return (
+      <OrderAdminBar
+        t={t}
+        loggedIn={showAdminEditLinks}
+        password={adminPasswordInput}
+        onPasswordChange={(value) => {
+          setAdminPasswordInput(value);
+          if (adminLoginError) setAdminLoginError("");
+        }}
+        remember={adminRemember}
+        onRememberChange={setAdminRemember}
+        loading={adminLoginLoading}
+        error={adminLoginError}
+        onLogin={() => {
+          void loginAdminOnOrder();
+        }}
+        onLogout={logoutAdminOnOrder}
+      />
+    );
+  };
 
   const renderModeTabs = () => (
     <div className="order-mode-tabs" role="tablist" aria-label="Order mode">
       <button
         type="button"
         role="tab"
+        aria-selected={mode === "catalog"}
+        onClick={() => changeMode("catalog")}
+        className={`order-mode-tab order-mode-tab--catalog${mode === "catalog" ? " is-active" : ""}`}
+        style={modeButtonStyle(mode === "catalog")}
+      >
+        {t.catalogMode}
+      </button>
+      <button
+        type="button"
+        role="tab"
         aria-selected={mode === "promotion"}
         onClick={() => changeMode("promotion")}
-        className="order-mode-tab"
+        className={`order-mode-tab order-mode-tab--promo${mode === "promotion" ? " is-active" : ""}`}
         style={promoModeButtonStyle(mode === "promotion")}
       >
         {t.promotionMode}
@@ -1611,50 +2608,64 @@ export default function OrderPage() {
       <button
         type="button"
         role="tab"
+        aria-selected={mode === "ndh"}
+        onClick={() => changeMode("ndh")}
+        className={`order-mode-tab order-mode-tab--ndh${mode === "ndh" ? " is-active" : ""}`}
+        style={ndhModeButtonStyle(mode === "ndh")}
+      >
+        {t.ndhMode}
+        {ndhItems.length > 0 ? ` (${ndhItems.length})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
         aria-selected={mode === "newItems"}
         onClick={() => changeMode("newItems")}
-        className="order-mode-tab"
+        className={`order-mode-tab order-mode-tab--new${mode === "newItems" ? " is-active" : ""}`}
         style={newItemsModeButtonStyle(mode === "newItems")}
       >
         {t.newItemsMode}
         {newItemCount > 0 ? ` (${newItemCount})` : ""}
       </button>
+      {SEASONAL_TAB_ENABLED ? (
       <button
         type="button"
         role="tab"
-        aria-selected={mode === "clearance"}
-        onClick={() => changeMode("clearance")}
-        className="order-mode-tab"
-        style={clearanceModeButtonStyle(mode === "clearance")}
+        aria-selected={mode === "seasonal"}
+        onClick={() => changeMode("seasonal")}
+        className={`order-mode-tab order-mode-tab--seasonal${mode === "seasonal" ? " is-active" : ""}`}
+        style={seasonalModeButtonStyle(mode === "seasonal")}
       >
-        {t.clearanceMode}
-        {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
+        {t.seasonalMode}
+        {seasonalCount > 0 ? ` (${seasonalCount})` : ""}
       </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "catalog"}
-        onClick={() => changeMode("catalog")}
-        className="order-mode-tab"
-        style={modeButtonStyle(mode === "catalog")}
-      >
-        {t.catalogMode}
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "search"}
-        onClick={() => changeMode("search")}
-        className="order-mode-tab"
-        style={modeButtonStyle(mode === "search")}
-      >
-        {t.searchMode}
-      </button>
+      ) : null}
+      {QUICK_ORDER_ENABLED ? (
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "search"}
+          onClick={() => changeMode("search")}
+          className="order-mode-tab"
+          style={modeButtonStyle(mode === "search")}
+        >
+          {t.searchMode}
+        </button>
+      ) : null}
     </div>
   );
 
   const renderMobileModeTags = () => (
     <div className="order-shop-mode-tags" role="tablist" aria-label="Order mode">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "catalog"}
+        onClick={() => changeMode("catalog")}
+        className={`order-shop-tag order-shop-tag--catalog${mode === "catalog" ? " is-active" : ""}`}
+      >
+        {t.catalogMode}
+      </button>
       <button
         type="button"
         role="tab"
@@ -1668,6 +2679,16 @@ export default function OrderPage() {
       <button
         type="button"
         role="tab"
+        aria-selected={mode === "ndh"}
+        onClick={() => changeMode("ndh")}
+        className={`order-shop-tag order-shop-tag--ndh${mode === "ndh" ? " is-active" : ""}`}
+      >
+        {t.ndhMode}
+        {ndhItems.length > 0 ? ` (${ndhItems.length})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
         aria-selected={mode === "newItems"}
         onClick={() => changeMode("newItems")}
         className={`order-shop-tag order-shop-tag--new${mode === "newItems" ? " is-active" : ""}`}
@@ -1675,41 +2696,36 @@ export default function OrderPage() {
         {t.newItemsMode}
         {newItemCount > 0 ? ` (${newItemCount})` : ""}
       </button>
+      {SEASONAL_TAB_ENABLED ? (
       <button
         type="button"
         role="tab"
-        aria-selected={mode === "clearance"}
-        onClick={() => changeMode("clearance")}
-        className={`order-shop-tag order-shop-tag--clearance${mode === "clearance" ? " is-active" : ""}`}
+        aria-selected={mode === "seasonal"}
+        onClick={() => changeMode("seasonal")}
+        className={`order-shop-tag order-shop-tag--seasonal${mode === "seasonal" ? " is-active" : ""}`}
       >
-        {t.clearanceMode}
-        {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
+        {t.seasonalMode}
+        {seasonalCount > 0 ? ` (${seasonalCount})` : ""}
       </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "catalog"}
-        onClick={() => changeMode("catalog")}
-        className={`order-shop-tag order-shop-tag--catalog${mode === "catalog" ? " is-active" : ""}`}
-      >
-        {t.catalogMode}
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "search"}
-        onClick={() => changeMode("search")}
-        className={`order-shop-tag order-shop-tag--quick${mode === "search" ? " is-active" : ""}`}
-      >
-        {t.searchMode}
-      </button>
+      ) : null}
+      {QUICK_ORDER_ENABLED ? (
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === "search"}
+          onClick={() => changeMode("search")}
+          className={`order-shop-tag order-shop-tag--quick${mode === "search" ? " is-active" : ""}`}
+        >
+          {t.searchMode}
+        </button>
+      ) : null}
     </div>
   );
 
   const renderMobileShopHeader = () => (
     <div className="order-shop-header">
       <div className="order-shop-header-top">
-        <div className="order-shop-store">
+        <div className="order-shop-store" onClick={tapAdminUnlock}>
           <span className="order-shop-store-name">{storeName}</span>
           <span className="order-shop-store-id">{accountNo}</span>
         </div>
@@ -1742,6 +2758,7 @@ export default function OrderPage() {
           </button>
         </div>
       </div>
+      {renderAdminBar()}
 
       {renderMobileModeTags()}
 
@@ -1788,6 +2805,8 @@ export default function OrderPage() {
           </button>
         </div>
       ) : null}
+
+      {renderCatalogCategoryRow()}
 
       {mode === "search" ? (
         <div className="order-shop-search-row order-shop-quick-composer">
@@ -1872,41 +2891,48 @@ export default function OrderPage() {
 
   const showCatalogSearch = mode === "catalog" && stickyPanelOpen && !isMobileViewport;
 
+  const renderCatalogCategoryRow = () =>
+    mode === "catalog" ? (
+      <div className="order-catalog-cat-row" role="group" aria-label={t.category}>
+        {categoryOptions.map((cat) => {
+          const active = cat === "ALL" ? categoryAllActive : categoryFilters.includes(cat);
+          return (
+            <button
+              key={cat}
+              type="button"
+              className={`order-catalog-cat-chip${active ? " is-active" : ""}`}
+              onClick={() => toggleCategoryFilter(cat)}
+              aria-pressed={active}
+            >
+              {cat}
+            </button>
+          );
+        })}
+        {activeCatalogFilterCount > 0 || catalogSearch.trim() ? (
+          <button type="button" className="order-catalog-cat-chip order-catalog-cat-chip--clear" onClick={clearCatalogFilters}>
+            {t.clearFilters}
+          </button>
+        ) : null}
+      </div>
+    ) : null;
+
   const renderCatalogFiltersPanel = () =>
     catalogFiltersOpen && mode === "catalog" ? (
       <div className="order-sticky-filters">
-        {isMobileViewport ? (
-          <>
-            {renderCatalogScopeChips("order-sticky-catalog-chips--in-filters")}
-            <div className="order-sticky-catalog-meta order-sticky-catalog-meta--in-filters">
-              {t.selected}: {cartItemCount} · {t.showing} {orderableCatalogItems.length} {t.catalogCount}
-            </div>
-          </>
-        ) : null}
-        <div style={filterBlockStyle}>
-          <div style={filterLabelStyle}>{t.category}</div>
-          <div style={categoryBarStyle} className="order-category-filters">
-            {categoryOptions.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => toggleCategoryFilter(cat)}
-                style={categoryButtonStyle(cat === "ALL" ? categoryAllActive : categoryFilters.includes(cat))}
-                aria-pressed={cat === "ALL" ? categoryAllActive : categoryFilters.includes(cat)}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
+        {renderCatalogScopeChips("order-sticky-catalog-chips--in-filters")}
+        <div className="order-sticky-catalog-meta order-sticky-catalog-meta--in-filters">
+          {t.selected}: {cartItemCount} · {t.showing} {orderableCatalogItems.length} {t.catalogCount}
         </div>
-
         {(brandSplit.topBrands.length > 0 || brandSplit.moreBrands.length > 0) ? (
           <div style={filterBlockStyle}>
             <div style={filterLabelStyle}>{t.brand}</div>
             <div style={categoryBarStyle}>
               <button
                 type="button"
-                onClick={() => setBrandFilter("ALL")}
+                onClick={() => {
+                  setBrandFilter("ALL");
+                  if (isMobileViewport) setCatalogFiltersOpen(false);
+                }}
                 style={categoryButtonStyle(brandFilter === "ALL")}
               >
                 {t.allBrands}
@@ -1915,7 +2941,10 @@ export default function OrderPage() {
                 <button
                   key={brand}
                   type="button"
-                  onClick={() => setBrandFilter(brand)}
+                  onClick={() => {
+                    setBrandFilter(brand);
+                    if (isMobileViewport) setCatalogFiltersOpen(false);
+                  }}
                   style={categoryButtonStyle(brandFilter === brand)}
                 >
                   {formatBrandLabel(brand)}
@@ -1925,7 +2954,10 @@ export default function OrderPage() {
                 <select
                   aria-label={t.moreBrandsPick}
                   value={brandFilter !== "ALL" && brandSplit.moreBrands.includes(brandFilter) ? brandFilter : ""}
-                  onChange={(e) => setBrandFilter(e.target.value ? e.target.value : "ALL")}
+                  onChange={(e) => {
+                    setBrandFilter(e.target.value ? e.target.value : "ALL");
+                    if (isMobileViewport) setCatalogFiltersOpen(false);
+                  }}
                   style={brandSelectStyle}
                 >
                   <option value="">{t.moreBrandsPick}</option>
@@ -1975,7 +3007,7 @@ export default function OrderPage() {
         <section style={cardStyle} className="order-top-card order-compact-card">
           <div className="order-header-bar">
             <div className="order-header-main">
-              <div className="order-top-title-line">
+              <div className="order-top-title-line" onClick={tapAdminUnlock}>
                 <span className="order-top-title">{t.title}</span>
                 <span className="order-top-meta">
                   {accountNo} · {storeName}
@@ -2013,6 +3045,7 @@ export default function OrderPage() {
               {t.logout}
             </button>
           </div>
+          {renderAdminBar()}
           {showCustomerInfo ? (
             <div className="order-customer-fields">
               <OrderInput fullWidth label={t.phone} value={phone} onChange={setPhone} placeholder="" />
@@ -2042,7 +3075,12 @@ export default function OrderPage() {
               <>
             {renderModeTabs()}
 
-            {showCatalogSearch ? renderCatalogSearchRow() : null}
+            {mode === "catalog" ? (
+              <div className="order-catalog-toolbar">
+                {showCatalogSearch ? renderCatalogSearchRow() : null}
+                {renderCatalogCategoryRow()}
+              </div>
+            ) : null}
             {renderCatalogFiltersPanel()}
 
             {stickyPanelOpen ? (
@@ -2067,11 +3105,13 @@ export default function OrderPage() {
 
                 {mode === "catalog" ? (
                   <>
-                    {!isMobileViewport ? renderCatalogScopeChips() : null}
                     {!isMobileViewport ? (
                       <div className="order-sticky-catalog-footer">
                         <div className="order-sticky-catalog-meta">
                           {t.selected}: {cartItemCount} · {t.showing} {orderableCatalogItems.length} {t.catalogCount}
+                          {activeCatalogFilterCount > 0
+                            ? ` · ${t.showFilters} ${activeCatalogFilterCount}`
+                            : ""}
                         </div>
                         {renderStickyPanelToggle(true)}
                       </div>
@@ -2181,7 +3221,7 @@ export default function OrderPage() {
             onAddSkuToCart={addSkuFromSearch}
           />
         ) : mode === "newItems" ? (
-          <section className="order-shop-card order-shop-card--new">
+          <section className="order-shop-card">
             {newItemCatalogItems.length === 0 ? (
               <div style={{ ...emptyStyle, border: "1px solid #fdba74", background: "#fff7ed", color: "#c2410c" }}>{t.noNewItems}</div>
             ) : (
@@ -2199,7 +3239,7 @@ export default function OrderPage() {
                       inCartLabel={t.inCart}
                       promoBadgeLabel={t.newItems}
                       editLabel={t.editProduct}
-                      showAdminEdit={showAdminEditLinks}
+                      {...adminCardProps}
                       showNewItemListPrice
                       showNewProductBadge
                       showPublishedDate
@@ -2214,9 +3254,65 @@ export default function OrderPage() {
                           ? formatOrderNotAvailableMessage(item.sku || "", item.status, t)
                           : undefined
                       }
-                      invoicePrice={invoicePriceLabelForSku(sku)}
                       onAdjust={adjustCatalogQty}
                       onUpdateQty={updateCatalogQty}
+                      {...favoriteCardProps(sku)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        ) : mode === "seasonal" ? (
+          <section className="order-shop-card">
+            {seasonalLoading ? (
+              <div style={{ ...emptyStyle, border: "1px solid #fcd34d", background: "#fffbeb", color: "#b45309" }}>
+                {t.loadingSeasonal}
+              </div>
+            ) : seasonalCatalogItems.length === 0 ? (
+              <div style={{ ...emptyStyle, border: "1px solid #fcd34d", background: "#fffbeb", color: "#b45309" }}>
+                {t.noSeasonal}
+              </div>
+            ) : (
+              <div className="order-promo-grid order-seasonal-grid">
+                {seasonalCatalogItems.map((item) => {
+                  const sku = item.sku?.toUpperCase() || "";
+                  const qty = catalogQtyMap[sku] || "";
+                  const note = String((item as { seasonalNote?: string }).seasonalNote || "").trim();
+                  const etaDate = String((item as { seasonalEtaDate?: string }).seasonalEtaDate || "").trim();
+                  const etaPending = isSeasonalEtaPending(etaDate);
+                  const etaLabel = etaDate ? formatNewItemComingDate(etaDate, lang) || etaDate : "";
+                  const canOrder = isOrderableItem(item) && !etaPending;
+                  return (
+                    <CatalogQtyCard
+                      key={item.sku}
+                      item={{
+                        ...item,
+                        ...(etaDate ? { newItemComingDate: etaDate } : {}),
+                      }}
+                      qty={qty}
+                      palletLabel={t.pallet}
+                      justAddedLabel={t.justAdded}
+                      promoNote={note || undefined}
+                      inCartLabel={t.inCart}
+                      promoBadgeLabel={t.seasonalBadge}
+                      editLabel={t.editProduct}
+                      {...adminCardProps}
+                      showComingDate={Boolean(etaDate)}
+                      comingDateLabel={t.etaDate}
+                      lang={lang}
+                      highlight
+                      disabled={!canOrder}
+                      unavailableNote={
+                        etaPending
+                          ? t.seasonalEtaBlocked.replace("{date}", etaLabel)
+                          : !isOrderableItem(item) && !isReadyToOrderItem(item)
+                            ? formatOrderNotAvailableMessage(item.sku || "", item.status, t)
+                            : undefined
+                      }
+                      onAdjust={adjustCatalogQty}
+                      onUpdateQty={updateCatalogQty}
+                      {...favoriteCardProps(sku)}
                     />
                   );
                 })}
@@ -2224,7 +3320,7 @@ export default function OrderPage() {
             )}
           </section>
         ) : mode === "promotion" ? (
-          <section className="order-shop-card order-shop-card--promo">
+          <section className="order-shop-card">
             {promotionsLoading ? (
               <div style={{ ...emptyStyle, border: "1px solid #5eead4", background: "#f0fdfa", color: "#0f766e" }}>{t.loadingPromotions}</div>
             ) : promotionItems.length === 0 ? (
@@ -2250,9 +3346,7 @@ export default function OrderPage() {
                   const bogoPack = soldOut ? null : getPromoBogoPackSize(item);
                   const catalogItem = getCatalogItemBySku(sku) || item;
                   const notOrderable = !isOrderableItem(catalogItem);
-                  const cardItem = catalogItem.palletSize
-                    ? { ...item, palletSize: catalogItem.palletSize }
-                    : item;
+                  const cardItem = withCatalogCardFields(item, catalogItem);
                   return (
                     <CatalogQtyCard
                       key={item.sku}
@@ -2272,7 +3366,7 @@ export default function OrderPage() {
                       inCartLabel={t.inCart}
                       promoBadgeLabel={t.promoBadge}
                       editLabel={t.editProduct}
-                      showAdminEdit={showAdminEditLinks}
+                      {...adminCardProps}
                       highlight
                       disabled={soldOut || notOrderable}
                       unavailableNote={
@@ -2280,6 +3374,7 @@ export default function OrderPage() {
                       }
                       onAdjust={adjustCatalogQty}
                       onUpdateQty={updateCatalogQty}
+                      {...favoriteCardProps(sku)}
                     />
                   );
                 })}
@@ -2287,7 +3382,7 @@ export default function OrderPage() {
             )}
           </section>
         ) : mode === "clearance" ? (
-          <section className="order-shop-card order-shop-card--clearance">
+          <section className="order-shop-card">
             {clearanceItems.length > 0 ? (
               <div className="order-clearance-bulk-row">
                 <button
@@ -2323,9 +3418,7 @@ export default function OrderPage() {
                   const remainingLabel = soldOut ? t.clearanceSoldOut : item.remainingQty !== null && item.remainingQty !== undefined ? `${t.clearanceRemaining}: ${item.remainingQty}` : undefined;
                   const catalogItem = getCatalogItemBySku(sku) || item;
                   const notOrderable = !isOrderableItem(catalogItem);
-                  const cardItem = catalogItem.palletSize
-                    ? { ...item, palletSize: catalogItem.palletSize }
-                    : item;
+                  const cardItem = withCatalogCardFields(item, catalogItem);
                   return (
                     <CatalogQtyCard key={item.sku} item={cardItem} qty={qty}
                       palletLabel={t.pallet}
@@ -2334,11 +3427,46 @@ export default function OrderPage() {
                       promoPrice={priceLabel} promoDetails={detailsLabel} promoRemaining={remainingLabel}
                       policyNote={soldOut ? undefined : t.clearanceNoReturn}
                       inCartLabel={t.inCart} promoBadgeLabel={t.clearanceBadge} editLabel={t.editProduct}
-                      showAdminEdit={showAdminEditLinks} highlight disabled={soldOut || notOrderable}
-                      unavailableNote={
-                        notOrderable ? formatOrderNotAvailableMessage(sku, catalogItem.status, t) : undefined
-                      }
-                      onAdjust={adjustClearanceQty} onUpdateQty={updateClearanceQty} />
+                      {...adminCardProps} highlight disabled={soldOut || notOrderable}
+                      hideInventoryStatus
+                      onAdjust={adjustClearanceQty} onUpdateQty={updateClearanceQty}
+                      {...favoriteCardProps(sku)} />
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        ) : mode === "ndh" ? (
+          <section className="order-shop-card">
+            {ndhLoading ? (
+              <div style={{ ...emptyStyle, border: "1px solid #fda4af", background: "#fff1f2", color: "#9f1239" }}>{t.loadingNdh}</div>
+            ) : ndhItems.length === 0 ? (
+              <div style={emptyStyle}>{t.noNdh}</div>
+            ) : (
+              <div className="order-promo-grid">
+                {ndhItems.map((item) => {
+                  const sku = item.sku?.toUpperCase() || "";
+                  const expiryDate = item.expiryDate;
+                  const qty = ndhQtyMap[ndhListingKey(sku, expiryDate)] || "";
+                  const soldOut = item.remainingQty === 0;
+                  const priceLabel = item.clearancePrice ? `${t.ndhPrice}: ${item.clearancePrice}` : undefined;
+                  const detailsLabel = soldOut ? t.clearanceSoldOut : formatClearanceDetails(item, t);
+                  const remainingLabel = soldOut ? t.clearanceSoldOut : item.remainingQty !== null && item.remainingQty !== undefined ? `${t.clearanceRemaining}: ${item.remainingQty}` : undefined;
+                  const catalogItem = getCatalogItemBySku(sku) || item;
+                  const cardItem = withCatalogCardFields(item, catalogItem);
+                  return (
+                    <CatalogQtyCard key={`${sku}-${expiryDate || ""}`} item={cardItem} qty={qty}
+                      palletLabel={t.pallet}
+                      justAddedLabel={t.justAdded}
+                      promoNote={soldOut ? t.clearanceSoldOut : item.clearanceNote || t.ndhMode}
+                      promoPrice={priceLabel} promoDetails={detailsLabel} promoRemaining={remainingLabel}
+                      policyNote={soldOut ? undefined : t.clearanceNoReturn}
+                      inCartLabel={t.inCart} promoBadgeLabel={t.ndhMode} editLabel={t.editProduct}
+                      {...adminCardProps} highlight disabled={soldOut}
+                      hideInventoryStatus
+                      onAdjust={(lineSku, delta) => adjustNdhQty(lineSku, delta, expiryDate)}
+                      onUpdateQty={(lineSku, value) => updateNdhQty(lineSku, value, expiryDate)}
+                      {...favoriteCardProps(sku)} />
                   );
                 })}
               </div>
@@ -2346,43 +3474,53 @@ export default function OrderPage() {
           </section>
         ) : (
           <section className="order-shop-card order-shop-card--listing">
-            {recommendedStripItems.length > 0 ? (
-              <details className="order-details-fold">
-                <summary>
-                  {t.recommendedStripTitle} ({recommendedStripItems.length})
-                </summary>
-                <RecommendedStrip
-                  lang={lang}
-                  items={recommendedStripItems}
-                  onAddOne={(sku) => adjustCatalogQty(sku, 1)}
-                  hideTitle
-                />
-              </details>
-            ) : null}
-
-            <CatalogVirtualGrid
-              gridKey="catalog"
-              items={orderableCatalogItems}
-              catalogQtyMap={catalogQtyMap}
-              invoicePriceLabelForSku={invoicePriceLabelForSku}
-              inCartLabel={t.inCart}
-              palletLabel={t.pallet}
-              justAddedLabel={t.justAdded}
-              promoBadgeLabel={t.promoBadge}
-              weeklyPickSkus={promoSkuSet}
-              showNewProductBadge
-              newProductBadgeChecker={isNewItem}
-              editLabel={t.editProduct}
-              showAdminEdit={showAdminEditLinks}
-              canOrderItem={isOrderableItem}
-              orderBlockedMessage={(item) => formatOrderNotAvailableMessage(item.sku || "", item.status, t)}
-              onAdjust={adjustCatalogQty}
-              onUpdateQty={updateCatalogQty}
-            />
 
             {orderableCatalogItems.length === 0 ? (
-              <div style={{ ...emptyStyle, marginTop: 10 }}>{catalogShowSelectedOnly ? t.noItems : t.noMatches}</div>
-            ) : null}
+              <div style={{ ...emptyStyle, marginTop: 10 }} className={catalogShowFavoritesOnly ? "order-favorites-empty" : undefined}>
+                <div>
+                  {catalogShowFavoritesOnly
+                    ? t.noFavorites
+                    : catalogShowSelectedOnly
+                      ? t.noItems
+                      : t.noMatches}
+                </div>
+                {catalogShowFavoritesOnly ? (
+                  <button
+                    type="button"
+                    className="order-favorites-empty-btn"
+                    onClick={() => setCatalogShowFavoritesOnly(false)}
+                  >
+                    {t.showAllCatalog}
+                  </button>
+                ) : null}
+              </div>
+            ) : (
+              <CatalogVirtualGrid
+                embedScroll={fullscreen}
+                gridKey={`catalog:${categoryFilters.join(",")}:${brandFilter}:${catalogSearch}:${catalogShowFavoritesOnly}:${catalogShowSelectedOnly}:${catalogShowRecommendedOnly}:${showAvailableOnly}`}
+                items={orderableCatalogItems}
+                catalogQtyMap={catalogQtyMap}
+                invoicePriceLabelForSku={invoicePriceLabelForSku}
+                inCartLabel={t.inCart}
+                palletLabel={t.pallet}
+                justAddedLabel={t.justAdded}
+                promoBadgeLabel={t.promoBadge}
+                weeklyPickSkus={promoSkuSet}
+                showNewProductBadge
+                newProductBadgeChecker={isNewItem}
+                editLabel={t.editProduct}
+                lang={lang}
+                showAdminEdit={showAdminEditLinks}
+                onAdminCategoryChange={adminCardProps.onAdminCategoryChange}
+                adminCategoryLabel={adminCardProps.adminCategoryLabel}
+                adminCategoryAutoLabel={adminCardProps.adminCategoryAutoLabel}
+                canOrderItem={isOrderableItem}
+                orderBlockedMessage={(item) => formatOrderNotAvailableMessage(item.sku || "", item.status, t)}
+                extraCardProps={favoriteCardProps}
+                onAdjust={adjustCatalogQty}
+                onUpdateQty={updateCatalogQty}
+              />
+            )}
           </section>
         )}
 
@@ -2403,28 +3541,21 @@ export default function OrderPage() {
         lang={lang}
         items={cartDisplayItems}
         nhItemsSkus={nhItemsSkuSetForOrder}
+        ndhSkus={ndhSkuSetForOrder}
         lineCount={cartItemCount}
         totalCases={totalCases}
         submitting={submitting}
         onAdjustQty={adjustCartLineQty}
         onQtyInput={updateCartLineQty}
         onRemove={removeSkuFromOrder}
-        nudge={
-          clearanceUpsellLines.length > 0 ? (
-            <details className="order-cart-nudge-fold" open={cartItemCount > 0}>
-              <summary>
-                {t.clearanceMode} ({clearanceItems.length})
-              </summary>
-              <OrderShopNudge
-                lang={lang}
-                clearanceMissing={clearanceUpsellLines.length}
-                clearanceDealCount={clearanceItems.length}
-                onAddClearanceMissing={addAllMissingClearanceUpsell}
-                onViewClearance={() => changeMode("clearance")}
-              />
-            </details>
-          ) : null
-        }
+        unavailableItems={unavailableSubmitItems}
+        onRemoveUnavailable={() => {
+          const removed = removeUnavailableFromOrder();
+          if (removed.length > 0) {
+            showTransientToast(t.unavailableRemoved.replace("{count}", String(removed.length)));
+          }
+        }}
+        nudge={null}
         tools={
           <div className="order-cart-tools">
             <div className="order-cart-tools-row">
@@ -2456,6 +3587,25 @@ export default function OrderPage() {
         onReorder={reorderItems}
       />
 
+      <SkuOrderHistoryModal
+        open={Boolean(skuHistorySku)}
+        onClose={() => setSkuHistorySku("")}
+        lang={lang}
+        sku={skuHistorySku}
+        accountNo={accountNo}
+        invoicePricingEnabled={invoicePricingEnabled}
+        entries={skuOrderHistoryIndex.get(skuHistorySku) || []}
+        currentQty={catalogQtyMap[skuHistorySku] || ""}
+        onAddQty={(qty) => {
+          if (!skuHistorySku || qty <= 0) return;
+          updateCatalogQty(skuHistorySku, String(qty));
+          showTransientToast(
+            t.historyQtyAdded.replace("{sku}", skuHistorySku).replace("{qty}", String(qty)),
+            2200
+          );
+        }}
+      />
+
       <OrderBarcodeScanner
         open={barcodeScannerOpen}
         onClose={() => setBarcodeScannerOpen(false)}
@@ -2473,7 +3623,7 @@ export default function OrderPage() {
       <OrderFloatingCartFab
         count={cartItemCount}
         label={t.cartSummary}
-        hidden={showCart || showPastOrders || barcodeScannerOpen}
+        hidden={showCart || showPastOrders || Boolean(skuHistorySku) || barcodeScannerOpen}
         onClick={() => (showCart ? toggleCartPanel() : setShowCart(true))}
       />
 
@@ -2493,29 +3643,26 @@ export default function OrderPage() {
           lang={lang}
           items={cartDisplayItems}
           warnings={orderReviewWarnings}
-          clearanceUpsellLines={clearanceUpsellLines}
+          unavailableItems={unavailableSubmitItems}
+          clearanceUpsellLines={[]}
           onAddUpsellCase={(sku) => adjustQtyForSku(sku, 1, "clearance")}
-          onAddAllClearanceUpsell={addAllMissingClearanceUpsell}
+          onAddAllClearanceUpsell={() => {}}
           nhItemsSkus={nhItemsSkuSetForOrder}
+          ndhSkus={ndhSkuSetForOrder}
           promoDealBySku={promoDealBySku}
-          newItemsReminder={
-            showNewItemsReviewReminder
-              ? {
-                  count: newItemCount,
-                  onView: () => {
-                    setShowReview(false);
-                    changeMode("newItems");
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  },
-                }
-              : null
-          }
           accountNo={accountNo}
           storeName={storeName}
           submitting={submitting}
           onAdjustQty={adjustCartLineQty}
           onQtyInput={updateCartLineQty}
           onRemove={removeSkuFromOrder}
+          onRemoveUnavailable={() => {
+            const removed = removeUnavailableFromOrder();
+            if (removed.length > 0) {
+              showTransientToast(t.unavailableRemoved.replace("{count}", String(removed.length)));
+            }
+          }}
+          onRemoveUnavailableAndSubmit={removeUnavailableAndSubmit}
           onSubmit={submitOrder}
         />
 
@@ -2528,6 +3675,14 @@ export default function OrderPage() {
           lang={lang}
           orderRef={lastSubmittedRef}
           items={lastSubmittedItems}
+          suggestLines={[]}
+          onAddSuggestCase={() => {}}
+          onAddAllSuggest={() => {}}
+          onBrowseWeeklyPicks={() => {
+            setLastSubmittedRef("");
+            setLastSubmittedItems([]);
+            changeMode("promotion");
+          }}
         />
     </main>
   );

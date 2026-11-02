@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getExpAccessPassword } from "@/lib/expAuth";
+import { isValidExpPassword } from "@/lib/expAuth";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +13,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Password required." }, { status: 400 });
     }
 
-    if (password !== getExpAccessPassword()) {
+    if (!isValidExpPassword(password)) {
       return NextResponse.json({ error: "Invalid password." }, { status: 401 });
     }
 

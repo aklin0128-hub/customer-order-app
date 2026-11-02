@@ -59,6 +59,30 @@ export function parseCategoriesFromBody(body: {
   return legacy ? expandCategoryTags([legacy]) : [];
 }
 
+/**
+ * Parse a category-only PATCH. Empty / AUTO → clear override (`[]`).
+ * Returns null when a non-empty value is not a known category.
+ */
+export function resolveCategoryPatchInput(value: unknown): string[] | null {
+  const raw = String(value ?? "").trim();
+  if (!raw || raw.toUpperCase() === "AUTO") return [];
+  const categories = parseCategoriesFromBody({ category: raw });
+  return categories.length > 0 ? categories : null;
+}
+
+/** Merge a category-only change onto an existing product without touching other fields. */
+export function applyProductCategoryPatch<T extends ProductCategoryFields>(
+  product: T,
+  categoryInput: unknown
+): T {
+  const categories = resolveCategoryPatchInput(categoryInput);
+  if (categories === null) return product;
+  if (categories.length === 0) {
+    return { ...product, category: "", categories: [] };
+  }
+  return { ...product, category: categories[0], categories };
+}
+
 /** Tags used for customer catalog category filters. */
 export function getProductCategoryTags(item: CategoryItem): string[] {
   const explicit = readProductCategories(item);

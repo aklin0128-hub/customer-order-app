@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-import { getCatalogItemBySku } from "../catalogUtils";
+import { cartLinePoolKey } from "@/lib/orderNhItems";
+import { getCatalogItemBySku, isOrderableItem } from "../catalogUtils";
 import { copy } from "../orderCopy";
 import {
   compactQtyStripWrapStyle,
@@ -27,24 +28,34 @@ import type { CartItem, Lang } from "../types";
 import { ProductImage } from "./ProductImage";
 import { SalesUpsellPanel, type UpsellLine } from "./SalesUpsellPanel";
 
+export type UnavailableReviewItem = {
+  sku: string;
+  status: string;
+  nhItems?: boolean;
+  ndh?: boolean;
+};
+
 export function OrderReviewModal({
   open,
   onClose,
   lang,
   items,
   warnings = [],
+  unavailableItems = [],
   clearanceUpsellLines,
   onAddUpsellCase,
   onAddAllClearanceUpsell,
   nhItemsSkus,
+  ndhSkus,
   promoDealBySku,
-  newItemsReminder,
   accountNo,
   storeName,
   submitting,
   onAdjustQty,
   onQtyInput,
   onRemove,
+  onRemoveUnavailable,
+  onRemoveUnavailableAndSubmit,
   onSubmit,
 }: {
   open: boolean;
@@ -52,21 +63,21 @@ export function OrderReviewModal({
   lang: Lang;
   items: CartItem[];
   warnings?: string[];
+  unavailableItems?: UnavailableReviewItem[];
   clearanceUpsellLines?: UpsellLine[];
   onAddUpsellCase: (sku: string) => void;
   onAddAllClearanceUpsell: () => void;
   nhItemsSkus?: Set<string>;
+  ndhSkus?: Set<string>;
   promoDealBySku?: Record<string, string>;
-  newItemsReminder?: {
-    count: number;
-    onView: () => void;
-  } | null;
   accountNo: string;
   storeName: string;
   submitting: boolean;
-  onAdjustQty: (sku: string, delta: number, nhItems?: boolean) => void;
-  onQtyInput: (sku: string, value: string, nhItems?: boolean) => void;
-  onRemove: (sku: string, nhItems?: boolean) => void;
+  onAdjustQty: (sku: string, delta: number, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => void;
+  onQtyInput: (sku: string, value: string, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => void;
+  onRemove: (sku: string, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => void;
+  onRemoveUnavailable: () => void;
+  onRemoveUnavailableAndSubmit: () => void;
   onSubmit: () => void | Promise<void>;
 }) {
   useEffect(() => {
@@ -95,18 +106,21 @@ export function OrderReviewModal({
       lang={lang}
       items={items}
       warnings={warnings}
+      unavailableItems={unavailableItems}
       clearanceUpsellLines={clearanceUpsellLines}
       onAddUpsellCase={onAddUpsellCase}
       onAddAllClearanceUpsell={onAddAllClearanceUpsell}
       nhItemsSkus={nhItemsSkus}
+      ndhSkus={ndhSkus}
       promoDealBySku={promoDealBySku}
-      newItemsReminder={newItemsReminder}
       accountNo={accountNo}
       storeName={storeName}
       submitting={submitting}
       onAdjustQty={onAdjustQty}
       onQtyInput={onQtyInput}
       onRemove={onRemove}
+      onRemoveUnavailable={onRemoveUnavailable}
+      onRemoveUnavailableAndSubmit={onRemoveUnavailableAndSubmit}
       onSubmit={onSubmit}
       onClose={onClose}
     />
@@ -118,30 +132,40 @@ function OrderReviewModalContent({
   lang,
   items,
   warnings = [],
+  unavailableItems = [],
   clearanceUpsellLines,
   onAddUpsellCase,
   onAddAllClearanceUpsell,
   nhItemsSkus,
+  ndhSkus,
   promoDealBySku,
-  newItemsReminder,
   accountNo,
   storeName,
   submitting,
   onAdjustQty,
   onQtyInput,
   onRemove,
+  onRemoveUnavailable,
+  onRemoveUnavailableAndSubmit,
   onSubmit,
 }: Omit<Parameters<typeof OrderReviewModal>[0], "open">) {
   const t = copy[lang];
   const [hideWarnings, setHideWarnings] = useState(false);
   const [hideClearanceUpsell, setHideClearanceUpsell] = useState(false);
 
-  const hasClearanceInOrder = nhItemsSkus
-    ? items.some((item) => nhItemsSkus.has(item.sku.toUpperCase()))
-    : false;
+  const hasClearanceInOrder = items.some(
+    (item) =>
+      item.nhItems ||
+      item.ndh ||
+      nhItemsSkus?.has(item.sku.toUpperCase()) ||
+      ndhSkus?.has(item.sku.toUpperCase())
+  );
 
   const showClearanceUpsell = !hideClearanceUpsell && clearanceUpsellLines && clearanceUpsellLines.length > 0;
   const showWarnings = !hideWarnings && warnings.length > 0;
+  const unavailableList = unavailableItems || [];
+  const hasUnavailable = unavailableList.length > 0;
+  const unavailableKey = new Set(unavailableList.map((item) => cartLinePoolKey(item)));
 
   return (
     <div
@@ -178,6 +202,70 @@ function OrderReviewModalContent({
         </header>
 
         <div style={reviewModalBodyStyle}>
+          {hasUnavailable ? (
+            <div
+              style={{
+                border: "1px solid #fca5a5",
+                background: "#fef2f2",
+                color: "#991b1b",
+                borderRadius: 12,
+                padding: 12,
+                fontSize: 12,
+                lineHeight: 1.45,
+                marginBottom: 10,
+              }}
+            >
+              <div style={{ fontWeight: 900, fontSize: 13 }}>{t.unavailableInCartTitle}</div>
+              <div style={{ marginTop: 4, opacity: 0.95 }}>{t.unavailableInCartHint}</div>
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+                {unavailableList.map((item) => (
+                  <div key={cartLinePoolKey(item)} style={{ fontWeight: 800 }}>
+                    • {item.sku}
+                    {item.status ? ` — ${item.status}` : ""}
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={onRemoveUnavailable}
+                  style={{
+                    border: "1px solid #fecaca",
+                    background: "#fff",
+                    color: "#b91c1c",
+                    borderRadius: 999,
+                    padding: "8px 12px",
+                    fontSize: 12,
+                    fontWeight: 900,
+                    cursor: submitting ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {t.removeUnavailable}
+                </button>
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => {
+                    void onRemoveUnavailableAndSubmit();
+                  }}
+                  style={{
+                    border: "none",
+                    background: submitting ? "#fca5a5" : "#dc2626",
+                    color: "#fff",
+                    borderRadius: 999,
+                    padding: "8px 12px",
+                    fontSize: 12,
+                    fontWeight: 900,
+                    cursor: submitting ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {t.removeUnavailableAndSubmit}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {hasClearanceInOrder ? (
             <div style={{ border: "1px solid #fdba74", background: "#fff7ed", color: "#9a3412", borderRadius: 12, padding: 10, fontSize: 12, lineHeight: 1.45, marginBottom: 10, fontWeight: 800 }}>
               {t.clearancePolicyReviewNote}
@@ -230,41 +318,26 @@ function OrderReviewModalContent({
             />
           ) : null}
 
-          {newItemsReminder ? (
-            <div style={{ border: "1px solid #fdba74", background: "#fff7ed", color: "#9a3412", borderRadius: 12, padding: 10, fontSize: 12, lineHeight: 1.45, marginBottom: 10 }}>
-              <div style={{ fontWeight: 900, marginBottom: 6 }}>
-                {t.newItemsReviewReminder.replace("{count}", String(newItemsReminder.count))}
-              </div>
-              <button
-                type="button"
-                onClick={newItemsReminder.onView}
-                disabled={submitting}
-                style={{
-                  border: "1px solid #ea580c",
-                  background: "#ffedd5",
-                  color: "#c2410c",
-                  borderRadius: 999,
-                  padding: "7px 12px",
-                  fontSize: 12,
-                  fontWeight: 900,
-                  cursor: submitting ? "not-allowed" : "pointer",
-                }}
-              >
-                {t.viewNewItems}
-              </button>
-            </div>
-          ) : null}
-
           <div style={reviewListStyle}>
             {items.map((item, index) => {
               const catalogItem = getCatalogItemBySku(item.sku);
               const cleanSku = item.sku.toUpperCase();
               const isClearance = Boolean(item.nhItems);
+              const isNdh = Boolean(item.ndh);
               const promoDeal = promoDealBySku?.[cleanSku];
               const hasMetaLine = !!(catalogItem?.limitedQty || catalogItem?.palletSize);
+              const lineUnavailable =
+                unavailableKey.has(cartLinePoolKey(item)) ||
+                (catalogItem ? !isOrderableItem(catalogItem) : true);
 
               return (
-                <article key={`${item.sku}-${item.nhItems ? "nh" : "cat"}-${index}`} style={reviewItemStyle}>
+                <article
+                  key={`${cartLinePoolKey(item)}-${index}`}
+                  style={{
+                    ...reviewItemStyle,
+                    ...(lineUnavailable ? { border: "1px solid #fca5a5", background: "#fef2f2" } : null),
+                  }}
+                >
                   <div style={{ flex: "1 1 min(260px, 100%)", minWidth: 0, display: "flex", gap: 10 }}>
                     <ProductImage sku={item.sku} alt={item.sku} size={48} imageUrl={catalogItem?.imageUrl} />
                     <div style={{ minWidth: 0 }}>
@@ -285,6 +358,15 @@ function OrderReviewModalContent({
                         {catalogItem?.brand ? `${catalogItem.brand} | ` : ""}
                         {catalogItem?.name || "-"}
                       </div>
+                      {lineUnavailable ? (
+                        <div style={{ fontSize: 11, fontWeight: 800, color: "#b91c1c", marginTop: 4 }}>
+                          {catalogItem
+                            ? t.statusWarning
+                                .replace("{sku}", cleanSku)
+                                .replace("{status}", String(catalogItem.status || "").trim().toUpperCase() || t.orderNotAvailable)
+                            : t.unavailableMissingSku.replace("{sku}", cleanSku)}
+                        </div>
+                      ) : null}
                       {hasMetaLine ? (
                         <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
                           {catalogItem?.palletSize ? `${t.pallet}: ${catalogItem.palletSize}` : ""}
@@ -297,7 +379,14 @@ function OrderReviewModalContent({
                           {promoDeal}
                         </div>
                       ) : null}
-                      {isClearance ? (
+                      {isNdh ? (
+                        <div style={{ ...clearancePolicyStyle, marginTop: 6 }}>
+                          {t.ndhMode}
+                          {item.expiryDate ? ` · ${t.clearanceExpiry} ${item.expiryDate}` : ""}
+                          {" · "}
+                          {t.clearanceNoReturn}
+                        </div>
+                      ) : isClearance ? (
                         <div style={{ ...clearancePolicyStyle, marginTop: 6 }}>{t.clearanceNoReturn}</div>
                       ) : null}
                     </div>
@@ -305,19 +394,19 @@ function OrderReviewModalContent({
 
                   <div style={compactQtyStripWrapStyle}>
                     <div style={{ ...reviewQtyControlStyle, width: "100%", maxWidth: 300 }}>
-                      <button type="button" onClick={() => onAdjustQty(item.sku, -1, item.nhItems)} style={reviewQtyButtonStyle}>
+                      <button type="button" onClick={() => onAdjustQty(item.sku, -1, item.nhItems, item.ndh, item.expiryDate)} style={reviewQtyButtonStyle}>
                         −
                       </button>
                       <input
                         value={item.qty}
-                        onChange={(e) => onQtyInput(item.sku, e.target.value, item.nhItems)}
+                        onChange={(e) => onQtyInput(item.sku, e.target.value, item.nhItems, item.ndh, item.expiryDate)}
                         inputMode="numeric"
                         style={reviewQtyInputStyle}
                       />
-                      <button type="button" onClick={() => onAdjustQty(item.sku, 1, item.nhItems)} style={reviewQtyButtonStyle}>
+                      <button type="button" onClick={() => onAdjustQty(item.sku, 1, item.nhItems, item.ndh, item.expiryDate)} style={reviewQtyButtonStyle}>
                         +
                       </button>
-                      <button type="button" onClick={() => onRemove(item.sku, item.nhItems)} style={reviewRemoveButtonStyle}>
+                      <button type="button" onClick={() => onRemove(item.sku, item.nhItems, item.ndh, item.expiryDate)} style={reviewRemoveButtonStyle}>
                         {t.remove}
                       </button>
                     </div>
@@ -337,10 +426,14 @@ function OrderReviewModalContent({
             onClick={() => {
               void onSubmit();
             }}
-            disabled={submitting}
-            style={{ ...submitButtonStyle, background: submitting ? "#93c5fd" : "#16a34a" }}
+            disabled={submitting || hasUnavailable || items.length === 0}
+            title={hasUnavailable ? t.confirmSubmitBlocked : undefined}
+            style={{
+              ...submitButtonStyle,
+              background: submitting || hasUnavailable || items.length === 0 ? "#93c5fd" : "#16a34a",
+            }}
           >
-            {submitting ? t.submitting : t.confirmSubmit}
+            {submitting ? t.submitting : hasUnavailable ? t.confirmSubmitBlocked : t.confirmSubmit}
           </button>
         </footer>
       </div>

@@ -4,7 +4,7 @@ import { cachedServerData, SERVER_CACHE } from "@/lib/serverDataCache";
 
 export const dynamic = "force-dynamic";
 
-const CACHE_CONTROL = "public, s-maxage=120, stale-while-revalidate=600";
+const CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=600";
 
 export async function GET() {
   try {

@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
 const STORAGE_KEY = "exp_access_password";
+const REMEMBER_KEY = "exp_access_remember";
 
 type ExpAuthContextValue = {
   ready: boolean;
@@ -10,12 +11,34 @@ type ExpAuthContextValue = {
   password: string;
   error: string;
   loading: boolean;
-  login: (inputPassword: string) => Promise<boolean>;
+  login: (inputPassword: string, rememberMe?: boolean) => Promise<boolean>;
   logout: () => void;
   expHeaders: (extra?: HeadersInit) => HeadersInit;
 };
 
 const ExpAuthContext = createContext<ExpAuthContextValue | null>(null);
+
+function readSavedPassword() {
+  try {
+    const remembered = localStorage.getItem(REMEMBER_KEY) === "1";
+    if (remembered) {
+      return localStorage.getItem(STORAGE_KEY) || "";
+    }
+    return sessionStorage.getItem(STORAGE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function clearSavedPassword() {
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(REMEMBER_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 function useExpAuthState(): ExpAuthContextValue {
   const [ready, setReady] = useState(false);
@@ -25,7 +48,7 @@ function useExpAuthState(): ExpAuthContextValue {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const saved = sessionStorage.getItem(STORAGE_KEY);
+    const saved = readSavedPassword();
     if (saved) {
       setPassword(saved);
       setAuthed(true);
@@ -33,7 +56,7 @@ function useExpAuthState(): ExpAuthContextValue {
     setReady(true);
   }, []);
 
-  const login = useCallback(async (inputPassword: string) => {
+  const login = useCallback(async (inputPassword: string, rememberMe = true) => {
     const trimmed = inputPassword.trim();
     setError("");
     setLoading(true);
@@ -51,7 +74,15 @@ function useExpAuthState(): ExpAuthContextValue {
         throw new Error(data?.error || "Invalid password.");
       }
 
-      sessionStorage.setItem(STORAGE_KEY, trimmed);
+      clearSavedPassword();
+      if (rememberMe) {
+        localStorage.setItem(STORAGE_KEY, trimmed);
+        localStorage.setItem(REMEMBER_KEY, "1");
+      } else {
+        sessionStorage.setItem(STORAGE_KEY, trimmed);
+        localStorage.setItem(REMEMBER_KEY, "0");
+      }
+
       setPassword(trimmed);
       setAuthed(true);
       return true;
@@ -64,7 +95,7 @@ function useExpAuthState(): ExpAuthContextValue {
   }, []);
 
   const logout = useCallback(() => {
-    sessionStorage.removeItem(STORAGE_KEY);
+    clearSavedPassword();
     setPassword("");
     setAuthed(false);
   }, []);

@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { loadRedisProducts, productRedisKey, saveRedisProduct } from "@/lib/productRedisStore";
-import { parseCategoriesFromBody, expandCategoryTags } from "@/lib/productCategories";
+import {
+  parseCategoriesFromBody,
+  expandCategoryTags,
+  applyProductCategoryPatch,
+  resolveCategoryPatchInput,
+} from "@/lib/productCategories";
 import {
   mainCategoryToNewItemStorageLabel,
   parseNewItemStorageLabel,
@@ -232,6 +237,79 @@ export async function POST(req: Request) {
   } catch (error: any) {
     return NextResponse.json(
       { error: error?.message || "Failed to save product." },
+      { status: 500 }
+    );
+  }
+}
+
+/** Category-only update. Merges onto the existing Redis/catalog product so other fields stay intact. */
+export async function PATCH(req: Request) {
+  if (!checkAdmin(req)) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  try {
+    const body = await req.json();
+    const sku = String(body?.sku || "").trim().toUpperCase();
+
+    if (!sku) {
+      return NextResponse.json({ error: "Missing SKU." }, { status: 400 });
+    }
+
+    if (!body || !Object.prototype.hasOwnProperty.call(body, "category")) {
+      return NextResponse.json({ error: "Missing category." }, { status: 400 });
+    }
+
+    const categories = resolveCategoryPatchInput(body.category);
+    if (categories === null) {
+      return NextResponse.json(
+        { error: "Invalid category. Use DRY, FROZEN, FRESH, HOUSEWARE, or empty for AUTO." },
+        { status: 400 }
+      );
+    }
+
+    const catalogProduct = (catalogData as Product[]).find(
+      (item) => String(item.sku || "").toUpperCase() === sku
+    );
+    const redisProduct = await redis.get<Product>(productRedisKey(sku));
+    if (!catalogProduct && !redisProduct) {
+      return NextResponse.json({ error: "Product not found." }, { status: 404 });
+    }
+
+    const existing: Product = {
+      ...(catalogProduct ?? { sku }),
+      ...(redisProduct ?? {}),
+      sku,
+    };
+
+    const withCategory = applyProductCategoryPatch(existing, body.category);
+    const newItemStorageLabel =
+      resolveNewItemStorageLabel({
+        category: withCategory.category,
+        categories: withCategory.categories,
+        newItemStorageLabel: existing.newItemStorageLabel,
+      }) ?? parseNewItemStorageLabel(existing.newItemStorageLabel);
+
+    const product: Product = {
+      ...withCategory,
+      sku,
+      newItemStorageLabel,
+      source: "Redis",
+      updatedAt: new Date().toISOString(),
+    };
+
+    await saveRedisProduct(product);
+
+    bustServerDataCache(SERVER_CACHE.catalog);
+    bustServerDataCache(SERVER_CACHE.showcase);
+
+    return NextResponse.json({
+      success: true,
+      product,
+    });
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error?.message || "Failed to update category." },
       { status: 500 }
     );
   }

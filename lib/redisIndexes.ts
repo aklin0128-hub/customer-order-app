@@ -1,4 +1,5 @@
 import { normalizeAccountNo } from "@/lib/customers";
+import { redisSaddChunks } from "@/lib/redisBatch";
 import { redis } from "@/lib/redis";
 
 export const REDIS_INDEX = {
@@ -18,8 +19,8 @@ async function rebuildFromKeys(
     const acct = normalizeAccountNo(key.slice(prefix.length));
     if (!acct) continue;
     accounts.push(acct);
-    await redis.sadd(indexKey, acct);
   }
+  await redisSaddChunks(indexKey, accounts);
   return accounts;
 }
 
@@ -30,8 +31,8 @@ async function rebuildDraftIndex(): Promise<string[]> {
     const acct = normalizeAccountNo(key.replace(/^draft:/, ""));
     if (!acct) continue;
     accounts.push(acct);
-    await redis.sadd(REDIS_INDEX.draft, acct);
   }
+  await redisSaddChunks(REDIS_INDEX.draft, accounts);
   return accounts;
 }
 
@@ -42,8 +43,8 @@ async function rebuildCustomerIndex(): Promise<string[]> {
     const acct = normalizeAccountNo(key.replace(/^customer:/, ""));
     if (!acct) continue;
     accounts.push(acct);
-    await redis.sadd(REDIS_INDEX.customer, acct);
   }
+  await redisSaddChunks(REDIS_INDEX.customer, accounts);
   return accounts;
 }
 
