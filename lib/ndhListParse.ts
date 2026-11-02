@@ -165,9 +165,12 @@ export function parseNdhLifeDays(value: unknown): number | null {
   return num;
 }
 
-function shouldSkipExpiredLife(value: unknown) {
+/** Skip warehouse rows with fewer than 15 days of Life remaining. */
+export const NDH_MIN_LIFE_DAYS = 15;
+
+function shouldSkipShortLife(value: unknown) {
   const life = parseNdhLifeDays(value);
-  return life !== null && life <= 0;
+  return life !== null && life < NDH_MIN_LIFE_DAYS;
 }
 
 function applyDefaults(row: ParsedNdhListRow, defaults?: NdhListDefaults): ParsedNdhListRow {
@@ -279,7 +282,7 @@ function rowsFromMatrix(matrix: unknown[][], defaults?: NdhListDefaults): Parsed
       lastSku = next.sku;
       if (next.description) lastDescription = next.description;
       if (next.clearancePrice) lastPrice = next.clearancePrice;
-      if (lifeIndex >= 0 && shouldSkipExpiredLife(raw[lifeIndex])) continue;
+      if (lifeIndex >= 0 && shouldSkipShortLife(raw[lifeIndex])) continue;
       out.push(next);
     }
     return mergeNdhListRows(out);
