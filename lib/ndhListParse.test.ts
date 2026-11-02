@@ -110,8 +110,27 @@ test("parseNdhPrice reads TP and keeps at most two decimals", () => {
   assert.equal(parseNdhPrice("$5.388000000000001"), "$5.39");
   assert.equal(parseNdhPrice(5.380000000000001), "5.38");
   assert.equal(parseNdhPrice("12.5"), "12.50");
+  assert.equal(parseNdhPrice("SAMYANG"), undefined);
+  assert.equal(parseNdhPrice(0), undefined);
   assert.equal(formatClearancePriceDisplay("$5.388000000000001"), "$5.39");
   assert.equal(formatClearancePriceDisplay("8"), "$8.00");
+  assert.equal(formatClearancePriceDisplay("$0.00"), "");
+});
+
+test("warehouse CSV skips applied-filter banners and still reads TP", () => {
+  const rows = parseNdhListText(
+    [
+      "APPLIED FILTERS: LOC ON HAND QTY IS GREATER THAN 4 LOC INVENTORY STATUS IS NEAR DATE HOLD",
+      "PID,Brand,Description,Description K,Status,Size,S Type,S Life (D),LOT,Exp Date,Life,Inv,TP,BP",
+      "10482K,SAMYANG,BULDAK HABANERO LIME POTATO CHIPS (L),불닭,NORMAL,12X4.23 OZ,Dry,180,QC-MPL,11/2/2026,1,176,$5.38,12.00",
+      "APPLIED FILTERS: LOC ON HAND QTY IS GREATER THAN 4 LOC INVENTORY STATUS IS NEAR DATE HOLD,,,,,,11/2/2026,1,176,0,12.00",
+    ].join("\n")
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].sku, "10482K");
+  assert.equal(rows[0].clearancePrice, "$5.38");
+  assert.equal(rows[0].clearanceQty, "176");
+  assert.equal(rows[0].description, "BULDAK HABANERO LIME POTATO CHIPS (L)");
 });
 
 test("warehouse CSV uses TP not BP and rounds price to two decimals", () => {
