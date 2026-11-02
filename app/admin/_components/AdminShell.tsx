@@ -26,6 +26,7 @@ export type AdminNav =
   | "products"
   | "promotions"
   | "clearance"
+  | "ndh"
   | "seasonal"
   | "orders"
   | "invoices"

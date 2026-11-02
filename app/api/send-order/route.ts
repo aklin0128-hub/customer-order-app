@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { prependOrderHistory } from "@/lib/orderHistory";
 import { CLEARANCE_ORDER_EMAIL_TAG, incrementClearanceSold } from "@/lib/clearance";
+import { NDH_ORDER_EMAIL_TAG, incrementNdhSold } from "@/lib/ndh";
 import { incrementPromotionSold } from "@/lib/promotions";
 import { isValidOrderEmail, resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
 import { getCustomerByAccount, upsertCustomerContact } from "@/lib/customers";
@@ -19,15 +20,19 @@ function csvEscape(value: unknown) {
   return text;
 }
 
-type OrderLine = { sku: string; qty: string; nhItems?: boolean };
+type OrderLine = { sku: string; qty: string; nhItems?: boolean; ndh?: boolean };
+
+function lineTag(item: OrderLine) {
+  if (item.ndh) return NDH_ORDER_EMAIL_TAG;
+  if (item.nhItems) return CLEARANCE_ORDER_EMAIL_TAG;
+  return "";
+}
 
 function formatOrderLine(item: OrderLine) {
   const sku = String(item.sku || "").trim().toUpperCase();
   const qty = String(item.qty || "").trim();
-  if (item.nhItems) {
-    return `${sku} - ${qty} - ${CLEARANCE_ORDER_EMAIL_TAG}`;
-  }
-  return `${sku} - ${qty}`;
+  const tag = lineTag(item);
+  return tag ? `${sku} - ${qty} - ${tag}` : `${sku} - ${qty}`;
 }
 
 function buildCsv(items: OrderLine[]) {
@@ -36,8 +41,7 @@ function buildCsv(items: OrderLine[]) {
   for (const item of items) {
     const sku = String(item.sku || "").trim().toUpperCase();
     const qty = String(item.qty || "").trim();
-    const tag = item.nhItems ? CLEARANCE_ORDER_EMAIL_TAG : "";
-    rows.push([sku, qty, tag]);
+    rows.push([sku, qty, lineTag(item)]);
   }
 
   return rows.map((row) => row.map(csvEscape).join(",")).join("\n");
@@ -70,11 +74,15 @@ export async function POST(req: Request) {
     }
 
     const cleanedItems: OrderLine[] = items
-      .map((item: any) => ({
-        sku: String(item?.sku || "").trim().toUpperCase(),
-        qty: String(item?.qty || "").trim(),
-        nhItems: Boolean(item?.nhItems),
-      }))
+      .map((item: any) => {
+        const ndh = Boolean(item?.ndh);
+        return {
+          sku: String(item?.sku || "").trim().toUpperCase(),
+          qty: String(item?.qty || "").trim(),
+          ndh,
+          nhItems: Boolean(item?.nhItems) && !ndh,
+        };
+      })
       .filter((item: OrderLine) => item.sku && item.qty);
 
     if (cleanedItems.length === 0) {
@@ -124,6 +132,7 @@ export async function POST(req: Request) {
 
     const csv = buildCsv(cleanedItems);
     const clearanceLineCount = cleanedItems.filter((item) => item.nhItems).length;
+    const ndhLineCount = cleanedItems.filter((item) => item.ndh).length;
 
     const today = new Date().toISOString().slice(0, 10);
     const filename = `${accountNo}_order_${today}.csv`;
@@ -160,8 +169,10 @@ export async function POST(req: Request) {
         `Ref: ${finalOrderRef}`,
         `Items: ${cleanedItems.length}`,
         ...(clearanceLineCount > 0
-          ? [`Near Date Sale (${CLEARANCE_ORDER_EMAIL_TAG}): ${clearanceLineCount}`, ``]
+          ? [`Near Date Sale (${CLEARANCE_ORDER_EMAIL_TAG}): ${clearanceLineCount}`]
           : []),
+        ...(ndhLineCount > 0 ? [`NDH (${NDH_ORDER_EMAIL_TAG}): ${ndhLineCount}`] : []),
+        ...(clearanceLineCount > 0 || ndhLineCount > 0 ? [``] : []),
         ...cleanedItems.map((item) => formatOrderLine(item)),
       ].join("\n"),
       attachments: [
@@ -182,11 +193,18 @@ export async function POST(req: Request) {
         sku: item.sku,
         qty: Number(item.qty) || 0,
       }));
+    const ndhSoldQtyItems = cleanedItems
+      .filter((item) => item.ndh)
+      .map((item) => ({
+        sku: item.sku,
+        qty: Number(item.qty) || 0,
+      }));
 
     await prependOrderHistory(order);
     await mergeRecentItems(accountNo, cleanedItems);
     await incrementPromotionSold(soldQtyItems);
     await incrementClearanceSold(nhSoldQtyItems);
+    await incrementNdhSold(ndhSoldQtyItems);
 
     return NextResponse.json({
       success: true,

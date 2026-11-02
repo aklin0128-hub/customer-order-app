@@ -10,6 +10,7 @@ export const SERVER_CACHE = {
   catalog: "catalog",
   promotions: "promotions",
   clearance: "clearance",
+  ndh: "ndh",
   showcase: "showcase",
   seasonal: "seasonal",
 } as const;

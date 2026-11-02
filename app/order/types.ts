@@ -1,7 +1,7 @@
 export type Lang = "en" | "zh" | "ko" | "vi";
 
 /** Top-level order shop tabs. Quick order (`search`) and Seasonal stay available but hidden. */
-export type OrderMode = "catalog" | "promotion" | "clearance" | "newItems" | "seasonal" | "search";
+export type OrderMode = "catalog" | "promotion" | "clearance" | "ndh" | "newItems" | "seasonal" | "search";
 
 export type CatalogItem = {
   sku: string;
@@ -81,6 +81,8 @@ export type CartItem = {
   qty: string;
   /** True when line was added from clearance tab (NH_ITEMS email tag). */
   nhItems?: boolean;
+  /** True when line was added from the NDH tab. */
+  ndh?: boolean;
 };
 
 export type OrderHistoryItem = {

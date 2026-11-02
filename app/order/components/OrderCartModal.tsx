@@ -16,6 +16,7 @@ export function OrderCartModal({
   lang,
   items,
   nhItemsSkus,
+  ndhSkus,
   lineCount,
   totalCases,
   submitting,
@@ -35,15 +36,16 @@ export function OrderCartModal({
   lang: Lang;
   items: CartItem[];
   nhItemsSkus?: Set<string>;
+  ndhSkus?: Set<string>;
   lineCount: number;
   totalCases: number;
   submitting: boolean;
   statusMessage?: string;
-  onAdjustQty: (sku: string, delta: number, nhItems?: boolean) => void;
-  onQtyInput: (sku: string, value: string, nhItems?: boolean) => void;
-  onRemove: (sku: string, nhItems?: boolean) => void;
+  onAdjustQty: (sku: string, delta: number, nhItems?: boolean, ndh?: boolean) => void;
+  onQtyInput: (sku: string, value: string, nhItems?: boolean, ndh?: boolean) => void;
+  onRemove: (sku: string, nhItems?: boolean, ndh?: boolean) => void;
   onRemoveUnavailable?: () => void;
-  unavailableItems?: Array<{ sku: string; status: string; nhItems?: boolean }>;
+  unavailableItems?: Array<{ sku: string; status: string; nhItems?: boolean; ndh?: boolean }>;
   nudge?: ReactNode;
   tools?: ReactNode;
 }) {
@@ -88,6 +90,7 @@ export function OrderCartModal({
           lang={lang}
           items={items}
           nhItemsSkus={nhItemsSkus}
+          ndhSkus={ndhSkus}
           expanded
           onToggleExpanded={onClose}
           onClose={onClose}

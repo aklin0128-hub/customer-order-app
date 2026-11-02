@@ -98,6 +98,13 @@ export const clearanceModeButtonStyle = (active: boolean): CSSProperties => ({
   color: active ? "#ffffff" : "#6d28d9",
   boxShadow: active ? "0 4px 12px rgba(124, 58, 237, 0.28)" : "none",
 });
+export const ndhModeButtonStyle = (active: boolean): CSSProperties => ({
+  ...modeButtonStyle(active),
+  border: active ? "2px solid #be123c" : "1px solid #fda4af",
+  background: active ? "#be123c" : "#ffe4e6",
+  color: active ? "#ffffff" : "#9f1239",
+  boxShadow: active ? "0 4px 12px rgba(190, 18, 60, 0.28)" : "none",
+});
 export const newItemsModeButtonStyle = (active: boolean): CSSProperties => ({
   ...modeButtonStyle(active),
   border: active ? "2px solid #ea580c" : "1px solid #fdba74",

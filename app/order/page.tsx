@@ -100,10 +100,15 @@ import {
   countCartLines,
   countTotalCases,
   expandOrderSubmitLines,
+  cartLineKind,
+  cartLinePoolKey,
   getCatalogQty,
   getClearanceQty,
+  getNdhQty,
+  ndhSkuSet,
   nhItemsSkuSet,
   type QtyMaps,
+  type QtySource,
 } from "@/lib/orderNhItems";
 import { copy } from "./orderCopy";
 import { readInitialStickyPanelOpen, useMobileViewport } from "./useMobileViewport";
@@ -119,6 +124,7 @@ import {
   modeButtonStyle,
   promoModeButtonStyle,
   clearanceModeButtonStyle,
+  ndhModeButtonStyle,
   newItemsModeButtonStyle,
   seasonalModeButtonStyle,
   primarySmallButtonStyle,
@@ -151,6 +157,33 @@ const ORDER_LANG_LABELS: Record<Lang, string> = {
 
 const categoryOptions = CATEGORY_OPTIONS;
 
+function saleMapsFromCart(prev: CartItem[]) {
+  const clearance: Record<string, string> = {};
+  const ndh: Record<string, string> = {};
+  for (const item of prev) {
+    const sku = item.sku.toUpperCase();
+    if (item.ndh) ndh[sku] = item.qty;
+    else if (item.nhItems) clearance[sku] = item.qty;
+  }
+  return { clearance, ndh };
+}
+
+function cartRowsEqual(prev: CartItem[], next: CartItem[]) {
+  return (
+    prev.length === next.length &&
+    next.every((item, index) => {
+      const old = prev[index];
+      return (
+        Boolean(old) &&
+        old.sku === item.sku &&
+        old.qty === item.qty &&
+        Boolean(old.nhItems) === Boolean(item.nhItems) &&
+        Boolean(old.ndh) === Boolean(item.ndh)
+      );
+    })
+  );
+}
+
 export default function OrderPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -159,6 +192,7 @@ export default function OrderPage() {
   const submitLockRef = useRef(false);
   const autoLoadedRef = useRef(false);
   const clearanceFetchedRef = useRef(false);
+  const ndhFetchedRef = useRef(false);
   const transientMsgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addSkuToCartRef = useRef<(sku: string, qty?: string) => void>(() => {});
   const qtyInputRef = useRef("");
@@ -199,6 +233,8 @@ export default function OrderPage() {
   const [catalogQtyMap, setCatalogQtyMap] = useState<Record<string, string>>({});
   /** Session-only clearance cart — independent from catalogQtyMap. Not saved in drafts. */
   const [clearanceQtyMap, setClearanceQtyMap] = useState<Record<string, string>>({});
+  /** Session-only NDH cart — independent from catalog and Near Date Sale. Not saved in drafts. */
+  const [ndhQtyMap, setNdhQtyMap] = useState<Record<string, string>>({});
   const [catalogSearch, setCatalogSearch] = useState("");
   const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
   const [brandFilter, setBrandFilter] = useState("ALL");
@@ -240,6 +276,8 @@ export default function OrderPage() {
   const [seasonalLoading, setSeasonalLoading] = useState(false);
   const [clearanceItems, setClearanceItems] = useState<ClearanceItem[]>([]);
   const [clearanceLoading, setClearanceLoading] = useState(false);
+  const [ndhItems, setNdhItems] = useState<ClearanceItem[]>([]);
+  const [ndhLoading, setNdhLoading] = useState(false);
   const [showAdminEditLinks, setShowAdminEditLinks] = useState(false);
   const [adminUnlockOpen, setAdminUnlockOpen] = useState(false);
   const [adminPasswordInput, setAdminPasswordInput] = useState("");
@@ -647,6 +685,28 @@ export default function OrderPage() {
   }, [ready, mode]);
 
   useEffect(() => {
+    if (!ready || mode !== "ndh" || ndhFetchedRef.current) return;
+
+    const loadNdh = async () => {
+      ndhFetchedRef.current = true;
+      setNdhLoading(true);
+      try {
+        const res = await fetch("/api/ndh");
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.products)) {
+          setNdhItems(data.products);
+        }
+      } catch {
+        ndhFetchedRef.current = false;
+      } finally {
+        setNdhLoading(false);
+      }
+    };
+
+    void loadNdh();
+  }, [ready, mode]);
+
+  useEffect(() => {
     const saved = localStorage.getItem("lang") as Lang | null;
     if (saved === "en" || saved === "zh" || saved === "ko" || saved === "vi") setLang(saved);
 
@@ -661,6 +721,7 @@ export default function OrderPage() {
       savedMode === "catalog" ||
       savedMode === "promotion" ||
       savedMode === "clearance" ||
+      savedMode === "ndh" ||
       savedMode === "newItems" ||
       savedMode === "seasonal"
     ) {
@@ -673,6 +734,20 @@ export default function OrderPage() {
       setMode("newItems");
     } else {
       setMode("catalog");
+    }
+
+    const queryMode = new URLSearchParams(window.location.search).get("mode");
+    if (
+      queryMode === "catalog" ||
+      queryMode === "promotion" ||
+      queryMode === "clearance" ||
+      queryMode === "ndh" ||
+      queryMode === "newItems" ||
+      (queryMode === "seasonal" && SEASONAL_TAB_ENABLED) ||
+      (queryMode === "search" && QUICK_ORDER_ENABLED)
+    ) {
+      setMode(queryMode);
+      localStorage.setItem("order_mode", queryMode);
     }
   }, []);
 
@@ -1014,22 +1089,9 @@ export default function OrderPage() {
               return same ? prev : shared;
             });
             setCart((prev) => {
-              const clearance = Object.fromEntries(
-                prev.filter((item) => item.nhItems).map((item) => [item.sku.toUpperCase(), item.qty])
-              );
-              const next = buildCartDisplayItems({ catalog: shared, clearance });
-              const same =
-                prev.length === next.length &&
-                next.every((item, index) => {
-                  const old = prev[index];
-                  return (
-                    old &&
-                    old.sku === item.sku &&
-                    old.qty === item.qty &&
-                    Boolean(old.nhItems) === Boolean(item.nhItems)
-                  );
-                });
-              return same ? prev : next;
+              const sales = saleMapsFromCart(prev);
+              const next = buildCartDisplayItems({ catalog: shared, ...sales });
+              return cartRowsEqual(prev, next) ? prev : next;
             });
           }
         } catch {
@@ -1174,12 +1236,8 @@ export default function OrderPage() {
             cartDirtyRef.current = false;
             setCatalogQtyMap({});
             setCart((prev) => {
-              const clearance = Object.fromEntries(
-                prev
-                  .filter((item) => item.nhItems)
-                  .map((item) => [item.sku.toUpperCase(), item.qty])
-              );
-              return buildCartDisplayItems({ catalog: {}, clearance });
+              const sales = saleMapsFromCart(prev);
+              return buildCartDisplayItems({ catalog: {}, ...sales });
             });
             try {
               localStorage.removeItem(`draft_${accountNo}`);
@@ -1209,25 +1267,10 @@ export default function OrderPage() {
           return same ? prev : shared;
         });
         setCart((prev) => {
-          // Keep clearance lines; replace catalog portion via buildCartDisplayItems.
-          const clearance = Object.fromEntries(
-            prev
-              .filter((item) => item.nhItems)
-              .map((item) => [item.sku.toUpperCase(), item.qty])
-          );
-          const next = buildCartDisplayItems({ catalog: shared, clearance });
-          const same =
-            prev.length === next.length &&
-            next.every((item, index) => {
-              const old = prev[index];
-              return (
-                old &&
-                old.sku === item.sku &&
-                old.qty === item.qty &&
-                Boolean(old.nhItems) === Boolean(item.nhItems)
-              );
-            });
-          return same ? prev : next;
+          // Keep Near Date / NDH session lines; replace catalog portion via buildCartDisplayItems.
+          const sales = saleMapsFromCart(prev);
+          const next = buildCartDisplayItems({ catalog: shared, ...sales });
+          return cartRowsEqual(prev, next) ? prev : next;
         });
         localStorage.setItem(`draft_${accountNo}`, JSON.stringify(normalized));
       } catch {
@@ -1344,6 +1387,9 @@ export default function OrderPage() {
     for (const [sku, qty] of Object.entries(clearanceQtyMap || {})) {
       if (Number(qty) > 0) inCart.add(sku.toUpperCase());
     }
+    for (const [sku, qty] of Object.entries(ndhQtyMap || {})) {
+      if (Number(qty) > 0) inCart.add(sku.toUpperCase());
+    }
     for (const row of cart || []) {
       if (Number(row.qty) > 0) inCart.add(String(row.sku || "").toUpperCase());
     }
@@ -1359,7 +1405,7 @@ export default function OrderPage() {
         }
       })
       .catch(() => setInvoiceFrequentSkus([]));
-  }, [accountNo, cart, catalogQtyMap, clearanceQtyMap]);
+  }, [accountNo, cart, catalogQtyMap, clearanceQtyMap, ndhQtyMap]);
 
   const recommendedSkuSet = useMemo(() => {
     const skuSet = new Set<string>();
@@ -1492,8 +1538,8 @@ export default function OrderPage() {
   }, [brandFilter, brandSplit]);
 
   const qtyMaps = useMemo(
-    (): QtyMaps => ({ catalog: catalogQtyMap, clearance: clearanceQtyMap }),
-    [catalogQtyMap, clearanceQtyMap]
+    (): QtyMaps => ({ catalog: catalogQtyMap, clearance: clearanceQtyMap, ndh: ndhQtyMap }),
+    [catalogQtyMap, clearanceQtyMap, ndhQtyMap]
   );
 
   const cartDisplayItems = useMemo(() => buildCartDisplayItems(qtyMaps), [qtyMaps]);
@@ -1530,6 +1576,7 @@ export default function OrderPage() {
   const applyQtyState = (next: QtyMaps) => {
     setCatalogQtyMap(next.catalog);
     setClearanceQtyMap(next.clearance);
+    setNdhQtyMap(next.ndh || {});
     setCart(buildCartDisplayItems(next));
   };
 
@@ -1578,7 +1625,7 @@ export default function OrderPage() {
     }
   };
 
-  const setQtyForSku = (sku: string, value: string, source: "clearance" | "normal" = "normal") => {
+  const setQtyForSku = (sku: string, value: string, source: QtySource = "normal") => {
     const cleanSku = sku.trim().toUpperCase();
     const cleanQty = String(value || "").replace(/[^0-9]/g, "");
 
@@ -1617,6 +1664,18 @@ export default function OrderPage() {
     return item.remainingQty;
   };
 
+  const getNdhRemainingForSku = (cleanSku: string) => {
+    const item = ndhItems.find((p) => p.sku?.toUpperCase() === cleanSku);
+    if (!item) return null;
+    if (item.remainingQty === null || item.remainingQty === undefined) {
+      if (item.clearanceQty && item.clearanceQty > 0) {
+        return Math.max(0, item.clearanceQty - (item.soldQty || 0));
+      }
+      return null;
+    }
+    return item.remainingQty;
+  };
+
   const orderReviewWarnings = useMemo(() => {
     const warnings: string[] = [];
 
@@ -1627,6 +1686,18 @@ export default function OrderPage() {
 
       if (qty >= 100) warnings.push(t.highQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(qty)));
       // Unavailable / discontinued SKUs are shown in a dedicated review banner.
+
+      if (item.ndh) {
+        const ndhRemaining = getNdhRemainingForSku(cleanSku);
+        if (ndhRemaining !== null && qty > ndhRemaining) {
+          warnings.push(t.ndhQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(ndhRemaining)));
+        }
+        const ndh = ndhItems.find((c) => c.sku?.toUpperCase() === cleanSku);
+        if (ndh?.daysUntilExpiry != null && ndh.daysUntilExpiry <= 7 && ndh.daysUntilExpiry >= 0) {
+          warnings.push(`${cleanSku}: NDH expires in ${ndh.daysUntilExpiry} day(s).`);
+        }
+        continue;
+      }
 
       if (item.nhItems) {
         const clearanceRemaining = getClearanceRemainingForSku(cleanSku);
@@ -1671,7 +1742,7 @@ export default function OrderPage() {
 
     return warnings;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qtyMaps, promotionItems, clearanceItems, t]);
+  }, [qtyMaps, promotionItems, clearanceItems, ndhItems, t]);
 
   const promoSkuSet = useMemo(
     () => new Set(promotionItems.map((item) => item.sku?.toUpperCase()).filter(Boolean) as Iterable<string>),
@@ -1679,6 +1750,7 @@ export default function OrderPage() {
   );
 
   const nhItemsSkuSetForOrder = useMemo(() => nhItemsSkuSet(qtyMaps), [qtyMaps]);
+  const ndhSkuSetForOrder = useMemo(() => ndhSkuSet(qtyMaps), [qtyMaps]);
 
   const promoDealBySku = useMemo(() => {
     const map: Record<string, string> = {};
@@ -1718,10 +1790,14 @@ export default function OrderPage() {
     setQtyForSku(target.sku, qty);
   };
 
-  const adjustQtyForSku = (sku: string, delta: number, source: "clearance" | "normal" = "normal") => {
+  const adjustQtyForSku = (sku: string, delta: number, source: QtySource = "normal") => {
     const cleanSku = sku.trim().toUpperCase();
     const current =
-      source === "clearance" ? getClearanceQty(qtyMaps, cleanSku) : getCatalogQty(qtyMaps, cleanSku);
+      source === "clearance"
+        ? getClearanceQty(qtyMaps, cleanSku)
+        : source === "ndh"
+          ? getNdhQty(qtyMaps, cleanSku)
+          : getCatalogQty(qtyMaps, cleanSku);
     let next = Math.max(0, current + delta);
     let appliedDelta = delta;
 
@@ -1756,6 +1832,16 @@ export default function OrderPage() {
       }
     }
 
+    if (source === "ndh" && delta > 0) {
+      const ndhRemaining = getNdhRemainingForSku(cleanSku);
+      if (ndhRemaining !== null && next > ndhRemaining) {
+        alert(t.ndhLimitAlert.replace("{sku}", cleanSku).replace("{qty}", String(ndhRemaining)));
+        appliedDelta = ndhRemaining - current;
+        if (appliedDelta <= 0) return;
+        next = current + appliedDelta;
+      }
+    }
+
     if (!appliedDelta) return;
 
     if (source === "normal") {
@@ -1765,18 +1851,19 @@ export default function OrderPage() {
     applyQtyState(applyQtyDelta(qtyMaps, cleanSku, appliedDelta, source));
   };
 
-  const removeSkuFromOrder = (sku: string, nhItems?: boolean) => {
-    // Catalog lines omit nhItems (undefined). Only clear the matching pool so
-    // removing a catalog row does not wipe an independent clearance line.
-    setQtyForSku(sku, "", nhItems === true ? "clearance" : "normal");
+  const removeSkuFromOrder = (sku: string, nhItems?: boolean, ndh?: boolean) => {
+    // Catalog lines omit flags. Only clear the matching pool so removing a
+    // catalog row does not wipe an independent Near Date or NDH line.
+    setQtyForSku(sku, "", cartLineKind({ nhItems, ndh }));
   };
 
-  const adjustCartLineQty = (sku: string, delta: number, nhItems?: boolean) => {
-    adjustQtyForSku(sku, delta, nhItems ? "clearance" : "normal");
+  const adjustCartLineQty = (sku: string, delta: number, nhItems?: boolean, ndh?: boolean) => {
+    adjustQtyForSku(sku, delta, cartLineKind({ nhItems, ndh }));
   };
 
-  const updateCartLineQty = (sku: string, value: string, nhItems?: boolean) => {
-    if (nhItems) updateClearanceQty(sku, value);
+  const updateCartLineQty = (sku: string, value: string, nhItems?: boolean, ndh?: boolean) => {
+    if (ndh) updateNdhQty(sku, value);
+    else if (nhItems) updateClearanceQty(sku, value);
     else updateCatalogQty(sku, value);
   };
 
@@ -1798,6 +1885,28 @@ export default function OrderPage() {
         if (appliedDelta <= 0) continue;
       }
       next = applyQtyDelta(next, sku, appliedDelta, "clearance");
+    }
+    applyQtyState(next);
+  };
+
+  const addAllNdhOneCase = () => {
+    let next = qtyMaps;
+    for (const item of ndhItems) {
+      if (item.remainingQty === 0) continue;
+      const sku = item.sku?.toUpperCase();
+      if (!sku) continue;
+      const catalogItem = getCatalogItemBySku(sku) || item;
+      if (!isOrderableItem(catalogItem)) continue;
+      if (getNdhQty(next, sku) <= 0 && blockAddForSku(sku)) continue;
+
+      const current = getNdhQty(next, sku);
+      let appliedDelta = 1;
+      const ndhRemaining = getNdhRemainingForSku(sku);
+      if (ndhRemaining !== null && current + 1 > ndhRemaining) {
+        appliedDelta = ndhRemaining - current;
+        if (appliedDelta <= 0) continue;
+      }
+      next = applyQtyDelta(next, sku, appliedDelta, "ndh");
     }
     applyQtyState(next);
   };
@@ -1962,6 +2071,25 @@ export default function OrderPage() {
     setQtyForSku(cleanSku, clean, "clearance");
   };
 
+  const updateNdhQty = (sku: string, value: string) => {
+    const cleanSku = sku.toUpperCase();
+    const clean = value.replace(/[^0-9]/g, "");
+
+    if (clean && Number(clean) > 0 && blockAddForSku(cleanSku)) {
+      return;
+    }
+
+    const ndhRemaining = getNdhRemainingForSku(cleanSku);
+    const requested = Number(clean) || 0;
+    if (ndhRemaining !== null && requested > ndhRemaining) {
+      alert(t.ndhLimitAlert.replace("{sku}", cleanSku).replace("{qty}", String(ndhRemaining)));
+      setQtyForSku(cleanSku, ndhRemaining ? String(ndhRemaining) : "", "ndh");
+      return;
+    }
+
+    setQtyForSku(cleanSku, clean, "ndh");
+  };
+
   const adjustCatalogQty = (sku: string, delta: number) => {
     adjustQtyForSku(sku, delta, "normal");
   };
@@ -1978,6 +2106,10 @@ export default function OrderPage() {
 
   const adjustClearanceQty = (sku: string, delta: number) => {
     adjustQtyForSku(sku, delta, "clearance");
+  };
+
+  const adjustNdhQty = (sku: string, delta: number) => {
+    adjustQtyForSku(sku, delta, "ndh");
   };
 
   const reorderItems = (items: CartItem[]) => {
@@ -2020,7 +2152,7 @@ export default function OrderPage() {
 
     syncDeviceContributionsForCatalogMap(nextCatalog);
     setCatalogQtyMap(nextCatalog);
-    setCart(buildCartDisplayItems({ catalog: nextCatalog, clearance: clearanceQtyMap }));
+    setCart(buildCartDisplayItems({ catalog: nextCatalog, clearance: clearanceQtyMap, ndh: ndhQtyMap }));
     showTransientToast(`${orderable.length} ${t.items} added.`);
     // Do not auto-focus SKU input; prevents page from jumping.
   };
@@ -2042,6 +2174,7 @@ export default function OrderPage() {
     setCart([]);
     setCatalogQtyMap({});
     setClearanceQtyMap({});
+    setNdhQtyMap({});
     setShowCart(false);
     setSkuInput("");
     setQtyInput("");
@@ -2097,7 +2230,7 @@ export default function OrderPage() {
   const removeUnavailableFromOrder = () => {
     const unavailable = getUnavailableSubmitLines(getCurrentSubmitItems());
     for (const item of unavailable) {
-      removeSkuFromOrder(item.sku, item.nhItems);
+      removeSkuFromOrder(item.sku, item.nhItems, item.ndh);
     }
     return unavailable;
   };
@@ -2166,7 +2299,8 @@ export default function OrderPage() {
       syncDeviceContributionsForCatalogMap(parsedMap, { replace: true });
       setCatalogQtyMap(parsedMap);
       setClearanceQtyMap({});
-      setCart(buildCartDisplayItems({ catalog: parsedMap, clearance: {} }));
+      setNdhQtyMap({});
+      setCart(buildCartDisplayItems({ catalog: parsedMap, clearance: {}, ndh: {} }));
       showTransientToast(`${parsed.length} ${t.items} loaded.`);
     } catch (error: any) {
       alert(error?.message || "Failed to read CSV.");
@@ -2261,6 +2395,7 @@ export default function OrderPage() {
       setCart([]);
       setCatalogQtyMap({});
       setClearanceQtyMap({});
+      setNdhQtyMap({});
       setSkuInput("");
       setQtyInput("");
       setSelectedItem(null);
@@ -2299,15 +2434,11 @@ export default function OrderPage() {
       return;
     }
 
-    const unavailableKey = new Set(
-      unavailable.map((item) => `${item.sku.toUpperCase()}::${item.nhItems ? "nh" : "cat"}`)
-    );
-    const remaining = current.filter(
-      (item) => !unavailableKey.has(`${item.sku.toUpperCase()}::${item.nhItems ? "nh" : "cat"}`)
-    );
+    const unavailableKey = new Set(unavailable.map((item) => cartLinePoolKey(item)));
+    const remaining = current.filter((item) => !unavailableKey.has(cartLinePoolKey(item)));
 
     for (const item of unavailable) {
-      removeSkuFromOrder(item.sku, item.nhItems);
+      removeSkuFromOrder(item.sku, item.nhItems, item.ndh);
     }
 
     showTransientToast(t.unavailableRemoved.replace("{count}", String(unavailable.length)));
@@ -2336,7 +2467,9 @@ export default function OrderPage() {
         ? t.promotionMode
         : mode === "clearance"
           ? t.clearanceMode
-          : mode === "newItems"
+          : mode === "ndh"
+            ? t.ndhMode
+            : mode === "newItems"
             ? t.newItemsMode
             : mode === "seasonal"
               ? t.seasonalMode
@@ -2504,6 +2637,17 @@ export default function OrderPage() {
       <button
         type="button"
         role="tab"
+        aria-selected={mode === "ndh"}
+        onClick={() => changeMode("ndh")}
+        className={`order-mode-tab order-mode-tab--ndh${mode === "ndh" ? " is-active" : ""}`}
+        style={ndhModeButtonStyle(mode === "ndh")}
+      >
+        {t.ndhMode}
+        {ndhItems.length > 0 ? ` (${ndhItems.length})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
         aria-selected={mode === "newItems"}
         onClick={() => changeMode("newItems")}
         className={`order-mode-tab order-mode-tab--new${mode === "newItems" ? " is-active" : ""}`}
@@ -2570,6 +2714,16 @@ export default function OrderPage() {
       >
         {t.clearanceMode}
         {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === "ndh"}
+        onClick={() => changeMode("ndh")}
+        className={`order-shop-tag order-shop-tag--ndh${mode === "ndh" ? " is-active" : ""}`}
+      >
+        {t.ndhMode}
+        {ndhItems.length > 0 ? ` (${ndhItems.length})` : ""}
       </button>
       <button
         type="button"
@@ -3321,6 +3475,61 @@ export default function OrderPage() {
               </div>
             )}
           </section>
+        ) : mode === "ndh" ? (
+          <section className="order-shop-card">
+            {ndhItems.length > 0 ? (
+              <div className="order-clearance-bulk-row">
+                <button
+                  type="button"
+                  onClick={addAllNdhOneCase}
+                  style={{
+                    border: "1px solid #be123c",
+                    background: "#be123c",
+                    color: "#fff",
+                    borderRadius: 999,
+                    padding: "8px 14px",
+                    fontSize: 12,
+                    fontWeight: 900,
+                    cursor: "pointer",
+                  }}
+                >
+                  {t.addAllNdhOneCase}
+                </button>
+              </div>
+            ) : null}
+            {ndhLoading ? (
+              <div style={{ ...emptyStyle, border: "1px solid #fda4af", background: "#fff1f2", color: "#9f1239" }}>{t.loadingNdh}</div>
+            ) : ndhItems.length === 0 ? (
+              <div style={emptyStyle}>{t.noNdh}</div>
+            ) : (
+              <div className="order-promo-grid">
+                {ndhItems.map((item) => {
+                  const sku = item.sku?.toUpperCase() || "";
+                  const qty = ndhQtyMap[sku] || "";
+                  const soldOut = item.remainingQty === 0;
+                  const priceLabel = item.clearancePrice ? `${t.clearancePrice}: ${item.clearancePrice}` : undefined;
+                  const detailsLabel = soldOut ? t.clearanceSoldOut : formatClearanceDetails(item, t);
+                  const remainingLabel = soldOut ? t.clearanceSoldOut : item.remainingQty !== null && item.remainingQty !== undefined ? `${t.clearanceRemaining}: ${item.remainingQty}` : undefined;
+                  const catalogItem = getCatalogItemBySku(sku) || item;
+                  const notOrderable = !isOrderableItem(catalogItem);
+                  const cardItem = withCatalogCardFields(item, catalogItem);
+                  return (
+                    <CatalogQtyCard key={item.sku} item={cardItem} qty={qty}
+                      palletLabel={t.pallet}
+                      justAddedLabel={t.justAdded}
+                      promoNote={soldOut ? t.clearanceSoldOut : item.clearanceNote || t.ndhMode}
+                      promoPrice={priceLabel} promoDetails={detailsLabel} promoRemaining={remainingLabel}
+                      policyNote={soldOut ? undefined : t.clearanceNoReturn}
+                      inCartLabel={t.inCart} promoBadgeLabel={t.ndhMode} editLabel={t.editProduct}
+                      {...adminCardProps} highlight disabled={soldOut || notOrderable}
+                      hideInventoryStatus
+                      onAdjust={adjustNdhQty} onUpdateQty={updateNdhQty}
+                      {...favoriteCardProps(sku)} />
+                  );
+                })}
+              </div>
+            )}
+          </section>
         ) : (
           <section className="order-shop-card order-shop-card--listing">
 
@@ -3390,6 +3599,7 @@ export default function OrderPage() {
         lang={lang}
         items={cartDisplayItems}
         nhItemsSkus={nhItemsSkuSetForOrder}
+        ndhSkus={ndhSkuSetForOrder}
         lineCount={cartItemCount}
         totalCases={totalCases}
         submitting={submitting}
@@ -3496,6 +3706,7 @@ export default function OrderPage() {
           onAddUpsellCase={(sku) => adjustQtyForSku(sku, 1, "clearance")}
           onAddAllClearanceUpsell={() => {}}
           nhItemsSkus={nhItemsSkuSetForOrder}
+          ndhSkus={ndhSkuSetForOrder}
           promoDealBySku={promoDealBySku}
           accountNo={accountNo}
           storeName={storeName}

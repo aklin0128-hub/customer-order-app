@@ -2,6 +2,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 
+import { cartLinePoolKey } from "@/lib/orderNhItems";
 import { getCatalogItemBySku, isOrderableItem } from "../catalogUtils";
 import { copy } from "../orderCopy";
 import { clearancePolicyStyle } from "../orderStyles";
@@ -21,30 +22,28 @@ export function OrderCartSection({
   onRemove,
   onRemoveUnavailable,
   unavailableItems = [],
-  nhItemsSkus,
   nudge,
   tools,
 }: {
   lang: Lang;
   items: CartItem[];
   nhItemsSkus?: Set<string>;
+  ndhSkus?: Set<string>;
   expanded: boolean;
   onToggleExpanded: () => void;
   onClose?: () => void;
   lineCount: number;
   totalCases: number;
-  onAdjustQty: (sku: string, delta: number, nhItems?: boolean) => void;
-  onQtyInput: (sku: string, value: string, nhItems?: boolean) => void;
-  onRemove: (sku: string, nhItems?: boolean) => void;
+  onAdjustQty: (sku: string, delta: number, nhItems?: boolean, ndh?: boolean) => void;
+  onQtyInput: (sku: string, value: string, nhItems?: boolean, ndh?: boolean) => void;
+  onRemove: (sku: string, nhItems?: boolean, ndh?: boolean) => void;
   onRemoveUnavailable?: () => void;
-  unavailableItems?: Array<{ sku: string; status: string; nhItems?: boolean }>;
+  unavailableItems?: Array<{ sku: string; status: string; nhItems?: boolean; ndh?: boolean }>;
   nudge?: ReactNode;
   tools?: ReactNode;
 }) {
   const t = copy[lang];
-  const unavailableKey = new Set(
-    unavailableItems.map((item) => `${item.sku.toUpperCase()}::${item.nhItems ? "nh" : "cat"}`)
-  );
+  const unavailableKey = new Set(unavailableItems.map((item) => cartLinePoolKey(item)));
 
   const nameClampStyle: CSSProperties = {
     fontSize: 12,
@@ -110,7 +109,7 @@ export function OrderCartSection({
           <div style={{ marginTop: 4 }}>{t.unavailableInCartHint}</div>
           <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 3 }}>
             {unavailableItems.slice(0, 12).map((item) => (
-              <div key={`${item.sku}-${item.nhItems ? "nh" : "cat"}`} style={{ fontWeight: 800 }}>
+              <div key={cartLinePoolKey(item)} style={{ fontWeight: 800 }}>
                 • {item.sku}
                 {item.status ? ` — ${item.status}` : ""}
               </div>
@@ -148,9 +147,9 @@ export function OrderCartSection({
               {items.map((item) => {
                 const catalogItem = getCatalogItemBySku(item.sku);
                 const cleanSku = item.sku.toUpperCase();
-                const lineKey = `${item.sku}-${item.nhItems ? "nh" : "cat"}`;
+                const lineKey = cartLinePoolKey(item);
                 const lineUnavailable =
-                  unavailableKey.has(`${cleanSku}::${item.nhItems ? "nh" : "cat"}`) ||
+                  unavailableKey.has(lineKey) ||
                   (catalogItem ? !isOrderableItem(catalogItem) : true);
                 return (
                   <div
@@ -184,27 +183,29 @@ export function OrderCartSection({
                           {t.limited}: {catalogItem.limitedQty}
                         </div>
                       ) : null}
-                      {item.nhItems ? (
+                      {item.ndh ? (
+                        <div style={{ ...clearancePolicyStyle, marginTop: 4, fontSize: 10 }}>{t.ndhMode} · {t.clearanceNoReturn}</div>
+                      ) : item.nhItems ? (
                         <div style={{ ...clearancePolicyStyle, marginTop: 4, fontSize: 10 }}>{t.clearanceNoReturn}</div>
                       ) : null}
                     </div>
                     <div className="order-cart-row-actions">
                       <div className="order-cart-qty">
-                        <button type="button" onClick={() => onAdjustQty(item.sku, -1, item.nhItems)} className="order-cart-qty-btn" aria-label="-">
+                        <button type="button" onClick={() => onAdjustQty(item.sku, -1, item.nhItems, item.ndh)} className="order-cart-qty-btn" aria-label="-">
                           −
                         </button>
                         <input
                           value={item.qty}
-                          onChange={(e) => onQtyInput(item.sku, e.target.value, item.nhItems)}
+                          onChange={(e) => onQtyInput(item.sku, e.target.value, item.nhItems, item.ndh)}
                           inputMode="numeric"
                           className="order-cart-qty-input"
                           aria-label={item.sku}
                         />
-                        <button type="button" onClick={() => onAdjustQty(item.sku, 1, item.nhItems)} className="order-cart-qty-btn" aria-label="+">
+                        <button type="button" onClick={() => onAdjustQty(item.sku, 1, item.nhItems, item.ndh)} className="order-cart-qty-btn" aria-label="+">
                           +
                         </button>
                       </div>
-                      <button type="button" onClick={() => onRemove(item.sku, item.nhItems)} className="order-cart-remove-btn">
+                      <button type="button" onClick={() => onRemove(item.sku, item.nhItems, item.ndh)} className="order-cart-remove-btn">
                         {t.remove}
                       </button>
                     </div>

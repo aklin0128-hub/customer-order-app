@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { cartLinePoolKey } from "@/lib/orderNhItems";
 import { getCatalogItemBySku, isOrderableItem } from "../catalogUtils";
 import { copy } from "../orderCopy";
 import {
@@ -31,6 +32,7 @@ export type UnavailableReviewItem = {
   sku: string;
   status: string;
   nhItems?: boolean;
+  ndh?: boolean;
 };
 
 export function OrderReviewModal({
@@ -44,6 +46,7 @@ export function OrderReviewModal({
   onAddUpsellCase,
   onAddAllClearanceUpsell,
   nhItemsSkus,
+  ndhSkus,
   promoDealBySku,
   accountNo,
   storeName,
@@ -65,13 +68,14 @@ export function OrderReviewModal({
   onAddUpsellCase: (sku: string) => void;
   onAddAllClearanceUpsell: () => void;
   nhItemsSkus?: Set<string>;
+  ndhSkus?: Set<string>;
   promoDealBySku?: Record<string, string>;
   accountNo: string;
   storeName: string;
   submitting: boolean;
-  onAdjustQty: (sku: string, delta: number, nhItems?: boolean) => void;
-  onQtyInput: (sku: string, value: string, nhItems?: boolean) => void;
-  onRemove: (sku: string, nhItems?: boolean) => void;
+  onAdjustQty: (sku: string, delta: number, nhItems?: boolean, ndh?: boolean) => void;
+  onQtyInput: (sku: string, value: string, nhItems?: boolean, ndh?: boolean) => void;
+  onRemove: (sku: string, nhItems?: boolean, ndh?: boolean) => void;
   onRemoveUnavailable: () => void;
   onRemoveUnavailableAndSubmit: () => void;
   onSubmit: () => void | Promise<void>;
@@ -107,6 +111,7 @@ export function OrderReviewModal({
       onAddUpsellCase={onAddUpsellCase}
       onAddAllClearanceUpsell={onAddAllClearanceUpsell}
       nhItemsSkus={nhItemsSkus}
+      ndhSkus={ndhSkus}
       promoDealBySku={promoDealBySku}
       accountNo={accountNo}
       storeName={storeName}
@@ -132,6 +137,7 @@ function OrderReviewModalContent({
   onAddUpsellCase,
   onAddAllClearanceUpsell,
   nhItemsSkus,
+  ndhSkus,
   promoDealBySku,
   accountNo,
   storeName,
@@ -147,17 +153,19 @@ function OrderReviewModalContent({
   const [hideWarnings, setHideWarnings] = useState(false);
   const [hideClearanceUpsell, setHideClearanceUpsell] = useState(false);
 
-  const hasClearanceInOrder = nhItemsSkus
-    ? items.some((item) => nhItemsSkus.has(item.sku.toUpperCase()))
-    : false;
+  const hasClearanceInOrder = items.some(
+    (item) =>
+      item.nhItems ||
+      item.ndh ||
+      nhItemsSkus?.has(item.sku.toUpperCase()) ||
+      ndhSkus?.has(item.sku.toUpperCase())
+  );
 
   const showClearanceUpsell = !hideClearanceUpsell && clearanceUpsellLines && clearanceUpsellLines.length > 0;
   const showWarnings = !hideWarnings && warnings.length > 0;
   const unavailableList = unavailableItems || [];
   const hasUnavailable = unavailableList.length > 0;
-  const unavailableKey = new Set(
-    unavailableList.map((item) => `${item.sku.toUpperCase()}::${item.nhItems ? "nh" : "cat"}`)
-  );
+  const unavailableKey = new Set(unavailableList.map((item) => cartLinePoolKey(item)));
 
   return (
     <div
@@ -211,7 +219,7 @@ function OrderReviewModalContent({
               <div style={{ marginTop: 4, opacity: 0.95 }}>{t.unavailableInCartHint}</div>
               <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
                 {unavailableList.map((item) => (
-                  <div key={`${item.sku}-${item.nhItems ? "nh" : "cat"}`} style={{ fontWeight: 800 }}>
+                  <div key={cartLinePoolKey(item)} style={{ fontWeight: 800 }}>
                     • {item.sku}
                     {item.status ? ` — ${item.status}` : ""}
                   </div>
@@ -315,15 +323,16 @@ function OrderReviewModalContent({
               const catalogItem = getCatalogItemBySku(item.sku);
               const cleanSku = item.sku.toUpperCase();
               const isClearance = Boolean(item.nhItems);
+              const isNdh = Boolean(item.ndh);
               const promoDeal = promoDealBySku?.[cleanSku];
               const hasMetaLine = !!(catalogItem?.limitedQty || catalogItem?.palletSize);
               const lineUnavailable =
-                unavailableKey.has(`${cleanSku}::${isClearance ? "nh" : "cat"}`) ||
+                unavailableKey.has(cartLinePoolKey(item)) ||
                 (catalogItem ? !isOrderableItem(catalogItem) : true);
 
               return (
                 <article
-                  key={`${item.sku}-${item.nhItems ? "nh" : "cat"}-${index}`}
+                  key={`${cartLinePoolKey(item)}-${index}`}
                   style={{
                     ...reviewItemStyle,
                     ...(lineUnavailable ? { border: "1px solid #fca5a5", background: "#fef2f2" } : null),
@@ -370,7 +379,9 @@ function OrderReviewModalContent({
                           {promoDeal}
                         </div>
                       ) : null}
-                      {isClearance ? (
+                      {isNdh ? (
+                        <div style={{ ...clearancePolicyStyle, marginTop: 6 }}>{t.ndhMode} · {t.clearanceNoReturn}</div>
+                      ) : isClearance ? (
                         <div style={{ ...clearancePolicyStyle, marginTop: 6 }}>{t.clearanceNoReturn}</div>
                       ) : null}
                     </div>
@@ -378,19 +389,19 @@ function OrderReviewModalContent({
 
                   <div style={compactQtyStripWrapStyle}>
                     <div style={{ ...reviewQtyControlStyle, width: "100%", maxWidth: 300 }}>
-                      <button type="button" onClick={() => onAdjustQty(item.sku, -1, item.nhItems)} style={reviewQtyButtonStyle}>
+                      <button type="button" onClick={() => onAdjustQty(item.sku, -1, item.nhItems, item.ndh)} style={reviewQtyButtonStyle}>
                         −
                       </button>
                       <input
                         value={item.qty}
-                        onChange={(e) => onQtyInput(item.sku, e.target.value, item.nhItems)}
+                        onChange={(e) => onQtyInput(item.sku, e.target.value, item.nhItems, item.ndh)}
                         inputMode="numeric"
                         style={reviewQtyInputStyle}
                       />
-                      <button type="button" onClick={() => onAdjustQty(item.sku, 1, item.nhItems)} style={reviewQtyButtonStyle}>
+                      <button type="button" onClick={() => onAdjustQty(item.sku, 1, item.nhItems, item.ndh)} style={reviewQtyButtonStyle}>
                         +
                       </button>
-                      <button type="button" onClick={() => onRemove(item.sku, item.nhItems)} style={reviewRemoveButtonStyle}>
+                      <button type="button" onClick={() => onRemove(item.sku, item.nhItems, item.ndh)} style={reviewRemoveButtonStyle}>
                         {t.remove}
                       </button>
                     </div>

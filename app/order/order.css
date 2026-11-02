@@ -51,7 +51,7 @@
 
   .order-mode-tabs {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 10px;
     overflow: visible;
     padding: 2px 0 4px;
@@ -3972,6 +3972,10 @@
 
 .order-shop-tag--clearance {
   background: #7c3aed;
+}
+
+.order-shop-tag--ndh {
+  background: #be123c;
 }
 
 .order-shop-tag--catalog {

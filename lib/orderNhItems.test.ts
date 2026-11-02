@@ -5,10 +5,14 @@ import {
   applyQtyDelta,
   applyQtySet,
   buildCartDisplayItems,
+  cartLinePoolKey,
   expandOrderSubmitLines,
   getCatalogQty,
   getClearanceQty,
+  getNdhQty,
+  ndhSkuSet,
   nhItemsSkuSet,
+  type QtyMaps,
 } from "./orderNhItems";
 
 test("clearance and catalog qty are independent per sku", () => {
@@ -37,8 +41,24 @@ test("clearance set only updates clearance map", () => {
   assert.equal(getClearanceQty(maps, "C"), 2);
 });
 
+test("ndh qty is independent from catalog and clearance", () => {
+  let maps = applyQtyDelta({ catalog: {}, clearance: {} }, "D", 2, "ndh");
+  maps = applyQtyDelta(maps, "D", 1, "normal");
+  maps = applyQtyDelta(maps, "D", 3, "clearance");
+  assert.equal(getNdhQty(maps, "D"), 2);
+  assert.equal(getCatalogQty(maps, "D"), 1);
+  assert.equal(getClearanceQty(maps, "D"), 3);
+  assert.equal(ndhSkuSet(maps).has("D"), true);
+  assert.deepEqual(
+    expandOrderSubmitLines(maps).find((row) => row.ndh),
+    { sku: "D", qty: "2", ndh: true }
+  );
+  assert.equal(cartLinePoolKey({ sku: "D", ndh: true }), "D::ndh");
+  assert.equal(cartLinePoolKey({ sku: "D", nhItems: true }), "D::nh");
+});
+
 test("removing catalog qty leaves clearance qty for the same sku", () => {
-  let maps = { catalog: { D: "3" }, clearance: { D: "2" } };
+  let maps: QtyMaps = { catalog: { D: "3" }, clearance: { D: "2" } };
   maps = applyQtySet(maps, "D", "", "normal");
   assert.equal(getCatalogQty(maps, "D"), 0);
   assert.equal(getClearanceQty(maps, "D"), 2);
