@@ -2,6 +2,7 @@ import { getAllCustomers } from "@/lib/customers";
 import { getCustomerHealth } from "@/lib/customerHealth";
 import { getPromotionRecords, getPromotionStatus } from "@/lib/promotions";
 import { getClearanceRecords, getClearanceStatus } from "@/lib/clearance";
+import { getNdhRecords, ndhListingKey } from "@/lib/ndh";
 import { getInvoiceQualityStats } from "@/lib/invoiceQuality";
 import {
   getPromoEffectiveness,
@@ -56,6 +57,7 @@ export async function getAdminDashboardKpis(): Promise<AdminDashboardKpis> {
     invoiceQuality,
     promos,
     clearance,
+    ndh,
     cartStats,
     clearanceUrgent,
   ] = await Promise.all([
@@ -64,6 +66,7 @@ export async function getAdminDashboardKpis(): Promise<AdminDashboardKpis> {
     getInvoiceQualityStats(),
     getPromotionRecords(),
     getClearanceRecords(),
+    getNdhRecords(),
     getCartStats(),
     getClearanceUrgency(1),
   ]);
@@ -80,7 +83,14 @@ export async function getAdminDashboardKpis(): Promise<AdminDashboardKpis> {
   }
 
   const activePromotions = promos.filter((p) => getPromotionStatus(p) === "active").length;
-  const activeClearance = clearance.filter((c) => getClearanceStatus(c) === "active").length;
+  const seenNdh = new Set<string>();
+  let activeClearance = 0;
+  for (const record of [...ndh, ...clearance]) {
+    const key = ndhListingKey(record.sku, record.expiryDate);
+    if (seenNdh.has(key)) continue;
+    seenNdh.add(key);
+    if (getClearanceStatus(record) === "active") activeClearance += 1;
+  }
   const unassignedRegions = customers.filter((c) => !c.region).length;
   const invoicePricingCustomers = customers.filter((c) => c.invoicePricing === true).length;
 
@@ -138,9 +148,9 @@ export async function getAdminDashboardKpis(): Promise<AdminDashboardKpis> {
   if (clearanceUrgent.length > 0) {
     alerts.push({
       id: "clearance",
-      label: "Near Date Sale expiring soon",
+      label: "NDH expiring soon",
       count: clearanceUrgent.length,
-      href: "/admin/clearance",
+      href: "/admin/ndh",
       tone: "warn",
     });
   }

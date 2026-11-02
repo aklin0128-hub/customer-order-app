@@ -103,6 +103,7 @@ export function CatalogQtyCard({
   showNewProductBadge,
   listPriceLabel,
   hideInventoryStatus,
+  hideQtyControls,
 }: {
   item: CatalogItem;
   qty: string;
@@ -158,6 +159,8 @@ export function CatalogQtyCard({
   listPriceLabel?: string;
   /** Near Date Sale: hide catalog inventory cues, status badges, and OOS stamps. */
   hideInventoryStatus?: boolean;
+  /** Public browse pages: same card, no +/− qty controls. */
+  hideQtyControls?: boolean;
 }) {
   const [draftCategory, setDraftCategory] = useState<string | null>(null);
   const [categorySaving, setCategorySaving] = useState(false);
@@ -533,6 +536,7 @@ export function CatalogQtyCard({
         </>
       )}
 
+      {hideQtyControls ? null : (
       <div className="catalog-qty-card-stepper">
         <div style={catalogStepperStyle}>
           <button
@@ -584,6 +588,7 @@ export function CatalogQtyCard({
           </button>
         ) : null}
       </div>
+      )}
     </div>
   );
 }

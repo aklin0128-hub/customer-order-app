@@ -7,6 +7,7 @@ import {
   startOfUtcDay,
 } from "@/lib/analyticsCommon";
 import { getClearanceRecords, daysUntilExpiry, getClearanceRemainingQty } from "@/lib/clearance";
+import { getNdhRecords, ndhListingKey } from "@/lib/ndh";
 import { getPromotionRecords, getPromotionStatus } from "@/lib/promotions";
 import { listDraftAccounts } from "@/lib/redisIndexes";
 import { redis } from "@/lib/redis";
@@ -103,16 +104,23 @@ export async function getPromoEffectiveness(limit = 8): Promise<PromoEffectRow[]
 }
 
 export async function getClearanceUrgency(limit = 8): Promise<ClearanceUrgentRow[]> {
-  const records = await getClearanceRecords();
-  const rows: ClearanceUrgentRow[] = records.map((r) => ({
-    sku: r.sku,
-    note: r.note,
-    expiryDate: r.expiryDate,
-    daysUntilExpiry: daysUntilExpiry(r.expiryDate),
-    remainingQty: getClearanceRemainingQty(r),
-    soldQty: r.soldQty || 0,
-    clearancePrice: r.clearancePrice,
-  }));
+  const [ndh, clearance] = await Promise.all([getNdhRecords(), getClearanceRecords()]);
+  const seen = new Set<string>();
+  const rows: ClearanceUrgentRow[] = [];
+  for (const r of [...ndh, ...clearance]) {
+    const key = ndhListingKey(r.sku, r.expiryDate);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push({
+      sku: r.sku,
+      note: r.note,
+      expiryDate: r.expiryDate,
+      daysUntilExpiry: daysUntilExpiry(r.expiryDate),
+      remainingQty: getClearanceRemainingQty(r),
+      soldQty: r.soldQty || 0,
+      clearancePrice: r.clearancePrice,
+    });
+  }
 
   return rows
     .filter((r) => r.daysUntilExpiry === null || r.daysUntilExpiry <= 45)

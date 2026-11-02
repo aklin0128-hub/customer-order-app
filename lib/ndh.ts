@@ -3,6 +3,7 @@ import {
   daysUntilExpiry,
   formatClearancePriceDisplay,
   getClearanceProducts,
+  getClearanceRecords,
   getClearanceRemainingQty,
   getClearanceStatus,
   isClearanceVisibleToCustomers,
@@ -94,11 +95,30 @@ export async function saveNdhRecords(records: NdhRecord[]) {
   await redis.set(NDH_KEY, records);
 }
 
+/** Leftover Near Date (`clearance:list`) rows that are not already on NDH. */
+export function mergeNdhWithLegacyClearance(
+  ndh: NdhRecord[],
+  clearance: ClearanceRecord[]
+): NdhRecord[] {
+  const seen = new Set(ndh.map((record) => ndhListingKey(record.sku, record.expiryDate)));
+  const merged = [...ndh];
+  for (const record of clearance) {
+    const key = ndhListingKey(record.sku, record.expiryDate);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push({ ...record });
+  }
+  return merged;
+}
+
 export async function getNdhProducts(options?: {
   activeOnly?: boolean;
   records?: NdhRecord[];
 }): Promise<NdhProduct[]> {
-  const records = options?.records || (await getNdhRecords());
+  const stored = options?.records || (await getNdhRecords());
+  const records = options?.records
+    ? stored
+    : mergeNdhWithLegacyClearance(stored, await getClearanceRecords());
   const visible = options?.activeOnly
     ? records.filter((record) => isClearanceVisibleToCustomers(record))
     : records;

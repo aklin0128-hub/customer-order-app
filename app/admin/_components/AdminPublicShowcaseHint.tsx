@@ -44,7 +44,7 @@ const copy = {
   },
   ndh: {
     title: "Public page: /NDH",
-    body: "Active NDH rows appear on /NDH and on the customer order NDH tab, same card style as Near Date Sale. Upload a CSV/XLSX or paste SKUs — no extra publish step.",
+    body: "Active NDH rows appear on /NDH and on the customer order NDH tab. Upload a CSV/XLSX or paste SKUs — no extra publish step.",
     href: "/NDH",
     openLabel: "Open /NDH preview ↗",
   },

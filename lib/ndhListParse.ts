@@ -104,6 +104,22 @@ function parseInv(value: unknown): string | undefined {
   return String(Math.floor(num));
 }
 
+/** Warehouse `Life` (days left). Null when blank/unreadable. */
+export function parseNdhLifeDays(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const text = String(value).trim();
+  if (!text) return null;
+  const num = Number(text.replace(/[^0-9.-]/g, ""));
+  if (!Number.isFinite(num)) return null;
+  return num;
+}
+
+function shouldSkipExpiredLife(value: unknown) {
+  const life = parseNdhLifeDays(value);
+  return life !== null && life <= 0;
+}
+
 function applyDefaults(row: ParsedNdhListRow, defaults?: NdhListDefaults): ParsedNdhListRow {
   return {
     sku: row.sku,
@@ -171,6 +187,7 @@ function rowsFromMatrix(matrix: unknown[][], defaults?: NdhListDefaults): Parsed
 
   const headerCells = matrix[0].map(cleanHeader);
   const mapped = headerCells.map((cell) => HEADER_ALIASES[cell]);
+  const lifeIndex = headerCells.findIndex((cell) => cell === "life");
   const hasSkuHeader = mapped.includes("sku");
 
   const out: ParsedNdhListRow[] = [];
@@ -203,6 +220,7 @@ function rowsFromMatrix(matrix: unknown[][], defaults?: NdhListDefaults): Parsed
       lastSku = row.sku;
       if (row.description) lastDescription = row.description;
       if (row.clearancePrice) lastPrice = row.clearancePrice;
+      if (lifeIndex >= 0 && shouldSkipExpiredLife(raw[lifeIndex])) continue;
       out.push(applyDefaults(row, defaults));
     }
     return mergeNdhListRows(out);

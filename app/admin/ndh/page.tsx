@@ -290,8 +290,8 @@ export default function AdminNdhPage() {
   return (
     <AdminPage
       active="ndh"
-      title="NDH — Near Date list"
-      subtitle="Upload a CSV/XLSX or paste SKUs. Same customer cards as Near Date Sale on /order and /NDH."
+      title="NDH"
+      subtitle="Upload a CSV/XLSX or paste SKUs. Live on /NDH and the customer order NDH tab."
     >
       <AdminPublicShowcaseHint variant="ndh" />
       <StatGrid
@@ -311,7 +311,8 @@ export default function AdminNdhPage() {
           Use the warehouse CSV: <strong>PID</strong> (SKU), <strong>Description</strong>,{" "}
           <strong>Exp Date</strong>, <strong>Inv</strong>. Same SKU + same exp → Inv is added
           together. Same SKU + different exp → separate listings, each with its own Inv. Blank PID
-          rows stay with the SKU above. TP is optional price.
+          rows stay with the SKU above. Rows whose <strong>Life</strong> is 0 or negative are
+          skipped (that expiry is not imported). TP is optional price.
         </p>
         <input
           type="file"
