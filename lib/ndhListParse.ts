@@ -104,6 +104,21 @@ function parseInv(value: unknown): string | undefined {
   return String(Math.floor(num));
 }
 
+/** TP / price: keep at most two decimal places (Excel float noise → 5.38). */
+export function parseNdhPrice(value: unknown): string | undefined {
+  if (value == null || value === "") return undefined;
+  const raw = String(value).trim();
+  if (!raw) return undefined;
+  const hadDollar = raw.includes("$");
+  const num =
+    typeof value === "number" && Number.isFinite(value)
+      ? value
+      : Number(raw.replace(/[^0-9.-]/g, ""));
+  if (!Number.isFinite(num) || num < 0) return undefined;
+  const text = (Math.round(num * 100) / 100).toFixed(2);
+  return hadDollar ? `$${text}` : text;
+}
+
 /** Warehouse `Life` (days left). Null when blank/unreadable. */
 export function parseNdhLifeDays(value: unknown): number | null {
   if (value == null || value === "") return null;
@@ -126,7 +141,7 @@ function applyDefaults(row: ParsedNdhListRow, defaults?: NdhListDefaults): Parse
     description: row.description,
     note: row.note || defaults?.note || undefined,
     expiryDate: row.expiryDate || defaults?.expiryDate || undefined,
-    clearancePrice: row.clearancePrice || defaults?.clearancePrice || undefined,
+    clearancePrice: row.clearancePrice || parseNdhPrice(defaults?.clearancePrice) || undefined,
     clearanceQty: row.clearanceQty || defaults?.clearanceQty || undefined,
   };
 }
@@ -188,6 +203,7 @@ function rowsFromMatrix(matrix: unknown[][], defaults?: NdhListDefaults): Parsed
   const headerCells = matrix[0].map(cleanHeader);
   const mapped = headerCells.map((cell) => HEADER_ALIASES[cell]);
   const lifeIndex = headerCells.findIndex((cell) => cell === "life");
+  const tpIndex = headerCells.findIndex((cell) => cell === "tp");
   const hasSkuHeader = mapped.includes("sku");
 
   const out: ParsedNdhListRow[] = [];
@@ -205,7 +221,10 @@ function rowsFromMatrix(matrix: unknown[][], defaults?: NdhListDefaults): Parsed
         const value = raw[index];
         if (field === "sku") row.sku = cleanSku(value);
         else if (field === "expiryDate") row.expiryDate = normalizeNdhDate(value) || undefined;
-        else if (field === "clearancePrice") row.clearancePrice = String(value ?? "").trim() || undefined;
+        else if (field === "clearancePrice") {
+          if (tpIndex >= 0 && index !== tpIndex) return;
+          row.clearancePrice = parseNdhPrice(value);
+        }
         else if (field === "clearanceQty") row.clearanceQty = parseInv(value);
         else if (field === "note") row.note = String(value ?? "").trim() || undefined;
         else if (field === "description") row.description = String(value ?? "").trim() || undefined;
@@ -235,7 +254,7 @@ function rowsFromMatrix(matrix: unknown[][], defaults?: NdhListDefaults): Parsed
       applyDefaults(
         {
           sku,
-          clearancePrice: String(raw[1] ?? "").trim() || undefined,
+          clearancePrice: parseNdhPrice(raw[1]),
           expiryDate: expiry || undefined,
           clearanceQty: parseInv(raw[3]),
           note: String(raw[4] ?? "").trim() || undefined,

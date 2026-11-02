@@ -4,7 +4,8 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { mergeNdhListRows, normalizeNdhDate, parseNdhListText } from "./ndhListParse";
+import { formatClearancePriceDisplay } from "./clearanceFormat";
+import { mergeNdhListRows, normalizeNdhDate, parseNdhListText, parseNdhPrice } from "./ndhListParse";
 
 import { mergeNdhWithLegacyClearance } from "./ndh";
 
@@ -104,6 +105,26 @@ test("parseNdhListText applies defaults to sku-only paste", () => {
   assert.equal(rows[0].note, "NDH");
 });
 
+test("parseNdhPrice reads TP and keeps at most two decimals", () => {
+  assert.equal(parseNdhPrice("$4.17"), "$4.17");
+  assert.equal(parseNdhPrice("$5.388000000000001"), "$5.39");
+  assert.equal(parseNdhPrice(5.380000000000001), "5.38");
+  assert.equal(parseNdhPrice("12.5"), "12.50");
+  assert.equal(formatClearancePriceDisplay("$5.388000000000001"), "$5.39");
+  assert.equal(formatClearancePriceDisplay("8"), "$8.00");
+});
+
+test("warehouse CSV uses TP not BP and rounds price to two decimals", () => {
+  const rows = parseNdhListText(
+    [
+      "PID,Brand,Description,Exp Date,Life,Inv,TP,BP",
+      "10479T,TAOKAENOI,TEMPURA SEAWEED,11/8/2026,6,109,$5.388000000000001,12.99",
+    ].join("\n")
+  );
+  assert.equal(rows[0].sku, "10479T");
+  assert.equal(rows[0].clearancePrice, "$5.39");
+});
+
 test("normalizeNdhDate accepts US and ISO dates", () => {
   assert.equal(normalizeNdhDate("2026-11-20"), "2026-11-20");
   assert.equal(normalizeNdhDate("11/5/2026"), "2026-11-05");
@@ -123,7 +144,7 @@ test("NDH pages wire upload and order tab", () => {
   assert.doesNotMatch(publicPage, /showcase-card/);
   assert.match(orderPage, /changeMode\("ndh"\)/);
   assert.match(orderPage, /\/api\/ndh/);
-  assert.match(sendOrder, /NDH_ORDER_EMAIL_TAG/);
+  assert.match(sendOrder, /splitOrderLinesForEmail/);
   assert.match(sendOrder, /incrementNdhSold/);
 });
 

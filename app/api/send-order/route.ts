@@ -1,54 +1,23 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { prependOrderHistory } from "@/lib/orderHistory";
-import { CLEARANCE_ORDER_EMAIL_TAG, incrementClearanceSold } from "@/lib/clearance";
-import { NDH_ORDER_EMAIL_TAG, incrementNdhSold } from "@/lib/ndh";
+import { incrementClearanceSold } from "@/lib/clearance";
+import { incrementNdhSold } from "@/lib/ndh";
 import { incrementPromotionSold } from "@/lib/promotions";
 import { isValidOrderEmail, resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
 import { getCustomerByAccount, upsertCustomerContact } from "@/lib/customers";
 import { mergeRecentItems } from "@/lib/recentItems";
 import { getMergedCatalogProducts } from "@/lib/catalogMerge";
 import { isOrderableCatalogStatus } from "@/lib/orderableCatalog";
+import {
+  buildOrderEmail,
+  splitOrderLinesForEmail,
+  type OrderEmailLine,
+} from "@/lib/orderSubmitEmail";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-function csvEscape(value: unknown) {
-  const text = String(value ?? "");
-  if (text.includes(",") || text.includes('"') || text.includes("\n")) {
-    return `"${text.replace(/"/g, '""')}"`;
-  }
-  return text;
-}
-
-type OrderLine = { sku: string; qty: string; nhItems?: boolean; ndh?: boolean; expiryDate?: string };
-
-function lineTag(item: OrderLine) {
-  if (item.ndh) {
-    const exp = String(item.expiryDate || "").trim();
-    return exp ? `${NDH_ORDER_EMAIL_TAG} ${exp}` : NDH_ORDER_EMAIL_TAG;
-  }
-  if (item.nhItems) return CLEARANCE_ORDER_EMAIL_TAG;
-  return "";
-}
-
-function formatOrderLine(item: OrderLine) {
-  const sku = String(item.sku || "").trim().toUpperCase();
-  const qty = String(item.qty || "").trim();
-  const tag = lineTag(item);
-  return tag ? `${sku} - ${qty} - ${tag}` : `${sku} - ${qty}`;
-}
-
-function buildCsv(items: OrderLine[]) {
-  const rows = [["SKU", "Qty", "Tag"]];
-
-  for (const item of items) {
-    const sku = String(item.sku || "").trim().toUpperCase();
-    const qty = String(item.qty || "").trim();
-    rows.push([sku, qty, lineTag(item)]);
-  }
-
-  return rows.map((row) => row.map(csvEscape).join(",")).join("\n");
-}
+type OrderLine = OrderEmailLine;
 
 export async function POST(req: Request) {
   try {
@@ -135,12 +104,9 @@ export async function POST(req: Request) {
       orderRef ||
       `${accountNo}-${new Date().toISOString().slice(5, 10).replace("-", "")}`;
 
-    const csv = buildCsv(cleanedItems);
-    const clearanceLineCount = cleanedItems.filter((item) => item.nhItems).length;
-    const ndhLineCount = cleanedItems.filter((item) => item.ndh).length;
-
-    const today = new Date().toISOString().slice(0, 10);
-    const filename = `${accountNo}_order_${today}.csv`;
+    const { catalog: catalogItems, ndh: ndhItems } = splitOrderLinesForEmail(cleanedItems);
+    const companionSplit = catalogItems.length > 0 && ndhItems.length > 0;
+    const from = process.env.ORDER_FROM_EMAIL || "orders@rhorder.online";
 
     const order = {
       accountNo,
@@ -159,34 +125,35 @@ export async function POST(req: Request) {
       // Order still sends if profile save fails (e.g. missing customer record).
     }
 
-    await resend.emails.send({
-      from: process.env.ORDER_FROM_EMAIL || "orders@rhorder.online",
-      to: orderEmail,
-      subject: `New Order - ${accountNo} - ${storeName} - ${finalOrderRef}`,
-      text: [
-        `New order received.`,
-        ``,
-        `Account: ${accountNo}`,
-        `Store: ${storeName}`,
-        `Order email: ${orderEmail}`,
-        `Phone: ${phone || "-"}`,
-        `Note: ${note || "-"}`,
-        `Ref: ${finalOrderRef}`,
-        `Items: ${cleanedItems.length}`,
-        ...(clearanceLineCount > 0
-          ? [`NDH leftover (${CLEARANCE_ORDER_EMAIL_TAG}): ${clearanceLineCount}`]
-          : []),
-        ...(ndhLineCount > 0 ? [`NDH (${NDH_ORDER_EMAIL_TAG}): ${ndhLineCount}`] : []),
-        ...(clearanceLineCount > 0 || ndhLineCount > 0 ? [``] : []),
-        ...cleanedItems.map((item) => formatOrderLine(item)),
-      ].join("\n"),
-      attachments: [
-        {
-          filename,
-          content: Buffer.from(csv).toString("base64"),
-        },
-      ],
-    });
+    const sendBatch = async (kind: "catalog" | "ndh", batch: OrderLine[]) => {
+      if (!batch.length) return;
+      const email = buildOrderEmail({
+        kind,
+        accountNo,
+        storeName,
+        phone,
+        note,
+        orderEmail,
+        orderRef: finalOrderRef,
+        items: batch,
+        companionSplit,
+      });
+      await resend.emails.send({
+        from,
+        to: orderEmail,
+        subject: email.subject,
+        text: email.text,
+        attachments: [
+          {
+            filename: email.filename,
+            content: Buffer.from(email.csv).toString("base64"),
+          },
+        ],
+      });
+    };
+
+    await sendBatch("catalog", catalogItems);
+    await sendBatch("ndh", ndhItems);
 
     const soldQtyItems = cleanedItems.map((item) => ({
       sku: item.sku,
