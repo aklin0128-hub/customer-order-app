@@ -13,16 +13,6 @@ const nextConfig: NextConfig = {
         destination: "/admin/price-compare",
         permanent: false,
       },
-      {
-        source: "/ndh",
-        destination: "/NDH",
-        permanent: false,
-      },
-      {
-        source: "/ndh/:path*",
-        destination: "/NDH/:path*",
-        permanent: false,
-      },
     ];
   },
   serverExternalPackages: ["pdf-parse", "pdfjs-dist", "tesseract.js", "xlsx"],
