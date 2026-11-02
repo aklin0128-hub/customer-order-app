@@ -32,6 +32,7 @@ type StatusFilter = "all" | NdhStatus;
 
 type NdhRecord = {
   sku: string;
+  description?: string;
   note?: string;
   expiryDate: string;
   clearancePrice: string;
@@ -61,6 +62,7 @@ const statusLabel: Record<NdhStatus, string> = {
 function emptyForm() {
   return {
     sku: "",
+    description: "",
     note: "Sell as is",
     expiryDate: "",
     clearancePrice: "",
@@ -145,6 +147,8 @@ export default function AdminNdhPage() {
         return (
           p.sku.toUpperCase().includes(q) ||
           p.note?.toUpperCase().includes(q) ||
+          p.description?.toUpperCase().includes(q) ||
+          p.expiryDate?.includes(q) ||
           product?.name?.toUpperCase().includes(q) ||
           product?.brand?.toUpperCase().includes(q)
         );
@@ -179,6 +183,7 @@ export default function AdminNdhPage() {
   const editItem = (record: NdhRecord) => {
     setForm({
       sku: record.sku,
+      description: record.description || "",
       note: record.note || "Sell as is",
       expiryDate: record.expiryDate || "",
       clearancePrice: record.clearancePrice || "",
@@ -197,6 +202,7 @@ export default function AdminNdhPage() {
         headers: { ...adminHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({
           sku: form.sku,
+          description: form.description,
           note: form.note,
           expiryDate: form.expiryDate,
           clearancePrice: form.clearancePrice,
@@ -218,19 +224,23 @@ export default function AdminNdhPage() {
     }
   };
 
-  const removeItem = async (sku: string) => {
-    if (!confirm(`Remove ${sku} from NDH?`)) return;
+  const removeItem = async (sku: string, expiryDate?: string) => {
+    if (!confirm(`Remove ${sku}${expiryDate ? ` exp ${expiryDate}` : ""} from NDH?`)) return;
     setBusy(true);
     try {
-      const res = await fetch(`/api/admin/ndh?sku=${encodeURIComponent(sku)}`, {
+      const qs = new URLSearchParams({ sku });
+      if (expiryDate) qs.set("expiryDate", expiryDate);
+      const res = await fetch(`/api/admin/ndh?${qs.toString()}`, {
         method: "DELETE",
         headers: adminHeaders(),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to delete NDH item.");
       setItems(Array.isArray(data.items) ? data.items : []);
-      if (form.sku.trim().toUpperCase() === sku.toUpperCase()) setForm(emptyForm());
-      notify(`Removed ${sku}.`);
+      if (form.sku.trim().toUpperCase() === sku.toUpperCase() && (!expiryDate || form.expiryDate === expiryDate)) {
+        setForm(emptyForm());
+      }
+      notify(`Removed ${sku}${expiryDate ? ` ${expiryDate}` : ""}.`);
     } catch (err: unknown) {
       notify(err instanceof Error ? err.message : "Failed to delete NDH item.", "error");
     } finally {
@@ -298,8 +308,10 @@ export default function AdminNdhPage() {
 
       <Panel title="Upload list">
         <p style={{ margin: "0 0 10px", fontSize: 13, color: "#374151", lineHeight: 1.5 }}>
-          CSV/XLSX columns: sku, price, expiry, qty, note. Or paste one SKU per line and fill default
-          price + expiry on the right before uploading.
+          Use the warehouse CSV: <strong>PID</strong> (SKU), <strong>Description</strong>,{" "}
+          <strong>Exp Date</strong>, <strong>Inv</strong>. Same SKU + same exp → Inv is added
+          together. Same SKU + different exp → separate listings, each with its own Inv. Blank PID
+          rows stay with the SKU above. TP is optional price.
         </p>
         <input
           type="file"
@@ -349,7 +361,7 @@ export default function AdminNdhPage() {
         </div>
         <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 700, marginBottom: 10 }}>
           <input type="checkbox" checked={replaceAll} onChange={(e) => setReplaceAll(e.target.checked)} />
-          Replace the whole NDH list (instead of merging by SKU)
+          Replace the whole NDH list (instead of merging by SKU + exp)
         </label>
         <BtnRow>
           <BtnPrimary onClick={() => void uploadList()} disabled={busy}>
@@ -402,16 +414,19 @@ export default function AdminNdhPage() {
 
               return (
                 <SalesListItem
-                  key={p.sku}
-                  selected={editingSku === p.sku.toUpperCase()}
+                  key={`${p.sku}-${p.expiryDate}`}
+                  selected={editingSku === p.sku.toUpperCase() && form.expiryDate === p.expiryDate}
                   onClick={() => editItem(p)}
-                  onRemove={() => void removeItem(p.sku)}
+                  onRemove={() => void removeItem(p.sku, p.expiryDate)}
                   removeDisabled={busy}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <strong style={{ fontSize: 14 }}>{p.sku}</strong>
                     <StatusBadge label={statusLabel[status]} style={statusStyle[status]} />
                   </div>
+                  {p.description ? (
+                    <div style={{ fontSize: 12, color: "#374151", fontWeight: 700, marginTop: 2 }}>{p.description}</div>
+                  ) : null}
                   {p.note ? (
                     <div style={{ fontSize: 12, color: "#c2410c", fontWeight: 800, marginTop: 2 }}>{p.note}</div>
                   ) : null}
@@ -420,7 +435,7 @@ export default function AdminNdhPage() {
                       {product.brand ? `${product.brand} · ` : ""}
                       {product.name || "—"}
                     </div>
-                  ) : (
+                  ) : p.description ? null : (
                     <div className="admin-sales-list-summary" style={{ color: "#b91c1c", fontWeight: 700 }}>
                       SKU not in catalog
                     </div>
@@ -458,6 +473,13 @@ export default function AdminNdhPage() {
                   <SkuPreview sku={form.sku} product={selectedProduct} />
                 </div>
                 <div>
+                  <FieldLabel>Description</FieldLabel>
+                  <input
+                    value={form.description}
+                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                    placeholder="From CSV Description"
+                    style={inputStyle}
+                  />
                   <FieldLabel>Label / note</FieldLabel>
                   <input
                     value={form.note}
@@ -469,7 +491,7 @@ export default function AdminNdhPage() {
               </div>
             </FormSection>
 
-            <FormSection title="Pricing & expiry" hint="Required for save / list defaults" tone="clearance">
+            <FormSection title="Pricing & expiry" hint="Exp required. Price optional (TP in CSV or default below)." tone="clearance">
               <div className="admin-form-grid-2">
                 <div>
                   <FieldLabel required>Product expiry</FieldLabel>
@@ -481,7 +503,7 @@ export default function AdminNdhPage() {
                   />
                 </div>
                 <div>
-                  <FieldLabel required>NDH price</FieldLabel>
+                  <FieldLabel>NDH price (optional)</FieldLabel>
                   <input
                     value={form.clearancePrice}
                     onChange={(e) => setForm((f) => ({ ...f, clearancePrice: e.target.value }))}

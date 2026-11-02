@@ -73,9 +73,9 @@ export function OrderReviewModal({
   accountNo: string;
   storeName: string;
   submitting: boolean;
-  onAdjustQty: (sku: string, delta: number, nhItems?: boolean, ndh?: boolean) => void;
-  onQtyInput: (sku: string, value: string, nhItems?: boolean, ndh?: boolean) => void;
-  onRemove: (sku: string, nhItems?: boolean, ndh?: boolean) => void;
+  onAdjustQty: (sku: string, delta: number, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => void;
+  onQtyInput: (sku: string, value: string, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => void;
+  onRemove: (sku: string, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => void;
   onRemoveUnavailable: () => void;
   onRemoveUnavailableAndSubmit: () => void;
   onSubmit: () => void | Promise<void>;
@@ -380,7 +380,12 @@ function OrderReviewModalContent({
                         </div>
                       ) : null}
                       {isNdh ? (
-                        <div style={{ ...clearancePolicyStyle, marginTop: 6 }}>{t.ndhMode} · {t.clearanceNoReturn}</div>
+                        <div style={{ ...clearancePolicyStyle, marginTop: 6 }}>
+                          {t.ndhMode}
+                          {item.expiryDate ? ` · ${t.clearanceExpiry} ${item.expiryDate}` : ""}
+                          {" · "}
+                          {t.clearanceNoReturn}
+                        </div>
                       ) : isClearance ? (
                         <div style={{ ...clearancePolicyStyle, marginTop: 6 }}>{t.clearanceNoReturn}</div>
                       ) : null}
@@ -389,19 +394,19 @@ function OrderReviewModalContent({
 
                   <div style={compactQtyStripWrapStyle}>
                     <div style={{ ...reviewQtyControlStyle, width: "100%", maxWidth: 300 }}>
-                      <button type="button" onClick={() => onAdjustQty(item.sku, -1, item.nhItems, item.ndh)} style={reviewQtyButtonStyle}>
+                      <button type="button" onClick={() => onAdjustQty(item.sku, -1, item.nhItems, item.ndh, item.expiryDate)} style={reviewQtyButtonStyle}>
                         −
                       </button>
                       <input
                         value={item.qty}
-                        onChange={(e) => onQtyInput(item.sku, e.target.value, item.nhItems, item.ndh)}
+                        onChange={(e) => onQtyInput(item.sku, e.target.value, item.nhItems, item.ndh, item.expiryDate)}
                         inputMode="numeric"
                         style={reviewQtyInputStyle}
                       />
-                      <button type="button" onClick={() => onAdjustQty(item.sku, 1, item.nhItems, item.ndh)} style={reviewQtyButtonStyle}>
+                      <button type="button" onClick={() => onAdjustQty(item.sku, 1, item.nhItems, item.ndh, item.expiryDate)} style={reviewQtyButtonStyle}>
                         +
                       </button>
-                      <button type="button" onClick={() => onRemove(item.sku, item.nhItems, item.ndh)} style={reviewRemoveButtonStyle}>
+                      <button type="button" onClick={() => onRemove(item.sku, item.nhItems, item.ndh, item.expiryDate)} style={reviewRemoveButtonStyle}>
                         {t.remove}
                       </button>
                     </div>

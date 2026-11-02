@@ -110,6 +110,7 @@ import {
   type QtyMaps,
   type QtySource,
 } from "@/lib/orderNhItems";
+import { ndhListingKey } from "@/lib/ndhListParse";
 import { copy } from "./orderCopy";
 import { readInitialStickyPanelOpen, useMobileViewport } from "./useMobileViewport";
 import {
@@ -162,7 +163,7 @@ function saleMapsFromCart(prev: CartItem[]) {
   const ndh: Record<string, string> = {};
   for (const item of prev) {
     const sku = item.sku.toUpperCase();
-    if (item.ndh) ndh[sku] = item.qty;
+    if (item.ndh) ndh[ndhListingKey(sku, item.expiryDate)] = item.qty;
     else if (item.nhItems) clearance[sku] = item.qty;
   }
   return { clearance, ndh };
@@ -178,7 +179,8 @@ function cartRowsEqual(prev: CartItem[], next: CartItem[]) {
         old.sku === item.sku &&
         old.qty === item.qty &&
         Boolean(old.nhItems) === Boolean(item.nhItems) &&
-        Boolean(old.ndh) === Boolean(item.ndh)
+        Boolean(old.ndh) === Boolean(item.ndh) &&
+        String(old.expiryDate || "") === String(item.expiryDate || "")
       );
     })
   );
@@ -1387,8 +1389,8 @@ export default function OrderPage() {
     for (const [sku, qty] of Object.entries(clearanceQtyMap || {})) {
       if (Number(qty) > 0) inCart.add(sku.toUpperCase());
     }
-    for (const [sku, qty] of Object.entries(ndhQtyMap || {})) {
-      if (Number(qty) > 0) inCart.add(sku.toUpperCase());
+    for (const [key, qty] of Object.entries(ndhQtyMap || {})) {
+      if (Number(qty) > 0) inCart.add(key.split("::")[0].toUpperCase());
     }
     for (const row of cart || []) {
       if (Number(row.qty) > 0) inCart.add(String(row.sku || "").toUpperCase());
@@ -1625,11 +1627,11 @@ export default function OrderPage() {
     }
   };
 
-  const setQtyForSku = (sku: string, value: string, source: QtySource = "normal") => {
+  const setQtyForSku = (sku: string, value: string, source: QtySource = "normal", expiryDate?: string) => {
     const cleanSku = sku.trim().toUpperCase();
     const cleanQty = String(value || "").replace(/[^0-9]/g, "");
 
-    if (cleanQty && Number(cleanQty) > 0 && blockAddForSku(cleanSku)) {
+    if (source !== "ndh" && cleanQty && Number(cleanQty) > 0 && blockAddForSku(cleanSku)) {
       return;
     }
 
@@ -1637,7 +1639,7 @@ export default function OrderPage() {
       syncDeviceContribution(cleanSku, Number(cleanQty) || 0);
     }
 
-    applyQtyState(applyQtySet(qtyMaps, cleanSku, cleanQty, source));
+    applyQtyState(applyQtySet(qtyMaps, cleanSku, cleanQty, source, expiryDate));
   };
 
   const getPromoRemainingForSku = (cleanSku: string) => {
@@ -1664,8 +1666,12 @@ export default function OrderPage() {
     return item.remainingQty;
   };
 
-  const getNdhRemainingForSku = (cleanSku: string) => {
-    const item = ndhItems.find((p) => p.sku?.toUpperCase() === cleanSku);
+  const getNdhRemainingForSku = (cleanSku: string, expiryDate?: string) => {
+    const item = ndhItems.find(
+      (p) =>
+        p.sku?.toUpperCase() === cleanSku &&
+        (!expiryDate || String(p.expiryDate || "") === String(expiryDate || ""))
+    );
     if (!item) return null;
     if (item.remainingQty === null || item.remainingQty === undefined) {
       if (item.clearanceQty && item.clearanceQty > 0) {
@@ -1688,13 +1694,15 @@ export default function OrderPage() {
       // Unavailable / discontinued SKUs are shown in a dedicated review banner.
 
       if (item.ndh) {
-        const ndhRemaining = getNdhRemainingForSku(cleanSku);
+        const ndhRemaining = getNdhRemainingForSku(cleanSku, item.expiryDate);
         if (ndhRemaining !== null && qty > ndhRemaining) {
           warnings.push(t.ndhQtyWarning.replace("{sku}", cleanSku).replace("{qty}", String(ndhRemaining)));
         }
-        const ndh = ndhItems.find((c) => c.sku?.toUpperCase() === cleanSku);
+        const ndh = ndhItems.find(
+          (c) => c.sku?.toUpperCase() === cleanSku && String(c.expiryDate || "") === String(item.expiryDate || "")
+        );
         if (ndh?.daysUntilExpiry != null && ndh.daysUntilExpiry <= 7 && ndh.daysUntilExpiry >= 0) {
-          warnings.push(`${cleanSku}: NDH expires in ${ndh.daysUntilExpiry} day(s).`);
+          warnings.push(`${cleanSku} (${ndh.expiryDate}): NDH expires in ${ndh.daysUntilExpiry} day(s).`);
         }
         continue;
       }
@@ -1790,18 +1798,18 @@ export default function OrderPage() {
     setQtyForSku(target.sku, qty);
   };
 
-  const adjustQtyForSku = (sku: string, delta: number, source: QtySource = "normal") => {
+  const adjustQtyForSku = (sku: string, delta: number, source: QtySource = "normal", expiryDate?: string) => {
     const cleanSku = sku.trim().toUpperCase();
     const current =
       source === "clearance"
         ? getClearanceQty(qtyMaps, cleanSku)
         : source === "ndh"
-          ? getNdhQty(qtyMaps, cleanSku)
+          ? getNdhQty(qtyMaps, cleanSku, expiryDate)
           : getCatalogQty(qtyMaps, cleanSku);
     let next = Math.max(0, current + delta);
     let appliedDelta = delta;
 
-    if (delta > 0 && next > 0 && current <= 0 && blockAddForSku(cleanSku)) {
+    if (source !== "ndh" && delta > 0 && next > 0 && current <= 0 && blockAddForSku(cleanSku)) {
       return;
     }
 
@@ -1833,7 +1841,7 @@ export default function OrderPage() {
     }
 
     if (source === "ndh" && delta > 0) {
-      const ndhRemaining = getNdhRemainingForSku(cleanSku);
+      const ndhRemaining = getNdhRemainingForSku(cleanSku, expiryDate);
       if (ndhRemaining !== null && next > ndhRemaining) {
         alert(t.ndhLimitAlert.replace("{sku}", cleanSku).replace("{qty}", String(ndhRemaining)));
         appliedDelta = ndhRemaining - current;
@@ -1848,21 +1856,21 @@ export default function OrderPage() {
       syncDeviceContribution(cleanSku, next);
     }
 
-    applyQtyState(applyQtyDelta(qtyMaps, cleanSku, appliedDelta, source));
+    applyQtyState(applyQtyDelta(qtyMaps, cleanSku, appliedDelta, source, expiryDate));
   };
 
-  const removeSkuFromOrder = (sku: string, nhItems?: boolean, ndh?: boolean) => {
+  const removeSkuFromOrder = (sku: string, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => {
     // Catalog lines omit flags. Only clear the matching pool so removing a
     // catalog row does not wipe an independent Near Date or NDH line.
-    setQtyForSku(sku, "", cartLineKind({ nhItems, ndh }));
+    setQtyForSku(sku, "", cartLineKind({ nhItems, ndh }), expiryDate);
   };
 
-  const adjustCartLineQty = (sku: string, delta: number, nhItems?: boolean, ndh?: boolean) => {
-    adjustQtyForSku(sku, delta, cartLineKind({ nhItems, ndh }));
+  const adjustCartLineQty = (sku: string, delta: number, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => {
+    adjustQtyForSku(sku, delta, cartLineKind({ nhItems, ndh }), expiryDate);
   };
 
-  const updateCartLineQty = (sku: string, value: string, nhItems?: boolean, ndh?: boolean) => {
-    if (ndh) updateNdhQty(sku, value);
+  const updateCartLineQty = (sku: string, value: string, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => {
+    if (ndh) updateNdhQty(sku, value, expiryDate);
     else if (nhItems) updateClearanceQty(sku, value);
     else updateCatalogQty(sku, value);
   };
@@ -1895,18 +1903,16 @@ export default function OrderPage() {
       if (item.remainingQty === 0) continue;
       const sku = item.sku?.toUpperCase();
       if (!sku) continue;
-      const catalogItem = getCatalogItemBySku(sku) || item;
-      if (!isOrderableItem(catalogItem)) continue;
-      if (getNdhQty(next, sku) <= 0 && blockAddForSku(sku)) continue;
+      const expiryDate = item.expiryDate;
 
-      const current = getNdhQty(next, sku);
+      const current = getNdhQty(next, sku, expiryDate);
       let appliedDelta = 1;
-      const ndhRemaining = getNdhRemainingForSku(sku);
+      const ndhRemaining = getNdhRemainingForSku(sku, expiryDate);
       if (ndhRemaining !== null && current + 1 > ndhRemaining) {
         appliedDelta = ndhRemaining - current;
         if (appliedDelta <= 0) continue;
       }
-      next = applyQtyDelta(next, sku, appliedDelta, "ndh");
+      next = applyQtyDelta(next, sku, appliedDelta, "ndh", expiryDate);
     }
     applyQtyState(next);
   };
@@ -2071,23 +2077,19 @@ export default function OrderPage() {
     setQtyForSku(cleanSku, clean, "clearance");
   };
 
-  const updateNdhQty = (sku: string, value: string) => {
+  const updateNdhQty = (sku: string, value: string, expiryDate?: string) => {
     const cleanSku = sku.toUpperCase();
     const clean = value.replace(/[^0-9]/g, "");
 
-    if (clean && Number(clean) > 0 && blockAddForSku(cleanSku)) {
-      return;
-    }
-
-    const ndhRemaining = getNdhRemainingForSku(cleanSku);
+    const ndhRemaining = getNdhRemainingForSku(cleanSku, expiryDate);
     const requested = Number(clean) || 0;
     if (ndhRemaining !== null && requested > ndhRemaining) {
       alert(t.ndhLimitAlert.replace("{sku}", cleanSku).replace("{qty}", String(ndhRemaining)));
-      setQtyForSku(cleanSku, ndhRemaining ? String(ndhRemaining) : "", "ndh");
+      setQtyForSku(cleanSku, ndhRemaining ? String(ndhRemaining) : "", "ndh", expiryDate);
       return;
     }
 
-    setQtyForSku(cleanSku, clean, "ndh");
+    setQtyForSku(cleanSku, clean, "ndh", expiryDate);
   };
 
   const adjustCatalogQty = (sku: string, delta: number) => {
@@ -2108,8 +2110,8 @@ export default function OrderPage() {
     adjustQtyForSku(sku, delta, "clearance");
   };
 
-  const adjustNdhQty = (sku: string, delta: number) => {
-    adjustQtyForSku(sku, delta, "ndh");
+  const adjustNdhQty = (sku: string, delta: number, expiryDate?: string) => {
+    adjustQtyForSku(sku, delta, "ndh", expiryDate);
   };
 
   const reorderItems = (items: CartItem[]) => {
@@ -2230,7 +2232,7 @@ export default function OrderPage() {
   const removeUnavailableFromOrder = () => {
     const unavailable = getUnavailableSubmitLines(getCurrentSubmitItems());
     for (const item of unavailable) {
-      removeSkuFromOrder(item.sku, item.nhItems, item.ndh);
+      removeSkuFromOrder(item.sku, item.nhItems, item.ndh, item.expiryDate);
     }
     return unavailable;
   };
@@ -2438,7 +2440,7 @@ export default function OrderPage() {
     const remaining = current.filter((item) => !unavailableKey.has(cartLinePoolKey(item)));
 
     for (const item of unavailable) {
-      removeSkuFromOrder(item.sku, item.nhItems, item.ndh);
+      removeSkuFromOrder(item.sku, item.nhItems, item.ndh, item.expiryDate);
     }
 
     showTransientToast(t.unavailableRemoved.replace("{count}", String(unavailable.length)));
@@ -3505,25 +3507,26 @@ export default function OrderPage() {
               <div className="order-promo-grid">
                 {ndhItems.map((item) => {
                   const sku = item.sku?.toUpperCase() || "";
-                  const qty = ndhQtyMap[sku] || "";
+                  const expiryDate = item.expiryDate;
+                  const qty = ndhQtyMap[ndhListingKey(sku, expiryDate)] || "";
                   const soldOut = item.remainingQty === 0;
                   const priceLabel = item.clearancePrice ? `${t.clearancePrice}: ${item.clearancePrice}` : undefined;
                   const detailsLabel = soldOut ? t.clearanceSoldOut : formatClearanceDetails(item, t);
                   const remainingLabel = soldOut ? t.clearanceSoldOut : item.remainingQty !== null && item.remainingQty !== undefined ? `${t.clearanceRemaining}: ${item.remainingQty}` : undefined;
                   const catalogItem = getCatalogItemBySku(sku) || item;
-                  const notOrderable = !isOrderableItem(catalogItem);
                   const cardItem = withCatalogCardFields(item, catalogItem);
                   return (
-                    <CatalogQtyCard key={item.sku} item={cardItem} qty={qty}
+                    <CatalogQtyCard key={`${sku}-${expiryDate || ""}`} item={cardItem} qty={qty}
                       palletLabel={t.pallet}
                       justAddedLabel={t.justAdded}
                       promoNote={soldOut ? t.clearanceSoldOut : item.clearanceNote || t.ndhMode}
                       promoPrice={priceLabel} promoDetails={detailsLabel} promoRemaining={remainingLabel}
                       policyNote={soldOut ? undefined : t.clearanceNoReturn}
                       inCartLabel={t.inCart} promoBadgeLabel={t.ndhMode} editLabel={t.editProduct}
-                      {...adminCardProps} highlight disabled={soldOut || notOrderable}
+                      {...adminCardProps} highlight disabled={soldOut}
                       hideInventoryStatus
-                      onAdjust={adjustNdhQty} onUpdateQty={updateNdhQty}
+                      onAdjust={(lineSku, delta) => adjustNdhQty(lineSku, delta, expiryDate)}
+                      onUpdateQty={(lineSku, value) => updateNdhQty(lineSku, value, expiryDate)}
                       {...favoriteCardProps(sku)} />
                   );
                 })}

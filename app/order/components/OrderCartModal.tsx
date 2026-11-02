@@ -41,9 +41,9 @@ export function OrderCartModal({
   totalCases: number;
   submitting: boolean;
   statusMessage?: string;
-  onAdjustQty: (sku: string, delta: number, nhItems?: boolean, ndh?: boolean) => void;
-  onQtyInput: (sku: string, value: string, nhItems?: boolean, ndh?: boolean) => void;
-  onRemove: (sku: string, nhItems?: boolean, ndh?: boolean) => void;
+  onAdjustQty: (sku: string, delta: number, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => void;
+  onQtyInput: (sku: string, value: string, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => void;
+  onRemove: (sku: string, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => void;
   onRemoveUnavailable?: () => void;
   unavailableItems?: Array<{ sku: string; status: string; nhItems?: boolean; ndh?: boolean }>;
   nudge?: ReactNode;

@@ -9,6 +9,7 @@ export type NdhListDefaults = {
 
 export type ParsedNdhListRow = {
   sku: string;
+  description?: string;
   note?: string;
   expiryDate?: string;
   clearancePrice?: string;
@@ -21,19 +22,29 @@ const HEADER_ALIASES: Record<string, keyof ParsedNdhListRow> = {
   pid: "sku",
   itemno: "sku",
   itemnumber: "sku",
+  description: "description",
+  desc: "description",
+  itemdescription: "description",
+  product: "description",
+  name: "description",
   price: "clearancePrice",
   ndhprice: "clearancePrice",
   clearanceprice: "clearancePrice",
   saleprice: "clearancePrice",
+  tp: "clearancePrice",
   expiry: "expiryDate",
   expirydate: "expiryDate",
   exp: "expiryDate",
+  expdate: "expiryDate",
   expire: "expiryDate",
   expiredate: "expiryDate",
   qty: "clearanceQty",
   quantity: "clearanceQty",
   stock: "clearanceQty",
   cases: "clearanceQty",
+  inv: "clearanceQty",
+  inventory: "clearanceQty",
+  onhand: "clearanceQty",
   clearanceqty: "clearanceQty",
   note: "note",
   label: "note",
@@ -68,7 +79,7 @@ export function normalizeNdhDate(value: unknown): string {
     return `${y}-${m}-${d}`;
   }
   if (typeof value === "number" && Number.isFinite(value)) {
-    return excelSerialToIso(value);
+    if (value > 20000 && value < 80000) return excelSerialToIso(value);
   }
 
   const text = String(value).trim();
@@ -86,14 +97,73 @@ export function normalizeNdhDate(value: unknown): string {
   return text;
 }
 
+function parseInv(value: unknown): string | undefined {
+  if (value == null || value === "") return undefined;
+  const num = Number(String(value).replace(/[^0-9.]/g, ""));
+  if (!Number.isFinite(num) || num < 0) return undefined;
+  return String(Math.floor(num));
+}
+
 function applyDefaults(row: ParsedNdhListRow, defaults?: NdhListDefaults): ParsedNdhListRow {
   return {
     sku: row.sku,
+    description: row.description,
     note: row.note || defaults?.note || undefined,
     expiryDate: row.expiryDate || defaults?.expiryDate || undefined,
     clearancePrice: row.clearancePrice || defaults?.clearancePrice || undefined,
     clearanceQty: row.clearanceQty || defaults?.clearanceQty || undefined,
   };
+}
+
+export function ndhListingKey(sku: string, expiryDate?: string) {
+  const clean = cleanSku(sku);
+  const exp = String(expiryDate || "").trim();
+  return exp ? `${clean}::${exp}` : clean;
+}
+
+export function parseNdhListingKey(key: string): { sku: string; expiryDate?: string } {
+  const text = String(key || "").trim();
+  const idx = text.indexOf("::");
+  if (idx <= 0) return { sku: cleanSku(text) };
+  return {
+    sku: cleanSku(text.slice(0, idx)),
+    expiryDate: text.slice(idx + 2).trim() || undefined,
+  };
+}
+
+function qtyNumber(value?: string) {
+  const num = Number(String(value || "").replace(/[^0-9]/g, ""));
+  return Number.isFinite(num) && num > 0 ? Math.floor(num) : 0;
+}
+
+/** Same SKU + same exp → sum Inv. Different exp → separate rows. */
+export function mergeNdhListRows(rows: ParsedNdhListRow[]): ParsedNdhListRow[] {
+  const map = new Map<string, ParsedNdhListRow>();
+  const order: string[] = [];
+
+  for (const row of rows) {
+    const sku = cleanSku(row.sku);
+    if (!sku) continue;
+    const expiryDate = row.expiryDate || "";
+    const key = ndhListingKey(sku, expiryDate);
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, { ...row, sku, expiryDate: expiryDate || undefined });
+      order.push(key);
+      continue;
+    }
+
+    const summed = qtyNumber(existing.clearanceQty) + qtyNumber(row.clearanceQty);
+    map.set(key, {
+      ...existing,
+      description: existing.description || row.description,
+      note: existing.note || row.note,
+      clearancePrice: existing.clearancePrice || row.clearancePrice,
+      clearanceQty: summed > 0 ? String(summed) : existing.clearanceQty || row.clearanceQty,
+    });
+  }
+
+  return order.map((key) => map.get(key)!);
 }
 
 function rowsFromMatrix(matrix: unknown[][], defaults?: NdhListDefaults): ParsedNdhListRow[] {
@@ -106,6 +176,10 @@ function rowsFromMatrix(matrix: unknown[][], defaults?: NdhListDefaults): Parsed
   const out: ParsedNdhListRow[] = [];
 
   if (hasSkuHeader) {
+    let lastSku = "";
+    let lastDescription = "";
+    let lastPrice = "";
+
     for (const raw of matrix.slice(1)) {
       if (!Array.isArray(raw) || raw.every((cell) => String(cell ?? "").trim() === "")) continue;
       const row: ParsedNdhListRow = { sku: "" };
@@ -115,13 +189,23 @@ function rowsFromMatrix(matrix: unknown[][], defaults?: NdhListDefaults): Parsed
         if (field === "sku") row.sku = cleanSku(value);
         else if (field === "expiryDate") row.expiryDate = normalizeNdhDate(value) || undefined;
         else if (field === "clearancePrice") row.clearancePrice = String(value ?? "").trim() || undefined;
-        else if (field === "clearanceQty") row.clearanceQty = String(value ?? "").trim() || undefined;
+        else if (field === "clearanceQty") row.clearanceQty = parseInv(value);
         else if (field === "note") row.note = String(value ?? "").trim() || undefined;
+        else if (field === "description") row.description = String(value ?? "").trim() || undefined;
       });
+
+      if (!row.sku && lastSku) {
+        row.sku = lastSku;
+        if (!row.description) row.description = lastDescription || undefined;
+        if (!row.clearancePrice) row.clearancePrice = lastPrice || undefined;
+      }
       if (!row.sku) continue;
+      lastSku = row.sku;
+      if (row.description) lastDescription = row.description;
+      if (row.clearancePrice) lastPrice = row.clearancePrice;
       out.push(applyDefaults(row, defaults));
     }
-    return out;
+    return mergeNdhListRows(out);
   }
 
   for (const raw of matrix) {
@@ -135,7 +219,7 @@ function rowsFromMatrix(matrix: unknown[][], defaults?: NdhListDefaults): Parsed
           sku,
           clearancePrice: String(raw[1] ?? "").trim() || undefined,
           expiryDate: expiry || undefined,
-          clearanceQty: String(raw[3] ?? "").trim() || undefined,
+          clearanceQty: parseInv(raw[3]),
           note: String(raw[4] ?? "").trim() || undefined,
         },
         defaults
@@ -143,7 +227,7 @@ function rowsFromMatrix(matrix: unknown[][], defaults?: NdhListDefaults): Parsed
     );
   }
 
-  return out;
+  return mergeNdhListRows(out);
 }
 
 function splitDelimitedLine(line: string) {

@@ -34,11 +34,11 @@ export function OrderCartSection({
   onClose?: () => void;
   lineCount: number;
   totalCases: number;
-  onAdjustQty: (sku: string, delta: number, nhItems?: boolean, ndh?: boolean) => void;
-  onQtyInput: (sku: string, value: string, nhItems?: boolean, ndh?: boolean) => void;
-  onRemove: (sku: string, nhItems?: boolean, ndh?: boolean) => void;
+  onAdjustQty: (sku: string, delta: number, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => void;
+  onQtyInput: (sku: string, value: string, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => void;
+  onRemove: (sku: string, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => void;
   onRemoveUnavailable?: () => void;
-  unavailableItems?: Array<{ sku: string; status: string; nhItems?: boolean; ndh?: boolean }>;
+  unavailableItems?: Array<{ sku: string; status: string; nhItems?: boolean; ndh?: boolean; expiryDate?: string }>;
   nudge?: ReactNode;
   tools?: ReactNode;
 }) {
@@ -184,28 +184,33 @@ export function OrderCartSection({
                         </div>
                       ) : null}
                       {item.ndh ? (
-                        <div style={{ ...clearancePolicyStyle, marginTop: 4, fontSize: 10 }}>{t.ndhMode} · {t.clearanceNoReturn}</div>
+                        <div style={{ ...clearancePolicyStyle, marginTop: 4, fontSize: 10 }}>
+                          {t.ndhMode}
+                          {item.expiryDate ? ` · ${t.clearanceExpiry} ${item.expiryDate}` : ""}
+                          {" · "}
+                          {t.clearanceNoReturn}
+                        </div>
                       ) : item.nhItems ? (
                         <div style={{ ...clearancePolicyStyle, marginTop: 4, fontSize: 10 }}>{t.clearanceNoReturn}</div>
                       ) : null}
                     </div>
                     <div className="order-cart-row-actions">
                       <div className="order-cart-qty">
-                        <button type="button" onClick={() => onAdjustQty(item.sku, -1, item.nhItems, item.ndh)} className="order-cart-qty-btn" aria-label="-">
+                        <button type="button" onClick={() => onAdjustQty(item.sku, -1, item.nhItems, item.ndh, item.expiryDate)} className="order-cart-qty-btn" aria-label="-">
                           −
                         </button>
                         <input
                           value={item.qty}
-                          onChange={(e) => onQtyInput(item.sku, e.target.value, item.nhItems, item.ndh)}
+                          onChange={(e) => onQtyInput(item.sku, e.target.value, item.nhItems, item.ndh, item.expiryDate)}
                           inputMode="numeric"
                           className="order-cart-qty-input"
                           aria-label={item.sku}
                         />
-                        <button type="button" onClick={() => onAdjustQty(item.sku, 1, item.nhItems, item.ndh)} className="order-cart-qty-btn" aria-label="+">
+                        <button type="button" onClick={() => onAdjustQty(item.sku, 1, item.nhItems, item.ndh, item.expiryDate)} className="order-cart-qty-btn" aria-label="+">
                           +
                         </button>
                       </div>
-                      <button type="button" onClick={() => onRemove(item.sku, item.nhItems, item.ndh)} className="order-cart-remove-btn">
+                      <button type="button" onClick={() => onRemove(item.sku, item.nhItems, item.ndh, item.expiryDate)} className="order-cart-remove-btn">
                         {t.remove}
                       </button>
                     </div>

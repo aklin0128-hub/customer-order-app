@@ -20,10 +20,13 @@ function csvEscape(value: unknown) {
   return text;
 }
 
-type OrderLine = { sku: string; qty: string; nhItems?: boolean; ndh?: boolean };
+type OrderLine = { sku: string; qty: string; nhItems?: boolean; ndh?: boolean; expiryDate?: string };
 
 function lineTag(item: OrderLine) {
-  if (item.ndh) return NDH_ORDER_EMAIL_TAG;
+  if (item.ndh) {
+    const exp = String(item.expiryDate || "").trim();
+    return exp ? `${NDH_ORDER_EMAIL_TAG} ${exp}` : NDH_ORDER_EMAIL_TAG;
+  }
   if (item.nhItems) return CLEARANCE_ORDER_EMAIL_TAG;
   return "";
 }
@@ -81,6 +84,7 @@ export async function POST(req: Request) {
           qty: String(item?.qty || "").trim(),
           ndh,
           nhItems: Boolean(item?.nhItems) && !ndh,
+          expiryDate: ndh ? String(item?.expiryDate || "").trim() || undefined : undefined,
         };
       })
       .filter((item: OrderLine) => item.sku && item.qty);
@@ -98,6 +102,7 @@ export async function POST(req: Request) {
     );
     const notOrderable = cleanedItems
       .map((item) => {
+        if (item.ndh) return null;
         const product = catalogBySku.get(item.sku);
         if (product && isOrderableCatalogStatus(product.status)) return null;
         return {
@@ -198,6 +203,7 @@ export async function POST(req: Request) {
       .map((item) => ({
         sku: item.sku,
         qty: Number(item.qty) || 0,
+        expiryDate: item.expiryDate,
       }));
 
     await prependOrderHistory(order);

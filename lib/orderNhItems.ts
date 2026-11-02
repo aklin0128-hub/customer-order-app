@@ -1,3 +1,5 @@
+import { ndhListingKey, parseNdhListingKey } from "@/lib/ndhListParse";
+
 /** Catalog/quick-order, clearance (NH_ITEMS), and NDH qty are independent per SKU. */
 
 export type QtySource = "clearance" | "ndh" | "normal";
@@ -13,6 +15,7 @@ export type OrderSubmitLine = {
   qty: string;
   nhItems?: boolean;
   ndh?: boolean;
+  expiryDate?: string;
 };
 
 function cleanSku(sku: string) {
@@ -42,8 +45,8 @@ export function getClearanceQty(maps: QtyMaps, sku: string) {
   return parseQty(maps.clearance[cleanSku(sku)]);
 }
 
-export function getNdhQty(maps: QtyMaps, sku: string) {
-  return parseQty(mapFor(maps, "ndh")[cleanSku(sku)]);
+export function getNdhQty(maps: QtyMaps, sku: string, expiryDate?: string) {
+  return parseQty(mapFor(maps, "ndh")[ndhListingKey(sku, expiryDate)]);
 }
 
 /** @deprecated use getClearanceQty */
@@ -62,8 +65,8 @@ export function nhItemsSkuSet(maps: QtyMaps): Set<string> {
 
 export function ndhSkuSet(maps: QtyMaps): Set<string> {
   const set = new Set<string>();
-  for (const [sku, qty] of Object.entries(mapFor(maps, "ndh"))) {
-    if (parseQty(qty) > 0) set.add(cleanSku(sku));
+  for (const [key, qty] of Object.entries(mapFor(maps, "ndh"))) {
+    if (parseQty(qty) > 0) set.add(parseNdhListingKey(key).sku);
   }
   return set;
 }
@@ -72,9 +75,10 @@ export function applyQtyDelta(
   maps: QtyMaps,
   sku: string,
   delta: number,
-  source: QtySource
+  source: QtySource,
+  expiryDate?: string
 ): QtyMaps {
-  const key = cleanSku(sku);
+  const key = source === "ndh" ? ndhListingKey(sku, expiryDate) : cleanSku(sku);
   if (!key || !delta) return maps;
 
   const field = fieldForSource(source);
@@ -92,9 +96,10 @@ export function applyQtySet(
   maps: QtyMaps,
   sku: string,
   value: string,
-  source: QtySource
+  source: QtySource,
+  expiryDate?: string
 ): QtyMaps {
-  const key = cleanSku(sku);
+  const key = source === "ndh" ? ndhListingKey(sku, expiryDate) : cleanSku(sku);
   const field = fieldForSource(source);
   const next = parseQty(value);
   const nextFieldMap = { ...mapFor(maps, field) };
@@ -120,17 +125,20 @@ export function expandOrderSubmitLines(maps: QtyMaps): OrderSubmitLine[] {
     if (key && parsed > 0) lines.push({ sku: key, qty: String(parsed), nhItems: true });
   }
 
-  for (const [sku, qty] of Object.entries(mapFor(maps, "ndh"))) {
-    const key = cleanSku(sku);
+  for (const [rawKey, qty] of Object.entries(mapFor(maps, "ndh"))) {
     const parsed = parseQty(qty);
-    if (key && parsed > 0) lines.push({ sku: key, qty: String(parsed), ndh: true });
+    const { sku, expiryDate } = parseNdhListingKey(rawKey);
+    if (sku && parsed > 0) {
+      lines.push(expiryDate ? { sku, qty: String(parsed), ndh: true, expiryDate } : { sku, qty: String(parsed), ndh: true });
+    }
   }
 
   lines.sort(
     (a, b) =>
       a.sku.localeCompare(b.sku) ||
       Number(Boolean(a.nhItems)) - Number(Boolean(b.nhItems)) ||
-      Number(Boolean(a.ndh)) - Number(Boolean(b.ndh))
+      Number(Boolean(a.ndh)) - Number(Boolean(b.ndh)) ||
+      String(a.expiryDate || "").localeCompare(String(b.expiryDate || ""))
   );
   return lines;
 }
@@ -158,6 +166,7 @@ export function cartLineKind(item: { nhItems?: boolean; ndh?: boolean }): QtySou
   return "normal";
 }
 
-export function cartLinePoolKey(item: { sku: string; nhItems?: boolean; ndh?: boolean }) {
-  return `${cleanSku(item.sku)}::${item.ndh ? "ndh" : item.nhItems ? "nh" : "cat"}`;
+export function cartLinePoolKey(item: { sku: string; nhItems?: boolean; ndh?: boolean; expiryDate?: string }) {
+  if (item.ndh) return `ndh:${ndhListingKey(item.sku, item.expiryDate)}`;
+  return `${cleanSku(item.sku)}::${item.nhItems ? "nh" : "cat"}`;
 }

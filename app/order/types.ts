@@ -83,6 +83,8 @@ export type CartItem = {
   nhItems?: boolean;
   /** True when line was added from the NDH tab. */
   ndh?: boolean;
+  /** NDH listing expiry — same SKU can have multiple exp rows. */
+  expiryDate?: string;
 };
 
 export type OrderHistoryItem = {

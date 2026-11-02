@@ -53,8 +53,21 @@ test("ndh qty is independent from catalog and clearance", () => {
     expandOrderSubmitLines(maps).find((row) => row.ndh),
     { sku: "D", qty: "2", ndh: true }
   );
-  assert.equal(cartLinePoolKey({ sku: "D", ndh: true }), "D::ndh");
+  assert.equal(cartLinePoolKey({ sku: "D", ndh: true }), "ndh:D");
   assert.equal(cartLinePoolKey({ sku: "D", nhItems: true }), "D::nh");
+});
+
+test("ndh qty is independent per expiry date", () => {
+  let maps = applyQtyDelta({ catalog: {}, clearance: {} }, "10466K", 2, "ndh", "2026-12-16");
+  maps = applyQtyDelta(maps, "10466K", 3, "ndh", "2026-11-12");
+  assert.equal(getNdhQty(maps, "10466K", "2026-12-16"), 2);
+  assert.equal(getNdhQty(maps, "10466K", "2026-11-12"), 3);
+  const lines = expandOrderSubmitLines(maps).filter((row) => row.ndh);
+  assert.equal(lines.length, 2);
+  assert.deepEqual(
+    lines.find((row) => row.expiryDate === "2026-12-16"),
+    { sku: "10466K", qty: "2", ndh: true, expiryDate: "2026-12-16" }
+  );
 });
 
 test("removing catalog qty leaves clearance qty for the same sku", () => {

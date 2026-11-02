@@ -56,6 +56,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const result = await upsertNdhRecord({
       sku: body?.sku,
+      description: body?.description,
       note: body?.note,
       expiryDate: body?.expiryDate,
       clearancePrice: body?.clearancePrice,
@@ -91,12 +92,17 @@ export async function DELETE(req: Request) {
     const sku = String(url.searchParams.get("sku") || "")
       .trim()
       .toUpperCase();
+    const expiryDate = String(url.searchParams.get("expiryDate") || "").trim();
     if (!sku) {
       return NextResponse.json({ error: "Missing SKU." }, { status: 400 });
     }
 
     const current = await getNdhRecords();
-    const next = current.filter((row) => row.sku !== sku);
+    const next = current.filter((row) => {
+      if (row.sku !== sku) return true;
+      if (!expiryDate) return false;
+      return row.expiryDate !== expiryDate;
+    });
     await saveNdhRecords(next);
     bustServerDataCache(SERVER_CACHE.ndh);
 

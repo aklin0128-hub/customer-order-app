@@ -158,7 +158,7 @@ export default function NdhPublicPage() {
                   : "";
               return (
                 <article
-                  key={item.sku}
+                  key={`${item.sku}-${item.expiryDate || ""}`}
                   className="showcase-card"
                   style={{
                     border: "1px solid #fdba74",
