@@ -10,7 +10,7 @@ import {
   type ClearanceProduct,
   type ClearanceRecord,
 } from "@/lib/clearance";
-import { ndhListingKey } from "@/lib/ndhListParse";
+import { isValidNdhSku, ndhListingKey } from "@/lib/ndhListParse";
 
 export { ndhListingKey, parseNdhListingKey } from "@/lib/ndhListParse";
 
@@ -45,7 +45,7 @@ export function normalizeNdhRecord(entry: unknown): NdhRecord | null {
   const sku = String(raw.sku || "")
     .trim()
     .toUpperCase();
-  if (!sku) return null;
+  if (!isValidNdhSku(sku)) return null;
 
   const expiryDate = String(raw.expiryDate || "").trim();
   if (!expiryDate || !parseDateOnly(expiryDate)) return null;
@@ -229,6 +229,7 @@ export function validateNdhInput(input: {
     .trim()
     .toUpperCase();
   if (!sku) return { error: "Missing SKU." };
+  if (!isValidNdhSku(sku)) return { error: "Invalid SKU." };
 
   const expiryDate = String(input.expiryDate || "").trim();
   const clearancePrice = String(input.clearancePrice || "").trim();

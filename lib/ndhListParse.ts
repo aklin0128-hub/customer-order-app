@@ -64,6 +64,41 @@ function cleanSku(value: unknown) {
     .toUpperCase();
 }
 
+function rowText(raw: unknown[]) {
+  return raw.map((cell) => String(cell ?? "").trim()).join(" ").toUpperCase();
+}
+
+function isJunkReportRow(raw: unknown[]) {
+  const text = rowText(raw);
+  return (
+    text.includes("APPLIED FILTER") ||
+    text.includes("INVENTORY STATUS IS NEAR DATE") ||
+    text.includes("LOC ON HAND QTY") ||
+    /^TOTAL\b/.test(text)
+  );
+}
+
+/** Warehouse PIDs are short codes like 10482K / 000150 — not report banners. */
+export function isValidNdhSku(value: unknown) {
+  const sku = cleanSku(value);
+  if (!sku || sku.length > 20) return false;
+  if (/\s/.test(sku)) return false;
+  if (!/^[A-Z0-9][A-Z0-9.\-]*$/.test(sku)) return false;
+  if (/^(APPLIED|FILTERS?|TOTAL|COUNT|STATUS|HOLD|NEAR)$/.test(sku)) return false;
+  return true;
+}
+
+function isIsoExpiry(value?: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim());
+}
+
+function findHeaderRowIndex(matrix: unknown[][]) {
+  return matrix.findIndex((row) => {
+    if (!Array.isArray(row)) return false;
+    return row.some((cell) => HEADER_ALIASES[cleanHeader(cell)] === "sku");
+  });
+}
+
 function excelSerialToIso(value: number) {
   const parsed = XLSX.SSF.parse_date_code(value);
   if (!parsed?.y || !parsed.m || !parsed.d) return "";
@@ -108,13 +143,13 @@ function parseInv(value: unknown): string | undefined {
 export function parseNdhPrice(value: unknown): string | undefined {
   if (value == null || value === "") return undefined;
   const raw = String(value).trim();
-  if (!raw) return undefined;
+  if (!raw || !/[0-9]/.test(raw)) return undefined;
   const hadDollar = raw.includes("$");
   const num =
     typeof value === "number" && Number.isFinite(value)
       ? value
       : Number(raw.replace(/[^0-9.-]/g, ""));
-  if (!Number.isFinite(num) || num < 0) return undefined;
+  if (!Number.isFinite(num) || num <= 0) return undefined;
   const text = (Math.round(num * 100) / 100).toFixed(2);
   return hadDollar ? `$${text}` : text;
 }
@@ -200,7 +235,9 @@ export function mergeNdhListRows(rows: ParsedNdhListRow[]): ParsedNdhListRow[] {
 function rowsFromMatrix(matrix: unknown[][], defaults?: NdhListDefaults): ParsedNdhListRow[] {
   if (!matrix.length) return [];
 
-  const headerCells = matrix[0].map(cleanHeader);
+  const headerIndex = findHeaderRowIndex(matrix);
+  const headerRow = headerIndex >= 0 ? matrix[headerIndex] : matrix[0];
+  const headerCells = (headerRow || []).map(cleanHeader);
   const mapped = headerCells.map((cell) => HEADER_ALIASES[cell]);
   const lifeIndex = headerCells.findIndex((cell) => cell === "life");
   const tpIndex = headerCells.findIndex((cell) => cell === "tp");
@@ -213,8 +250,9 @@ function rowsFromMatrix(matrix: unknown[][], defaults?: NdhListDefaults): Parsed
     let lastDescription = "";
     let lastPrice = "";
 
-    for (const raw of matrix.slice(1)) {
+    for (const raw of matrix.slice(headerIndex + 1)) {
       if (!Array.isArray(raw) || raw.every((cell) => String(cell ?? "").trim() === "")) continue;
+      if (isJunkReportRow(raw)) continue;
       const row: ParsedNdhListRow = { sku: "" };
       mapped.forEach((field, index) => {
         if (!field) return;
@@ -230,38 +268,40 @@ function rowsFromMatrix(matrix: unknown[][], defaults?: NdhListDefaults): Parsed
         else if (field === "description") row.description = String(value ?? "").trim() || undefined;
       });
 
-      if (!row.sku && lastSku) {
+      const hasExpiry = isIsoExpiry(row.expiryDate);
+      if (!row.sku && lastSku && (hasExpiry || row.clearanceQty)) {
         row.sku = lastSku;
         if (!row.description) row.description = lastDescription || undefined;
         if (!row.clearancePrice) row.clearancePrice = lastPrice || undefined;
       }
-      if (!row.sku) continue;
-      lastSku = row.sku;
-      if (row.description) lastDescription = row.description;
-      if (row.clearancePrice) lastPrice = row.clearancePrice;
+      const next = applyDefaults(row, defaults);
+      if (!isValidNdhSku(next.sku) || !isIsoExpiry(next.expiryDate)) continue;
+      lastSku = next.sku;
+      if (next.description) lastDescription = next.description;
+      if (next.clearancePrice) lastPrice = next.clearancePrice;
       if (lifeIndex >= 0 && shouldSkipExpiredLife(raw[lifeIndex])) continue;
-      out.push(applyDefaults(row, defaults));
+      out.push(next);
     }
     return mergeNdhListRows(out);
   }
 
   for (const raw of matrix) {
     if (!Array.isArray(raw)) continue;
+    if (isJunkReportRow(raw)) continue;
     const sku = cleanSku(raw[0]);
-    if (!sku || HEADER_ALIASES[cleanHeader(sku)] === "sku") continue;
-    const expiry = normalizeNdhDate(raw[2]);
-    out.push(
-      applyDefaults(
-        {
-          sku,
-          clearancePrice: parseNdhPrice(raw[1]),
-          expiryDate: expiry || undefined,
-          clearanceQty: parseInv(raw[3]),
-          note: String(raw[4] ?? "").trim() || undefined,
-        },
-        defaults
-      )
+    if (!isValidNdhSku(sku) || HEADER_ALIASES[cleanHeader(sku)] === "sku") continue;
+    const next = applyDefaults(
+      {
+        sku,
+        clearancePrice: parseNdhPrice(raw[1]),
+        expiryDate: normalizeNdhDate(raw[2]) || undefined,
+        clearanceQty: parseInv(raw[3]),
+        note: String(raw[4] ?? "").trim() || undefined,
+      },
+      defaults
     );
+    if (!isIsoExpiry(next.expiryDate)) continue;
+    out.push(next);
   }
 
   return mergeNdhListRows(out);

@@ -313,7 +313,7 @@ export default function AdminNdhPage() {
           together. Same SKU + different exp → separate listings, each with its own Inv. Blank PID
           rows stay with the SKU above. Rows whose <strong>Life</strong> is 0 or negative are
           skipped (that expiry is not imported). Price comes from <strong>TP</strong>, at most two
-          decimal places.
+          decimal places. Report banners such as Applied Filters are ignored.
         </p>
         <input
           type="file"
