@@ -138,7 +138,7 @@ export default function NdhPublicPage() {
             {items.map((item) => {
               const sku = item.sku?.toUpperCase() || "";
               const soldOut = item.remainingQty === 0;
-              const priceLabel = item.clearancePrice ? `${ot.clearancePrice}: ${item.clearancePrice}` : undefined;
+              const priceLabel = item.clearancePrice ? `${ot.ndhPrice}: ${item.clearancePrice}` : undefined;
               const detailsLabel = soldOut ? ot.clearanceSoldOut : formatClearanceDetails(item, ot);
               const remainingLabel = soldOut
                 ? ot.clearanceSoldOut

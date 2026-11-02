@@ -1897,26 +1897,6 @@ export default function OrderPage() {
     applyQtyState(next);
   };
 
-  const addAllNdhOneCase = () => {
-    let next = qtyMaps;
-    for (const item of ndhItems) {
-      if (item.remainingQty === 0) continue;
-      const sku = item.sku?.toUpperCase();
-      if (!sku) continue;
-      const expiryDate = item.expiryDate;
-
-      const current = getNdhQty(next, sku, expiryDate);
-      let appliedDelta = 1;
-      const ndhRemaining = getNdhRemainingForSku(sku, expiryDate);
-      if (ndhRemaining !== null && current + 1 > ndhRemaining) {
-        appliedDelta = ndhRemaining - current;
-        if (appliedDelta <= 0) continue;
-      }
-      next = applyQtyDelta(next, sku, appliedDelta, "ndh", expiryDate);
-    }
-    applyQtyState(next);
-  };
-
   useEffect(() => {
     if (!normalizedSkuInput) {
       setSelectedItem(null);
@@ -3458,26 +3438,6 @@ export default function OrderPage() {
           </section>
         ) : mode === "ndh" ? (
           <section className="order-shop-card">
-            {ndhItems.length > 0 ? (
-              <div className="order-clearance-bulk-row">
-                <button
-                  type="button"
-                  onClick={addAllNdhOneCase}
-                  style={{
-                    border: "1px solid #be123c",
-                    background: "#be123c",
-                    color: "#fff",
-                    borderRadius: 999,
-                    padding: "8px 14px",
-                    fontSize: 12,
-                    fontWeight: 900,
-                    cursor: "pointer",
-                  }}
-                >
-                  {t.addAllNdhOneCase}
-                </button>
-              </div>
-            ) : null}
             {ndhLoading ? (
               <div style={{ ...emptyStyle, border: "1px solid #fda4af", background: "#fff1f2", color: "#9f1239" }}>{t.loadingNdh}</div>
             ) : ndhItems.length === 0 ? (
@@ -3489,7 +3449,7 @@ export default function OrderPage() {
                   const expiryDate = item.expiryDate;
                   const qty = ndhQtyMap[ndhListingKey(sku, expiryDate)] || "";
                   const soldOut = item.remainingQty === 0;
-                  const priceLabel = item.clearancePrice ? `${t.clearancePrice}: ${item.clearancePrice}` : undefined;
+                  const priceLabel = item.clearancePrice ? `${t.ndhPrice}: ${item.clearancePrice}` : undefined;
                   const detailsLabel = soldOut ? t.clearanceSoldOut : formatClearanceDetails(item, t);
                   const remainingLabel = soldOut ? t.clearanceSoldOut : item.remainingQty !== null && item.remainingQty !== undefined ? `${t.clearanceRemaining}: ${item.remainingQty}` : undefined;
                   const catalogItem = getCatalogItemBySku(sku) || item;
