@@ -6,8 +6,12 @@ import { fileURLToPath } from "node:url";
 
 import { mergeNdhListRows, normalizeNdhDate, parseNdhListText } from "./ndhListParse";
 
+import { mergeNdhWithLegacyClearance } from "./ndh";
+
 const here = dirname(fileURLToPath(import.meta.url));
 const adminPage = readFileSync(join(here, "../app/admin/ndh/page.tsx"), "utf8");
+const adminNav = readFileSync(join(here, "../app/admin/_components/admin-nav.ts"), "utf8");
+const nextConfig = readFileSync(join(here, "../next.config.ts"), "utf8");
 const publicPage = readFileSync(join(here, "../app/NDH/page.tsx"), "utf8");
 const orderPage = readFileSync(join(here, "../app/order/page.tsx"), "utf8");
 const uploadRoute = readFileSync(join(here, "../app/api/admin/ndh/upload/route.ts"), "utf8");
@@ -95,4 +99,49 @@ test("NDH pages wire upload and order tab", () => {
   assert.match(orderPage, /\/api\/ndh/);
   assert.match(sendOrder, /NDH_ORDER_EMAIL_TAG/);
   assert.match(sendOrder, /incrementNdhSold/);
+});
+
+test("Near Date Sale is folded into NDH only", () => {
+  assert.doesNotMatch(orderPage, /changeMode\("clearance"\)/);
+  assert.doesNotMatch(orderPage, /order-mode-tab--clearance/);
+  assert.doesNotMatch(orderPage, /order-shop-tag--clearance/);
+  assert.match(orderPage, /if \(resolved === "clearance"\) resolved = "ndh"/);
+  assert.doesNotMatch(adminNav, /Near Date Sale/);
+  assert.match(adminNav, /href: "\/admin\/ndh"/);
+  assert.match(nextConfig, /source: "\/admin\/clearance"/);
+  assert.match(nextConfig, /destination: "\/admin\/ndh"/);
+  assert.match(sendOrder, /ndhSoldQtyItems.map\(\(item\) => \(\{ sku: item.sku, qty: item.qty \}\)\)/);
+});
+
+test("mergeNdhWithLegacyClearance keeps NDH row and leftover SKU+exp", () => {
+  const merged = mergeNdhWithLegacyClearance(
+    [
+      {
+        sku: "A1",
+        expiryDate: "2026-11-20",
+        clearancePrice: "1",
+        clearanceQty: 4,
+        soldQty: 0,
+      },
+    ],
+    [
+      {
+        sku: "A1",
+        expiryDate: "2026-11-20",
+        clearancePrice: "9",
+        clearanceQty: 99,
+        soldQty: 0,
+      },
+      {
+        sku: "B2",
+        expiryDate: "2026-12-01",
+        clearancePrice: "2",
+        clearanceQty: 3,
+        soldQty: 0,
+      },
+    ]
+  );
+  assert.equal(merged.length, 2);
+  assert.equal(merged[0].clearanceQty, 4);
+  assert.equal(merged[1].sku, "B2");
 });

@@ -290,8 +290,8 @@ export default function AdminNdhPage() {
   return (
     <AdminPage
       active="ndh"
-      title="NDH — Near Date list"
-      subtitle="Upload a CSV/XLSX or paste SKUs. Same customer cards as Near Date Sale on /order and /NDH."
+      title="NDH"
+      subtitle="Upload a CSV/XLSX or paste SKUs. Live on /NDH and the customer order NDH tab."
     >
       <AdminPublicShowcaseHint variant="ndh" />
       <StatGrid

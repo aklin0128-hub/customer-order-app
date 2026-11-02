@@ -124,7 +124,6 @@ import {
   limitedBadgeStyle,
   modeButtonStyle,
   promoModeButtonStyle,
-  clearanceModeButtonStyle,
   ndhModeButtonStyle,
   newItemsModeButtonStyle,
   seasonalModeButtonStyle,
@@ -716,20 +715,20 @@ export default function OrderPage() {
     const savedDeals = localStorage.getItem("order_deals_sub");
     const savedPicks = localStorage.getItem("order_picks_sub");
 
-    // Migrate legacy modes into Catalog / Promotions / Near Date / New items.
+    // Migrate legacy modes into Catalog / Promotions / NDH / New items.
     if (savedMode === "seasonal" && !SEASONAL_TAB_ENABLED) {
       setMode("catalog");
+    } else if (savedMode === "clearance" || savedMode === "ndh") {
+      setMode("ndh");
     } else if (
       savedMode === "catalog" ||
       savedMode === "promotion" ||
-      savedMode === "clearance" ||
-      savedMode === "ndh" ||
       savedMode === "newItems" ||
       savedMode === "seasonal"
     ) {
       setMode(savedMode);
     } else if (savedMode === "deals") {
-      setMode(savedDeals === "clearance" ? "clearance" : "promotion");
+      setMode(savedDeals === "clearance" || savedDeals === "ndh" ? "ndh" : "promotion");
     } else if (savedMode === "picks") {
       setMode(savedPicks === "seasonal" && SEASONAL_TAB_ENABLED ? "seasonal" : "newItems");
     } else if (savedMode === "vegesFruits") {
@@ -739,17 +738,17 @@ export default function OrderPage() {
     }
 
     const queryMode = new URLSearchParams(window.location.search).get("mode");
+    const resolvedQueryMode = queryMode === "clearance" ? "ndh" : queryMode;
     if (
-      queryMode === "catalog" ||
-      queryMode === "promotion" ||
-      queryMode === "clearance" ||
-      queryMode === "ndh" ||
-      queryMode === "newItems" ||
-      (queryMode === "seasonal" && SEASONAL_TAB_ENABLED) ||
-      (queryMode === "search" && QUICK_ORDER_ENABLED)
+      resolvedQueryMode === "catalog" ||
+      resolvedQueryMode === "promotion" ||
+      resolvedQueryMode === "ndh" ||
+      resolvedQueryMode === "newItems" ||
+      (resolvedQueryMode === "seasonal" && SEASONAL_TAB_ENABLED) ||
+      (resolvedQueryMode === "search" && QUICK_ORDER_ENABLED)
     ) {
-      setMode(queryMode);
-      localStorage.setItem("order_mode", queryMode);
+      setMode(resolvedQueryMode);
+      localStorage.setItem("order_mode", resolvedQueryMode);
     }
   }, []);
 
@@ -760,6 +759,7 @@ export default function OrderPage() {
 
   const changeMode = (next: OrderMode) => {
     let resolved = next;
+    if (resolved === "clearance") resolved = "ndh";
     if (!QUICK_ORDER_ENABLED && resolved === "search") resolved = "catalog";
     if (!SEASONAL_TAB_ENABLED && resolved === "seasonal") resolved = "catalog";
     setMode(resolved);
@@ -2628,17 +2628,6 @@ export default function OrderPage() {
       <button
         type="button"
         role="tab"
-        aria-selected={mode === "clearance"}
-        onClick={() => changeMode("clearance")}
-        className={`order-mode-tab order-mode-tab--clearance${mode === "clearance" ? " is-active" : ""}`}
-        style={clearanceModeButtonStyle(mode === "clearance")}
-      >
-        {t.clearanceMode}
-        {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
-      </button>
-      <button
-        type="button"
-        role="tab"
         aria-selected={mode === "ndh"}
         onClick={() => changeMode("ndh")}
         className={`order-mode-tab order-mode-tab--ndh${mode === "ndh" ? " is-active" : ""}`}
@@ -2706,16 +2695,6 @@ export default function OrderPage() {
       >
         {t.promotionMode}
         {promotionItems.length > 0 ? ` (${promotionItems.length})` : ""}
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === "clearance"}
-        onClick={() => changeMode("clearance")}
-        className={`order-shop-tag order-shop-tag--clearance${mode === "clearance" ? " is-active" : ""}`}
-      >
-        {t.clearanceMode}
-        {clearanceItems.length > 0 ? ` (${clearanceItems.length})` : ""}
       </button>
       <button
         type="button"

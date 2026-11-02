@@ -174,7 +174,7 @@ export async function POST(req: Request) {
         `Ref: ${finalOrderRef}`,
         `Items: ${cleanedItems.length}`,
         ...(clearanceLineCount > 0
-          ? [`Near Date Sale (${CLEARANCE_ORDER_EMAIL_TAG}): ${clearanceLineCount}`]
+          ? [`NDH leftover (${CLEARANCE_ORDER_EMAIL_TAG}): ${clearanceLineCount}`]
           : []),
         ...(ndhLineCount > 0 ? [`NDH (${NDH_ORDER_EMAIL_TAG}): ${ndhLineCount}`] : []),
         ...(clearanceLineCount > 0 || ndhLineCount > 0 ? [``] : []),
@@ -209,7 +209,10 @@ export async function POST(req: Request) {
     await prependOrderHistory(order);
     await mergeRecentItems(accountNo, cleanedItems);
     await incrementPromotionSold(soldQtyItems);
-    await incrementClearanceSold(nhSoldQtyItems);
+    await incrementClearanceSold([
+      ...nhSoldQtyItems,
+      ...ndhSoldQtyItems.map((item) => ({ sku: item.sku, qty: item.qty })),
+    ]);
     await incrementNdhSold(ndhSoldQtyItems);
 
     return NextResponse.json({
