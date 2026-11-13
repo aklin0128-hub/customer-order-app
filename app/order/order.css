@@ -2903,7 +2903,8 @@
   position: fixed;
   right: auto;
   bottom: auto;
-  z-index: 90;
+  z-index: 8500;
+  isolation: isolate;
   width: 64px;
   height: 64px;
   border: none;
@@ -2923,6 +2924,7 @@
   align-items: center;
   justify-content: center;
   padding: 0;
+  transform: translate3d(0, 0, 0);
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease,
@@ -2941,34 +2943,34 @@
 }
 
 .order-floating-cart-fab:hover {
-  transform: translateY(-2px);
+  transform: translate3d(0, -2px, 0);
   box-shadow:
     0 14px 32px rgba(124, 58, 237, 0.48),
     0 6px 14px rgba(91, 33, 182, 0.32);
 }
 
 .order-floating-cart-fab:active:not(.is-dragging) {
-  transform: translateY(0);
+  transform: translate3d(0, 0, 0);
 }
 
 .order-floating-cart-fab.is-dragging {
   cursor: grabbing;
   touch-action: none;
   transition: none;
-  transform: none;
+  transform: translate3d(0, 0, 0);
   box-shadow:
     0 16px 36px rgba(124, 58, 237, 0.5),
     0 8px 18px rgba(91, 33, 182, 0.34);
 }
 
 .order-floating-cart-fab.is-dragging:hover {
-  transform: none;
+  transform: translate3d(0, 0, 0);
 }
 
 .order-floating-cart-fab.is-hidden {
   opacity: 0;
   pointer-events: none;
-  transform: scale(0.92);
+  transform: translate3d(0, 0, 0) scale(0.92);
 }
 
 .order-floating-cart-fab-icon {

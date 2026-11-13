@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import {
   clampFabPosition,
@@ -199,9 +200,9 @@ export function OrderFloatingCartFab({ count, label, hidden, onClick }: Props) {
     openCart();
   };
 
-  if (!position) return null;
+  if (!position || typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <button
       type="button"
       className={`order-floating-cart-fab${hidden ? " is-hidden" : ""}${dragging ? " is-dragging" : ""}`}
@@ -229,6 +230,7 @@ export function OrderFloatingCartFab({ count, label, hidden, onClick }: Props) {
       {count > 0 ? (
         <span className="order-floating-cart-fab-badge">{count > 99 ? "99+" : count}</span>
       ) : null}
-    </button>
+    </button>,
+    document.body
   );
 }
