@@ -91,6 +91,9 @@ export function OrderFloatingCartFab({ count, label, hidden, onClick }: Props) {
   });
   const lastOpenAtRef = useRef(0);
   const skipClickRef = useRef(false);
+  const unbindDragRef = useRef<(() => void) | null>(null);
+  const savePositionRef = useRef<(pos: FabPosition) => void>(() => {});
+  const openCartRef = useRef<() => void>(() => {});
 
   useLayoutEffect(() => {
     setPosition(loadStoredPosition() ?? liveDefault());
@@ -110,6 +113,8 @@ export function OrderFloatingCartFab({ count, label, hidden, onClick }: Props) {
     };
   }, []);
 
+  useLayoutEffect(() => () => unbindDragRef.current?.(), []);
+
   const savePosition = useCallback((pos: FabPosition) => {
     const clamped = liveClamp(pos);
     setPosition(clamped);
@@ -127,8 +132,81 @@ export function OrderFloatingCartFab({ count, label, hidden, onClick }: Props) {
     onClick();
   }, [onClick]);
 
+  savePositionRef.current = savePosition;
+  openCartRef.current = openCart;
+
+  const unbindDrag = () => {
+    unbindDragRef.current?.();
+    unbindDragRef.current = null;
+  };
+
+  const bindDrag = (target: HTMLButtonElement) => {
+    unbindDrag();
+
+    const onMove = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d.active || e.pointerId !== d.pointerId) return;
+      e.preventDefault();
+
+      const dx = e.clientX - d.startX;
+      const dy = e.clientY - d.startY;
+      if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+
+      if (!d.moved) {
+        d.moved = true;
+        setDragging(true);
+      }
+
+      savePositionRef.current({ x: d.originX + dx, y: d.originY + dy });
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!dragRef.current.active) return;
+      e.preventDefault();
+    };
+
+    const finish = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d.active || e.pointerId !== d.pointerId) return;
+
+      const wasDrag = d.moved;
+      d.active = false;
+      d.moved = false;
+      setDragging(false);
+      unbindDrag();
+
+      if (d.captured) {
+        try {
+          target.releasePointerCapture(e.pointerId);
+        } catch {
+          /* already released */
+        }
+        d.captured = false;
+      }
+
+      if (wasDrag) {
+        skipClickRef.current = true;
+        return;
+      }
+      openCartRef.current();
+    };
+
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
+    window.addEventListener("touchmove", onTouchMove, { passive: false, capture: true });
+
+    unbindDragRef.current = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+      window.removeEventListener("touchmove", onTouchMove, true);
+    };
+  };
+
   const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (!position || e.button !== 0) return;
+    e.stopPropagation();
     const d = dragRef.current;
     d.active = true;
     d.moved = false;
@@ -138,57 +216,13 @@ export function OrderFloatingCartFab({ count, label, hidden, onClick }: Props) {
     d.startY = e.clientY;
     d.originX = position.x;
     d.originY = position.y;
-  };
-
-  const onPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
-    const d = dragRef.current;
-    if (!d.active || e.pointerId !== d.pointerId) return;
-
-    const dx = e.clientX - d.startX;
-    const dy = e.clientY - d.startY;
-    if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
-
-    if (!d.moved) {
-      d.moved = true;
-      setDragging(true);
-      if (!d.captured) {
-        try {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          d.captured = true;
-        } catch {
-          /* iPad Safari may reject capture */
-        }
-      }
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      d.captured = true;
+    } catch {
+      /* iPad Safari may reject capture */
     }
-
-    e.preventDefault();
-    savePosition({ x: d.originX + dx, y: d.originY + dy });
-  };
-
-  const finishPointer = (e: React.PointerEvent<HTMLButtonElement>) => {
-    const d = dragRef.current;
-    if (!d.active || e.pointerId !== d.pointerId) return;
-
-    const wasDrag = d.moved;
-    d.active = false;
-    d.moved = false;
-    setDragging(false);
-
-    if (d.captured) {
-      try {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      } catch {
-        /* already released */
-      }
-      d.captured = false;
-    }
-
-    if (wasDrag) {
-      skipClickRef.current = true;
-      return;
-    }
-
-    openCart();
+    bindDrag(e.currentTarget);
   };
 
   const onNativeClick = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -208,9 +242,6 @@ export function OrderFloatingCartFab({ count, label, hidden, onClick }: Props) {
       className={`order-floating-cart-fab${hidden ? " is-hidden" : ""}${dragging ? " is-dragging" : ""}`}
       style={{ left: position.x, top: position.y }}
       onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={finishPointer}
-      onPointerCancel={finishPointer}
       onClick={onNativeClick}
       aria-label={count > 0 ? `${label} (${count})` : label}
     >

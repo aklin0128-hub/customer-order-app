@@ -89,9 +89,10 @@ test("FAB stacks above the iPad sticky header and allows taps", () => {
   const fabBlock = css.slice(css.indexOf(".order-floating-cart-fab {"), css.indexOf(".order-floating-cart-fab-ring"));
   assert.match(fabBlock, /z-index:\s*8500;/);
   assert.match(fabBlock, /isolation:\s*isolate;/);
-  assert.match(fabBlock, /touch-action:\s*manipulation;/);
+  assert.match(fabBlock, /touch-action:\s*none;/);
   assert.match(fabSrc, /visualViewport/);
   assert.match(fabSrc, /createPortal/);
+  assert.match(fabSrc, /passive:\s*false/);
   assert.match(fabSrc, /onClick=\{onNativeClick\}/);
   assert.match(layoutSrc, /viewportFit:\s*"cover"/);
   assert.match(css, /\.order-sticky-bar\s*\{[^}]*z-index:\s*80/);
