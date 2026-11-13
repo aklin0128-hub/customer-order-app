@@ -2,8 +2,20 @@
 
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
+import {
+  clampFabPosition,
+  defaultFabPosition,
+  fabSizeForWidth,
+  getViewportBox,
+  parseSafeInset,
+  safariChromeClearance,
+  type FabPosition,
+  type SafeInsets,
+} from "../floatingCartFabPosition";
+
 const STORAGE_KEY = "order_fab_position_v1";
 const DRAG_THRESHOLD_PX = 6;
+const TAP_DEDUP_MS = 400;
 
 type Props = {
   count: number;
@@ -12,50 +24,59 @@ type Props = {
   onClick: () => void;
 };
 
-type Position = { x: number; y: number };
-
-function getFabSize() {
-  if (typeof window === "undefined") return 64;
-  return window.innerWidth >= 768 ? 68 : 64;
-}
-
-function clampPosition(pos: Position, size = getFabSize()): Position {
-  const margin = 8;
-  const maxX = Math.max(margin, window.innerWidth - size - margin);
-  const maxY = Math.max(margin, window.innerHeight - size - margin);
-  return {
-    x: Math.min(Math.max(margin, pos.x), maxX),
-    y: Math.min(Math.max(margin, pos.y), maxY),
+function readSafeInsets(): SafeInsets {
+  if (typeof document === "undefined") {
+    return { top: 0, right: 0, bottom: 0, left: 0 };
+  }
+  const probe = document.createElement("div");
+  probe.style.cssText =
+    "position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)";
+  document.body.appendChild(probe);
+  const cs = getComputedStyle(probe);
+  const insets = {
+    top: parseSafeInset(cs.paddingTop),
+    right: parseSafeInset(cs.paddingRight),
+    bottom: parseSafeInset(cs.paddingBottom),
+    left: parseSafeInset(cs.paddingLeft),
   };
+  probe.remove();
+  return insets;
 }
 
-function defaultPosition(): Position {
-  const size = getFabSize();
-  const marginY = window.innerWidth >= 768 ? 24 : 16;
-  const marginX = window.innerWidth >= 768 ? 24 : 14;
-  return clampPosition(
-    {
-      x: window.innerWidth - size - marginX,
-      y: window.innerHeight - size - marginY,
-    },
-    size
-  );
+function liveClamp(pos: FabPosition): FabPosition {
+  const viewport = getViewportBox(window);
+  const size = fabSizeForWidth(viewport.width);
+  const extras = safariChromeClearance(viewport, window.innerHeight);
+  return clampFabPosition(pos, {
+    size,
+    viewport,
+    safeInsets: readSafeInsets(),
+    extraBottom: extras.extraBottom,
+    extraRight: extras.extraRight,
+  });
 }
 
-function loadStoredPosition(): Position | null {
+function liveDefault(): FabPosition {
+  const viewport = getViewportBox(window);
+  const size = fabSizeForWidth(viewport.width);
+  const extras = safariChromeClearance(viewport, window.innerHeight);
+  return defaultFabPosition(size, viewport, { ...extras, safeInsets: readSafeInsets() });
+}
+
+function loadStoredPosition(): FabPosition | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Position;
+    const parsed = JSON.parse(raw) as FabPosition;
     if (!Number.isFinite(parsed?.x) || !Number.isFinite(parsed?.y)) return null;
-    return clampPosition(parsed);
+    return liveClamp(parsed);
   } catch {
     return null;
   }
 }
 
 export function OrderFloatingCartFab({ count, label, hidden, onClick }: Props) {
-  const [position, setPosition] = useState<Position | null>(null);
+  const [position, setPosition] = useState<FabPosition | null>(null);
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef({
     active: false,
@@ -65,22 +86,31 @@ export function OrderFloatingCartFab({ count, label, hidden, onClick }: Props) {
     startY: 0,
     originX: 0,
     originY: 0,
+    captured: false,
   });
+  const lastOpenAtRef = useRef(0);
+  const skipClickRef = useRef(false);
 
   useLayoutEffect(() => {
-    setPosition(loadStoredPosition() ?? defaultPosition());
+    setPosition(loadStoredPosition() ?? liveDefault());
   }, []);
 
   useLayoutEffect(() => {
     const onResize = () => {
-      setPosition((prev) => (prev ? clampPosition(prev) : defaultPosition()));
+      setPosition((prev) => liveClamp(prev ?? liveDefault()));
     };
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("scroll", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("scroll", onResize);
+    };
   }, []);
 
-  const savePosition = useCallback((pos: Position) => {
-    const clamped = clampPosition(pos);
+  const savePosition = useCallback((pos: FabPosition) => {
+    const clamped = liveClamp(pos);
     setPosition(clamped);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(clamped));
@@ -89,17 +119,24 @@ export function OrderFloatingCartFab({ count, label, hidden, onClick }: Props) {
     }
   }, []);
 
+  const openCart = useCallback(() => {
+    const now = Date.now();
+    if (now - lastOpenAtRef.current < TAP_DEDUP_MS) return;
+    lastOpenAtRef.current = now;
+    onClick();
+  }, [onClick]);
+
   const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (!position || e.button !== 0) return;
     const d = dragRef.current;
     d.active = true;
     d.moved = false;
+    d.captured = false;
     d.pointerId = e.pointerId;
     d.startX = e.clientX;
     d.startY = e.clientY;
     d.originX = position.x;
     d.originY = position.y;
-    e.currentTarget.setPointerCapture(e.pointerId);
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
@@ -113,6 +150,14 @@ export function OrderFloatingCartFab({ count, label, hidden, onClick }: Props) {
     if (!d.moved) {
       d.moved = true;
       setDragging(true);
+      if (!d.captured) {
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          d.captured = true;
+        } catch {
+          /* iPad Safari may reject capture */
+        }
+      }
     }
 
     e.preventDefault();
@@ -128,13 +173,30 @@ export function OrderFloatingCartFab({ count, label, hidden, onClick }: Props) {
     d.moved = false;
     setDragging(false);
 
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      /* already released */
+    if (d.captured) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        /* already released */
+      }
+      d.captured = false;
     }
 
-    if (!wasDrag) onClick();
+    if (wasDrag) {
+      skipClickRef.current = true;
+      return;
+    }
+
+    openCart();
+  };
+
+  const onNativeClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (skipClickRef.current) {
+      skipClickRef.current = false;
+      e.preventDefault();
+      return;
+    }
+    openCart();
   };
 
   if (!position) return null;
@@ -148,6 +210,7 @@ export function OrderFloatingCartFab({ count, label, hidden, onClick }: Props) {
       onPointerMove={onPointerMove}
       onPointerUp={finishPointer}
       onPointerCancel={finishPointer}
+      onClick={onNativeClick}
       aria-label={count > 0 ? `${label} (${count})` : label}
     >
       <span className="order-floating-cart-fab-ring" aria-hidden>

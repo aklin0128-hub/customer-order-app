@@ -2903,7 +2903,7 @@
   position: fixed;
   right: auto;
   bottom: auto;
-  z-index: 55;
+  z-index: 90;
   width: 64px;
   height: 64px;
   border: none;
@@ -2914,9 +2914,11 @@
     0 10px 28px rgba(124, 58, 237, 0.42),
     0 4px 12px rgba(91, 33, 182, 0.28);
   cursor: grab;
-  touch-action: none;
+  touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2951,6 +2953,7 @@
 
 .order-floating-cart-fab.is-dragging {
   cursor: grabbing;
+  touch-action: none;
   transition: none;
   transform: none;
   box-shadow:
