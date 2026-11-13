@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { emptySalesCreditLines } from "@/lib/credit/salesCreditRequest";
+import { emptySalesCreditLines, SALES_CREDIT_EMAIL } from "@/lib/credit/salesCreditRequest";
 import { buildSalesCreditRequestPdf } from "@/lib/credit/salesCreditRequestPdf";
 
 test("sales credit request PDF starts with %PDF and includes form values", async () => {
@@ -11,7 +11,7 @@ test("sales credit request PDF starts with %PDF and includes form values", async
       customerNo: "FL168",
       customerName: "TAN TIEN",
       dateOfRequest: "11/13/2026",
-      customerEmail: "ELIN@RHEEBROS.COM",
+      customerEmail: SALES_CREDIT_EMAIL,
       invoiceNo: "INV-100",
       invoiceDate: "11/1/2026",
       lines: emptySalesCreditLines().map((line) =>

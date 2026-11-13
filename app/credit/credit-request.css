@@ -141,6 +141,7 @@
 .scr-value input[type="email"] {
   color: #0b59c9;
   text-decoration: underline;
+  cursor: default;
 }
 
 .scr-cols {

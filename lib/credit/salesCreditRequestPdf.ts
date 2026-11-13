@@ -3,6 +3,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf
 import {
   formatSalesCreditMoney,
   salesCreditTotal,
+  SALES_CREDIT_EMAIL,
   type SalesCreditPhoto,
   type SalesCreditRequestForm,
 } from "@/lib/credit/salesCreditRequest";
@@ -154,7 +155,7 @@ export async function buildSalesCreditRequestPdf(opts: {
     ["Customer #", opts.form.customerNo],
     ["Customer Name", opts.form.customerName],
     ["Date of Request", opts.form.dateOfRequest],
-    ["Customer email address", opts.form.customerEmail, true],
+    ["Customer email address", SALES_CREDIT_EMAIL, true],
     ["Invoice #", opts.form.invoiceNo],
     ["Invoice Date:", opts.form.invoiceDate],
   ];

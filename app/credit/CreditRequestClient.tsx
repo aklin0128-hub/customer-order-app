@@ -7,6 +7,7 @@ import {
   formatSalesCreditDate,
   formatSalesCreditMoney,
   salesCreditTotal,
+  SALES_CREDIT_EMAIL,
   type SalesCreditLine,
   type SalesCreditRequestForm,
 } from "@/lib/credit/salesCreditRequest";
@@ -42,7 +43,7 @@ export function CreditRequestClient() {
   const [customerNo, setCustomerNo] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [dateOfRequest, setDateOfRequest] = useState(todayIso());
-  const [customerEmail, setCustomerEmail] = useState("");
+  const customerEmail = SALES_CREDIT_EMAIL;
   const [invoiceNo, setInvoiceNo] = useState("");
   const [invoiceDate, setInvoiceDate] = useState("");
   const [lines, setLines] = useState<SalesCreditLine[]>(emptySalesCreditLines);
@@ -59,7 +60,6 @@ export function CreditRequestClient() {
       setCustomerNo(String(draft.customerNo || ""));
       setCustomerName(String(draft.customerName || ""));
       setDateOfRequest(String(draft.dateOfRequest || todayIso()));
-      setCustomerEmail(String(draft.customerEmail || ""));
       setInvoiceNo(String(draft.invoiceNo || ""));
       setInvoiceDate(String(draft.invoiceDate || ""));
       if (Array.isArray(draft.lines) && draft.lines.length) {
@@ -225,7 +225,6 @@ export function CreditRequestClient() {
               setLines(emptySalesCreditLines());
               setCustomerNo("");
               setCustomerName("");
-              setCustomerEmail("");
               setInvoiceNo("");
               setInvoiceDate("");
               setPhotos((prev) => {
@@ -276,7 +275,7 @@ export function CreditRequestClient() {
         <label className="scr-row">
           <span className="scr-label">Customer email address</span>
           <span className="scr-value">
-            <input type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} />
+            <input type="email" value={customerEmail} readOnly tabIndex={-1} />
           </span>
         </label>
         <label className="scr-row">

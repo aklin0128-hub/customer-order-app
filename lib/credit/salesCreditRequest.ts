@@ -1,3 +1,5 @@
+export const SALES_CREDIT_EMAIL = "ELIN@RHEEBROS.COM";
+
 export const SALES_CREDIT_REASONS = [
   "Allowance & Promotion",
   "Damage",
