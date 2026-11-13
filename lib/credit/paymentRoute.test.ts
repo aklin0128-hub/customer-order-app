@@ -11,5 +11,8 @@ test("deposit slip stays on /payment and sales credit request lives on /credit",
   assert.match(paymentPage, /open \/payment/);
   assert.match(creditPage, /open \/credit/);
   assert.match(creditPage, /Sales Credit Request/);
+  const creditClient = readFileSync(new URL("../../app/credit/CreditRequestClient.tsx", import.meta.url), "utf8");
+  assert.match(creditClient, /\/api\/customer-profile\?accountNo=/);
+  assert.match(creditClient, /setCustomerName\(String\(data\.storeName/);
   assert.equal(existsSync(new URL("../../app/credit/CreditRequestClient.tsx", import.meta.url)), true);
 });

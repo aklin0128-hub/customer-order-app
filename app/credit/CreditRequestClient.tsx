@@ -102,6 +102,42 @@ export function CreditRequestClient() {
   }, [hydrated, salesId, customerNo, customerName, dateOfRequest, customerEmail, invoiceNo, invoiceDate, lines]);
 
   useEffect(() => {
+    if (!hydrated) return;
+    const acct = customerNo.trim().toUpperCase();
+    if (acct.length < 2) return;
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/customer-profile?accountNo=${encodeURIComponent(acct)}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          storeName?: string;
+          accountNo?: string;
+        };
+        if (controller.signal.aborted) return;
+        if (!res.ok) {
+          if (res.status === 404) setCustomerName("");
+          return;
+        }
+        if (data.accountNo && data.accountNo !== customerNo) {
+          setCustomerNo(String(data.accountNo).toUpperCase());
+        }
+        setCustomerName(String(data.storeName || "").trim());
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+      }
+    }, 350);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [hydrated, customerNo]);
+
+  useEffect(() => {
     return () => {
       for (const p of photos) URL.revokeObjectURL(p.url);
     };
@@ -217,7 +253,12 @@ export function CreditRequestClient() {
         <label className="scr-row">
           <span className="scr-label">Customer #</span>
           <span className="scr-value">
-            <input value={customerNo} onChange={(e) => setCustomerNo(e.target.value)} />
+            <input
+              value={customerNo}
+              autoCapitalize="characters"
+              onChange={(e) => setCustomerNo(e.target.value.toUpperCase())}
+              placeholder="e.g. FL168"
+            />
           </span>
         </label>
         <label className="scr-row">
