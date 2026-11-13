@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-/** Accepted passwords for /credit. Defaults keep 536678. */
+/** Accepted passwords for /payment. Defaults keep 536678. */
 const DEFAULT_CREDIT_PASSWORDS = ["536678"];
 
 export function getCreditAccessPasswords(): string[] {

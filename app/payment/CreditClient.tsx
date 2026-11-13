@@ -379,7 +379,7 @@ export function CreditClient() {
         <div>
           <h2>Save</h2>
           <p className="credit-hint" style={{ marginBottom: 0 }}>
-            Saves documents, check info, and header on this browser. Restores when you reopen /credit.
+            Saves documents, check info, and header on this browser. Restores when you reopen /payment.
           </p>
           {savedAt ? (
             <p className="credit-meta" style={{ marginTop: 6 }}>

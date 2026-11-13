@@ -5,7 +5,7 @@ import { AdminLogin } from "@/app/admin/_components/AdminLogin";
 import { CreditClient } from "./CreditClient";
 import { CreditAuthProvider, useCreditAuth } from "./useCreditAuth";
 
-function CreditPageInner() {
+function PaymentPageInner() {
   const { ready, authed, error, loading, login, logout } = useCreditAuth();
   const [passwordInput, setPasswordInput] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
@@ -16,7 +16,7 @@ function CreditPageInner() {
     return (
       <AdminLogin
         title="Credit / Deposit Slip"
-        subtitle="Enter password to open /credit."
+        subtitle="Enter password to open /payment."
         password={passwordInput}
         onPasswordChange={setPasswordInput}
         rememberMe={rememberMe}
@@ -32,7 +32,7 @@ function CreditPageInner() {
     <main className="credit-page">
       <header className="credit-header">
         <div>
-          <p className="credit-kicker">/credit</p>
+          <p className="credit-kicker">/payment</p>
           <h1 className="credit-title">Credit & Check Deposit</h1>
           <p className="credit-subtitle">
             Upload statement → pick debits/credits → apply check # / amount / date → PDF or Excel
@@ -49,10 +49,10 @@ function CreditPageInner() {
   );
 }
 
-export default function CreditPage() {
+export default function PaymentPage() {
   return (
     <CreditAuthProvider>
-      <CreditPageInner />
+      <PaymentPageInner />
     </CreditAuthProvider>
   );
 }
