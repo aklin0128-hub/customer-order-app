@@ -18,11 +18,6 @@ const nextConfig: NextConfig = {
         destination: "/admin/ndh",
         permanent: false,
       },
-      {
-        source: "/credit",
-        destination: "/payment",
-        permanent: false,
-      },
     ];
   },
   serverExternalPackages: ["pdf-parse", "pdfjs-dist", "tesseract.js", "xlsx"],
