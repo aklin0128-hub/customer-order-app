@@ -361,10 +361,13 @@ export const catalogStepInputStyle: CSSProperties = {
   borderRadius: 10,
   border: "1px solid #d1d5db",
   textAlign: "center",
-  fontSize: 15,
-  fontWeight: 900,
+  fontSize: 16,
+  fontWeight: 800,
+  color: "#111827",
+  background: "#ffffff",
   outline: "none",
   boxSizing: "border-box",
+  padding: "0 2px",
 };
 export const stepperStyle: CSSProperties = {
   display: "grid",

@@ -2,6 +2,7 @@
 .order-page {
   --order-footer-h: 24px;
   background: #f1f5f9;
+  color-scheme: light;
   padding: 12px 10px calc(var(--order-footer-h) + env(safe-area-inset-bottom, 0px));
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   box-sizing: border-box;
@@ -2139,6 +2140,19 @@
   user-select: none;
 }
 
+.catalog-qty-step-input {
+  min-width: 0;
+  color: #111827;
+  background: #ffffff;
+  -webkit-text-fill-color: #111827;
+  caret-color: #111827;
+  opacity: 1;
+  padding: 0 2px;
+  line-height: 42px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 .catalog-promo-deal-tiers {
   display: flex;
   flex-direction: column;
@@ -2997,6 +3011,7 @@
   border-radius: 999px;
   background: #fff;
   color: var(--order-fab-purple);
+  -webkit-text-fill-color: var(--order-fab-purple);
   font-size: 12px;
   font-weight: 900;
   line-height: 22px;
@@ -3500,7 +3515,10 @@
   .catalog-qty-card-stepper input {
     min-height: 44px !important;
     font-size: 16px !important;
-    padding: 4px 6px !important;
+    padding: 0 2px !important;
+    color: #111827 !important;
+    -webkit-text-fill-color: #111827 !important;
+    background: #ffffff !important;
   }
 
   .catalog-qty-card-stepper > div {

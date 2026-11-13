@@ -549,6 +549,7 @@ export function CatalogQtyCard({
             −
           </button>
           <input
+            className="catalog-qty-step-input"
             value={qty}
             onChange={(e) => onUpdateQty(item.sku, e.target.value)}
             placeholder="0"
