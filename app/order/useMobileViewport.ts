@@ -17,6 +17,5 @@ export function useMobileViewport(maxWidth = 767) {
 }
 
 export function readInitialStickyPanelOpen() {
-  if (typeof window === "undefined") return true;
-  return window.innerWidth >= 768;
+  return true;
 }

@@ -123,6 +123,12 @@ test("Hide collapses desktop chrome to the account name", () => {
   assert.match(orderCss, /\.order-chrome-collapsed\s*\{/);
 });
 
+test("mobile shop header puts Hide under the store name", () => {
+  assert.match(orderPageSrc, /order-shop-chrome-toggle--below-title/);
+  assert.match(orderCss, /\.order-shop-chrome-toggle--below-title\s*\{/);
+  assert.match(orderPageSrc, /order-shop-header\$\{stickyPanelOpen \? "" : " is-collapsed"\}/);
+});
+
 test("catalog cards stay under the sticky directory bar while scrolling", () => {
   assert.match(orderCss, /\.order-sticky-bar\s*\{[^}]*z-index:\s*80/);
   assert.match(

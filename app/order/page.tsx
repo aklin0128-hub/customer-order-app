@@ -289,12 +289,6 @@ export default function OrderPage() {
   const isMobileViewport = useMobileViewport();
 
   useEffect(() => {
-    if (isMobileViewport && mode === "search") {
-      setStickyPanelOpen(true);
-    }
-  }, [isMobileViewport, mode]);
-
-  useEffect(() => {
     if (!accountNo) {
       setFavoriteSkus([]);
       setCatalogShowFavoritesOnly(false);
@@ -2723,12 +2717,24 @@ export default function OrderPage() {
   );
 
   const renderMobileShopHeader = () => (
-    <div className="order-shop-header">
+    <div className={`order-shop-header${stickyPanelOpen ? "" : " is-collapsed"}`}>
       <div className="order-shop-header-top">
         <div className="order-shop-store" onClick={tapAdminUnlock}>
           <span className="order-shop-store-name">{storeName}</span>
           <span className="order-shop-store-id">{accountNo}</span>
         </div>
+        {!stickyPanelOpen ? (
+          <button
+            type="button"
+            className="order-shop-chrome-toggle"
+            onClick={() => setStickyPanelOpen(true)}
+            aria-expanded={false}
+            aria-label={t.show}
+          >
+            {t.show}
+          </button>
+        ) : null}
+        {stickyPanelOpen ? (
         <div className="order-shop-header-actions">
           <div className="order-shop-lang" role="group" aria-label="Language">
             {(["en", "zh", "ko", "vi"] as Lang[]).map((item) => (
@@ -2757,7 +2763,19 @@ export default function OrderPage() {
             {t.logout}
           </button>
         </div>
+        ) : null}
       </div>
+      {stickyPanelOpen ? (
+      <>
+      <button
+        type="button"
+        className="order-shop-chrome-toggle order-shop-chrome-toggle--below-title"
+        onClick={() => setStickyPanelOpen(false)}
+        aria-expanded={true}
+        aria-label={t.hide}
+      >
+        {t.hide}
+      </button>
       {renderAdminBar()}
 
       {renderMobileModeTags()}
@@ -2885,6 +2903,8 @@ export default function OrderPage() {
           onAddSkuToCart={addSkuFromSearch}
           onAdjustQty={adjustCatalogQty}
         />
+      ) : null}
+      </>
       ) : null}
     </div>
   );
@@ -3092,7 +3112,7 @@ export default function OrderPage() {
             {isMobileViewport && !fullscreen ? (
               <>
                 {renderMobileShopHeader()}
-                {renderCatalogFiltersPanel()}
+                {stickyPanelOpen ? renderCatalogFiltersPanel() : null}
               </>
             ) : (
               <>
