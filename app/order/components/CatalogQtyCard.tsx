@@ -553,6 +553,7 @@ export function CatalogQtyCard({
             value={qty}
             onChange={(e) => onUpdateQty(item.sku, e.target.value)}
             placeholder="0"
+            size={3}
             inputMode="numeric"
             disabled={disabled || orderingBlocked}
             style={{ ...catalogStepInputStyle, opacity: disabled || orderingBlocked ? 0.5 : 1 }}

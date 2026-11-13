@@ -2132,6 +2132,7 @@
   margin-top: auto;
   padding-top: 8px;
   flex-shrink: 0;
+  min-width: 0;
 }
 
 .catalog-qty-step-btn {
@@ -2142,6 +2143,8 @@
 
 .catalog-qty-step-input {
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
   color: #111827;
   background: #ffffff;
   -webkit-text-fill-color: #111827;
@@ -2151,6 +2154,12 @@
   line-height: 42px;
   -webkit-appearance: none;
   appearance: none;
+}
+
+.catalog-qty-step-input::placeholder {
+  color: #6b7280;
+  -webkit-text-fill-color: #6b7280;
+  opacity: 1;
 }
 
 .catalog-promo-deal-tiers {

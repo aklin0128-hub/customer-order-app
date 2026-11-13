@@ -338,11 +338,12 @@ export const inCartTagStyle: CSSProperties = {
 };
 export const catalogStepperStyle: CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "44px 1fr 44px",
-  gap: 8,
+  gridTemplateColumns: "44px minmax(0, 1fr) 44px",
+  gap: 6,
   alignItems: "center",
   marginTop: 0,
   paddingTop: 0,
+  minWidth: 0,
 };
 export const catalogStepBtnStyle: CSSProperties = {
   width: 44,

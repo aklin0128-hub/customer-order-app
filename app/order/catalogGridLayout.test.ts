@@ -109,8 +109,10 @@ test("catalog category bar stays a compact single row", () => {
 test("catalog qty input keeps a dark fill so iPad Safari shows the number", () => {
   assert.match(orderCss, /\.catalog-qty-step-input\s*\{[^}]*-webkit-text-fill-color:\s*#111827/);
   assert.match(orderCss, /\.catalog-qty-step-input\s*\{[^}]*color:\s*#111827/);
+  assert.match(orderStylesSrc, /gridTemplateColumns:\s*"44px minmax\(0, 1fr\) 44px"/);
   const cardSrc = readFileSync(join(here, "components/CatalogQtyCard.tsx"), "utf8");
   assert.match(cardSrc, /className="catalog-qty-step-input"/);
+  assert.match(cardSrc, /size=\{3\}/);
 });
 
 test("catalog cards stay under the sticky directory bar while scrolling", () => {
