@@ -162,6 +162,37 @@
   padding-bottom: 6px;
 }
 
+.order-sticky-bar-inner.is-collapsed {
+  padding: 6px 10px;
+}
+
+.order-chrome-collapsed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+
+.order-chrome-collapsed-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 4px 0;
+  text-align: left;
+  font-size: 15px;
+  font-weight: 900;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.order-chrome-collapsed .order-sticky-panel-toggle--inline {
+  margin-left: auto;
+}
+
 .order-sticky-bar-inner:has(.order-sticky-panel-collapsed) .order-sticky-panel-toggle {
   margin-top: 2px;
 }

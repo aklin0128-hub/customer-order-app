@@ -2890,6 +2890,8 @@ export default function OrderPage() {
   );
 
   const showCatalogSearch = mode === "catalog" && stickyPanelOpen && !isMobileViewport;
+  const accountLabel = [accountNo, storeName].filter(Boolean).join(" · ");
+  const collapseDesktopChrome = !isMobileViewport && !stickyPanelOpen;
 
   const renderCatalogCategoryRow = () =>
     mode === "catalog" ? (
@@ -3004,6 +3006,7 @@ export default function OrderPage() {
   return (
     <main ref={mainRef} className={`order-page${fullscreen ? " is-fullscreen" : ""}${isMobileViewport ? " order-page--mobile-shop" : ""}`}>
       <div className="order-container">
+        {!collapseDesktopChrome ? (
         <section style={cardStyle} className="order-top-card order-compact-card">
           <div className="order-header-bar">
             <div className="order-header-main">
@@ -3041,6 +3044,7 @@ export default function OrderPage() {
             >
               {t.customerInfo}
             </button>
+            {renderStickyPanelToggle(true)}
             <button type="button" onClick={logout} className="order-header-logout" style={smallButtonStyle}>
               {t.logout}
             </button>
@@ -3053,9 +3057,28 @@ export default function OrderPage() {
             </div>
           ) : null}
         </section>
+        ) : null}
 
         <div className="order-sticky-bar">
-          <div className="order-sticky-bar-inner">
+          <div className={`order-sticky-bar-inner${collapseDesktopChrome ? " is-collapsed" : ""}`}>
+            {collapseDesktopChrome ? (
+              <div className="order-chrome-collapsed">
+                <button
+                  type="button"
+                  className="order-chrome-collapsed-name"
+                  onClick={tapAdminUnlock}
+                >
+                  {accountLabel || t.accountNo}
+                </button>
+                {fullscreen ? (
+                  <button type="button" className="order-fullscreen-exit" onClick={toggleFullscreen}>
+                    {t.exitFullscreen}
+                  </button>
+                ) : null}
+                {renderStickyPanelToggle(true)}
+              </div>
+            ) : (
+            <>
             {fullscreen ? (
               <div className="order-fullscreen-toolbar">
                 <span className="order-fullscreen-meta">
@@ -3193,6 +3216,8 @@ export default function OrderPage() {
 
             {!stickyPanelOpen && !isMobileViewport ? renderStickyPanelToggle() : null}
               </>
+            )}
+            </>
             )}
           </div>
         </div>

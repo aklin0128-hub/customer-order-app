@@ -115,6 +115,14 @@ test("catalog qty input keeps a dark fill so iPad Safari shows the number", () =
   assert.match(cardSrc, /size=\{3\}/);
 });
 
+test("Hide collapses desktop chrome to the account name", () => {
+  assert.match(orderPageSrc, /const collapseDesktopChrome = !isMobileViewport && !stickyPanelOpen/);
+  assert.match(orderPageSrc, /className="order-chrome-collapsed"/);
+  assert.match(orderPageSrc, /className="order-chrome-collapsed-name"/);
+  assert.match(orderPageSrc, /accountLabel \|\| t\.accountNo/);
+  assert.match(orderCss, /\.order-chrome-collapsed\s*\{/);
+});
+
 test("catalog cards stay under the sticky directory bar while scrolling", () => {
   assert.match(orderCss, /\.order-sticky-bar\s*\{[^}]*z-index:\s*80/);
   assert.match(
