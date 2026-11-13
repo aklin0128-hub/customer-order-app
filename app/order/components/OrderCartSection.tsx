@@ -2,7 +2,8 @@
 
 import type { CSSProperties, ReactNode } from "react";
 
-import { getCatalogItemBySku } from "../catalogUtils";
+import { cartLinePoolKey } from "@/lib/orderNhItems";
+import { getCatalogItemBySku, isOrderableItem } from "../catalogUtils";
 import { copy } from "../orderCopy";
 import { clearancePolicyStyle } from "../orderStyles";
 import type { CartItem, Lang } from "../types";
@@ -19,25 +20,30 @@ export function OrderCartSection({
   onAdjustQty,
   onQtyInput,
   onRemove,
-  nhItemsSkus,
+  onRemoveUnavailable,
+  unavailableItems = [],
   nudge,
   tools,
 }: {
   lang: Lang;
   items: CartItem[];
   nhItemsSkus?: Set<string>;
+  ndhSkus?: Set<string>;
   expanded: boolean;
   onToggleExpanded: () => void;
   onClose?: () => void;
   lineCount: number;
   totalCases: number;
-  onAdjustQty: (sku: string, delta: number, nhItems?: boolean) => void;
-  onQtyInput: (sku: string, value: string, nhItems?: boolean) => void;
-  onRemove: (sku: string, nhItems?: boolean) => void;
+  onAdjustQty: (sku: string, delta: number, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => void;
+  onQtyInput: (sku: string, value: string, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => void;
+  onRemove: (sku: string, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => void;
+  onRemoveUnavailable?: () => void;
+  unavailableItems?: Array<{ sku: string; status: string; nhItems?: boolean; ndh?: boolean; expiryDate?: string }>;
   nudge?: ReactNode;
   tools?: ReactNode;
 }) {
   const t = copy[lang];
+  const unavailableKey = new Set(unavailableItems.map((item) => cartLinePoolKey(item)));
 
   const nameClampStyle: CSSProperties = {
     fontSize: 12,
@@ -86,6 +92,52 @@ export function OrderCartSection({
 
       {expanded && nudge ? nudge : null}
 
+      {expanded && unavailableItems.length > 0 ? (
+        <div
+          style={{
+            margin: "0 0 10px",
+            border: "1px solid #fca5a5",
+            background: "#fef2f2",
+            color: "#991b1b",
+            borderRadius: 12,
+            padding: 10,
+            fontSize: 12,
+            lineHeight: 1.45,
+          }}
+        >
+          <div style={{ fontWeight: 900 }}>{t.unavailableInCartTitle}</div>
+          <div style={{ marginTop: 4 }}>{t.unavailableInCartHint}</div>
+          <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 3 }}>
+            {unavailableItems.slice(0, 12).map((item) => (
+              <div key={cartLinePoolKey(item)} style={{ fontWeight: 800 }}>
+                • {item.sku}
+                {item.status ? ` — ${item.status}` : ""}
+              </div>
+            ))}
+            {unavailableItems.length > 12 ? <div>• …</div> : null}
+          </div>
+          {onRemoveUnavailable ? (
+            <button
+              type="button"
+              onClick={onRemoveUnavailable}
+              style={{
+                marginTop: 8,
+                border: "1px solid #fecaca",
+                background: "#fff",
+                color: "#b91c1c",
+                borderRadius: 999,
+                padding: "8px 12px",
+                fontSize: 12,
+                fontWeight: 900,
+                cursor: "pointer",
+              }}
+            >
+              {t.removeUnavailable}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {expanded ? (
         <div className={onClose ? "order-cart-modal-scroll" : undefined}>
           {items.length === 0 ? (
@@ -94,9 +146,17 @@ export function OrderCartSection({
             <div className="order-cart-list">
               {items.map((item) => {
                 const catalogItem = getCatalogItemBySku(item.sku);
-                const lineKey = `${item.sku}-${item.nhItems ? "nh" : "cat"}`;
+                const cleanSku = item.sku.toUpperCase();
+                const lineKey = cartLinePoolKey(item);
+                const lineUnavailable =
+                  unavailableKey.has(lineKey) ||
+                  (catalogItem ? !isOrderableItem(catalogItem) : true);
                 return (
-                  <div key={lineKey} className="order-cart-row">
+                  <div
+                    key={lineKey}
+                    className="order-cart-row"
+                    style={lineUnavailable ? { borderColor: "#fca5a5", background: "#fef2f2" } : undefined}
+                  >
                     <ProductImage sku={item.sku} alt={item.sku} size={48} imageUrl={catalogItem?.imageUrl} />
                     <div className="order-cart-row-info">
                       <div className="order-cart-row-sku">{item.sku}</div>
@@ -106,32 +166,51 @@ export function OrderCartSection({
                           {catalogItem.name || ""}
                         </div>
                       ) : null}
+                      {lineUnavailable ? (
+                        <div className="order-cart-row-note is-warn" style={{ color: "#b91c1c", fontWeight: 800 }}>
+                          {catalogItem
+                            ? t.statusWarning
+                                .replace("{sku}", cleanSku)
+                                .replace(
+                                  "{status}",
+                                  String(catalogItem.status || "").trim().toUpperCase() || "UNAVAILABLE"
+                                )
+                            : t.unavailableMissingSku.replace("{sku}", cleanSku)}
+                        </div>
+                      ) : null}
                       {catalogItem?.limitedQty ? (
                         <div className="order-cart-row-note is-warn">
                           {t.limited}: {catalogItem.limitedQty}
                         </div>
                       ) : null}
-                      {item.nhItems ? (
+                      {item.ndh ? (
+                        <div style={{ ...clearancePolicyStyle, marginTop: 4, fontSize: 10 }}>
+                          {t.ndhMode}
+                          {item.expiryDate ? ` · ${t.clearanceExpiry} ${item.expiryDate}` : ""}
+                          {" · "}
+                          {t.clearanceNoReturn}
+                        </div>
+                      ) : item.nhItems ? (
                         <div style={{ ...clearancePolicyStyle, marginTop: 4, fontSize: 10 }}>{t.clearanceNoReturn}</div>
                       ) : null}
                     </div>
                     <div className="order-cart-row-actions">
                       <div className="order-cart-qty">
-                        <button type="button" onClick={() => onAdjustQty(item.sku, -1, item.nhItems)} className="order-cart-qty-btn" aria-label="-">
+                        <button type="button" onClick={() => onAdjustQty(item.sku, -1, item.nhItems, item.ndh, item.expiryDate)} className="order-cart-qty-btn" aria-label="-">
                           −
                         </button>
                         <input
                           value={item.qty}
-                          onChange={(e) => onQtyInput(item.sku, e.target.value, item.nhItems)}
+                          onChange={(e) => onQtyInput(item.sku, e.target.value, item.nhItems, item.ndh, item.expiryDate)}
                           inputMode="numeric"
                           className="order-cart-qty-input"
                           aria-label={item.sku}
                         />
-                        <button type="button" onClick={() => onAdjustQty(item.sku, 1, item.nhItems)} className="order-cart-qty-btn" aria-label="+">
+                        <button type="button" onClick={() => onAdjustQty(item.sku, 1, item.nhItems, item.ndh, item.expiryDate)} className="order-cart-qty-btn" aria-label="+">
                           +
                         </button>
                       </div>
-                      <button type="button" onClick={() => onRemove(item.sku, item.nhItems)} className="order-cart-remove-btn">
+                      <button type="button" onClick={() => onRemove(item.sku, item.nhItems, item.ndh, item.expiryDate)} className="order-cart-remove-btn">
                         {t.remove}
                       </button>
                     </div>

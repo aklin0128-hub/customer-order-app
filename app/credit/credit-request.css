@@ -1,0 +1,285 @@
+.scr-page {
+  min-height: 100vh;
+  background: #eef2f6;
+  color: #111;
+  font-family: Calibri, "Segoe UI", Arial, sans-serif;
+}
+
+.scr-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 16px 16px 8px;
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.scr-kicker {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.scr-title {
+  margin: 4px 0 4px;
+  font-size: 26px;
+  font-weight: 900;
+}
+
+.scr-subtitle {
+  margin: 0;
+  color: #475569;
+  font-size: 14px;
+}
+
+.scr-logout,
+.scr-btn {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.scr-btn.primary {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #fff;
+}
+
+.scr-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.scr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.scr-body {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 8px 16px 40px;
+}
+
+.scr-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.scr-status {
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.scr-status.error {
+  color: #b91c1c;
+}
+
+.scr-sheet {
+  background: #fff;
+  border: 1px solid #111;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.scr-banner {
+  background: #e5e5e5;
+  border-bottom: 1px solid #111;
+  padding: 7px 10px;
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.scr-row {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  border-bottom: 1px solid #111;
+  min-height: 34px;
+}
+
+.scr-label {
+  background: #bdd7ee;
+  border-right: 1px solid #111;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 4px 10px;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.scr-value {
+  display: flex;
+  align-items: stretch;
+}
+
+.scr-value input,
+.scr-value textarea {
+  width: 100%;
+  border: 0;
+  outline: none;
+  text-align: center;
+  font-size: 14px;
+  padding: 4px 8px;
+  background: transparent;
+  font-family: inherit;
+}
+
+.scr-value input[type="email"] {
+  color: #0b59c9;
+  text-decoration: underline;
+  cursor: default;
+}
+
+.scr-cols {
+  display: grid;
+  grid-template-columns: 210px 140px 1fr;
+  border-bottom: 1px solid #111;
+  min-height: 36px;
+}
+
+.scr-cols > * {
+  border-right: 1px solid #111;
+}
+
+.scr-cols > *:last-child {
+  border-right: 0;
+}
+
+.scr-head {
+  background: #bdd7ee;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-weight: 800;
+  font-size: 13px;
+  padding: 6px 8px;
+}
+
+.scr-reason {
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.scr-amount input,
+.scr-detail textarea {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  resize: none;
+}
+
+.scr-amount input {
+  text-align: center;
+}
+
+.scr-total .scr-reason,
+.scr-total .scr-amount,
+.scr-total .scr-detail {
+  background: #bdd7ee;
+  font-weight: 800;
+}
+
+.scr-total .scr-amount {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scr-photo-head {
+  background: #bdd7ee;
+  border-bottom: 1px solid #111;
+  padding: 6px 10px;
+  font-weight: 800;
+}
+
+.scr-photo-box {
+  min-height: 220px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.scr-photo-box input[type="file"] {
+  font-size: 13px;
+}
+
+.scr-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scr-thumb {
+  width: 120px;
+  position: relative;
+}
+
+.scr-thumb img {
+  width: 120px;
+  height: 90px;
+  object-fit: cover;
+  border: 1px solid #94a3b8;
+  background: #f8fafc;
+}
+
+.scr-thumb button {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  border: 0;
+  background: #fff;
+  border-radius: 999px;
+  width: 22px;
+  height: 22px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.scr-photo-hint {
+  color: #64748b;
+  font-size: 13px;
+}
+
+@media (max-width: 700px) {
+  .scr-row,
+  .scr-cols {
+    grid-template-columns: 1fr;
+  }
+
+  .scr-label,
+  .scr-reason {
+    justify-content: flex-start;
+    border-right: 0;
+    border-bottom: 1px solid #111;
+  }
+
+  .scr-cols > * {
+    border-right: 0;
+    border-bottom: 1px solid #111;
+  }
+}

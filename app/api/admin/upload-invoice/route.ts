@@ -7,17 +7,20 @@ import { put } from "@vercel/blob";
 import { resolveInvoiceLineSku } from "@/lib/invoice/catalogSku";
 import { extractInvoiceText } from "@/lib/invoice/extractText";
 import {
-  IMPORT_LIST_KEY,
   type InvoiceImportRecord,
   type InvoiceLineWithCatalog,
 } from "@/lib/invoice/invoiceImportRecord";
+import { compactInvoiceLines } from "@/lib/invoice/invoiceImportCompact";
+import { prependInvoiceImport } from "@/lib/invoice/invoiceImportStore";
+import { resolveInvoiceCaseUnitPrice } from "@/lib/invoice/invoiceCaseUnitPrice";
 import { parseInvoiceText } from "@/lib/invoice/parseInvoiceText";
 import { bustAnalyticsCache } from "@/lib/analyticsCache";
-import { findDuplicateInvoiceImport } from "@/lib/invoiceDedup";
+import { refreshInvoiceLatestPricesCache } from "@/lib/invoiceLatestPrices";
+import { findDuplicateInvoiceImport, formatDuplicateSkipMessage } from "@/lib/invoiceDedup";
 import { prependOrderHistory } from "@/lib/orderHistory";
+import { incrementPromotionSoldFromInvoice } from "@/lib/promotions";
 import { guessRegionFromText } from "@/lib/regionGuess";
 import { mergeRecentItems } from "@/lib/recentItems";
-import { redis } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -76,6 +79,26 @@ export async function POST(req: Request) {
         })
       : null;
 
+    if (duplicate) {
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        reason: "duplicate",
+        message: formatDuplicateSkipMessage({
+          accountNo,
+          invoiceNo: parsed.invoiceNo,
+          invoiceDate: parsed.invoiceDate,
+          existing: duplicate,
+        }),
+        accountNo,
+        invoiceNo: parsed.invoiceNo,
+        invoiceDate: parsed.invoiceDate,
+        parsedTextChars: text.length,
+        unknownSkus: [],
+        duplicateWarning: duplicate,
+      });
+    }
+
     const linesWithFlags: InvoiceLineWithCatalog[] = await Promise.all(
       parsed.lines.map(async (line) => {
         const resolved = await resolveInvoiceLineSku(line.sku);
@@ -100,10 +123,18 @@ export async function POST(req: Request) {
     let appliedToHistory = false;
 
     if (applyToHistory && linesWithFlags.length > 0 && accountNo) {
-      const itemsForHistory = linesWithFlags.map((l) => ({
-        sku: l.sku,
-        qty: String(l.qty),
-      }));
+      const itemsForHistory = linesWithFlags.map((l) => {
+        const unitPrice = resolveInvoiceCaseUnitPrice({
+          qty: l.qty,
+          unitPrice: l.unitPrice,
+          lineTotal: l.lineTotal,
+        });
+        return {
+          sku: l.sku,
+          qty: String(l.qty),
+          ...(typeof unitPrice === "number" && unitPrice > 0 ? { unitPrice } : {}),
+        };
+      });
 
       await mergeRecentItems(accountNo, itemsForHistory);
 
@@ -132,6 +163,22 @@ export async function POST(req: Request) {
       appliedToHistory = true;
     }
 
+    // Limited promo qty: count invoice lines when invoice date is inside the promo window.
+    if (linesWithFlags.length > 0) {
+      const promoItems = linesWithFlags
+        .map((line) => ({
+          sku: line.sku,
+          qty: Number(line.qty) || 0,
+        }))
+        .filter((line) => line.sku && line.qty > 0);
+      if (promoItems.length > 0) {
+        await incrementPromotionSoldFromInvoice(
+          promoItems,
+          parsed.invoiceDate || new Date().toISOString()
+        );
+      }
+    }
+
     const record: InvoiceImportRecord = {
       id,
       uploadedAt: new Date().toISOString(),
@@ -144,7 +191,8 @@ export async function POST(req: Request) {
       mimeType: mime,
       extractMethod: method,
       lineCount: linesWithFlags.length,
-      lines: linesWithFlags,
+      lines: compactInvoiceLines(linesWithFlags),
+      unknownSkus,
       warnings: [...parsed.warnings],
       appliedToHistory,
     };
@@ -157,11 +205,9 @@ export async function POST(req: Request) {
       record.warnings.push("Applied to history skipped (unchecked in form).");
     }
 
-    const list =
-      (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
-    const nextList = [record, ...list];
-    await redis.set(IMPORT_LIST_KEY, nextList);
+    await prependInvoiceImport(record);
     bustAnalyticsCache();
+    await refreshInvoiceLatestPricesCache();
 
     const suggestedRegion = guessRegionFromText(
       [storeName, parsed.accountNo, accountNo].filter(Boolean).join(" ")
@@ -172,7 +218,6 @@ export async function POST(req: Request) {
       record,
       parsedTextChars: text.length,
       unknownSkus,
-      duplicateWarning: duplicate,
       suggestedRegion: suggestedRegion || null,
     });
   } catch (error: any) {

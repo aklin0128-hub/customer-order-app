@@ -13,11 +13,20 @@ const nextConfig: NextConfig = {
         destination: "/admin/price-compare",
         permanent: false,
       },
+      {
+        source: "/admin/clearance",
+        destination: "/admin/ndh",
+        permanent: false,
+      },
     ];
   },
   serverExternalPackages: ["pdf-parse", "pdfjs-dist", "tesseract.js", "xlsx"],
   outputFileTracingIncludes: {
     "/api/admin/upload-invoice": [
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+      "./node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs",
+    ],
+    "/api/credit/parse": [
       "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
       "./node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs",
     ],

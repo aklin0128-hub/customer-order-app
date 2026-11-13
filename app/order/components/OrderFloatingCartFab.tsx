@@ -1,9 +1,22 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+
+import {
+  clampFabPosition,
+  defaultFabPosition,
+  fabSizeForWidth,
+  getViewportBox,
+  parseSafeInset,
+  safariChromeClearance,
+  type FabPosition,
+  type SafeInsets,
+} from "../floatingCartFabPosition";
 
 const STORAGE_KEY = "order_fab_position_v1";
 const DRAG_THRESHOLD_PX = 6;
+const TAP_DEDUP_MS = 400;
 
 type Props = {
   count: number;
@@ -12,51 +25,59 @@ type Props = {
   onClick: () => void;
 };
 
-type Position = { x: number; y: number };
-
-function getFabSize() {
-  if (typeof window === "undefined") return 64;
-  return window.innerWidth >= 768 ? 68 : 64;
-}
-
-function clampPosition(pos: Position, size = getFabSize()): Position {
-  const margin = 8;
-  const maxX = Math.max(margin, window.innerWidth - size - margin);
-  const maxY = Math.max(margin, window.innerHeight - size - margin);
-  return {
-    x: Math.min(Math.max(margin, pos.x), maxX),
-    y: Math.min(Math.max(margin, pos.y), maxY),
+function readSafeInsets(): SafeInsets {
+  if (typeof document === "undefined") {
+    return { top: 0, right: 0, bottom: 0, left: 0 };
+  }
+  const probe = document.createElement("div");
+  probe.style.cssText =
+    "position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)";
+  document.body.appendChild(probe);
+  const cs = getComputedStyle(probe);
+  const insets = {
+    top: parseSafeInset(cs.paddingTop),
+    right: parseSafeInset(cs.paddingRight),
+    bottom: parseSafeInset(cs.paddingBottom),
+    left: parseSafeInset(cs.paddingLeft),
   };
+  probe.remove();
+  return insets;
 }
 
-function defaultPosition(): Position {
-  const size = getFabSize();
-  const marginY = window.innerWidth >= 768 ? 24 : 16;
-  const marginX =
-    window.innerWidth >= 768 ? Math.max(24, (window.innerWidth - 1040) / 2 + 24) : 14;
-  return clampPosition(
-    {
-      x: window.innerWidth - size - marginX,
-      y: window.innerHeight - size - marginY,
-    },
-    size
-  );
+function liveClamp(pos: FabPosition): FabPosition {
+  const viewport = getViewportBox(window);
+  const size = fabSizeForWidth(viewport.width);
+  const extras = safariChromeClearance(viewport, window.innerHeight);
+  return clampFabPosition(pos, {
+    size,
+    viewport,
+    safeInsets: readSafeInsets(),
+    extraBottom: extras.extraBottom,
+    extraRight: extras.extraRight,
+  });
 }
 
-function loadStoredPosition(): Position | null {
+function liveDefault(): FabPosition {
+  const viewport = getViewportBox(window);
+  const size = fabSizeForWidth(viewport.width);
+  const extras = safariChromeClearance(viewport, window.innerHeight);
+  return defaultFabPosition(size, viewport, { ...extras, safeInsets: readSafeInsets() });
+}
+
+function loadStoredPosition(): FabPosition | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Position;
+    const parsed = JSON.parse(raw) as FabPosition;
     if (!Number.isFinite(parsed?.x) || !Number.isFinite(parsed?.y)) return null;
-    return clampPosition(parsed);
+    return liveClamp(parsed);
   } catch {
     return null;
   }
 }
 
 export function OrderFloatingCartFab({ count, label, hidden, onClick }: Props) {
-  const [position, setPosition] = useState<Position | null>(null);
+  const [position, setPosition] = useState<FabPosition | null>(null);
   const [dragging, setDragging] = useState(false);
   const dragRef = useRef({
     active: false,
@@ -66,22 +87,36 @@ export function OrderFloatingCartFab({ count, label, hidden, onClick }: Props) {
     startY: 0,
     originX: 0,
     originY: 0,
+    captured: false,
   });
+  const lastOpenAtRef = useRef(0);
+  const skipClickRef = useRef(false);
+  const unbindDragRef = useRef<(() => void) | null>(null);
+  const savePositionRef = useRef<(pos: FabPosition) => void>(() => {});
+  const openCartRef = useRef<() => void>(() => {});
 
   useLayoutEffect(() => {
-    setPosition(loadStoredPosition() ?? defaultPosition());
+    setPosition(loadStoredPosition() ?? liveDefault());
   }, []);
 
   useLayoutEffect(() => {
     const onResize = () => {
-      setPosition((prev) => (prev ? clampPosition(prev) : defaultPosition()));
+      setPosition((prev) => liveClamp(prev ?? liveDefault()));
     };
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("scroll", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("scroll", onResize);
+    };
   }, []);
 
-  const savePosition = useCallback((pos: Position) => {
-    const clamped = clampPosition(pos);
+  useLayoutEffect(() => () => unbindDragRef.current?.(), []);
+
+  const savePosition = useCallback((pos: FabPosition) => {
+    const clamped = liveClamp(pos);
     setPosition(clamped);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(clamped));
@@ -90,65 +125,124 @@ export function OrderFloatingCartFab({ count, label, hidden, onClick }: Props) {
     }
   }, []);
 
+  const openCart = useCallback(() => {
+    const now = Date.now();
+    if (now - lastOpenAtRef.current < TAP_DEDUP_MS) return;
+    lastOpenAtRef.current = now;
+    onClick();
+  }, [onClick]);
+
+  savePositionRef.current = savePosition;
+  openCartRef.current = openCart;
+
+  const unbindDrag = () => {
+    unbindDragRef.current?.();
+    unbindDragRef.current = null;
+  };
+
+  const bindDrag = (target: HTMLButtonElement) => {
+    unbindDrag();
+
+    const onMove = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d.active || e.pointerId !== d.pointerId) return;
+      e.preventDefault();
+
+      const dx = e.clientX - d.startX;
+      const dy = e.clientY - d.startY;
+      if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+
+      if (!d.moved) {
+        d.moved = true;
+        setDragging(true);
+      }
+
+      savePositionRef.current({ x: d.originX + dx, y: d.originY + dy });
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!dragRef.current.active) return;
+      e.preventDefault();
+    };
+
+    const finish = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d.active || e.pointerId !== d.pointerId) return;
+
+      const wasDrag = d.moved;
+      d.active = false;
+      d.moved = false;
+      setDragging(false);
+      unbindDrag();
+
+      if (d.captured) {
+        try {
+          target.releasePointerCapture(e.pointerId);
+        } catch {
+          /* already released */
+        }
+        d.captured = false;
+      }
+
+      if (wasDrag) {
+        skipClickRef.current = true;
+        return;
+      }
+      openCartRef.current();
+    };
+
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
+    window.addEventListener("touchmove", onTouchMove, { passive: false, capture: true });
+
+    unbindDragRef.current = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+      window.removeEventListener("touchmove", onTouchMove, true);
+    };
+  };
+
   const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (!position || e.button !== 0) return;
+    e.stopPropagation();
     const d = dragRef.current;
     d.active = true;
     d.moved = false;
+    d.captured = false;
     d.pointerId = e.pointerId;
     d.startX = e.clientX;
     d.startY = e.clientY;
     d.originX = position.x;
     d.originY = position.y;
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-
-  const onPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
-    const d = dragRef.current;
-    if (!d.active || e.pointerId !== d.pointerId) return;
-
-    const dx = e.clientX - d.startX;
-    const dy = e.clientY - d.startY;
-    if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
-
-    if (!d.moved) {
-      d.moved = true;
-      setDragging(true);
-    }
-
-    e.preventDefault();
-    savePosition({ x: d.originX + dx, y: d.originY + dy });
-  };
-
-  const finishPointer = (e: React.PointerEvent<HTMLButtonElement>) => {
-    const d = dragRef.current;
-    if (!d.active || e.pointerId !== d.pointerId) return;
-
-    const wasDrag = d.moved;
-    d.active = false;
-    d.moved = false;
-    setDragging(false);
-
     try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
+      e.currentTarget.setPointerCapture(e.pointerId);
+      d.captured = true;
     } catch {
-      /* already released */
+      /* iPad Safari may reject capture */
     }
-
-    if (!wasDrag) onClick();
+    bindDrag(e.currentTarget);
   };
 
-  if (!position) return null;
+  const onNativeClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (skipClickRef.current) {
+      skipClickRef.current = false;
+      e.preventDefault();
+      return;
+    }
+    openCart();
+  };
 
-  return (
+  if (!position || typeof document === "undefined") return null;
+
+  return createPortal(
     <button
       type="button"
       className={`order-floating-cart-fab${hidden ? " is-hidden" : ""}${dragging ? " is-dragging" : ""}`}
       style={{ left: position.x, top: position.y }}
       onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={finishPointer}
-      onPointerCancel={finishPointer}
+      onClick={onNativeClick}
       aria-label={count > 0 ? `${label} (${count})` : label}
     >
       <span className="order-floating-cart-fab-ring" aria-hidden>
@@ -167,6 +261,7 @@ export function OrderFloatingCartFab({ count, label, hidden, onClick }: Props) {
       {count > 0 ? (
         <span className="order-floating-cart-fab-badge">{count > 99 ? "99+" : count}</span>
       ) : null}
-    </button>
+    </button>,
+    document.body
   );
 }

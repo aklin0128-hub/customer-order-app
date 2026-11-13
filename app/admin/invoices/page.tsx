@@ -34,9 +34,18 @@ type ImportRecord = {
   appliedToHistory: boolean;
 };
 
+type DuplicateSkip = {
+  id: string;
+  uploadedAt: string;
+  invoiceNo: string | null;
+  invoiceDate: string | null;
+};
+
 type BatchUploadResult = {
   fileName: string;
   record?: ImportRecord;
+  skippedDuplicate?: DuplicateSkip;
+  skipMessage?: string;
   unknownSkus: string[];
   parsedChars: number;
   error?: string;
@@ -44,6 +53,24 @@ type BatchUploadResult = {
 
 type InvoiceSortField = "uploadedAt" | "account" | "invoiceDate" | "invoiceNo";
 type SortDir = "asc" | "desc";
+
+type DuplicateGroupMember = {
+  id: string;
+  uploadedAt: string;
+  accountNo: string;
+  invoiceNo: string | null;
+  invoiceDate: string | null;
+  lineCount: number;
+};
+
+type DuplicateGroup = {
+  key: string;
+  matchBy: "invoiceNo" | "invoiceDate";
+  accountNo: string;
+  invoiceNo: string | null;
+  invoiceDate: string | null;
+  imports: DuplicateGroupMember[];
+};
 
 const labelStyle = { display: "block" as const, fontSize: 12, fontWeight: 700, marginBottom: 6, color: "#374151" };
 
@@ -77,6 +104,9 @@ export default function AdminInvoicesPage() {
   const [parsedChars, setParsedChars] = useState(0);
   const [batchResults, setBatchResults] = useState<BatchUploadResult[]>([]);
   const [selectedImportIds, setSelectedImportIds] = useState<string[]>([]);
+  const [dupChecked, setDupChecked] = useState(false);
+  const [dupGroups, setDupGroups] = useState<DuplicateGroup[]>([]);
+  const [selectedDupIds, setSelectedDupIds] = useState<string[]>([]);
 
   const loadImports = async (page = listPage) => {
     try {
@@ -153,6 +183,19 @@ export default function AdminInvoicesPage() {
           const data = await res.json();
           if (!res.ok) throw new Error(data?.error || "Upload failed.");
 
+          if (data.skipped && data.duplicateWarning) {
+            const result: BatchUploadResult = {
+              fileName: selectedFile.name,
+              skippedDuplicate: data.duplicateWarning as DuplicateSkip,
+              skipMessage: String(data.message || "Skipped duplicate invoice."),
+              unknownSkus: [],
+              parsedChars: Number(data.parsedTextChars || 0),
+            };
+            results.push(result);
+            setBatchResults([...results]);
+            continue;
+          }
+
           const rec = data.record as ImportRecord;
           const result: BatchUploadResult = {
             fileName: selectedFile.name,
@@ -177,10 +220,14 @@ export default function AdminInvoicesPage() {
       }
 
       const successCount = results.filter((r) => r.record).length;
-      const failedCount = results.length - successCount;
+      const skippedCount = results.filter((r) => r.skippedDuplicate).length;
+      const failedCount = results.filter((r) => r.error).length;
       const combinedUnknown = Array.from(new Set(results.flatMap((r) => r.unknownSkus)));
       setUnknownSkus(combinedUnknown);
-      setMsg(`Invoice upload complete: ${successCount} succeeded, ${failedCount} failed.`);
+      const parts = [`${successCount} saved`];
+      if (skippedCount) parts.push(`${skippedCount} skipped (duplicate)`);
+      if (failedCount) parts.push(`${failedCount} failed`);
+      setMsg(`Invoice upload complete: ${parts.join(", ")}.`);
       setMsgTone(failedCount ? "error" : "success");
       await loadImports();
       setFiles([]);
@@ -233,7 +280,7 @@ export default function AdminInvoicesPage() {
     }
   };
 
-  const deleteImport = async (row: ImportRecord, options: { skipConfirm?: boolean } = {}) => {
+  const deleteImport = async (row: Pick<ImportRecord, "id" | "invoiceNo">, options: { skipConfirm?: boolean } = {}) => {
     if (!options.skipConfirm && !confirm(`Delete invoice import ${row.invoiceNo || row.id}? This removes the saved import and invoice file, but does not undo customer history/recent items.`)) return false;
 
     setBusy(true);
@@ -248,6 +295,12 @@ export default function AdminInvoicesPage() {
 
       setImports((prev) => prev.filter((item) => item.id !== row.id));
       setSelectedImportIds((prev) => prev.filter((id) => id !== row.id));
+      setDupGroups((prev) =>
+        prev
+          .map((group) => ({ ...group, imports: group.imports.filter((item) => item.id !== row.id) }))
+          .filter((group) => group.imports.length > 1)
+      );
+      setSelectedDupIds((prev) => prev.filter((id) => id !== row.id));
       if (lastRecord?.id === row.id) setLastRecord(null);
       setMsg(data?.warning ? `Deleted import, but file delete warning: ${data.warning}` : "Invoice import deleted.");
       setMsgTone(data?.warning ? "error" : "success");
@@ -281,6 +334,15 @@ export default function AdminInvoicesPage() {
   const lastRecordUnknownSkus = useMemo(
     () => (lastRecord?.lines || []).filter((line) => !line.inCatalog && line.sku).map((line) => line.sku),
     [lastRecord]
+  );
+
+  const extraDupIds = useMemo(
+    () => dupGroups.flatMap((group) => group.imports.slice(1).map((row) => row.id)),
+    [dupGroups]
+  );
+  const duplicateImportIds = useMemo(
+    () => new Set(dupGroups.flatMap((group) => group.imports.map((row) => row.id))),
+    [dupGroups]
   );
 
   const invoiceQuality = quality;
@@ -341,6 +403,65 @@ export default function AdminInvoicesPage() {
     }
   };
 
+  const checkDuplicateInvoices = async () => {
+    setBusy(true);
+    setMsg("");
+    try {
+      const res = await fetch("/api/admin/invoice-imports/duplicates", {
+        cache: "no-store",
+        headers: adminHeaders(),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to check duplicate invoices.");
+
+      const groups = Array.isArray(data.groups) ? (data.groups as DuplicateGroup[]) : [];
+      const extraCount = Number(data.extraCount) || groups.reduce((sum, group) => sum + Math.max(0, group.imports.length - 1), 0);
+      setDupGroups(groups);
+      setDupChecked(true);
+      setSelectedDupIds([]);
+      setMsg(
+        groups.length
+          ? `Found ${groups.length} duplicate group(s) · ${extraCount} extra cop${extraCount === 1 ? "y" : "ies"}.`
+          : "No duplicate invoices found."
+      );
+      setMsgTone("success");
+    } catch (err: unknown) {
+      setMsg(err instanceof Error ? err.message : "Failed to check duplicate invoices.");
+      setMsgTone("error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleDupSelection = (id: string) => {
+    setSelectedDupIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  };
+
+  const deleteDuplicateImports = async (rows: DuplicateGroupMember[]) => {
+    if (rows.length === 0) return;
+    if (
+      !confirm(
+        `Delete ${rows.length} duplicate invoice import${rows.length === 1 ? "" : "s"}? This removes saved imports and invoice files, but does not undo customer history/recent items.`
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    let successCount = 0;
+    try {
+      for (const row of rows) {
+        const ok = await deleteImport(row, { skipConfirm: true });
+        if (ok) successCount += 1;
+      }
+      setMsg(`Deleted ${successCount}/${rows.length} duplicate invoice import(s).`);
+      setMsgTone(successCount === rows.length ? "success" : "error");
+      await loadImports(listPage);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const exportLatestPricesCsv = async () => {
     setBusy(true);
     setMsg("");
@@ -362,7 +483,7 @@ export default function AdminInvoicesPage() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      setMsg("Downloaded latest invoice prices (newest invoice per account + SKU).");
+      setMsg("Downloaded latest invoice prices (account, SKU, price, last price date).");
       setMsgTone("success");
     } catch (err: unknown) {
       setMsg(err instanceof Error ? err.message : "Failed to export latest prices.");
@@ -408,6 +529,23 @@ export default function AdminInvoicesPage() {
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: invoiceQuality.unknownSkus.length > 0 ? 8 : 0 }}>
           <button
             type="button"
+            onClick={() => void checkDuplicateInvoices()}
+            disabled={busy}
+            style={{
+              border: "1px solid #fcd34d",
+              borderRadius: 10,
+              padding: "8px 12px",
+              background: "#fffbeb",
+              color: "#92400e",
+              fontWeight: 800,
+              fontSize: 12,
+              cursor: busy ? "not-allowed" : "pointer",
+            }}
+          >
+            Check duplicates
+          </button>
+          <button
+            type="button"
             onClick={() => void exportLatestPricesCsv()}
             disabled={busy}
             style={{
@@ -447,8 +585,143 @@ export default function AdminInvoicesPage() {
           ) : null}
         </div>
         <p style={{ margin: 0, fontSize: 12, color: "#6b7280" }}>
-          Latest price CSV: one row per account + SKU with columns account, sku, price only. Re-parse saved imports to refresh prices after parser updates without deleting or re-uploading.
+          Latest price CSV: one row per account + SKU with columns account, sku, price, lastPriceDate. Re-parse saved imports to refresh dates and prices after parser updates without deleting or re-uploading. Check duplicates groups the same account + invoice #, or the same account + date when no invoice number was parsed.
         </p>
+        {dupChecked ? (
+          <div
+            style={{
+              marginTop: 12,
+              border: dupGroups.length ? "1px solid #fcd34d" : "1px solid #d1d5db",
+              background: dupGroups.length ? "#fffbeb" : "#f9fafb",
+              borderRadius: 12,
+              padding: 12,
+            }}
+          >
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: dupGroups.length ? 10 : 0 }}>
+              <strong style={{ fontSize: 13, color: dupGroups.length ? "#92400e" : "#374151" }}>
+                {dupGroups.length
+                  ? `${dupGroups.length} duplicate group(s) · ${extraDupIds.length} extra cop${extraDupIds.length === 1 ? "y" : "ies"}`
+                  : "No duplicate invoices found"}
+              </strong>
+              {dupGroups.length > 0 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDupIds(extraDupIds)}
+                    disabled={busy || extraDupIds.length === 0}
+                    style={{
+                      border: "1px solid #fcd34d",
+                      background: "#fff",
+                      color: "#92400e",
+                      borderRadius: 10,
+                      padding: "6px 10px",
+                      fontSize: 12,
+                      fontWeight: 800,
+                      cursor: busy || extraDupIds.length === 0 ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    Select extras ({extraDupIds.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void deleteDuplicateImports(
+                        dupGroups.flatMap((group) => group.imports.filter((row) => selectedDupIds.includes(row.id)))
+                      )
+                    }
+                    disabled={busy || selectedDupIds.length === 0}
+                    style={{
+                      border: "1px solid #fecaca",
+                      background: "#fef2f2",
+                      color: "#b91c1c",
+                      borderRadius: 10,
+                      padding: "6px 10px",
+                      fontSize: 12,
+                      fontWeight: 800,
+                      cursor: busy || selectedDupIds.length === 0 ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    Delete selected extras ({selectedDupIds.length})
+                  </button>
+                </>
+              ) : null}
+            </div>
+            {dupGroups.map((group) => {
+              const extras = group.imports.slice(1);
+              return (
+                <div
+                  key={group.key}
+                  style={{
+                    border: "1px solid #fde68a",
+                    background: "#fff",
+                    borderRadius: 10,
+                    padding: 10,
+                    marginTop: 8,
+                  }}
+                >
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ fontWeight: 800, fontSize: 13, color: "#92400e" }}>
+                      {group.accountNo} · {group.matchBy === "invoiceNo" ? group.invoiceNo || "—" : `date ${group.invoiceDate || "—"}`} · {group.imports.length} copies
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void deleteDuplicateImports(extras)}
+                      disabled={busy || extras.length === 0}
+                      style={{
+                        border: "1px solid #fecaca",
+                        background: "#fef2f2",
+                        color: "#b91c1c",
+                        borderRadius: 8,
+                        padding: "5px 8px",
+                        fontSize: 11,
+                        fontWeight: 800,
+                        cursor: busy || extras.length === 0 ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      Keep oldest, delete extras
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+                    {group.imports.map((row, index) => (
+                      <div key={row.id} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "#374151" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedDupIds.includes(row.id)}
+                          onChange={() => toggleDupSelection(row.id)}
+                          disabled={busy}
+                          aria-label={`Select duplicate ${row.invoiceNo || row.id}`}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ fontWeight: 800 }}>{index === 0 ? "Oldest" : `Extra ${index}`}</span>
+                          {" · "}
+                          {row.invoiceNo || "no invoice #"} · {row.invoiceDate || "no date"} · {row.lineCount} lines · uploaded{" "}
+                          {new Date(row.uploadedAt).toLocaleString()}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void deleteDuplicateImports([row])}
+                          disabled={busy}
+                          style={{
+                            border: "1px solid #fecaca",
+                            background: "#fff",
+                            color: "#b91c1c",
+                            borderRadius: 8,
+                            padding: "4px 8px",
+                            fontSize: 11,
+                            fontWeight: 800,
+                            cursor: busy ? "not-allowed" : "pointer",
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
       </section>
 
       <section style={{ ...panel, marginBottom: 16 }}>
@@ -501,6 +774,9 @@ export default function AdminInvoicesPage() {
           >
             {busy ? "Processing…" : files.length > 1 ? `Upload & parse ${files.length} files` : "Upload & parse"}
           </button>
+          <p style={{ margin: 0, fontSize: 12, color: "#6b7280", lineHeight: 1.45 }}>
+            Same account + invoice # (or same date if no number) is skipped automatically. Batch results will say which files were skipped.
+          </p>
         </div>
       </section>
 
@@ -512,17 +788,26 @@ export default function AdminInvoicesPage() {
               <div
                 key={result.fileName}
                 style={{
-                  border: result.error ? "1px solid #fecaca" : "1px solid #bbf7d0",
-                  background: result.error ? "#fef2f2" : "#f0fdf4",
+                  border: result.error
+                    ? "1px solid #fecaca"
+                    : result.skippedDuplicate
+                      ? "1px solid #fcd34d"
+                      : "1px solid #bbf7d0",
+                  background: result.error ? "#fef2f2" : result.skippedDuplicate ? "#fffbeb" : "#f0fdf4",
                   borderRadius: 12,
                   padding: 10,
                   fontSize: 13,
-                  color: result.error ? "#991b1b" : "#166534",
+                  color: result.error ? "#991b1b" : result.skippedDuplicate ? "#92400e" : "#166534",
                 }}
               >
                 <div style={{ fontWeight: 900 }}>{result.fileName}</div>
                 {result.error ? (
                   <div style={{ marginTop: 4 }}>{result.error}</div>
+                ) : result.skippedDuplicate ? (
+                  <div style={{ marginTop: 4 }}>
+                    {result.skipMessage ||
+                      `Skipped duplicate ${result.skippedDuplicate.invoiceNo || "invoice"} — already uploaded.`}
+                  </div>
                 ) : result.record ? (
                   <div style={{ marginTop: 4 }}>
                     {result.record.accountNo || "no acct"} · {result.record.invoiceNo || "no invoice #"} · {result.record.lineCount} lines · {result.parsedChars} chars
@@ -540,7 +825,8 @@ export default function AdminInvoicesPage() {
           <h2 style={panelTitle}>Last successful result</h2>
           <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 10 }}>
             Account: <strong>{lastRecord.accountNo || "(none)"}</strong> · Invoice:{" "}
-            <strong>{lastRecord.invoiceNo || "(none)"}</strong> · Method:{" "}
+            <strong>{lastRecord.invoiceNo || "(none)"}</strong> · Date:{" "}
+            <strong>{lastRecord.invoiceDate || "not detected"}</strong> · Method:{" "}
             <strong>{lastRecord.extractMethod}</strong> · Chars extracted:{" "}
             <strong>{parsedChars}</strong> · Blob:{" "}
             <button
@@ -720,7 +1006,15 @@ export default function AdminInvoicesPage() {
             <p style={{ color: "#6b7280", fontSize: 14 }}>No imports yet.</p>
           ) : (
             sortedImports.map((row) => (
-              <div key={row.id} style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "#fafafa" }}>
+              <div
+                key={row.id}
+                style={{
+                  border: duplicateImportIds.has(row.id) ? "1px solid #fcd34d" : "1px solid #e5e7eb",
+                  borderRadius: 12,
+                  padding: 12,
+                  background: duplicateImportIds.has(row.id) ? "#fffbeb" : "#fafafa",
+                }}
+              >
                 <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                   <input
                     type="checkbox"
@@ -733,9 +1027,12 @@ export default function AdminInvoicesPage() {
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ fontWeight: 900, fontSize: 14 }}>
                       {row.invoiceNo || "—"} · {row.accountNo || "no acct"} · {row.lineCount} lines
+                      {duplicateImportIds.has(row.id) ? (
+                        <span style={{ marginLeft: 8, color: "#92400e", fontSize: 11, fontWeight: 800 }}>DUPLICATE</span>
+                      ) : null}
                     </div>
                     <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
-                      {new Date(row.uploadedAt).toLocaleString()} · {row.extractMethod}
+                      Invoice {row.invoiceDate || "date not detected"} · uploaded {new Date(row.uploadedAt).toLocaleString()} · {row.extractMethod}
                     </div>
                   </div>
                   <button

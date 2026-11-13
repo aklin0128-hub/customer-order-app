@@ -32,6 +32,11 @@ export function formatShowcasePromoDisplay(
     if (fallback) priceLine = fallback;
   }
 
+  // Buy X Get Y can also carry a unit promo price — surface it under the deal line.
+  if (highlight.headline && highlight.simplePrice) {
+    details.push(highlight.simplePrice);
+  }
+
   const packHint = formatPromoBuyXGetYPackHint(item, t);
   if (packHint) details.push(packHint);
 

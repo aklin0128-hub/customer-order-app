@@ -3,6 +3,7 @@ import { normalizeMarketRegion, type MarketRegionId } from "@/lib/customerRegion
 import { loadCustomers } from "@/lib/loadCustomers";
 import { bustAnalyticsCache } from "@/lib/analyticsCache";
 import { indexCustomerAccount, listRedisCustomerAccounts, unindexCustomerAccount } from "@/lib/redisIndexes";
+import { redisMgetChunks } from "@/lib/redisBatch";
 import { redis } from "@/lib/redis";
 
 export type CustomerRecord = {
@@ -78,6 +79,16 @@ export async function upsertCustomerContact(
   const nextPhone =
     patch.phone !== undefined ? patch.phone.trim() || undefined : existing.phone;
 
+  const emailUnchanged = (nextEmail || "") === (existing.email || "");
+  const phoneUnchanged = (nextPhone || "") === (existing.phone || "");
+  if (existing.source === "redis" && emailUnchanged && phoneUnchanged) {
+    return {
+      orderEmail: resolveCustomerOrderEmail(nextEmail),
+      email: nextEmail,
+      phone: nextPhone,
+    };
+  }
+
   await redis.set(`customer:${acct}`, {
     accountNo: acct,
     storeName: existing.storeName,
@@ -118,8 +129,12 @@ export async function getAllCustomers(): Promise<CustomerRecord[]> {
   }
 
   const accounts = await listRedisCustomerAccounts();
-  for (const accountNo of accounts) {
-    const item = await redis.get<Partial<CustomerRecord>>(`customer:${accountNo}`);
+  const redisRows = await redisMgetChunks<Partial<CustomerRecord>>(
+    accounts.map((accountNo) => `customer:${accountNo}`)
+  );
+  for (let i = 0; i < accounts.length; i++) {
+    const accountNo = accounts[i];
+    const item = redisRows[i];
     if (!item) continue;
 
     const acctNorm = normalizeAccountNo(item?.accountNo || accountNo);

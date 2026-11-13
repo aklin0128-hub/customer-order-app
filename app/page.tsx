@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { readCustomerSession, saveCustomerSession } from "@/lib/customerSession";
+
 import "./login.css";
 
 type Lang = "en" | "zh" | "ko" | "vi";
@@ -10,7 +12,7 @@ type Lang = "en" | "zh" | "ko" | "vi";
 const copy = {
   en: {
     title: "Store Ordering",
-    subtitle: "Sign in for promotions, clearance deals, and easy ordering.",
+    subtitle: "Sign in for promotions, NDH deals, and easy ordering.",
     brandName: "Store Portal",
     accountNumber: "Account number",
     password: "Password",
@@ -23,18 +25,19 @@ const copy = {
     emptyPassword: "Please enter your password.",
     showPassword: "Show",
     hidePassword: "Hide",
+    rememberMe: "Remember me on this device",
     welcomeBack: "Welcome back",
     lastAccountHint: "Last signed-in account loaded.",
-    footer: "Promotions · Clearance · Draft auto-save · EN / 中文 / 한국어 / Tiếng Việt",
+    footer: "Promotions · NDH · Draft auto-save · EN / 中文 / 한국어 / Tiếng Việt",
     featPromo: "Promotions",
-    featClearance: "Clearance",
+    featClearance: "NDH",
     featCatalog: "Catalog order",
     featSearch: "Quick order",
     featDraft: "Save draft",
   },
   zh: {
     title: "门店订货",
-    subtitle: "登录查看促销、临期特价，轻松下单。",
+    subtitle: "登录查看促销、NDH，轻松下单。",
     brandName: "门店订货",
     accountNumber: "客户账号",
     password: "密码",
@@ -47,18 +50,19 @@ const copy = {
     emptyPassword: "请输入密码。",
     showPassword: "显示",
     hidePassword: "隐藏",
+    rememberMe: "在此设备上记住我",
     welcomeBack: "欢迎回来",
     lastAccountHint: "已填入上次登录的账号。",
-    footer: "促销 · 临期特价 · 自动保存草稿 · 多语言",
+    footer: "促销 · NDH · 自动保存草稿 · 多语言",
     featPromo: "促销",
-    featClearance: "临期特价",
+    featClearance: "NDH",
     featCatalog: "目录订货",
     featSearch: "快速下单",
     featDraft: "保存草稿",
   },
   ko: {
     title: "매장 주문",
-    subtitle: "로그인 후 프로모션, 임박 특가를 확인하고 주문하세요.",
+    subtitle: "로그인 후 프로모션, NDH를 확인하고 주문하세요.",
     brandName: "매장 주문",
     accountNumber: "거래처 번호",
     password: "비밀번호",
@@ -71,18 +75,19 @@ const copy = {
     emptyPassword: "비밀번호를 입력하세요.",
     showPassword: "표시",
     hidePassword: "숨기기",
+    rememberMe: "이 기기에서 기억하기",
     welcomeBack: "다시 오신 것을 환영합니다",
     lastAccountHint: "마지막 로그인 계정이 입력되었습니다.",
-    footer: "프로모션 · 임박 특가 · 임시 저장 · 다국어",
+    footer: "프로모션 · NDH · 임시 저장 · 다국어",
     featPromo: "프로모션",
-    featClearance: "임박 특가",
+    featClearance: "NDH",
     featCatalog: "카탈로그 주문",
     featSearch: "빠른 주문",
     featDraft: "임시 저장",
   },
   vi: {
     title: "Đặt hàng cửa hàng",
-    subtitle: "Đăng nhập xem khuyến mãi, hàng thanh lý và đặt hàng dễ dàng.",
+    subtitle: "Đăng nhập xem khuyến mãi, NDH và đặt hàng dễ dàng.",
     brandName: "Cổng đặt hàng",
     accountNumber: "Mã khách",
     password: "Mật khẩu",
@@ -95,11 +100,12 @@ const copy = {
     emptyPassword: "Vui lòng nhập mật khẩu.",
     showPassword: "Hiện",
     hidePassword: "Ẩn",
+    rememberMe: "Ghi nhớ trên thiết bị này",
     welcomeBack: "Chào mừng trở lại",
     lastAccountHint: "Đã điền mã khách lần đăng nhập trước.",
-    footer: "Khuyến mãi · Thanh lý · Tự lưu nháp · Đa ngôn ngữ",
+    footer: "Khuyến mãi · NDH · Tự lưu nháp · Đa ngôn ngữ",
     featPromo: "Khuyến mãi",
-    featClearance: "Thanh lý",
+    featClearance: "NDH",
     featCatalog: "Đặt theo danh mục",
     featSearch: "Đặt nhanh",
     featDraft: "Lưu nháp",
@@ -124,10 +130,11 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [hadSavedAccount, setHadSavedAccount] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
-    if (sessionStorage.getItem("customer_logged_in") === "true") {
+    if (readCustomerSession()) {
       router.replace("/order");
       return;
     }
@@ -201,12 +208,14 @@ export default function LoginPage() {
         return;
       }
 
-      sessionStorage.setItem("customer_logged_in", "true");
-      sessionStorage.setItem("customer_account_no", data.customer.accountNo);
-      sessionStorage.setItem("customer_store_name", data.customer.storeName || "");
-      sessionStorage.setItem("customer_order_email", data.customer.orderEmail || "elin@rheebros.com");
-
-      localStorage.setItem("last_account_no", data.customer.accountNo);
+      saveCustomerSession(
+        {
+          accountNo: data.customer.accountNo,
+          storeName: data.customer.storeName || "",
+          orderEmail: data.customer.orderEmail || "elin@rheebros.com",
+        },
+        rememberMe
+      );
 
       router.push("/order");
     } catch {
@@ -322,6 +331,26 @@ export default function LoginPage() {
                   </button>
                 </div>
               </div>
+
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#374151",
+                  cursor: "pointer",
+                  userSelect: "none",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
+                {t.rememberMe}
+              </label>
 
               {error ? (
                 <div style={errorBoxStyle} role="alert">

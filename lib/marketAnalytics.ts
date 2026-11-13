@@ -5,7 +5,7 @@ import {
   type CustomerRegionValue,
 } from "@/lib/customerRegion";
 import { resolveInvoiceCaseUnitPrice } from "@/lib/invoice/invoiceCaseUnitPrice";
-import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
+import { loadInvoiceImports } from "@/lib/analyticsCommon";
 import { redis } from "@/lib/redis";
 
 export type MarketPeriod = "biweekly" | "monthly" | "quarterly" | "year";
@@ -299,7 +299,7 @@ export async function getMarketAnalytics(period: MarketPeriod): Promise<MarketAn
   let importCount = 0;
   let linesInRange = 0;
 
-  const imports = (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
+  const imports = await loadInvoiceImports();
   importCount = imports.length;
 
   for (const record of imports) {

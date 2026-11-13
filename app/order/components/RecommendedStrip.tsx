@@ -10,11 +10,13 @@ export function RecommendedStrip({
   items,
   onAddOne,
   hideTitle = false,
+  onHide,
 }: {
   lang: Lang;
   items: CatalogItem[];
   onAddOne: (sku: string) => void;
   hideTitle?: boolean;
+  onHide?: () => void;
 }) {
   const t = copy[lang];
   if (items.length === 0) return null;
@@ -22,7 +24,14 @@ export function RecommendedStrip({
   return (
     <div className={`order-recommended-strip${hideTitle ? " order-recommended-strip--embedded" : ""}`}>
       {hideTitle ? null : (
-        <div className="order-recommended-strip-title">{t.recommendedStripTitle}</div>
+        <div className="order-recommended-strip-head">
+          <div className="order-recommended-strip-title">{t.recommendedStripTitle}</div>
+          {onHide ? (
+            <button type="button" className="order-recommended-strip-hide" onClick={onHide}>
+              {t.hideSuggested}
+            </button>
+          ) : null}
+        </div>
       )}
       <div className="order-recommended-strip-scroll">
         {items.map((item) => {

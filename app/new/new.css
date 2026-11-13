@@ -187,10 +187,10 @@
 }
 
 .new-card .showcase-card-badge-row {
-  margin-bottom: 0;
-  gap: 4px;
+  margin-bottom: 4px;
+  gap: 2px;
   flex-direction: row;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-start;
   width: 100%;

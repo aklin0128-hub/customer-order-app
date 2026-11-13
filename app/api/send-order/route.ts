@@ -1,47 +1,23 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { prependOrderHistory } from "@/lib/orderHistory";
-import { CLEARANCE_ORDER_EMAIL_TAG, incrementClearanceSold } from "@/lib/clearance";
+import { incrementClearanceSold } from "@/lib/clearance";
+import { incrementNdhSold } from "@/lib/ndh";
 import { incrementPromotionSold } from "@/lib/promotions";
 import { isValidOrderEmail, resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
 import { getCustomerByAccount, upsertCustomerContact } from "@/lib/customers";
 import { mergeRecentItems } from "@/lib/recentItems";
 import { getMergedCatalogProducts } from "@/lib/catalogMerge";
 import { isOrderableCatalogStatus } from "@/lib/orderableCatalog";
+import {
+  buildOrderEmail,
+  splitOrderLinesForEmail,
+  type OrderEmailLine,
+} from "@/lib/orderSubmitEmail";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-function csvEscape(value: unknown) {
-  const text = String(value ?? "");
-  if (text.includes(",") || text.includes('"') || text.includes("\n")) {
-    return `"${text.replace(/"/g, '""')}"`;
-  }
-  return text;
-}
-
-type OrderLine = { sku: string; qty: string; nhItems?: boolean };
-
-function formatOrderLine(item: OrderLine) {
-  const sku = String(item.sku || "").trim().toUpperCase();
-  const qty = String(item.qty || "").trim();
-  if (item.nhItems) {
-    return `${sku} - ${qty} - ${CLEARANCE_ORDER_EMAIL_TAG}`;
-  }
-  return `${sku} - ${qty}`;
-}
-
-function buildCsv(items: OrderLine[]) {
-  const rows = [["SKU", "Qty", "Tag"]];
-
-  for (const item of items) {
-    const sku = String(item.sku || "").trim().toUpperCase();
-    const qty = String(item.qty || "").trim();
-    const tag = item.nhItems ? CLEARANCE_ORDER_EMAIL_TAG : "";
-    rows.push([sku, qty, tag]);
-  }
-
-  return rows.map((row) => row.map(csvEscape).join(",")).join("\n");
-}
+type OrderLine = OrderEmailLine;
 
 export async function POST(req: Request) {
   try {
@@ -70,11 +46,16 @@ export async function POST(req: Request) {
     }
 
     const cleanedItems: OrderLine[] = items
-      .map((item: any) => ({
-        sku: String(item?.sku || "").trim().toUpperCase(),
-        qty: String(item?.qty || "").trim(),
-        nhItems: Boolean(item?.nhItems),
-      }))
+      .map((item: any) => {
+        const ndh = Boolean(item?.ndh);
+        return {
+          sku: String(item?.sku || "").trim().toUpperCase(),
+          qty: String(item?.qty || "").trim(),
+          ndh,
+          nhItems: Boolean(item?.nhItems) && !ndh,
+          expiryDate: ndh ? String(item?.expiryDate || "").trim() || undefined : undefined,
+        };
+      })
       .filter((item: OrderLine) => item.sku && item.qty);
 
     if (cleanedItems.length === 0) {
@@ -88,15 +69,26 @@ export async function POST(req: Request) {
     const catalogBySku = new Map(
       catalogProducts.map((p) => [String(p.sku || "").trim().toUpperCase(), p])
     );
-    const notOrderable = cleanedItems.filter((item) => {
-      const product = catalogBySku.get(item.sku);
-      return !product || !isOrderableCatalogStatus(product.status);
-    });
+    const notOrderable = cleanedItems
+      .map((item) => {
+        if (item.ndh) return null;
+        const product = catalogBySku.get(item.sku);
+        if (product && isOrderableCatalogStatus(product.status)) return null;
+        return {
+          sku: item.sku,
+          status: product
+            ? String(product.status || "").trim().toUpperCase() || "UNAVAILABLE"
+            : "NOT FOUND",
+        };
+      })
+      .filter(Boolean) as Array<{ sku: string; status: string }>;
     if (notOrderable.length > 0) {
       const skus = notOrderable.map((i) => i.sku).join(", ");
       return NextResponse.json(
         {
-          error: `These items are not available to order (only NORMAL, NORMAL NOBR, TBD): ${skus}`,
+          error: `These items are not available to order (only NORMAL / NORMAL_* / TBD): ${skus}`,
+          code: "UNAVAILABLE_ITEMS",
+          unavailableItems: notOrderable,
         },
         { status: 400 }
       );
@@ -112,11 +104,9 @@ export async function POST(req: Request) {
       orderRef ||
       `${accountNo}-${new Date().toISOString().slice(5, 10).replace("-", "")}`;
 
-    const csv = buildCsv(cleanedItems);
-    const clearanceLineCount = cleanedItems.filter((item) => item.nhItems).length;
-
-    const today = new Date().toISOString().slice(0, 10);
-    const filename = `${accountNo}_order_${today}.csv`;
+    const { catalog: catalogItems, ndh: ndhItems } = splitOrderLinesForEmail(cleanedItems);
+    const companionSplit = catalogItems.length > 0 && ndhItems.length > 0;
+    const from = process.env.ORDER_FROM_EMAIL || "orders@rhorder.online";
 
     const order = {
       accountNo,
@@ -135,32 +125,35 @@ export async function POST(req: Request) {
       // Order still sends if profile save fails (e.g. missing customer record).
     }
 
-    await resend.emails.send({
-      from: process.env.ORDER_FROM_EMAIL || "orders@rhorder.online",
-      to: orderEmail,
-      subject: `New Order - ${accountNo} - ${storeName} - ${finalOrderRef}`,
-      text: [
-        `New order received.`,
-        ``,
-        `Account: ${accountNo}`,
-        `Store: ${storeName}`,
-        `Order email: ${orderEmail}`,
-        `Phone: ${phone || "-"}`,
-        `Note: ${note || "-"}`,
-        `Ref: ${finalOrderRef}`,
-        `Items: ${cleanedItems.length}`,
-        ...(clearanceLineCount > 0
-          ? [`Clearance (${CLEARANCE_ORDER_EMAIL_TAG}): ${clearanceLineCount}`, ``]
-          : []),
-        ...cleanedItems.map((item) => formatOrderLine(item)),
-      ].join("\n"),
-      attachments: [
-        {
-          filename,
-          content: Buffer.from(csv).toString("base64"),
-        },
-      ],
-    });
+    const sendBatch = async (kind: "catalog" | "ndh", batch: OrderLine[]) => {
+      if (!batch.length) return;
+      const email = buildOrderEmail({
+        kind,
+        accountNo,
+        storeName,
+        phone,
+        note,
+        orderEmail,
+        orderRef: finalOrderRef,
+        items: batch,
+        companionSplit,
+      });
+      await resend.emails.send({
+        from,
+        to: orderEmail,
+        subject: email.subject,
+        text: email.text,
+        attachments: [
+          {
+            filename: email.filename,
+            content: Buffer.from(email.csv).toString("base64"),
+          },
+        ],
+      });
+    };
+
+    await sendBatch("catalog", catalogItems);
+    await sendBatch("ndh", ndhItems);
 
     const soldQtyItems = cleanedItems.map((item) => ({
       sku: item.sku,
@@ -172,11 +165,22 @@ export async function POST(req: Request) {
         sku: item.sku,
         qty: Number(item.qty) || 0,
       }));
+    const ndhSoldQtyItems = cleanedItems
+      .filter((item) => item.ndh)
+      .map((item) => ({
+        sku: item.sku,
+        qty: Number(item.qty) || 0,
+        expiryDate: item.expiryDate,
+      }));
 
     await prependOrderHistory(order);
     await mergeRecentItems(accountNo, cleanedItems);
     await incrementPromotionSold(soldQtyItems);
-    await incrementClearanceSold(nhSoldQtyItems);
+    await incrementClearanceSold([
+      ...nhSoldQtyItems,
+      ...ndhSoldQtyItems.map((item) => ({ sku: item.sku, qty: item.qty })),
+    ]);
+    await incrementNdhSold(ndhSoldQtyItems);
 
     return NextResponse.json({
       success: true,

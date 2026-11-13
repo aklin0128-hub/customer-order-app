@@ -42,11 +42,17 @@ const copy = {
     href: "/new/",
     openLabel: "Open /new/ preview ↗",
   },
+  ndh: {
+    title: "Public page: /NDH",
+    body: "Active NDH rows appear on /NDH and on the customer order NDH tab. Upload a CSV/XLSX or paste SKUs — no extra publish step.",
+    href: "/NDH",
+    openLabel: "Open /NDH preview ↗",
+  },
 } as const;
 
 export function AdminPublicShowcaseHint({ variant }: { variant: keyof typeof copy }) {
   const t = copy[variant];
-  const isPromo = variant === "promotions";
+  const isPromo = variant === "promotions" || variant === "ndh";
 
   return (
     <div style={isPromo ? promoBoxStyle : boxStyle} role="note">

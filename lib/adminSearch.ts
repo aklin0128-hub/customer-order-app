@@ -1,7 +1,7 @@
 import catalogData from "@/data/catalog_sku_master_extracted.json";
 import { cleanSku } from "@/lib/analyticsCommon";
 import { getAllCustomers } from "@/lib/customers";
-import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
+import { loadInvoiceImportSummaries } from "@/lib/invoice/invoiceImportStore";
 import { redis } from "@/lib/redis";
 
 export type AdminSearchResult =
@@ -64,7 +64,7 @@ async function searchOrders(q: string, limit: number, results: AdminSearchResult
 }
 
 async function searchInvoices(q: string, limit: number, results: AdminSearchResult[]) {
-  const list = (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
+  const list = await loadInvoiceImportSummaries();
   const hits = list
     .filter((row) => {
       const hay = `${row.id} ${row.accountNo} ${row.invoiceNo || ""} ${row.supplierOrderNo || ""}`.toUpperCase();

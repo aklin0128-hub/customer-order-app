@@ -3,5 +3,7 @@
 export function formatClearancePriceDisplay(price: string) {
   const trimmed = String(price || "").trim();
   if (!trimmed) return "";
-  return trimmed.startsWith("$") ? trimmed : `$${trimmed}`;
+  const num = Number(trimmed.replace(/[^0-9.-]/g, ""));
+  if (!Number.isFinite(num) || num <= 0) return "";
+  return `$${(Math.round(num * 100) / 100).toFixed(2)}`;
 }
