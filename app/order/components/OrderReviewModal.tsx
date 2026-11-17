@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { cartLinePoolKey } from "@/lib/orderNhItems";
+import { formatCountLabel, formatLinesAndCases } from "@/lib/countLabel";
 import { getCatalogItemBySku, isOrderableItem } from "../catalogUtils";
 import { copy } from "../orderCopy";
 import {
@@ -50,6 +51,9 @@ export function OrderReviewModal({
   promoDealBySku,
   accountNo,
   storeName,
+  phone = "",
+  note = "",
+  totalCases = 0,
   submitting,
   onAdjustQty,
   onQtyInput,
@@ -72,6 +76,9 @@ export function OrderReviewModal({
   promoDealBySku?: Record<string, string>;
   accountNo: string;
   storeName: string;
+  phone?: string;
+  note?: string;
+  totalCases?: number;
   submitting: boolean;
   onAdjustQty: (sku: string, delta: number, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => void;
   onQtyInput: (sku: string, value: string, nhItems?: boolean, ndh?: boolean, expiryDate?: string) => void;
@@ -115,6 +122,9 @@ export function OrderReviewModal({
       promoDealBySku={promoDealBySku}
       accountNo={accountNo}
       storeName={storeName}
+      phone={phone}
+      note={note}
+      totalCases={totalCases}
       submitting={submitting}
       onAdjustQty={onAdjustQty}
       onQtyInput={onQtyInput}
@@ -141,6 +151,9 @@ function OrderReviewModalContent({
   promoDealBySku,
   accountNo,
   storeName,
+  phone = "",
+  note = "",
+  totalCases = 0,
   submitting,
   onAdjustQty,
   onQtyInput,
@@ -152,6 +165,7 @@ function OrderReviewModalContent({
   const t = copy[lang];
   const [hideWarnings, setHideWarnings] = useState(false);
   const [hideClearanceUpsell, setHideClearanceUpsell] = useState(false);
+  const [submitArmed, setSubmitArmed] = useState(false);
 
   const hasClearanceInOrder = items.some(
     (item) =>
@@ -190,11 +204,19 @@ function OrderReviewModalContent({
             </div>
             <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4, lineHeight: 1.4, wordBreak: "break-word" }}>
               <span>{accountNo}</span>
-              {(accountNo || storeName) ? " · " : null}
-              <span>{storeName}</span>
-              {(accountNo || storeName) ? " · " : null}
-              {items.length} {t.items}
+              {storeName ? ` · ${storeName}` : ""}
+              {` · ${formatLinesAndCases(lang, items.length, totalCases, t)}`}
             </div>
+            {phone.trim() ? (
+              <div style={{ fontSize: 12, color: "#4b5563", marginTop: 4 }}>
+                {t.phone}: {phone.trim()}
+              </div>
+            ) : null}
+            {note.trim() ? (
+              <div style={{ fontSize: 12, color: "#4b5563", marginTop: 4, whiteSpace: "pre-wrap" }}>
+                {t.note}: {note.trim()}
+              </div>
+            ) : null}
           </div>
           <button type="button" onClick={() => (submitting ? undefined : onClose())} disabled={submitting} style={dangerSmallButtonStyle}>
             {t.close}
@@ -424,16 +446,28 @@ function OrderReviewModalContent({
           <button
             type="button"
             onClick={() => {
+              if (submitting || hasUnavailable || items.length === 0) return;
+              if (!submitArmed) {
+                setSubmitArmed(true);
+                return;
+              }
+              setSubmitArmed(false);
               void onSubmit();
             }}
             disabled={submitting || hasUnavailable || items.length === 0}
             title={hasUnavailable ? t.confirmSubmitBlocked : undefined}
             style={{
               ...submitButtonStyle,
-              background: submitting || hasUnavailable || items.length === 0 ? "#93c5fd" : "#16a34a",
+              background: submitting || hasUnavailable || items.length === 0 ? "#93c5fd" : submitArmed ? "#15803d" : "#16a34a",
             }}
           >
-            {submitting ? t.submitting : hasUnavailable ? t.confirmSubmitBlocked : t.confirmSubmit}
+            {submitting
+              ? t.submitting
+              : hasUnavailable
+                ? t.confirmSubmitBlocked
+                : submitArmed
+                  ? t.submitConfirm
+                  : t.confirmSubmit}
           </button>
         </footer>
       </div>

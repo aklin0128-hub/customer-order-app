@@ -10,6 +10,7 @@ import {
   catalogRowEstimatePx,
   catalogRowGapPx,
   catalogListDocumentTop,
+  catalogWindowScrollTop,
   catalogVirtualRowKey,
   measureCatalogVirtualRow,
   CATALOG_ROW_GAP_PX,
@@ -165,6 +166,29 @@ test("catalog list follows the page scroll like New items", () => {
   );
   assert.match(orderStylesSrc, /overflow:\s*"visible"/);
   assert.doesNotMatch(orderStylesSrc, /catalogVirtualScrollStyle[\s\S]*overflow:\s*"auto"/);
+});
+
+test("catalogWindowScrollTop leaves room for the sticky header", () => {
+  const el = { getBoundingClientRect: () => ({ top: 180 }) };
+  const prev = globalThis.window;
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: { scrollY: 40 },
+  });
+  try {
+    assert.equal(catalogWindowScrollTop(el, 120), 92);
+    assert.equal(catalogWindowScrollTop(null, 120), 0);
+  } finally {
+    if (prev) {
+      Object.defineProperty(globalThis, "window", { configurable: true, value: prev });
+    }
+  }
+});
+
+test("available-only hides maybe-out-of-stock inventory cues", () => {
+  assert.match(orderPageSrc, /inventoryCueKind\(item\?\.inventory\) !== "maybe_oos"/);
+  assert.match(orderPageSrc, /setShowAvailableOnly\(false\)/);
+  assert.match(virtualGridSrc, /catalogWindowScrollTop/);
 });
 
 test("catalogListDocumentTop adds scrollY to the list top", () => {

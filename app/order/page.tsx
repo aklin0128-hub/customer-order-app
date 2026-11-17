@@ -24,6 +24,8 @@ import { ProductImage } from "./components/ProductImage";
 import { replaceCatalog, catalog, patchCatalogItem, patchSkuFields } from "./catalogState";
 import { ADMIN_UNLOCK_TAP_COUNT, ADMIN_UNLOCK_TAP_WINDOW_MS, isAdminUnlockSearch } from "./adminUnlock";
 import { isProductOrderingBlocked } from "@/lib/productAvailability";
+import { inventoryCueKind } from "@/lib/inventoryCue";
+import { sanitizeQtyInput } from "@/lib/qtyInput";
 import { compareCatalogByNewestImport, compareCatalogForDisplay, formatNewItemComingDate } from "@/lib/catalogNewItems";
 import { isSeasonalEtaPending } from "@/lib/seasonalItems";
 import { clearCustomerSession, readCustomerSession, updateCustomerOrderEmail } from "@/lib/customerSession";
@@ -260,6 +262,7 @@ export default function OrderPage() {
   const [showPastOrders, setShowPastOrders] = useState(false);
   const [skuHistorySku, setSkuHistorySku] = useState("");
   const [showCart, setShowCart] = useState(false);
+  const [clearOrderArmed, setClearOrderArmed] = useState(false);
   const [catalogShowSelectedOnly, setCatalogShowSelectedOnly] = useState(false);
   const [catalogShowRecommendedOnly, setCatalogShowRecommendedOnly] = useState(false);
   const [catalogFiltersOpen, setCatalogFiltersOpen] = useState(false);
@@ -287,6 +290,10 @@ export default function OrderPage() {
   const [adminLoginLoading, setAdminLoginLoading] = useState(false);
   const [stickyPanelOpen, setStickyPanelOpen] = useState(readInitialStickyPanelOpen);
   const isMobileViewport = useMobileViewport();
+
+  useEffect(() => {
+    if (!showCart) setClearOrderArmed(false);
+  }, [showCart]);
 
   useEffect(() => {
     if (!accountNo) {
@@ -412,6 +419,7 @@ export default function OrderPage() {
     setCatalogShowRecommendedOnly(false);
     setCatalogShowFavoritesOnly(false);
     setCatalogShowSelectedOnly(false);
+    setShowAvailableOnly(false);
     setCatalogSearch("");
     setCatalogFiltersOpen(false);
   };
@@ -421,7 +429,11 @@ export default function OrderPage() {
   const t = copy[lang];
 
   const passesAvailableFilter = useCallback(
-    (item?: CatalogItem | null) => Boolean(item) && isOrderableItem(item) && !isProductOrderingBlocked(item),
+    (item?: CatalogItem | null) =>
+      Boolean(item) &&
+      isOrderableItem(item) &&
+      !isProductOrderingBlocked(item) &&
+      inventoryCueKind(item?.inventory) !== "maybe_oos",
     []
   );
 
@@ -1623,7 +1635,9 @@ export default function OrderPage() {
 
   const setQtyForSku = (sku: string, value: string, source: QtySource = "normal", expiryDate?: string) => {
     const cleanSku = sku.trim().toUpperCase();
-    const cleanQty = String(value || "").replace(/[^0-9]/g, "");
+    const parsed = sanitizeQtyInput(value);
+    if (parsed.ignore) return;
+    const cleanQty = parsed.qty;
 
     if (source !== "ndh" && cleanQty && Number(cleanQty) > 0 && blockAddForSku(cleanSku)) {
       return;
@@ -2008,8 +2022,10 @@ export default function OrderPage() {
   };
 
   const updateCatalogQty = (sku: string, value: string) => {
+    const parsed = sanitizeQtyInput(value);
+    if (parsed.ignore) return;
     const cleanSku = sku.toUpperCase();
-    const clean = value.replace(/[^0-9]/g, "");
+    const clean = parsed.qty;
 
     if (clean && Number(clean) > 0 && blockAddForSku(cleanSku)) {
       return;
@@ -2029,12 +2045,14 @@ export default function OrderPage() {
       return;
     }
 
-    setQtyForSku(sku, value, "normal");
+    setQtyForSku(sku, clean, "normal");
   };
 
   const updateClearanceQty = (sku: string, value: string) => {
+    const parsed = sanitizeQtyInput(value);
+    if (parsed.ignore) return;
     const cleanSku = sku.toUpperCase();
-    const clean = value.replace(/[^0-9]/g, "");
+    const clean = parsed.qty;
 
     if (clean && Number(clean) > 0 && blockAddForSku(cleanSku)) {
       return;
@@ -2052,8 +2070,10 @@ export default function OrderPage() {
   };
 
   const updateNdhQty = (sku: string, value: string, expiryDate?: string) => {
+    const parsed = sanitizeQtyInput(value);
+    if (parsed.ignore) return;
     const cleanSku = sku.toUpperCase();
-    const clean = value.replace(/[^0-9]/g, "");
+    const clean = parsed.qty;
 
     const ndhRemaining = getNdhRemainingForSku(cleanSku, expiryDate);
     const requested = Number(clean) || 0;
@@ -2145,8 +2165,6 @@ export default function OrderPage() {
   };
 
   const clearOrder = async () => {
-    if (!confirm(t.clearConfirm)) return;
-
     setCart([]);
     setCatalogQtyMap({});
     setClearanceQtyMap({});
@@ -3615,8 +3633,19 @@ export default function OrderPage() {
               >
                 {t.uploadCsv}
               </button>
-              <button type="button" onClick={clearOrder} className="order-cart-clear-btn">
-                {t.clearOrder}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!clearOrderArmed) {
+                    setClearOrderArmed(true);
+                    return;
+                  }
+                  setClearOrderArmed(false);
+                  void clearOrder();
+                }}
+                className="order-cart-clear-btn"
+              >
+                {clearOrderArmed ? t.clearConfirm : t.clearOrder}
               </button>
               <input ref={fileInputRef} type="file" accept=".csv" style={{ display: "none" }} onChange={handleUploadCsv} />
             </div>
@@ -3668,7 +3697,7 @@ export default function OrderPage() {
       <OrderFloatingCartFab
         count={cartItemCount}
         label={t.cartSummary}
-        hidden={showCart || showPastOrders || Boolean(skuHistorySku) || barcodeScannerOpen}
+        hidden={showCart || showPastOrders || showReview || Boolean(skuHistorySku) || barcodeScannerOpen}
         onClick={() => (showCart ? toggleCartPanel() : setShowCart(true))}
       />
 
@@ -3697,6 +3726,9 @@ export default function OrderPage() {
           promoDealBySku={promoDealBySku}
           accountNo={accountNo}
           storeName={storeName}
+          phone={phone}
+          note={note}
+          totalCases={totalCases}
           submitting={submitting}
           onAdjustQty={adjustCartLineQty}
           onQtyInput={updateCartLineQty}

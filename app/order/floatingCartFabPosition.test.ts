@@ -100,3 +100,17 @@ test("FAB stacks above the iPad sticky header and allows taps", () => {
   const fabZ = Number(fabBlock.match(/z-index:\s*(\d+)/)?.[1] || 0);
   assert.ok(fabZ > stickyZ);
 });
+
+test("past-order and SKU history overlays sit above the cart FAB", () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const css = readFileSync(join(here, "order.css"), "utf8");
+  const pastZ = Number(css.match(/\.order-past-orders-overlay\s*\{[^}]*z-index:\s*(\d+)/)?.[1] || 0);
+  const historyZ = Number(css.match(/\.sku-order-history-overlay\s*\{[^}]*z-index:\s*(\d+)/)?.[1] || 0);
+  const fabZ = Number(
+    css
+      .slice(css.indexOf(".order-floating-cart-fab {"), css.indexOf(".order-floating-cart-fab-ring"))
+      .match(/z-index:\s*(\d+)/)?.[1] || 0
+  );
+  assert.ok(pastZ > fabZ);
+  assert.ok(historyZ > fabZ);
+});

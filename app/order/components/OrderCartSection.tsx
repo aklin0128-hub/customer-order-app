@@ -3,6 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 
 import { cartLinePoolKey } from "@/lib/orderNhItems";
+import { formatLinesAndCases } from "@/lib/countLabel";
 import { getCatalogItemBySku, isOrderableItem } from "../catalogUtils";
 import { copy } from "../orderCopy";
 import { clearancePolicyStyle } from "../orderStyles";
@@ -67,7 +68,7 @@ export function OrderCartSection({
               </h2>
               {lineCount > 0 ? (
                 <span className="order-cart-header-count">
-                  {lineCount} {t.lines} · {totalCases} {t.cases}
+                  {formatLinesAndCases(lang, lineCount, totalCases, t)}
                 </span>
               ) : null}
             </div>
@@ -81,7 +82,7 @@ export function OrderCartSection({
               {t.orderCart}
               {lineCount > 0 ? (
                 <span className="order-cart-header-count">
-                  {lineCount} {t.lines} · {totalCases} {t.cases}
+                  {formatLinesAndCases(lang, lineCount, totalCases, t)}
                 </span>
               ) : null}
             </span>
