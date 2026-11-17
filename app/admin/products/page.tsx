@@ -649,7 +649,7 @@ export default function AdminProductsPage() {
             />
             <p style={{ margin: 0, fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>
               Reads <strong>PID/SKU</strong>, <strong>Status</strong>, <strong>UPC</strong>, <strong>PL</strong>, and <strong>INV</strong>.
-              Inventory 0 or below shows “limited or gone”; below 50 shows “limited availability”. Unknown SKUs are created in Redis. Status <strong>NEW</strong> is not customer “New items”.
+              Inventory 0 or below shows “limited or gone”; below 50 shows “low inventory”. Unknown SKUs are created in Redis. Status <strong>NEW</strong> is not customer “New items”.
             </p>
             {uploadingStatusXlsx ? <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: "#2563eb" }}>Uploading and updating status...</p> : null}
             {statusUploadResult ? (

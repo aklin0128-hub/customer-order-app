@@ -53,8 +53,8 @@ export function inventoryCueLabel(kind: InventoryCueKind, lang: InventoryCueLang
     if (lang === "vi") return "Hạn chế hoặc hết hàng";
     return "Limited or Gone";
   }
-  if (lang === "zh") return "供应有限";
-  if (lang === "ko") return "수량 한정";
-  if (lang === "vi") return "Số lượng hạn chế";
-  return "Limited availability";
+  if (lang === "zh") return "库存偏低";
+  if (lang === "ko") return "재고 부족";
+  if (lang === "vi") return "Tồn kho thấp";
+  return "Low inventory";
 }
