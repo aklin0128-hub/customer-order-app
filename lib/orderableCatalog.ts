@@ -48,3 +48,14 @@ export function isSeasonalStatus(status?: string | null) {
 export function isCustomerVisibleCatalogStatus(status?: string | null) {
   return !isReadyToOrderStatus(status) && !isSeasonalStatus(status);
 }
+
+/** Warehouse NORMAL* codes (NORMAL, NORMAL_NOBR, NORMAL_NBR) are not customer labels. */
+export function isSilentCustomerStatusLabel(status?: string | null) {
+  const compact = String(status || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s_-]+/g, "");
+  if (!compact || compact === "INV") return true;
+  if (compact === "READYTOORDER") return true;
+  return compact === "NORMAL" || compact === "NORMALNOBR" || compact === "NORMALNBR";
+}

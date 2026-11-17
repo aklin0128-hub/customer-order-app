@@ -1,7 +1,7 @@
 "use client";
 
 import { ProductImage } from "@/app/order/components/ProductImage";
-import { formatBrandLabel, getDisplayStatus, getStatusBadgeStyle } from "@/app/order/catalogUtils";
+import { formatBrandLabel, getStatusBadgeStyle } from "@/app/order/catalogUtils";
 import { catalogCardStyle, catalogNameStyle } from "@/app/order/orderStyles";
 import type { Lang } from "@/app/order/types";
 
@@ -89,7 +89,7 @@ export function CatalogInfoCard({
             ...getStatusBadgeStyle(item.status),
           }}
         >
-          {getDisplayStatus(item.status) || status}
+          {status}
         </span>
       ) : null}
     </article>

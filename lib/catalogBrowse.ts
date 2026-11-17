@@ -1,6 +1,6 @@
 import { parseInventoryNumber } from "@/lib/inventoryCue";
 import { isHiddenFromCustomerCatalog } from "@/lib/catalogVisibility";
-import { isCustomerVisibleCatalogStatus, isOrderableCatalogStatus } from "@/lib/orderableCatalog";
+import { isCustomerVisibleCatalogStatus, isOrderableCatalogStatus, isSilentCustomerStatusLabel } from "@/lib/orderableCatalog";
 import { scoreCatalogTextSearch } from "@/lib/catalogTextSearch";
 
 export type CatalogBrowseItem = {
@@ -88,6 +88,6 @@ export function filterCatalogBrowseItems(items: CatalogBrowseItem[], query: stri
 
 export function displayCatalogStatus(status?: string) {
   const s = String(status || "").trim().toUpperCase();
-  if (!s || s === "INV" || s === "NORMAL") return "";
+  if (isSilentCustomerStatusLabel(s)) return "";
   return s;
 }
