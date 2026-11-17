@@ -30,7 +30,8 @@ test("inventoryCueKind: 50 and above is normal", () => {
 
 test("inventoryCueLabel matches languages", () => {
   assert.equal(inventoryCueLabel("maybe_oos", "zh"), "可能没货");
-  assert.equal(inventoryCueLabel("low", "en"), "Low inventory");
+  assert.equal(inventoryCueLabel("low", "en"), "Limited availability");
+  assert.equal(inventoryCueLabel("low", "zh"), "供应有限");
   assert.equal(inventoryCueLabel(null, "en"), "");
 });
 
