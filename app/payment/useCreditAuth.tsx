@@ -2,6 +2,13 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
+import {
+  clearSavedAdminPassword,
+  getSavedAdminPassword,
+  persistAdminPassword,
+  verifyAdminPassword,
+} from "@/app/admin/_components/AdminAuthContext";
+
 const STORAGE_KEY = "credit_access_password";
 const REMEMBER_KEY = "credit_access_remember";
 
@@ -18,7 +25,7 @@ type CreditAuthContextValue = {
 
 const CreditAuthContext = createContext<CreditAuthContextValue | null>(null);
 
-function readSavedPassword() {
+function readSavedCreditPassword() {
   try {
     const remembered = localStorage.getItem(REMEMBER_KEY) === "1";
     if (remembered) return localStorage.getItem(STORAGE_KEY) || "";
@@ -28,7 +35,28 @@ function readSavedPassword() {
   }
 }
 
-function clearSavedPassword() {
+function readSavedPassword() {
+  return getSavedAdminPassword() || readSavedCreditPassword();
+}
+
+function persistCreditPassword(password: string, rememberMe = true) {
+  const trimmed = password.trim();
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(REMEMBER_KEY);
+    if (rememberMe) {
+      localStorage.setItem(STORAGE_KEY, trimmed);
+      localStorage.setItem(REMEMBER_KEY, "1");
+    } else {
+      sessionStorage.setItem(STORAGE_KEY, trimmed);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearSavedCreditPassword() {
   try {
     sessionStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(STORAGE_KEY);
@@ -59,21 +87,24 @@ function useCreditAuthState(): CreditAuthContextValue {
     setError("");
     setLoading(true);
     try {
+      const admin = await verifyAdminPassword(trimmed);
+      if (admin.ok) {
+        persistAdminPassword(trimmed, rememberMe);
+        persistCreditPassword(trimmed, rememberMe);
+        setPassword(trimmed);
+        setAuthed(true);
+        return true;
+      }
+
       const res = await fetch("/api/credit/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: trimmed }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Invalid password.");
+      if (!res.ok) throw new Error(data?.error || admin.error || "Invalid password.");
 
-      clearSavedPassword();
-      if (rememberMe) {
-        localStorage.setItem(STORAGE_KEY, trimmed);
-        localStorage.setItem(REMEMBER_KEY, "1");
-      } else {
-        sessionStorage.setItem(STORAGE_KEY, trimmed);
-      }
+      persistCreditPassword(trimmed, rememberMe);
       setPassword(trimmed);
       setAuthed(true);
       return true;
@@ -87,7 +118,8 @@ function useCreditAuthState(): CreditAuthContextValue {
   }, []);
 
   const logout = useCallback(() => {
-    clearSavedPassword();
+    clearSavedCreditPassword();
+    clearSavedAdminPassword();
     setPassword("");
     setAuthed(false);
     setError("");
@@ -96,6 +128,7 @@ function useCreditAuthState(): CreditAuthContextValue {
   const creditHeaders = useCallback(
     (extra: Record<string, string> = {}) => ({
       "x-credit-password": password,
+      "x-admin-password": password,
       ...extra,
     }),
     [password]

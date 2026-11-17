@@ -16,7 +16,7 @@ function PaymentPageInner() {
     return (
       <AdminLogin
         title="Credit / Deposit Slip"
-        subtitle="Enter password to open /payment."
+        subtitle="Enter admin password to open /payment."
         password={passwordInput}
         onPasswordChange={setPasswordInput}
         rememberMe={rememberMe}
