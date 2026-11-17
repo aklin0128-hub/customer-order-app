@@ -48,10 +48,10 @@ export function inventoryCueKindForItem(item: InventoryCueItem, now = new Date()
 export function inventoryCueLabel(kind: InventoryCueKind, lang: InventoryCueLang = "en"): string {
   if (!kind) return "";
   if (kind === "maybe_oos") {
-    if (lang === "zh") return "可能没货";
-    if (lang === "ko") return "재고 없을 수 있음";
-    if (lang === "vi") return "Có thể hết hàng";
-    return "May be out of stock";
+    if (lang === "zh") return "有限或缺货";
+    if (lang === "ko") return "한정 또는 품절";
+    if (lang === "vi") return "Hạn chế hoặc hết hàng";
+    return "Limited or Gone";
   }
   if (lang === "zh") return "供应有限";
   if (lang === "ko") return "수량 한정";
