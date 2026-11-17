@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
-/** Accepted passwords for /payment. Defaults keep 536678. */
+import { getAdminPassword } from "@/lib/adminAuth";
+
+/** Accepted passwords for /payment and /credit. Defaults keep 536678. */
 const DEFAULT_CREDIT_PASSWORDS = ["536678"];
 
 export function getCreditAccessPasswords(): string[] {
@@ -12,8 +14,7 @@ export function getCreditAccessPasswords(): string[] {
     if (trimmed) passwords.add(trimmed);
   }
 
-  const admin = String(process.env.ADMIN_PASSWORD || "").trim();
-  if (admin) passwords.add(admin);
+  passwords.add(getAdminPassword());
 
   // Reuse comp password when set so one shared ops password works.
   const comp = process.env.COMP_ACCESS_PASSWORD || "";
@@ -31,7 +32,9 @@ export function isValidCreditPassword(password: string) {
 }
 
 export function checkCreditRequest(req: Request) {
-  return isValidCreditPassword(req.headers.get("x-credit-password") || "");
+  const credit = req.headers.get("x-credit-password") || "";
+  const admin = req.headers.get("x-admin-password") || "";
+  return isValidCreditPassword(credit) || isValidCreditPassword(admin);
 }
 
 export function creditUnauthorizedResponse() {

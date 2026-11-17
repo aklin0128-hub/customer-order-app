@@ -16,7 +16,7 @@ function CreditPageInner() {
     return (
       <AdminLogin
         title="Sales Credit Request"
-        subtitle="Enter password to open /credit."
+        subtitle="Enter admin password to open /credit."
         password={passwordInput}
         onPasswordChange={setPasswordInput}
         rememberMe={rememberMe}
