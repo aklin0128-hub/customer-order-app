@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   compareSkuAsc,
+  displayCatalogStatus,
   filterCatalogBrowseItems,
   mapProductsToCatalogBrowse,
   sortCatalogBrowseItems,
@@ -68,6 +69,12 @@ test("mapProductsToCatalogBrowse keeps NORMAL* and TBD; hides READYTOORDER and S
     items.map((item) => item.sku),
     ["A1", "A3", "A5"]
   );
+});
+
+test("displayCatalogStatus hides NORMAL_NOBR", () => {
+  assert.equal(displayCatalogStatus("NORMAL_NOBR"), "");
+  assert.equal(displayCatalogStatus("NORMAL"), "");
+  assert.equal(displayCatalogStatus("TBD"), "TBD");
 });
 
 test("filterCatalogBrowseItems matches sku and upc digits", () => {

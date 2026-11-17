@@ -3,7 +3,7 @@ import { catalog } from "./catalogState";
 import { isCatalogNewItem, isJustAddedItem as isJustAddedCatalogItem } from "@/lib/catalogNewItems";
 import { isHiddenFromCustomerCatalog } from "@/lib/catalogVisibility";
 import { scoreCatalogTextSearch } from "@/lib/catalogTextSearch";
-import { isOrderableCatalogStatus, isCustomerVisibleCatalogStatus, isReadyToOrderStatus } from "@/lib/orderableCatalog";
+import { isOrderableCatalogStatus, isCustomerVisibleCatalogStatus, isReadyToOrderStatus, isSilentCustomerStatusLabel } from "@/lib/orderableCatalog";
 import { formatMoneyPrice, formatPromoTierPricesLine, getApplicablePromoTier } from "@/lib/promoFormat";
 import type { PromoPriceTier } from "@/lib/promotions";
 
@@ -279,9 +279,7 @@ export function isJustAddedItem(item?: CatalogItem | null) {
 
 export function getDisplayStatus(status?: string) {
   const s = String(status || "").trim().toUpperCase();
-  if (!s || s === "INV") return "";
-  // Never surface Ready-to-Order wording to customers.
-  if (isReadyToOrderStatus(s)) return "";
+  if (isSilentCustomerStatusLabel(s)) return "";
   return s;
 }
 

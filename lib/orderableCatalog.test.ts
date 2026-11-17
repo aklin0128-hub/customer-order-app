@@ -7,6 +7,7 @@ import {
   isOrderableCatalogStatus,
   isReadyToOrderStatus,
   isSeasonalStatus,
+  isSilentCustomerStatusLabel,
 } from "./orderableCatalog";
 
 test("NORMAL* and TBD are orderable; READYTOORDER is not", () => {
@@ -35,6 +36,16 @@ test("READYTOORDER and SEASONAL are hidden from Catalog browsing", () => {
   assert.equal(isCustomerVisibleCatalogStatus("NORMAL"), true);
   assert.equal(isCustomerVisibleCatalogStatus("TBD"), true);
   assert.equal(isOrderableCatalogStatus("SEASONAL"), true);
+});
+
+test("NORMAL_NOBR and other NORMAL* codes are not shown as customer labels", () => {
+  assert.equal(isSilentCustomerStatusLabel("NORMAL_NOBR"), true);
+  assert.equal(isSilentCustomerStatusLabel("NORMAL NOBR"), true);
+  assert.equal(isSilentCustomerStatusLabel("NORMAL_NBR"), true);
+  assert.equal(isSilentCustomerStatusLabel("NORMAL"), true);
+  assert.equal(isSilentCustomerStatusLabel("TBD"), false);
+  assert.equal(isSilentCustomerStatusLabel("DISCONTINUED"), false);
+  assert.equal(isSilentCustomerStatusLabel("LIMITED"), false);
 });
 
 test("DISCONTINUED matches spaced or underscored status", () => {
