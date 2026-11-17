@@ -8,6 +8,7 @@ import {
   catalogColumnCountForWidth,
   catalogColGapPx,
   catalogListDocumentTop,
+  catalogWindowScrollTop,
   catalogRowEstimatePx,
   catalogRowGapPx,
   catalogVirtualRowKey,
@@ -183,7 +184,9 @@ function CatalogWindowGridBody(props: CatalogGridBodyProps) {
       skipWindowReset.current = false;
       return;
     }
-    window.scrollTo({ top: Math.max(0, scrollMarginRef.current - 12) });
+    const sticky = document.querySelector(".order-sticky-bar") as HTMLElement | null;
+    const stickyH = sticky?.getBoundingClientRect().height ?? 0;
+    window.scrollTo({ top: catalogWindowScrollTop(listRef.current, stickyH) });
   }, [props.gridKey, columnCount]);
 
   useLayoutEffect(() => {

@@ -60,6 +60,15 @@ export function catalogListDocumentTop(el: { getBoundingClientRect: () => { top:
   return el.getBoundingClientRect().top + window.scrollY;
 }
 
+/** Scroll so the catalog list sits just below the sticky header, not under it. */
+export function catalogWindowScrollTop(
+  el: { getBoundingClientRect: () => { top: number } } | null,
+  stickyHeight = 0
+) {
+  const listTop = catalogListDocumentTop(el);
+  return Math.max(0, listTop - Math.max(0, stickyHeight) - 8);
+}
+
 /** @deprecated use catalogColGapPx */
 export function catalogGridGapPx(_columnCount?: number) {
   return CATALOG_COL_GAP_PX;

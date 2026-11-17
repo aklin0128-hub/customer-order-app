@@ -13,6 +13,7 @@ import {
   sumSkuOrderHistoryCases,
   type SkuOrderHistoryEntry,
 } from "@/lib/skuOrderHistory";
+import { formatCountLabel } from "@/lib/countLabel";
 import { getCatalogItemBySku } from "../catalogUtils";
 import { copy } from "../orderCopy";
 import type { Lang } from "../types";
@@ -151,9 +152,11 @@ export function SkuOrderHistoryModal({
 
         {pricedEntries.length > 0 ? (
           <p className="sku-order-history-summary">
-            {t.skuHistorySummary
-              .replace("{count}", String(pricedEntries.length))
-              .replace("{cases}", String(totalCases))}
+            {lang === "en"
+              ? `${formatCountLabel(pricedEntries.length, "en", "order", "orders")} · ${formatCountLabel(totalCases, "en", "case", "cases")} total`
+              : t.skuHistorySummary
+                  .replace("{count}", String(pricedEntries.length))
+                  .replace("{cases}", String(totalCases))}
             {inCart > 0 ? ` · ${t.inCart}: ${inCart}` : ""}
           </p>
         ) : (

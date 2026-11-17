@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { formatLinesAndCases } from "@/lib/countLabel";
 import { getCatalogItemBySku } from "../catalogUtils";
 import { copy } from "../orderCopy";
 import { secondaryButtonStyle, toggleTextStyle } from "../orderStyles";
@@ -96,8 +97,8 @@ export function OrderPastOrdersModal({
                       <div className="order-past-orders-card-meta">
                         <div className="order-past-orders-card-ref">{order.orderRef || "—"}</div>
                         <div className="order-past-orders-card-detail">
-                          {order.createdAt ? new Date(order.createdAt).toLocaleString() : ""} · {items.length}{" "}
-                          {t.items} · {totalCases} {t.cases}
+                          {order.createdAt ? new Date(order.createdAt).toLocaleString() : ""} ·{" "}
+                          {formatLinesAndCases(lang, items.length, totalCases, t)}
                         </div>
                         {!expanded ? (
                           <div className="order-past-orders-card-preview">
