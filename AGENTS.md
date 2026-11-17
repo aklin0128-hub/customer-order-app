@@ -37,3 +37,11 @@ deployed incomplete branches and wiped earlier fixes.
 - Never “restore an old commit” to production unless that commit is an ancestor of
   the current deploy branch or you have re-applied every later production fix.
 - `git pull` syncs code; it does **not** deploy. Deploy is a separate, explicit step.
+
+## Cursor Cloud specific instructions
+
+- Install with `npm ci` (Node 22, `package-lock.json`). Run it again safely; it is idempotent.
+- `bash scripts/cloud-agent-start.sh` starts a local Upstash REST stand-in on `127.0.0.1:8079` (`scripts/dev-upstash-rest.mjs`, data in `/tmp/customer-order-dev-redis.json`) and then `npm run dev` on port 3000. It exports `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` for that local server. Keep those pointed at the local stand-in so development does not write to production Redis.
+- Login and catalog reads use that Redis client. A demo account is in `data/customers.csv`: account `FL123`, password `1234`. After sign-in the app opens `/order`.
+- Checks: `npm test` (passes). `npm run lint` and `npx tsc --noEmit` currently report existing project issues; they are not caused by the local Redis stand-in.
+- Product image uploads need `BLOB_READ_WRITE_TOKEN`. Sending an order email needs `RESEND_API_KEY`. Catalog browse and draft save work without them.
