@@ -249,7 +249,7 @@ export default function OrderPage() {
   const [lastSubmittedItems, setLastSubmittedItems] = useState<CartItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
   const [autoLoaded, setAutoLoaded] = useState(false);
-  const [showAvailableOnly, setShowAvailableOnly] = useState(true);
+  const [showAvailableOnly, setShowAvailableOnly] = useState(false);
   const [catalogShowFavoritesOnly, setCatalogShowFavoritesOnly] = useState(false);
   const [favoriteSkus, setFavoriteSkus] = useState<string[]>([]);
   const [showUpc, setShowUpc] = useState(false);

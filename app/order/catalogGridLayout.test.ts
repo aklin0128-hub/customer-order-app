@@ -191,6 +191,10 @@ test("available-only hides maybe-out-of-stock inventory cues", () => {
   assert.match(virtualGridSrc, /catalogWindowScrollTop/);
 });
 
+test("Show available items only is off by default", () => {
+  assert.match(orderPageSrc, /const \[showAvailableOnly, setShowAvailableOnly\] = useState\(false\)/);
+});
+
 test("catalogListDocumentTop adds scrollY to the list top", () => {
   const el = { getBoundingClientRect: () => ({ top: 120 }) };
   const prev = globalThis.window;
