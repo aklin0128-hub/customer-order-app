@@ -1,5 +1,6 @@
 import { loadRedisProducts } from "@/lib/productRedisStore";
 import { redis } from "@/lib/redis";
+import { isHiddenFromCustomerCatalog } from "@/lib/catalogVisibility";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
 export const PROMOTIONS_KEY = "promotions:list";
 
@@ -358,6 +359,7 @@ export async function getPromotionProducts(options?: {
 
     const product = map.get(record.sku);
     if (!product) continue;
+    if (options?.activeOnly && isHiddenFromCustomerCatalog(product)) continue;
 
     products.push(recordToProduct(record, product));
   }

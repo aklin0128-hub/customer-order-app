@@ -29,6 +29,20 @@ test("mapProductsToCatalogBrowse strips non-catalog fields", () => {
   assert.equal("bp" in (items[0] || {}), false);
 });
 
+test("mapProductsToCatalogBrowse omits Wegmans items", () => {
+  const items = mapProductsToCatalogBrowse(
+    [
+      { sku: "A1", status: "NORMAL", brand: "NONGSHIM" },
+      { sku: "W1", status: "NORMAL", brand: "WEGMANS" },
+    ],
+    { availableOnly: false }
+  );
+  assert.deepEqual(
+    items.map((item) => item.sku),
+    ["A1"]
+  );
+});
+
 test("mapProductsToCatalogBrowse keeps inventory 0 and drops null", () => {
   const items = mapProductsToCatalogBrowse(
     [

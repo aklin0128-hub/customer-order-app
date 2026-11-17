@@ -1,4 +1,5 @@
 import { parseInventoryNumber } from "@/lib/inventoryCue";
+import { isHiddenFromCustomerCatalog } from "@/lib/catalogVisibility";
 import { isCustomerVisibleCatalogStatus, isOrderableCatalogStatus } from "@/lib/orderableCatalog";
 import { scoreCatalogTextSearch } from "@/lib/catalogTextSearch";
 
@@ -67,7 +68,7 @@ export function mapProductsToCatalogBrowse(
   for (const raw of products) {
     if (!raw || typeof raw !== "object") continue;
     const item = toCatalogBrowseItem(raw as Record<string, unknown>);
-    if (item) items.push(item);
+    if (item && !isHiddenFromCustomerCatalog(item)) items.push(item);
   }
   const sorted = sortCatalogBrowseItems(items);
   if (options?.availableOnly === false) return sorted;

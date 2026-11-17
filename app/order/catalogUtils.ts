@@ -1,6 +1,7 @@
 import { catalog } from "./catalogState";
 
 import { isCatalogNewItem, isJustAddedItem as isJustAddedCatalogItem } from "@/lib/catalogNewItems";
+import { isHiddenFromCustomerCatalog } from "@/lib/catalogVisibility";
 import { scoreCatalogTextSearch } from "@/lib/catalogTextSearch";
 import { isOrderableCatalogStatus, isCustomerVisibleCatalogStatus, isReadyToOrderStatus } from "@/lib/orderableCatalog";
 import { formatMoneyPrice, formatPromoTierPricesLine, getApplicablePromoTier } from "@/lib/promoFormat";
@@ -202,6 +203,7 @@ export function getImageUrl(sku?: string) {
 
 /** Only these catalog statuses can be added to an order. */
 export function isOrderableItem(item?: CatalogItem | null) {
+  if (isHiddenFromCustomerCatalog(item)) return false;
   return isOrderableCatalogStatus(item?.status);
 }
 

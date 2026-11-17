@@ -1,4 +1,5 @@
 import catalogData from "@/data/catalog_sku_master_extracted.json";
+import { isHiddenFromCustomerCatalog } from "@/lib/catalogVisibility";
 import { loadRedisProducts } from "@/lib/productRedisStore";
 
 export type MergedCatalogProduct = {
@@ -59,5 +60,7 @@ export async function getMergedCatalogProducts(): Promise<MergedCatalogProduct[]
     });
   }
 
-  return Array.from(map.values()).sort((a, b) => a.sku.localeCompare(b.sku));
+  return Array.from(map.values())
+    .filter((item) => !isHiddenFromCustomerCatalog(item))
+    .sort((a, b) => a.sku.localeCompare(b.sku));
 }
