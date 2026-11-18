@@ -18,6 +18,7 @@ import { OrderQuickOrderPanel } from "./components/OrderQuickOrderPanel";
 import { OrderQuickPicksStrip } from "./components/OrderQuickPicksStrip";
 import { SkuOrderHistoryModal } from "./components/SkuOrderHistoryModal";
 import { OrderInput } from "./components/OrderInput";
+import { OrderNoticePopup } from "./components/OrderNoticePopup";
 import { OrderReviewModal } from "./components/OrderReviewModal";
 import { OrderSubmittedModal } from "./components/OrderSubmittedModal";
 import { ProductImage } from "./components/ProductImage";
@@ -3700,6 +3701,8 @@ export default function OrderPage() {
         hidden={showCart || showPastOrders || showReview || Boolean(skuHistorySku) || barcodeScannerOpen}
         onClick={() => (showCart ? toggleCartPanel() : setShowCart(true))}
       />
+
+      <OrderNoticePopup ready={ready} />
 
       {(toastMsg || submitMsg) && !showCart ? (
         <div
