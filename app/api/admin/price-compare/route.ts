@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
+import { loadInvoiceImports } from "@/lib/analyticsCommon";
 import { resolveInvoiceCaseUnitPrice } from "@/lib/invoice/invoiceCaseUnitPrice";
-import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
+import type { InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
 import { redis } from "@/lib/redis";
 
 export const dynamic = "force-dynamic";
@@ -141,7 +142,7 @@ export async function GET(req: Request) {
         ? new Date(Date.now() - days * 24 * 60 * 60 * 1000)
         : null;
 
-    const imports = (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
+    const imports = await loadInvoiceImports();
     const points: PricePoint[] = [];
     const purchasePoints: PurchasePoint[] = [];
     const skuQueryAlias = skuAlias(skuQuery);

@@ -1,0 +1,260 @@
+.comp-page {
+  min-height: 100vh;
+  background: #f8fafc;
+  color: #111827;
+  overflow-x: hidden;
+}
+
+.comp-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.comp-kicker {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+  text-transform: uppercase;
+}
+
+.comp-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.comp-subtitle {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.comp-logout {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.comp-logout:hover {
+  background: #f9fafb;
+}
+
+.comp-body {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 24px 40px;
+  display: grid;
+  /* minmax(0,1fr) stops the wide price table from stretching the whole page. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.comp-body > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.comp-table-scroll {
+  overflow: auto;
+  max-width: 100%;
+  max-height: 70vh;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.comp-virtual-header {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: flex;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.comp-virtual-row {
+  display: flex;
+  border-bottom: 1px solid #f3f4f6;
+  background: #fff;
+}
+
+.comp-virtual-frozen {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  flex-shrink: 0;
+  background: inherit;
+  box-shadow: 1px 0 0 #e5e7eb;
+}
+
+.comp-virtual-header .comp-virtual-frozen {
+  z-index: 5;
+  background: #f9fafb;
+}
+
+.comp-virtual-prices {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.comp-vh-sku,
+.comp-vh-brand,
+.comp-vh-name,
+.comp-vh-price {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex-shrink: 0;
+  border-right: 1px solid #f3f4f6;
+}
+
+.comp-cell-sku,
+.comp-cell-brand,
+.comp-cell-name,
+.comp-cell-price {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 8px;
+  font-size: 13px;
+  box-sizing: border-box;
+  border-right: 1px solid #f3f4f6;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  height: 100%;
+}
+
+.comp-cell-sku {
+  font-weight: 900;
+  color: #111827;
+}
+
+.comp-cell-sku.is-price-changed {
+  background: #fef3c7;
+  color: #92400e;
+  box-shadow: inset 3px 0 0 #f59e0b;
+}
+
+.comp-virtual-row.is-price-changed .comp-virtual-frozen {
+  background: #fffbeb;
+}
+
+.comp-cell-brand,
+.comp-cell-name {
+  color: #374151;
+}
+
+.comp-cell-price {
+  justify-content: flex-end;
+  font-weight: 800;
+}
+
+.comp-invoice-no {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  font-weight: 700;
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+.comp-invoice-no-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 58px;
+}
+
+.comp-exclude-btn {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #6b7280;
+  border-radius: 6px;
+  width: 18px;
+  height: 18px;
+  line-height: 1;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.comp-exclude-btn:hover {
+  border-color: #fca5a5;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.comp-excluded-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.comp-excluded-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: #6b7280;
+}
+
+.comp-excluded-chip {
+  border: 1px dashed #d1d5db;
+  background: #f9fafb;
+  color: #6b7280;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.comp-excluded-chip:hover {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #047857;
+}
+
+.comp-excluded-reset {
+  border: none;
+  background: none;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 3px 4px;
+}
+
+@media (max-width: 720px) {
+  .comp-header {
+    flex-direction: column;
+    padding: 16px;
+  }
+
+  .comp-body {
+    padding: 12px 16px 32px;
+  }
+
+  .comp-title {
+    font-size: 24px;
+  }
+}

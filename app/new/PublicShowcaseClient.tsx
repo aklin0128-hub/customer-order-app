@@ -222,6 +222,7 @@ export default function PublicShowcaseClient({
                       lang={lang}
                       showPromo={activeTab === "promo"}
                       showNewDetails={activeTab === "new"}
+                      showListPrice={false}
                       className="new-card"
                     />
                   </div>
@@ -238,11 +239,7 @@ export default function PublicShowcaseClient({
             <Link href="/new" className="new-secondary-link">
               {t.seeNew}
             </Link>
-          ) : (
-            <Link href="/promo" className="new-secondary-link">
-              {t.seePromo}
-            </Link>
-          )}
+          ) : null}
           <Link href="/" className="new-sign-in-btn">
             {t.signIn}
           </Link>

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   buildLatestInvoicePricesFromImports,
+  filterLatestPriceRows,
   invoiceLatestPricesToCsv,
 } from "./invoiceLatestPrices";
 import type { InvoiceImportRecord } from "./invoice/invoiceImportRecord";
@@ -109,10 +110,19 @@ test("buildLatestInvoicePricesFromImports keeps price from newest invoice that c
   ]);
 });
 
-test("invoiceLatestPricesToCsv outputs only account, sku, price columns", () => {
+test("invoiceLatestPricesToCsv includes lastPriceDate as the fourth column", () => {
   const csv = invoiceLatestPricesToCsv([
     { account: "FL1", sku: "ABC", price: 9.99, invoiceDate: "2026-04-01" },
   ]);
-  assert.equal(csv, '"account","sku","price"\n"FL1","ABC","9.99"');
-  assert.equal(csv.includes("invoice"), false);
+  assert.equal(csv, '"account","sku","price","lastPriceDate"\n"FL1","ABC","9.99","2026-04-01"');
+});
+
+test("filterLatestPriceRows keeps one account from the compact cache", () => {
+  const rows = [
+    { account: "FL100", sku: "00100", price: 12, invoiceDate: "2026-03-10" },
+    { account: "FL200", sku: "00100", price: 9, invoiceDate: "2026-03-11" },
+  ];
+  assert.deepEqual(filterLatestPriceRows(rows, { accountNo: "fl100" }), [
+    { account: "FL100", sku: "00100", price: 12, invoiceDate: "2026-03-10" },
+  ]);
 });

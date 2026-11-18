@@ -2,10 +2,9 @@ import catalogData from "@/data/catalog_sku_master_extracted.json";
 import { cleanSku, parseQty } from "@/lib/analyticsPure";
 import { analyticsCacheKey, cachedAnalytics } from "@/lib/analyticsCache";
 import { resolveInvoiceCaseUnitPrice } from "@/lib/invoice/invoiceCaseUnitPrice";
-import { IMPORT_LIST_KEY, type InvoiceImportRecord } from "@/lib/invoice/invoiceImportRecord";
+import { loadInvoiceImportsWithLines } from "@/lib/invoice/invoiceImportStore";
 import { loadRedisProducts } from "@/lib/productRedisStore";
 import { loadAllOrderHistories } from "@/lib/orderHistory";
-import { redis } from "@/lib/redis";
 
 export type CatalogProduct = {
   sku: string;
@@ -91,7 +90,7 @@ export function median(values: number[]) {
 
 export async function loadInvoiceImports() {
   return cachedAnalytics("invoiceImports", async () => {
-    return (await redis.get<InvoiceImportRecord[]>(IMPORT_LIST_KEY)) || [];
+    return loadInvoiceImportsWithLines();
   });
 }
 

@@ -7,7 +7,7 @@ export type OrderHistoryEntry = {
   accountNo: string;
   storeName: string;
   orderRef: string;
-  items: { sku: string; qty: string }[];
+  items: { sku: string; qty: string; unitPrice?: number }[];
   note?: string;
   phone?: string;
   createdAt: string;

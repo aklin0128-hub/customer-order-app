@@ -41,6 +41,7 @@ export function ShowcaseCard({
   showPromo,
   className = "showcase-card",
   showNewDetails,
+  showListPrice = true,
   imageSize,
 }: {
   item: LoginPreviewCard;
@@ -49,6 +50,8 @@ export function ShowcaseCard({
   className?: string;
   /** New-items tab: show Details when description or PDF exists */
   showNewDetails?: boolean;
+  /** Public /new hides list prices; order New items tab keeps them. */
+  showListPrice?: boolean;
   imageSize?: number;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -75,7 +78,7 @@ export function ShowcaseCard({
       ? formatNewItemComingDate(item.newItemComingDate, lang)
       : null;
   const listPriceText =
-    showNewDetails && item.newItemListPrice
+    showListPrice && showNewDetails && item.newItemListPrice
       ? formatNewItemListPriceDisplay(item.newItemListPrice)
       : null;
   const comingSoon = showNewDetails && isComingSoonNewItem(item);

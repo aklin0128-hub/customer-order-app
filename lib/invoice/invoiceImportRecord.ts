@@ -17,11 +17,14 @@ export type InvoiceImportRecord = {
   extractMethod: "pdf" | "ocr";
   lineCount: number;
   lines: InvoiceLineWithCatalog[];
+  /** Compact list copies: unknown SKUs without storing every invoice line. */
+  unknownSkus?: string[];
   warnings: string[];
   appliedToHistory: boolean;
 };
 
 export const IMPORT_LIST_KEY = "invoiceImports:list";
+export const INVOICE_LINES_KEY_PREFIX = "invoiceImports:lines:";
 
 export function resolveInvoiceBlobPathname(
   record: Pick<InvoiceImportRecord, "blobPathname" | "blobUrl">

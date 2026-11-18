@@ -1,12 +1,32 @@
 import { NextResponse } from "next/server";
 
-/** Password for /exp coworker inventory lookup (set EXP_ACCESS_PASSWORD in production). */
+/** Accepted passwords for /exp. Defaults keep 536678 and add 2026. */
+const DEFAULT_EXP_PASSWORDS = ["536678", "2026"];
+
+export function getExpAccessPasswords(): string[] {
+  const passwords = new Set(DEFAULT_EXP_PASSWORDS);
+
+  const fromEnv = process.env.EXP_ACCESS_PASSWORD || "";
+  for (const part of fromEnv.split(",")) {
+    const trimmed = part.trim();
+    if (trimmed) passwords.add(trimmed);
+  }
+
+  return [...passwords];
+}
+
+/** @deprecated Prefer getExpAccessPasswords / isValidExpPassword */
 export function getExpAccessPassword() {
-  return process.env.EXP_ACCESS_PASSWORD || process.env.ADMIN_PASSWORD || "536678";
+  return getExpAccessPasswords()[0] || "536678";
+}
+
+export function isValidExpPassword(password: string) {
+  const trimmed = String(password || "").trim();
+  return Boolean(trimmed) && getExpAccessPasswords().includes(trimmed);
 }
 
 export function checkExpRequest(req: Request) {
-  return (req.headers.get("x-exp-password") || "") === getExpAccessPassword();
+  return isValidExpPassword(req.headers.get("x-exp-password") || "");
 }
 
 export function expUnauthorizedResponse() {

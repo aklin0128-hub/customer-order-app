@@ -1,36 +1,35 @@
 import catalogData from "@/data/catalog_sku_master_extracted.json";
 import { cleanSku } from "@/lib/analyticsCommon";
+import { scoreCatalogTextSearch } from "@/lib/catalogTextSearch";
 import { loadInventoryLots } from "@/lib/inventoryExpiry";
 import { loadRedisProducts } from "@/lib/productRedisStore";
 
 export type SkuSuggestRow = { sku: string; name: string };
 
-function rankSkuMatch(sku: string, name: string, q: string): number {
-  const su = sku.toUpperCase();
-  const nu = name.toUpperCase();
-  if (su.startsWith(q)) return 0;
-  if (su.includes(q)) return 1;
-  if (nu.includes(q)) return 2;
-  return 3;
+function suggestLabel(brand: string, name: string, sku: string) {
+  const n = name.trim();
+  const b = brand.trim();
+  if (b && n) return `${b} · ${n}`;
+  return n || b || sku;
 }
 
 export function adminSkuSuggestFromCatalog(query: string, limit = 15): SkuSuggestRow[] {
-  const q = String(query || "").trim().toUpperCase();
+  const q = String(query || "").trim();
   if (q.length < 2) return [];
 
   const hits: { sku: string; name: string; rank: number }[] = [];
 
-  for (const item of catalogData as { sku?: string; name?: string }[]) {
+  for (const item of catalogData as { sku?: string; name?: string; brand?: string }[]) {
     const sku = cleanSku(item.sku);
     if (!sku) continue;
     const name = String(item.name || "");
-    const su = sku.toUpperCase();
-    const nu = name.toUpperCase();
-    if (!su.includes(q) && !nu.includes(q)) continue;
-    hits.push({ sku, name, rank: rankSkuMatch(sku, name, q) });
+    const brand = String(item.brand || "");
+    const rank = scoreCatalogTextSearch({ sku, name, brand }, q);
+    if (rank < 0) continue;
+    hits.push({ sku, name: suggestLabel(brand, name, sku), rank });
   }
 
-  hits.sort((a, b) => a.rank - b.rank || a.sku.localeCompare(b.sku));
+  hits.sort((a, b) => b.rank - a.rank || a.sku.localeCompare(b.sku));
   return hits.slice(0, limit).map(({ sku, name }) => ({ sku, name }));
 }
 
@@ -39,13 +38,22 @@ export async function adminSkuSuggest(
   limit = 15,
   options?: { includeInventory?: boolean }
 ): Promise<SkuSuggestRow[]> {
-  const q = String(query || "").trim().toUpperCase();
+  const q = String(query || "").trim();
   if (q.length < 2) return [];
 
-  const bySku = new Map<string, SkuSuggestRow>();
+  const bySku = new Map<string, { row: SkuSuggestRow; rank: number }>();
 
-  for (const row of adminSkuSuggestFromCatalog(query, limit)) {
-    bySku.set(row.sku.toUpperCase(), row);
+  for (const item of catalogData as { sku?: string; name?: string; brand?: string }[]) {
+    const sku = cleanSku(item.sku);
+    if (!sku) continue;
+    const name = String(item.name || "");
+    const brand = String(item.brand || "");
+    const rank = scoreCatalogTextSearch({ sku, name, brand }, q);
+    if (rank < 0) continue;
+    bySku.set(sku.toUpperCase(), {
+      row: { sku, name: suggestLabel(brand, name, sku) },
+      rank,
+    });
   }
 
   const exactSku = cleanSku(query);
@@ -56,8 +64,13 @@ export async function adminSkuSuggest(
     for (const item of redisHits) {
       const sku = cleanSku(item.sku);
       if (!sku) continue;
-      const name = String(item.name || item.brand || "").trim();
-      bySku.set(sku.toUpperCase(), { sku, name: name || sku });
+      const name = String(item.name || "").trim();
+      const brand = String(item.brand || "").trim();
+      const rank = scoreCatalogTextSearch({ sku, name, brand }, q);
+      bySku.set(sku.toUpperCase(), {
+        row: { sku, name: suggestLabel(brand, name, sku) },
+        rank: rank >= 0 ? Math.max(rank, 900) : 1000,
+      });
     }
   }
 
@@ -72,12 +85,12 @@ export async function adminSkuSuggest(
         }
       }
       for (const [sku, name] of descBySku) {
-        const su = sku.toUpperCase();
-        const nu = name.toUpperCase();
-        if (!su.includes(q) && !nu.includes(q)) continue;
-        const key = su;
-        if (!bySku.has(key)) {
-          bySku.set(key, { sku, name });
+        const rank = scoreCatalogTextSearch({ sku, name }, q);
+        if (rank < 0) continue;
+        const key = sku.toUpperCase();
+        const prev = bySku.get(key);
+        if (!prev || rank > prev.rank) {
+          bySku.set(key, { row: { sku, name }, rank });
         }
       }
     } catch {
@@ -86,6 +99,6 @@ export async function adminSkuSuggest(
   }
 
   const merged = [...bySku.values()];
-  merged.sort((a, b) => rankSkuMatch(a.sku, a.name, q) - rankSkuMatch(b.sku, b.name, q) || a.sku.localeCompare(b.sku));
-  return merged.slice(0, limit);
+  merged.sort((a, b) => b.rank - a.rank || a.row.sku.localeCompare(b.row.sku));
+  return merged.slice(0, limit).map((item) => item.row);
 }

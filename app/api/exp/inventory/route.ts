@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { resolveOnhandInventory } from "@/lib/catalogOnhand";
 import { requireExp } from "@/lib/expAuth";
 import { getSkuExpiration, loadInventoryLots } from "@/lib/inventoryExpiry";
 import { getInventoryCsvMeta } from "@/lib/inventoryExpiryStore";
@@ -20,11 +21,15 @@ export async function GET(req: Request) {
     if (sku.trim()) {
       const status = url.searchParams.get("status") || undefined;
       const onlyFuture = url.searchParams.get("onlyFuture") === "1";
-      const result = await getSkuExpiration(sku, { status, onlyFutureExpiry: onlyFuture });
+      const [result, onhand] = await Promise.all([
+        getSkuExpiration(sku, { status, onlyFutureExpiry: onlyFuture }),
+        resolveOnhandInventory(sku),
+      ]);
       return NextResponse.json({
         success: true,
         meta,
         loadedRows: rows.length,
+        onhandInventory: onhand.onhandInventory,
         ...result,
       });
     }

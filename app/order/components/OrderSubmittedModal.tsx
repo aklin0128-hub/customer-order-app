@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+import { formatCountLabel } from "@/lib/countLabel";
 import { getCatalogItemBySku } from "../catalogUtils";
 import { copy } from "../orderCopy";
 import {
@@ -83,7 +84,7 @@ export function OrderSubmittedModal({
           {t.ref}: {orderRef}
         </div>
         <div style={{ fontSize: 13, color: "#6b7280", textAlign: "center", marginTop: 4, flexShrink: 0 }}>
-          {items.length} {t.items}
+          {formatCountLabel(items.length, lang, "item", t.items)}
         </div>
 
         <div style={submittedOrderListStyle}>
