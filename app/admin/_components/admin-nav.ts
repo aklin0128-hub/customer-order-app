@@ -34,6 +34,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       { id: "promotions", label: "Promotions", href: "/admin/promotions", hint: "Featured sales", icon: "🏷️" },
       { id: "ndh", label: "NDH", href: "/admin/ndh", hint: "Near-date list", icon: "📋" },
       { id: "seasonal", label: "Seasonal", href: "/admin/seasonal", hint: "Curated seasonal tab", icon: "🍂" },
+      { id: "notice", label: "Notice", href: "/admin/notice", hint: "Order-page popup", icon: "📢" },
       {
         id: "inventory",
         label: "Inventory & ETA",
