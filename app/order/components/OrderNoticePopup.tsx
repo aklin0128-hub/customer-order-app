@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-import { ORDER_NOTICE_AUTO_CLOSE_MS, type PublicOrderNotice } from "@/lib/orderNotice";
+import { ORDER_NOTICE_AUTO_CLOSE_MS, pickNoticeCopy, type PublicOrderNotice } from "@/lib/orderNotice";
 import type { Lang } from "../types";
 
 function dismissKey(notice: PublicOrderNotice) {
-  return `order_notice_dismissed:${notice.updatedAt}:${notice.body}`;
+  return `order_notice_dismissed:${notice.updatedAt}`;
 }
 
 function wasDismissed(notice: PublicOrderNotice) {
@@ -25,7 +25,15 @@ function rememberDismiss(notice: PublicOrderNotice) {
   }
 }
 
-export function OrderNoticePopup({ lang, copy, ready }: { lang: Lang; copy: { notice: string; close: string; noticeAutoClose: string }; ready: boolean }) {
+export function OrderNoticePopup({
+  lang,
+  copy,
+  ready,
+}: {
+  lang: Lang;
+  copy: { notice: string; close: string; noticeAutoClose: string };
+  ready: boolean;
+}) {
   const [notice, setNotice] = useState<PublicOrderNotice | null>(null);
   const [open, setOpen] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(ORDER_NOTICE_AUTO_CLOSE_MS / 1000);
@@ -38,7 +46,8 @@ export function OrderNoticePopup({ lang, copy, ready }: { lang: Lang; copy: { no
       .then((data) => {
         if (cancelled) return;
         const next = data?.notice as PublicOrderNotice | null;
-        if (!next?.body || wasDismissed(next)) return;
+        if (!next?.translations || wasDismissed(next)) return;
+        if (!pickNoticeCopy(next.translations, "en")) return;
         setNotice(next);
         setOpen(true);
         setSecondsLeft(ORDER_NOTICE_AUTO_CLOSE_MS / 1000);
@@ -64,24 +73,25 @@ export function OrderNoticePopup({ lang, copy, ready }: { lang: Lang; copy: { no
     return () => window.clearInterval(tick);
   }, [open, notice]);
 
-  if (!open || !notice) return null;
+  const localized = notice ? pickNoticeCopy(notice.translations, lang) : null;
+  if (!open || !notice || !localized) return null;
 
   const close = () => {
     rememberDismiss(notice);
     setOpen(false);
   };
 
-        return (
-          <div className="order-notice-overlay" role="dialog" aria-modal="true" aria-labelledby="order-notice-title" lang={lang}>
-            <div className="order-notice-card">
-              <button type="button" className="order-notice-close" onClick={close} aria-label={copy.close}>
-                ×
-              </button>
-              {notice.title ? <p className="order-notice-kicker">{copy.notice}</p> : null}
-              <h2 id="order-notice-title" className="order-notice-title">
-                {notice.title || copy.notice}
-              </h2>
-              <p className="order-notice-body">{notice.body}</p>
+  return (
+    <div className="order-notice-overlay" role="dialog" aria-modal="true" aria-labelledby="order-notice-title" lang={lang}>
+      <div className="order-notice-card">
+        <button type="button" className="order-notice-close" onClick={close} aria-label={copy.close}>
+          ×
+        </button>
+        {localized.title ? <p className="order-notice-kicker">{copy.notice}</p> : null}
+        <h2 id="order-notice-title" className="order-notice-title">
+          {localized.title || copy.notice}
+        </h2>
+        <p className="order-notice-body">{localized.body}</p>
         <p className="order-notice-timer">{copy.noticeAutoClose.replace("{sec}", String(secondsLeft))}</p>
       </div>
     </div>

@@ -32,9 +32,11 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const record = await saveOrderNoticeRecord({
+      translations: body?.translations,
       title: body?.title,
       body: body?.body,
       enabled: body?.enabled !== false,
+      hideOnDate: body?.hideOnDate,
     });
     return NextResponse.json({ success: true, record });
   } catch (error: unknown) {
