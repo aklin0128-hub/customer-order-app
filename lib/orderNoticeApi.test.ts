@@ -37,6 +37,7 @@ test("admin notice page is linked in the catalog nav", () => {
   const page = readFileSync(join(root, "app/admin/notice/page.tsx"), "utf8");
   assert.match(page, /Save notice/);
   assert.match(page, /Hide from customers/);
+  assert.match(page, /Add product/);
   assert.match(page, /Hide on date/);
   assert.doesNotMatch(page, /中文/);
   assert.doesNotMatch(page, /한국어/);

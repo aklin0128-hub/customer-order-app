@@ -43,7 +43,7 @@ export function OrderNoticePopup({ ready }: { ready: boolean }) {
       .then((data) => {
         if (cancelled) return;
         const next = data?.notice as PublicOrderNotice | null;
-        if (!next?.body || wasDismissed(next)) return;
+        if (!next?.items?.length || wasDismissed(next)) return;
         setNotice(next);
         setOpen(true);
         setSecondsLeft(ORDER_NOTICE_AUTO_CLOSE_MS / 1000);
@@ -69,12 +69,14 @@ export function OrderNoticePopup({ ready }: { ready: boolean }) {
     return () => window.clearInterval(tick);
   }, [open, notice]);
 
-  if (!open || !notice) return null;
+  if (!open || !notice || notice.items.length === 0) return null;
 
   const close = () => {
     rememberDismiss(notice);
     setOpen(false);
   };
+
+  const heading = notice.heading || NOTICE_COPY.notice;
 
   return (
     <div className="order-notice-overlay" role="dialog" aria-modal="true" aria-labelledby="order-notice-title" lang="en">
@@ -82,11 +84,18 @@ export function OrderNoticePopup({ ready }: { ready: boolean }) {
         <button type="button" className="order-notice-close" onClick={close} aria-label={NOTICE_COPY.close}>
           ×
         </button>
-        {notice.title ? <p className="order-notice-kicker">{NOTICE_COPY.notice}</p> : null}
+        {notice.heading ? <p className="order-notice-kicker">{NOTICE_COPY.notice}</p> : null}
         <h2 id="order-notice-title" className="order-notice-title">
-          {notice.title || NOTICE_COPY.notice}
+          {heading}
         </h2>
-        <p className="order-notice-body">{notice.body}</p>
+        <ul className="order-notice-list">
+          {notice.items.map((item, index) => (
+            <li key={`${item.name}-${index}`} className="order-notice-item">
+              {item.name ? <p className="order-notice-item-name">{item.name}</p> : null}
+              {item.note ? <p className="order-notice-item-note">{item.note}</p> : null}
+            </li>
+          ))}
+        </ul>
         <p className="order-notice-timer">{NOTICE_COPY.noticeAutoClose.replace("{sec}", String(secondsLeft))}</p>
       </div>
     </div>

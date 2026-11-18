@@ -5,20 +5,30 @@ export const ORDER_NOTICE_REDIS_KEY = "orderNotice:current";
 export const ORDER_NOTICE_AUTO_CLOSE_MS = 20_000;
 export const ORDER_NOTICE_TITLE_MAX = 120;
 export const ORDER_NOTICE_BODY_MAX = 4000;
+export const ORDER_NOTICE_MAX_ITEMS = 20;
 export const ORDER_NOTICE_TZ = "America/New_York";
 
-export type OrderNoticeRecord = {
-  title: string;
-  body: string;
-  enabled: boolean;
-  /** Hide from customers starting this YYYY-MM-DD (US Eastern). */
+export type OrderNoticeItem = {
+  name: string;
+  note: string;
   hideOnDate?: string;
+};
+
+export type OrderNoticeRecord = {
+  heading: string;
+  items: OrderNoticeItem[];
+  enabled: boolean;
   updatedAt: number;
 };
 
+export type PublicOrderNoticeItem = {
+  name: string;
+  note: string;
+};
+
 export type PublicOrderNotice = {
-  title: string;
-  body: string;
+  heading: string;
+  items: PublicOrderNoticeItem[];
   updatedAt: number;
 };
 
@@ -39,8 +49,14 @@ function firstFilledCopy(row: Record<string, unknown>): { title: string; body: s
     row.translations && typeof row.translations === "object"
       ? (row.translations as Record<string, unknown>)
       : {};
-  const candidates = [copyFrom({ title: row.title, body: row.body }), copyFrom(nested.en), copyFrom(nested.zh), copyFrom(nested.ko), copyFrom(nested.vi)];
-  return candidates.find((item) => item.body) || candidates[0];
+  const candidates = [
+    copyFrom({ title: row.title, body: row.body }),
+    copyFrom(nested.en),
+    copyFrom(nested.zh),
+    copyFrom(nested.ko),
+    copyFrom(nested.vi),
+  ];
+  return candidates.find((item) => item.body || item.title) || candidates[0];
 }
 
 export function formatEasternDateYmd(now = new Date()): string {
@@ -58,22 +74,59 @@ export function isOrderNoticeExpired(hideOnDate?: string | null, now = new Date(
   return formatEasternDateYmd(now) >= day;
 }
 
+export function emptyNoticeItem(): OrderNoticeItem {
+  return { name: "", note: "" };
+}
+
+export function normalizeNoticeItem(raw: unknown): OrderNoticeItem | null {
+  const row = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const name = clip(row.name ?? row.title, ORDER_NOTICE_TITLE_MAX);
+  const note = clip(row.note ?? row.body, ORDER_NOTICE_BODY_MAX);
+  const hideOnDate = parseSeasonalEtaDate(row.hideOnDate);
+  if (!name && !note) return null;
+  return hideOnDate ? { name, note, hideOnDate } : { name, note };
+}
+
+export function hasNoticeItemText(item: OrderNoticeItem): boolean {
+  return Boolean(item.name.trim() || item.note.trim());
+}
+
+export function visibleNoticeItems(items: OrderNoticeItem[], now = new Date()): PublicOrderNoticeItem[] {
+  return items
+    .filter((item) => hasNoticeItemText(item) && !isOrderNoticeExpired(item.hideOnDate, now))
+    .map((item) => ({ name: item.name, note: item.note }));
+}
+
+function migrateLegacyItems(row: Record<string, unknown>): unknown[] {
+  if (Array.isArray(row.items)) return row.items;
+  const copy = firstFilledCopy(row);
+  if (!copy.title && !copy.body) return [];
+  return [
+    {
+      name: copy.title,
+      note: copy.body,
+      hideOnDate: row.hideOnDate,
+    },
+  ];
+}
+
 export function normalizeOrderNotice(raw: unknown): OrderNoticeRecord {
   const row = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-  const copy = firstFilledCopy(row);
+  const items = migrateLegacyItems(row)
+    .map(normalizeNoticeItem)
+    .filter((item): item is OrderNoticeItem => Boolean(item))
+    .slice(0, ORDER_NOTICE_MAX_ITEMS);
   const updatedAt = Number(row.updatedAt);
-  const hideOnDate = parseSeasonalEtaDate(row.hideOnDate);
   return {
-    title: copy.title,
-    body: copy.body,
-    enabled: row.enabled !== false && Boolean(copy.body),
-    hideOnDate,
+    heading: clip(row.heading, ORDER_NOTICE_TITLE_MAX),
+    items,
+    enabled: row.enabled !== false && items.some(hasNoticeItemText),
     updatedAt: Number.isFinite(updatedAt) && updatedAt > 0 ? updatedAt : Date.now(),
   };
 }
 
 export function emptyOrderNotice(): OrderNoticeRecord {
-  return { title: "", body: "", enabled: false, updatedAt: 0 };
+  return { heading: "", items: [], enabled: false, updatedAt: 0 };
 }
 
 export function toPublicOrderNotice(
@@ -81,12 +134,11 @@ export function toPublicOrderNotice(
   now = new Date()
 ): PublicOrderNotice | null {
   if (!record?.enabled) return null;
-  if (isOrderNoticeExpired(record.hideOnDate, now)) return null;
-  const body = String(record.body || "").trim();
-  if (!body) return null;
+  const items = visibleNoticeItems(record.items, now);
+  if (items.length === 0) return null;
   return {
-    title: String(record.title || "").trim(),
-    body,
+    heading: String(record.heading || "").trim(),
+    items,
     updatedAt: record.updatedAt,
   };
 }
@@ -98,19 +150,17 @@ export async function getOrderNoticeRecord(): Promise<OrderNoticeRecord> {
 }
 
 export async function saveOrderNoticeRecord(input: {
-  title?: string;
-  body?: string;
+  heading?: string;
+  items?: unknown[];
   enabled?: boolean;
-  hideOnDate?: string | null;
 }): Promise<OrderNoticeRecord> {
   const next = normalizeOrderNotice({
-    title: input.title,
-    body: input.body,
+    heading: input.heading,
+    items: input.items,
     enabled: input.enabled,
-    hideOnDate: input.hideOnDate,
     updatedAt: Date.now(),
   });
-  if (!String(next.body || "").trim()) {
+  if (!next.items.some(hasNoticeItemText)) {
     next.enabled = false;
   }
   await redis.set(ORDER_NOTICE_REDIS_KEY, next);
