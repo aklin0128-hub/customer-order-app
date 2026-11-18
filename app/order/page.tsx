@@ -3702,11 +3702,7 @@ export default function OrderPage() {
         onClick={() => (showCart ? toggleCartPanel() : setShowCart(true))}
       />
 
-      <OrderNoticePopup
-        lang={lang}
-        copy={{ notice: t.notice, close: t.close, noticeAutoClose: t.noticeAutoClose }}
-        ready={ready}
-      />
+      <OrderNoticePopup ready={ready} />
 
       {(toastMsg || submitMsg) && !showCart ? (
         <div

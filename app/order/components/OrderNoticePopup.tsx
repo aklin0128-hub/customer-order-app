@@ -2,8 +2,13 @@
 
 import { useEffect, useState } from "react";
 
-import { ORDER_NOTICE_AUTO_CLOSE_MS, pickNoticeCopy, type PublicOrderNotice } from "@/lib/orderNotice";
-import type { Lang } from "../types";
+import { ORDER_NOTICE_AUTO_CLOSE_MS, type PublicOrderNotice } from "@/lib/orderNotice";
+
+const NOTICE_COPY = {
+  notice: "Notice",
+  close: "Close",
+  noticeAutoClose: "Closes in {sec}s",
+};
 
 function dismissKey(notice: PublicOrderNotice) {
   return `order_notice_dismissed:${notice.updatedAt}`;
@@ -25,15 +30,7 @@ function rememberDismiss(notice: PublicOrderNotice) {
   }
 }
 
-export function OrderNoticePopup({
-  lang,
-  copy,
-  ready,
-}: {
-  lang: Lang;
-  copy: { notice: string; close: string; noticeAutoClose: string };
-  ready: boolean;
-}) {
+export function OrderNoticePopup({ ready }: { ready: boolean }) {
   const [notice, setNotice] = useState<PublicOrderNotice | null>(null);
   const [open, setOpen] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(ORDER_NOTICE_AUTO_CLOSE_MS / 1000);
@@ -46,8 +43,7 @@ export function OrderNoticePopup({
       .then((data) => {
         if (cancelled) return;
         const next = data?.notice as PublicOrderNotice | null;
-        if (!next?.translations || wasDismissed(next)) return;
-        if (!pickNoticeCopy(next.translations, "en")) return;
+        if (!next?.body || wasDismissed(next)) return;
         setNotice(next);
         setOpen(true);
         setSecondsLeft(ORDER_NOTICE_AUTO_CLOSE_MS / 1000);
@@ -73,8 +69,7 @@ export function OrderNoticePopup({
     return () => window.clearInterval(tick);
   }, [open, notice]);
 
-  const localized = notice ? pickNoticeCopy(notice.translations, lang) : null;
-  if (!open || !notice || !localized) return null;
+  if (!open || !notice) return null;
 
   const close = () => {
     rememberDismiss(notice);
@@ -82,17 +77,17 @@ export function OrderNoticePopup({
   };
 
   return (
-    <div className="order-notice-overlay" role="dialog" aria-modal="true" aria-labelledby="order-notice-title" lang={lang}>
+    <div className="order-notice-overlay" role="dialog" aria-modal="true" aria-labelledby="order-notice-title" lang="en">
       <div className="order-notice-card">
-        <button type="button" className="order-notice-close" onClick={close} aria-label={copy.close}>
+        <button type="button" className="order-notice-close" onClick={close} aria-label={NOTICE_COPY.close}>
           ×
         </button>
-        {localized.title ? <p className="order-notice-kicker">{copy.notice}</p> : null}
+        {notice.title ? <p className="order-notice-kicker">{NOTICE_COPY.notice}</p> : null}
         <h2 id="order-notice-title" className="order-notice-title">
-          {localized.title || copy.notice}
+          {notice.title || NOTICE_COPY.notice}
         </h2>
-        <p className="order-notice-body">{localized.body}</p>
-        <p className="order-notice-timer">{copy.noticeAutoClose.replace("{sec}", String(secondsLeft))}</p>
+        <p className="order-notice-body">{notice.body}</p>
+        <p className="order-notice-timer">{NOTICE_COPY.noticeAutoClose.replace("{sec}", String(secondsLeft))}</p>
       </div>
     </div>
   );
