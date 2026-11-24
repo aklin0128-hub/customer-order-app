@@ -18,6 +18,7 @@ import {
   statValue,
   statsGrid,
 } from "./admin-styles";
+import { buildOrderDownloadCsv, type OrderEmailLine } from "@/lib/orderSubmitEmail";
 
 export function Toast({ message, tone }: { message: string; tone?: "success" | "error" }) {
   if (!message) return null;
@@ -172,11 +173,10 @@ export function formatDate(iso?: string) {
 export function downloadOrderCsv(order: {
   accountNo: string;
   orderRef?: string;
-  items?: { sku: string; qty: string }[];
+  items?: OrderEmailLine[];
 }) {
   const items = order.items || [];
-  const rows = ["SKU,Qty", ...items.map((i) => `${i.sku},${i.qty}`)];
-  const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob([buildOrderDownloadCsv(items)], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

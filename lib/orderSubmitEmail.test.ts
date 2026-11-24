@@ -4,7 +4,14 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildOrderEmail, lineTag, splitOrderLinesForEmail } from "./orderSubmitEmail";
+import {
+  attachNdhPrices,
+  buildCsv,
+  buildOrderDownloadCsv,
+  buildOrderEmail,
+  lineTag,
+  splitOrderLinesForEmail,
+} from "./orderSubmitEmail";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sendOrder = readFileSync(join(here, "../app/api/send-order/route.ts"), "utf8");
@@ -71,4 +78,38 @@ test("send-order sends catalog and NDH emails as separate messages", () => {
   assert.match(sendOrder, /splitOrderLinesForEmail/);
   assert.match(sendOrder, /sendBatch\("catalog"/);
   assert.match(sendOrder, /sendBatch\("ndh"/);
+  assert.match(sendOrder, /attachNdhPrices/);
+  assert.match(sendOrder, /getNdhProducts/);
+});
+
+test("attachNdhPrices fills PRICE from listing and sku fallback", () => {
+  const exact = attachNdhPrices(
+    [{ sku: "B2", qty: "1", ndh: true, expiryDate: "2026-11-08" }],
+    [{ sku: "B2", expiryDate: "2026-11-08", clearancePrice: "4.17" }]
+  );
+  assert.equal(exact[0].price, "4.17");
+  assert.match(buildCsv(exact, "ndh"), /^SKU,QTY,PRICE\nB2,1,\$4\.17$/m);
+
+  const skuOnly = attachNdhPrices(
+    [{ sku: "B2", qty: "1", ndh: true, expiryDate: "2026-12-01" }],
+    [{ sku: "B2", expiryDate: "2026-11-08", clearancePrice: "4.17" }]
+  );
+  assert.equal(skuOnly[0].price, "4.17");
+
+  const keepClient = attachNdhPrices(
+    [{ sku: "B2", qty: "1", ndh: true, price: "9.99" }],
+    []
+  );
+  assert.equal(keepClient[0].price, "9.99");
+});
+
+test("order download CSV uses SKU QTY PRICE for NDH lines", () => {
+  assert.equal(
+    buildOrderDownloadCsv([{ sku: "A1", qty: "2" }]),
+    "SKU,Qty\nA1,2"
+  );
+  assert.equal(
+    buildOrderDownloadCsv([{ sku: "B2", qty: "1", ndh: true, price: "4.17" }]),
+    "SKU,QTY,PRICE\nB2,1,$4.17"
+  );
 });

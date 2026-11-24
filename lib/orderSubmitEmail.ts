@@ -1,6 +1,6 @@
-import { CLEARANCE_ORDER_EMAIL_TAG } from "@/lib/clearance";
 import { formatClearancePriceDisplay } from "@/lib/clearanceFormat";
-import { NDH_ORDER_EMAIL_TAG } from "@/lib/ndh";
+import { ndhListingKey } from "@/lib/ndhListParse";
+import { CLEARANCE_ORDER_EMAIL_TAG, NDH_ORDER_EMAIL_TAG } from "@/lib/orderEmailTags";
 
 export type OrderEmailLine = {
   sku: string;
@@ -30,6 +30,51 @@ export function ndhTagPrice(price?: string) {
   const raw = String(price || "").trim();
   if (!raw) return "";
   return formatClearancePriceDisplay(raw) || raw;
+}
+
+export type NdhPriceListing = {
+  sku?: string;
+  expiryDate?: string;
+  clearancePrice?: string;
+  price?: string;
+};
+
+function listingPrice(row: NdhPriceListing) {
+  return String(row.clearancePrice || row.price || "").trim();
+}
+
+/** Fill NDH line prices from live listings (exact sku+date, then unique sku, then existing). */
+export function attachNdhPrices<T extends OrderEmailLine>(lines: T[], listings: NdhPriceListing[]): T[] {
+  const byKey = new Map<string, string>();
+  const bySku = new Map<string, Set<string>>();
+
+  for (const row of listings) {
+    const sku = String(row.sku || "").trim().toUpperCase();
+    const price = listingPrice(row);
+    if (!sku || !price) continue;
+    byKey.set(ndhListingKey(sku, row.expiryDate), price);
+    if (!bySku.has(sku)) bySku.set(sku, new Set());
+    bySku.get(sku)!.add(price);
+  }
+
+  return lines.map((item) => {
+    if (!item.ndh) return item;
+    const sku = String(item.sku || "").trim().toUpperCase();
+    const exact = byKey.get(ndhListingKey(sku, item.expiryDate)) || "";
+    const skuPrices = bySku.get(sku);
+    const skuOnly = skuPrices && skuPrices.size === 1 ? [...skuPrices][0] : "";
+    const price = exact || String(item.price || "").trim() || skuOnly || undefined;
+    return { ...item, price };
+  });
+}
+
+export function buildOrderDownloadCsv(items: OrderEmailLine[]) {
+  if (items.some((item) => item.ndh || item.price)) return buildCsv(items, "ndh");
+  const rows = [["SKU", "Qty"]];
+  for (const item of items) {
+    rows.push([String(item.sku || "").trim().toUpperCase(), String(item.qty || "").trim()]);
+  }
+  return rows.map((row) => row.map(csvEscape).join(",")).join("\n");
 }
 
 export function lineTag(item: OrderEmailLine) {

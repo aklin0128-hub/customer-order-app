@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { prependOrderHistory } from "@/lib/orderHistory";
 import { incrementClearanceSold } from "@/lib/clearance";
-import { getNdhRecords, incrementNdhSold, ndhListingKey } from "@/lib/ndh";
+import { getNdhProducts, incrementNdhSold } from "@/lib/ndh";
 import { incrementPromotionSold } from "@/lib/promotions";
 import { isValidOrderEmail, resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
 import { getCustomerByAccount, upsertCustomerContact } from "@/lib/customers";
@@ -10,6 +10,7 @@ import { mergeRecentItems } from "@/lib/recentItems";
 import { getMergedCatalogProducts } from "@/lib/catalogMerge";
 import { isOrderableCatalogStatus } from "@/lib/orderableCatalog";
 import {
+  attachNdhPrices,
   buildOrderEmail,
   splitOrderLinesForEmail,
   type OrderEmailLine,
@@ -61,15 +62,7 @@ export async function POST(req: Request) {
 
     if (cleanedItems.some((item) => item.ndh)) {
       try {
-        const ndhRecords = await getNdhRecords();
-        const priceByKey = new Map(
-          ndhRecords.map((record) => [ndhListingKey(record.sku, record.expiryDate), record.clearancePrice])
-        );
-        cleanedItems = cleanedItems.map((item) => {
-          if (!item.ndh) return item;
-          const listed = priceByKey.get(ndhListingKey(item.sku, item.expiryDate));
-          return { ...item, price: listed || item.price };
-        });
+        cleanedItems = attachNdhPrices(cleanedItems, await getNdhProducts());
       } catch {
         /* keep client price if Redis lookup fails */
       }

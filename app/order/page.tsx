@@ -114,6 +114,7 @@ import {
   type QtySource,
 } from "@/lib/orderNhItems";
 import { ndhListingKey } from "@/lib/ndhListParse";
+import { attachNdhPrices, buildOrderDownloadCsv } from "@/lib/orderSubmitEmail";
 import { copy } from "./orderCopy";
 import { readInitialStickyPanelOpen, useMobileViewport } from "./useMobileViewport";
 import {
@@ -2212,7 +2213,7 @@ export default function OrderPage() {
   };
 
   const getCurrentSubmitItems = () => {
-    return expandOrderSubmitLines(qtyMaps);
+    return attachNdhPrices(expandOrderSubmitLines(qtyMaps), ndhItems);
   };
 
   const unavailableSubmitItems = useMemo(
@@ -2237,8 +2238,8 @@ export default function OrderPage() {
       return;
     }
 
-    const rows = ["SKU,Qty", ...items.map((item) => `${item.sku},${item.qty}`)];
-    const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const csv = buildOrderDownloadCsv(items);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
 
     const now = new Date();
@@ -2269,7 +2270,14 @@ export default function OrderPage() {
 
       let startIndex = 0;
       const firstLine = lines[0].replace(/\s/g, "").toUpperCase();
-      if (firstLine === "SKU,QTY" || firstLine === "SKU,QUANTITY") startIndex = 1;
+      if (
+        firstLine === "SKU,QTY" ||
+        firstLine === "SKU,QUANTITY" ||
+        firstLine.startsWith("SKU,QTY,") ||
+        firstLine.startsWith("SKU,QUANTITY,")
+      ) {
+        startIndex = 1;
+      }
 
       const parsed: CartItem[] = [];
       const parsedMap: Record<string, string> = {};
@@ -2279,7 +2287,7 @@ export default function OrderPage() {
         if (parts.length < 2) continue;
 
         const sku = (parts[0] || "").trim().toUpperCase();
-        const qty = parts.slice(1).join(",").trim().toUpperCase();
+        const qty = (parts[1] || "").trim().toUpperCase();
         if (!sku || !qty) continue;
 
         parsed.push({ sku, qty });
