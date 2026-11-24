@@ -172,6 +172,8 @@ test("NDH pages wire upload and order tab", () => {
   assert.match(publicPage, /ot\.ndhPrice/);
   assert.match(sendOrder, /splitOrderLinesForEmail/);
   assert.match(sendOrder, /incrementNdhSold/);
+  assert.match(sendOrder, /getNdhRecords/);
+  assert.match(sendOrder, /item\?\.clearancePrice/);
 });
 
 test("Near Date Sale is folded into NDH only", () => {

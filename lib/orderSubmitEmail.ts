@@ -1,4 +1,5 @@
 import { CLEARANCE_ORDER_EMAIL_TAG } from "@/lib/clearance";
+import { formatClearancePriceDisplay } from "@/lib/clearanceFormat";
 import { NDH_ORDER_EMAIL_TAG } from "@/lib/ndh";
 
 export type OrderEmailLine = {
@@ -7,6 +8,8 @@ export type OrderEmailLine = {
   nhItems?: boolean;
   ndh?: boolean;
   expiryDate?: string;
+  /** NDH listing price — used in the Tag column instead of the expiry date. */
+  price?: string;
 };
 
 export function isNdhEmailLine(item: OrderEmailLine) {
@@ -23,10 +26,16 @@ export function splitOrderLinesForEmail(items: OrderEmailLine[]) {
   return { catalog, ndh };
 }
 
+export function ndhTagPrice(price?: string) {
+  const raw = String(price || "").trim();
+  if (!raw) return "";
+  return formatClearancePriceDisplay(raw) || raw;
+}
+
 export function lineTag(item: OrderEmailLine) {
   if (item.ndh) {
-    const exp = String(item.expiryDate || "").trim();
-    return exp ? `${NDH_ORDER_EMAIL_TAG} ${exp}` : NDH_ORDER_EMAIL_TAG;
+    const price = ndhTagPrice(item.price);
+    return price ? `${NDH_ORDER_EMAIL_TAG} ${price}` : NDH_ORDER_EMAIL_TAG;
   }
   if (item.nhItems) return CLEARANCE_ORDER_EMAIL_TAG;
   return "";
