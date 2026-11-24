@@ -10,6 +10,7 @@ import { mergeRecentItems } from "@/lib/recentItems";
 import { getMergedCatalogProducts } from "@/lib/catalogMerge";
 import { isOrderableCatalogStatus } from "@/lib/orderableCatalog";
 import {
+  attachCatalogPrices,
   attachNdhPrices,
   buildOrderEmail,
   splitOrderLinesForEmail,
@@ -55,18 +56,11 @@ export async function POST(req: Request) {
           ndh,
           nhItems: Boolean(item?.nhItems) && !ndh,
           expiryDate: ndh ? String(item?.expiryDate || "").trim() || undefined : undefined,
-          price: ndh ? String(item?.price || item?.clearancePrice || "").trim() || undefined : undefined,
+          price:
+            String(item?.price || item?.clearancePrice || item?.bp || "").trim() || undefined,
         };
       })
       .filter((item: OrderLine) => item.sku && item.qty);
-
-    if (cleanedItems.some((item) => item.ndh)) {
-      try {
-        cleanedItems = attachNdhPrices(cleanedItems, await getNdhProducts());
-      } catch {
-        /* keep client price if Redis lookup fails */
-      }
-    }
 
     if (cleanedItems.length === 0) {
       return NextResponse.json(
@@ -76,6 +70,14 @@ export async function POST(req: Request) {
     }
 
     const catalogProducts = await getMergedCatalogProducts();
+    cleanedItems = attachCatalogPrices(cleanedItems, catalogProducts);
+    if (cleanedItems.some((item) => item.ndh)) {
+      try {
+        cleanedItems = attachNdhPrices(cleanedItems, await getNdhProducts());
+      } catch {
+        /* keep client price if Redis lookup fails */
+      }
+    }
     const catalogBySku = new Map(
       catalogProducts.map((p) => [String(p.sku || "").trim().toUpperCase(), p])
     );

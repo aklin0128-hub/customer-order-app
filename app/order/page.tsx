@@ -114,7 +114,7 @@ import {
   type QtySource,
 } from "@/lib/orderNhItems";
 import { ndhListingKey } from "@/lib/ndhListParse";
-import { attachNdhPrices, buildOrderDownloadCsv } from "@/lib/orderSubmitEmail";
+import { attachCatalogPrices, attachNdhPrices, buildOrderDownloadCsv } from "@/lib/orderSubmitEmail";
 import { copy } from "./orderCopy";
 import { readInitialStickyPanelOpen, useMobileViewport } from "./useMobileViewport";
 import {
@@ -2213,7 +2213,7 @@ export default function OrderPage() {
   };
 
   const getCurrentSubmitItems = () => {
-    return attachNdhPrices(expandOrderSubmitLines(qtyMaps), ndhItems);
+    return attachNdhPrices(attachCatalogPrices(expandOrderSubmitLines(qtyMaps), catalog), ndhItems);
   };
 
   const unavailableSubmitItems = useMemo(
