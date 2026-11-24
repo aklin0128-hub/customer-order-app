@@ -5,7 +5,6 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  attachCatalogPrices,
   attachNdhPrices,
   buildCsv,
   buildOrderDownloadCsv,
@@ -42,7 +41,7 @@ test("NDH email is labeled separately from the regular order email", () => {
     note: "",
     orderEmail: "orders@example.com",
     orderRef: "FL111-1101",
-    items: [{ sku: "A1", qty: "2", price: "42.52" }],
+    items: [{ sku: "A1", qty: "2" }],
     companionSplit: true,
   });
   const ndh = buildOrderEmail({
@@ -66,8 +65,9 @@ test("NDH email is labeled separately from the regular order email", () => {
   assert.match(ndh.csv, /^SKU,QTY,PRICE\nB2,1,\$4\.17$/m);
   assert.doesNotMatch(ndh.text, /A1 - 2/);
   assert.match(catalog.text, /separate NDH email/);
-  assert.match(catalog.text, /A1 - 2 - \$42\.52/);
-  assert.match(catalog.csv, /^SKU,QTY,PRICE\nA1,2,\$42\.52$/m);
+  assert.match(catalog.text, /A1 - 2$/m);
+  assert.doesNotMatch(catalog.csv, /PRICE/);
+  assert.match(catalog.csv, /^SKU,Qty,Tag\nA1,2,$/m);
 });
 
 test("NDH order lines are SKU QTY PRICE", () => {
@@ -81,21 +81,8 @@ test("send-order sends catalog and NDH emails as separate messages", () => {
   assert.match(sendOrder, /sendBatch\("catalog"/);
   assert.match(sendOrder, /sendBatch\("ndh"/);
   assert.match(sendOrder, /attachNdhPrices/);
-  assert.match(sendOrder, /attachCatalogPrices/);
+  assert.doesNotMatch(sendOrder, /attachCatalogPrices/);
   assert.match(sendOrder, /getNdhProducts/);
-});
-
-test("attachCatalogPrices fills PRICE from catalog BP", () => {
-  const priced = attachCatalogPrices(
-    [
-      { sku: "03590J", qty: "12" },
-      { sku: "B2", qty: "1", ndh: true },
-    ],
-    [{ sku: "03590J", bp: 42.52 }, { sku: "B2", bp: 9.99 }]
-  );
-  assert.equal(priced[0].price, "42.52");
-  assert.equal(priced[1].price, undefined);
-  assert.match(buildCsv(priced, "catalog"), /^SKU,QTY,PRICE\n03590J,12,\$42\.52\nB2,1,$/m);
 });
 
 test("attachNdhPrices fills PRICE from listing and sku fallback", () => {
@@ -119,13 +106,20 @@ test("attachNdhPrices fills PRICE from listing and sku fallback", () => {
   assert.equal(keepClient[0].price, "9.99");
 });
 
-test("order download CSV uses SKU QTY PRICE", () => {
+test("order download CSV only puts PRICE on NDH lines", () => {
   assert.equal(
     buildOrderDownloadCsv([{ sku: "A1", qty: "2", price: "42.52" }]),
-    "SKU,QTY,PRICE\nA1,2,$42.52"
+    "SKU,Qty\nA1,2"
   );
   assert.equal(
     buildOrderDownloadCsv([{ sku: "B2", qty: "1", ndh: true, price: "4.17" }]),
     "SKU,QTY,PRICE\nB2,1,$4.17"
+  );
+  assert.equal(
+    buildOrderDownloadCsv([
+      { sku: "A1", qty: "2", price: "42.52" },
+      { sku: "B2", qty: "1", ndh: true, price: "4.17" },
+    ]),
+    "SKU,QTY,PRICE\nA1,2,\nB2,1,$4.17"
   );
 });

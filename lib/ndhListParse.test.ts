@@ -169,6 +169,7 @@ test("NDH pages wire upload and order tab", () => {
   assert.match(orderPage, /\/api\/ndh/);
   assert.match(orderPage, /t\.ndhPrice/);
   assert.match(orderPage, /attachNdhPrices/);
+  assert.doesNotMatch(orderPage, /attachCatalogPrices/);
   assert.match(orderPage, /buildOrderDownloadCsv/);
   assert.doesNotMatch(orderPage, /addAllNdhOneCase/);
   assert.match(publicPage, /ot\.ndhPrice/);
