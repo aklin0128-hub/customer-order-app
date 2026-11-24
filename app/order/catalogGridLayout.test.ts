@@ -114,7 +114,7 @@ test("inventory cue is first and History is second on every card", () => {
   assert.ok(cueIdx > 0 && historyIdx > cueIdx);
   assert.match(cardSrc, /catalog-qty-card-cue-placeholder/);
   assert.match(cardSrc, /catalog-qty-card-history-placeholder/);
-  assert.match(orderPageSrc, /lastOrderedLabel: t\.historyLink,/);
+  assert.match(orderPageSrc, /lastOrderedLabel: latest \? t\.historyLink : undefined,/);
   assert.match(orderCss, /\.catalog-qty-card-status-stack\s*\{[^}]*flex-direction:\s*column/);
 });
 
