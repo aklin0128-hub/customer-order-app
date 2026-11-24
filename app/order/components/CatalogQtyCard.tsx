@@ -367,46 +367,42 @@ export function CatalogQtyCard({
           {palletLabel}: {item.palletSize}
         </div>
       ) : null}
-      {inventoryCue ? (
-        <div className={`catalog-inventory-cue catalog-inventory-cue--${inventoryCue === "maybe_oos" ? "oos" : "low"}`}>
-          {inventoryCueLabel(inventoryCue, lang)}
+      {inventoryCue || lastOrderedLabel ? (
+        <div className="catalog-qty-card-status-row">
+          {inventoryCue ? (
+            <div className={`catalog-inventory-cue catalog-inventory-cue--${inventoryCue === "maybe_oos" ? "oos" : "low"}`}>
+              {inventoryCueLabel(inventoryCue, lang)}
+            </div>
+          ) : null}
+          {lastOrderedLabel && onOpenHistory ? (
+            <button
+              type="button"
+              className="catalog-qty-card-last-ordered"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenHistory(item.sku);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <span className="catalog-qty-card-last-ordered-text">{lastOrderedLabel}</span>
+              <span className="catalog-qty-card-last-ordered-chevron" aria-hidden="true">
+                ›
+              </span>
+            </button>
+          ) : null}
         </div>
       ) : null}
-      {onOpenHistory || reserveInvoicePrice || invoicePrice ? (
+      {reserveInvoicePrice || invoicePrice ? (
         <div className="catalog-qty-card-commerce">
-          {onOpenHistory ? (
-            <div className="catalog-qty-card-history-slot">
-              {lastOrderedLabel ? (
-                <button
-                  type="button"
-                  className="catalog-qty-card-last-ordered"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenHistory(item.sku);
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                >
-                  <span className="catalog-qty-card-last-ordered-text">{lastOrderedLabel}</span>
-                  <span className="catalog-qty-card-last-ordered-chevron" aria-hidden="true">
-                    ›
-                  </span>
-                </button>
-              ) : (
-                <span className="catalog-qty-card-history-placeholder" aria-hidden="true" />
-              )}
-            </div>
-          ) : null}
-          {reserveInvoicePrice || invoicePrice ? (
-            <div className="catalog-qty-card-price-row">
-              {invoicePrice ? (
-                <div className="catalog-qty-card-invoice-price">
-                  <InvoicePriceLine text={invoicePrice} />
-                </div>
-              ) : (
-                <span className="catalog-qty-card-invoice-price-placeholder" aria-hidden="true" />
-              )}
-            </div>
-          ) : null}
+          <div className="catalog-qty-card-price-row">
+            {invoicePrice ? (
+              <div className="catalog-qty-card-invoice-price">
+                <InvoicePriceLine text={invoicePrice} />
+              </div>
+            ) : (
+              <span className="catalog-qty-card-invoice-price-placeholder" aria-hidden="true" />
+            )}
+          </div>
         </div>
       ) : null}
       {showUpc ? (
