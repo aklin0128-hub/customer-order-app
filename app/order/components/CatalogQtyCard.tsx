@@ -367,27 +367,41 @@ export function CatalogQtyCard({
           {palletLabel}: {item.palletSize}
         </div>
       ) : null}
-      {inventoryCue ? (
-        <div className={`catalog-inventory-cue catalog-inventory-cue--${inventoryCue === "maybe_oos" ? "oos" : "low"}`}>
-          {inventoryCueLabel(inventoryCue, lang)}
+      {hideInventoryStatus && !(lastOrderedLabel && onOpenHistory) ? null : (
+        <div className="catalog-qty-card-status-stack">
+          {hideInventoryStatus ? null : (
+            <div className="catalog-qty-card-cue-slot">
+              {inventoryCue ? (
+                <div className={`catalog-inventory-cue catalog-inventory-cue--${inventoryCue === "maybe_oos" ? "oos" : "low"}`}>
+                  {inventoryCueLabel(inventoryCue, lang)}
+                </div>
+              ) : (
+                <span className="catalog-qty-card-cue-placeholder" aria-hidden="true" />
+              )}
+            </div>
+          )}
+          <div className="catalog-qty-card-history-slot">
+            {lastOrderedLabel && onOpenHistory ? (
+              <button
+                type="button"
+                className="catalog-qty-card-last-ordered"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenHistory(item.sku);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <span className="catalog-qty-card-last-ordered-text">{lastOrderedLabel}</span>
+                <span className="catalog-qty-card-last-ordered-chevron" aria-hidden="true">
+                  ›
+                </span>
+              </button>
+            ) : (
+              <span className="catalog-qty-card-history-placeholder" aria-hidden="true" />
+            )}
+          </div>
         </div>
-      ) : null}
-      {lastOrderedLabel && onOpenHistory ? (
-        <button
-          type="button"
-          className="catalog-qty-card-last-ordered"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenHistory(item.sku);
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <span className="catalog-qty-card-last-ordered-text">{lastOrderedLabel}</span>
-          <span className="catalog-qty-card-last-ordered-chevron" aria-hidden="true">
-            ›
-          </span>
-        </button>
-      ) : null}
+      )}
       {reserveInvoicePrice || invoicePrice ? (
         <div className="catalog-qty-card-commerce">
           <div className="catalog-qty-card-price-row">
