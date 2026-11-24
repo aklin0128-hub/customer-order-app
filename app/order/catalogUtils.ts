@@ -395,6 +395,29 @@ export function resolveCatalogFilterTargetItem(query: string, filtered: CatalogI
   return null;
 }
 
+/** Prefer a match inside the visible list (NDH / promo / new) instead of the full catalog. */
+export function resolveListSearchTargetItem<T extends CatalogItem>(query: string, filtered: T[]): T | null {
+  const trimmed = query.trim();
+  if (!trimmed) return null;
+  const upper = trimmed.toUpperCase();
+  const exact = filtered.find((item) => String(item.sku || "").toUpperCase() === upper);
+  if (exact) return exact;
+  const scanned = filtered.find((item) => catalogItemMatchesScanCode(item, trimmed));
+  if (scanned) return scanned;
+  if (filtered.length === 1) return filtered[0] || null;
+  return null;
+}
+
+export function filterItemsBySearchQuery<T extends CatalogItem>(items: T[], query: string): T[] {
+  const q = query.trim();
+  if (!q) return items;
+  return items
+    .map((item) => ({ item, score: scoreCatalogSearchQuery(item, q) }))
+    .filter((row) => row.score >= 0)
+    .sort((a, b) => b.score - a.score || String(a.item.sku || "").localeCompare(String(b.item.sku || "")))
+    .map((row) => row.item);
+}
+
 function catalogSearchTokens(value: string) {
   return String(value || "")
     .toUpperCase()
