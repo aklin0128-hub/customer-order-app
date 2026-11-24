@@ -1,0 +1,112 @@
+.pc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.pc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  border-radius: 999px;
+  padding: 4px 8px 4px 12px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.pc-chip button {
+  border: 0;
+  background: #e2e8f0;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  font-weight: 800;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.pc-chip button:hover {
+  background: #cbd5e1;
+}
+
+.pc-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.45;
+}
+
+.pc-table-scroll {
+  overflow: auto;
+  max-width: 100%;
+  max-height: 70vh;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.pc-table {
+  border-collapse: collapse;
+  min-width: 100%;
+  font-size: 13px;
+}
+
+.pc-table th,
+.pc-table td {
+  border: 1px solid #e5e7eb;
+  padding: 7px 10px;
+  white-space: nowrap;
+}
+
+.pc-table th {
+  position: sticky;
+  top: 0;
+  background: #f1f5f9;
+  font-weight: 800;
+  text-align: center;
+  z-index: 1;
+}
+
+.pc-table th.pc-sku,
+.pc-table td.pc-sku {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: #fff;
+  z-index: 2;
+  font-weight: 800;
+}
+
+.pc-table th.pc-sku {
+  background: #f1f5f9;
+  z-index: 3;
+}
+
+.pc-table th.pc-desc,
+.pc-table td.pc-desc {
+  text-align: left;
+  min-width: 180px;
+  white-space: normal;
+}
+
+.pc-table td.pc-price {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.pc-table tr.pc-diff td {
+  background: #fffbeb;
+}
+
+.pc-table tr.pc-diff td.pc-sku {
+  background: #fffbeb;
+}
+
+.pc-empty {
+  color: #64748b;
+  text-align: center;
+}
