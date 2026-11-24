@@ -94,10 +94,7 @@ import {
   toggleFavoriteSku,
   type FavoriteSkusPayload,
 } from "@/lib/favoriteSkus";
-import {
-  buildSkuOrderHistoryIndex,
-  getLatestSkuOrderHistoryEntry,
-} from "@/lib/skuOrderHistory";
+import { buildSkuOrderHistoryIndex } from "@/lib/skuOrderHistory";
 import {
   applyQtyDelta,
   applyQtySet,
@@ -2581,12 +2578,11 @@ export default function OrderPage() {
   const favoriteCardProps = useCallback((sku: string) => {
     const cleanSku = sku.toUpperCase();
     const isFavorite = favoriteSkuSet.has(cleanSku);
-    const latest = getLatestSkuOrderHistoryEntry(skuOrderHistoryIndex.get(cleanSku));
     return {
       favorite: isFavorite,
       favoriteLabel: isFavorite ? t.removeFavorite : t.addFavorite,
       onToggleFavorite: toggleFavorite,
-      lastOrderedLabel: latest ? t.historyLink : undefined,
+      lastOrderedLabel: t.historyLink,
       onOpenHistory: openSkuHistory,
       showUpc,
       invoicePrice: invoicePriceLabelForSku(cleanSku),
@@ -2598,7 +2594,6 @@ export default function OrderPage() {
     invoicePricingEnabled,
     openSkuHistory,
     showUpc,
-    skuOrderHistoryIndex,
     t.addFavorite,
     t.historyLink,
     t.removeFavorite,

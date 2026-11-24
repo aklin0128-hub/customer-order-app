@@ -107,13 +107,15 @@ test("catalog category bar stays a compact single row", () => {
   );
 });
 
-test("History sits below the inventory cue", () => {
+test("inventory cue is first and History is second on every card", () => {
   const cardSrc = readFileSync(join(here, "components/CatalogQtyCard.tsx"), "utf8");
-  const cueIdx = cardSrc.indexOf("catalog-inventory-cue");
-  const historyIdx = cardSrc.indexOf("catalog-qty-card-last-ordered");
+  const cueIdx = cardSrc.indexOf("catalog-qty-card-cue-slot");
+  const historyIdx = cardSrc.indexOf("catalog-qty-card-history-slot");
   assert.ok(cueIdx > 0 && historyIdx > cueIdx);
-  assert.doesNotMatch(cardSrc, /catalog-qty-card-status-row/);
-  assert.match(orderCss, /\.catalog-qty-card-last-ordered\s*\{[^}]*margin:\s*6px 0 0/);
+  assert.match(cardSrc, /catalog-qty-card-cue-placeholder/);
+  assert.match(cardSrc, /catalog-qty-card-history-placeholder/);
+  assert.match(orderPageSrc, /lastOrderedLabel: t\.historyLink,/);
+  assert.match(orderCss, /\.catalog-qty-card-status-stack\s*\{[^}]*flex-direction:\s*column/);
 });
 
 test("catalog qty input keeps a dark fill so iPad Safari shows the number", () => {
