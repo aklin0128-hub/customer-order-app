@@ -17,6 +17,8 @@ const publicPage = readFileSync(join(here, "../app/NDH/page.tsx"), "utf8");
 const orderPage = readFileSync(join(here, "../app/order/page.tsx"), "utf8");
 const uploadRoute = readFileSync(join(here, "../app/api/admin/ndh/upload/route.ts"), "utf8");
 const sendOrder = readFileSync(join(here, "../app/api/send-order/route.ts"), "utf8");
+const catalogUtils = readFileSync(join(here, "../app/order/catalogUtils.ts"), "utf8");
+const ndhLib = readFileSync(join(here, "./ndh.ts"), "utf8");
 
 test("parseNdhListText reads header csv", () => {
   const rows = parseNdhListText(
@@ -168,6 +170,9 @@ test("NDH pages wire upload and order tab", () => {
   assert.match(orderPage, /changeMode\("ndh"\)/);
   assert.match(orderPage, /\/api\/ndh/);
   assert.match(orderPage, /t\.ndhPrice/);
+  assert.match(orderPage, /if \(item\.ndh\) return true;/);
+  assert.match(catalogUtils, /if \(item\.ndh\) continue;/);
+  assert.match(ndhLib, /isDiscontinuedStatus\(base\.status\)/);
   assert.match(orderPage, /attachNdhPrices/);
   assert.doesNotMatch(orderPage, /attachCatalogPrices/);
   assert.match(orderPage, /buildOrderDownloadCsv/);

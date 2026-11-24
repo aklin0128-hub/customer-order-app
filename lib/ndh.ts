@@ -10,6 +10,7 @@ import {
   type ClearanceProduct,
   type ClearanceRecord,
 } from "@/lib/clearance";
+import { isDiscontinuedStatus } from "@/lib/orderableCatalog";
 import { isValidNdhSku, ndhListingKey } from "@/lib/ndhListParse";
 
 export { ndhListingKey, parseNdhListingKey } from "@/lib/ndhListParse";
@@ -169,6 +170,8 @@ export async function getNdhProducts(options?: {
       clearanceQty: record.clearanceQty,
       soldQty: record.soldQty || 0,
       daysUntilExpiry: daysUntilExpiry(record.expiryDate),
+      // NDH listings stay sellable even when the catalog SKU is DISCONTINUED.
+      ...(isDiscontinuedStatus(base.status) ? { status: undefined } : {}),
     });
   }
 

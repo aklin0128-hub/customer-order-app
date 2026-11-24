@@ -2123,6 +2123,7 @@ export default function OrderPage() {
     }
 
     const orderable = valid.filter((item) => {
+      if (item.ndh) return true;
       const sku = item.sku.toUpperCase();
       const catalogItem = getCatalogItemBySku(sku);
       return Boolean(catalogItem && isOrderableItem(catalogItem));
