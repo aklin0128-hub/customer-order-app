@@ -5,6 +5,7 @@ import {
   emptySalesCreditLines,
   isSalesCreditAmountInput,
   parseSalesCreditAmount,
+  salesCreditRequestPdfFileName,
   salesCreditTotal,
 } from "./salesCreditRequest";
 
@@ -24,6 +25,12 @@ test("parseSalesCreditAmount accepts cents and ignores an in-progress decimal", 
   assert.equal(parseSalesCreditAmount("12."), 12);
   assert.equal(parseSalesCreditAmount("12.5"), 12.5);
   assert.equal(parseSalesCreditAmount("12.50"), 12.5);
+});
+
+test("PDF file name is sales-credit-request_ plus customer account", () => {
+  assert.equal(salesCreditRequestPdfFileName("fl168"), "sales-credit-request_FL168.pdf");
+  assert.equal(salesCreditRequestPdfFileName(" FL-123 "), "sales-credit-request_FL123.pdf");
+  assert.equal(salesCreditRequestPdfFileName(""), "sales-credit-request.pdf");
 });
 
 test("empty sales credit lines include memo and amountInput", () => {
