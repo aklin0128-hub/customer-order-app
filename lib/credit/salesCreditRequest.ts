@@ -15,7 +15,10 @@ export type SalesCreditReason = (typeof SALES_CREDIT_REASONS)[number];
 export type SalesCreditLine = {
   reason: SalesCreditReason;
   amount: number | null;
+  /** Raw Amount field so a trailing decimal (e.g. `12.`) is not stripped while typing. */
+  amountInput: string;
   itemDetail: string;
+  memo: string;
 };
 
 export type SalesCreditRequestForm = {
@@ -38,8 +41,25 @@ export function emptySalesCreditLines(): SalesCreditLine[] {
   return SALES_CREDIT_REASONS.map((reason) => ({
     reason,
     amount: null,
+    amountInput: "",
     itemDetail: "",
+    memo: "",
   }));
+}
+
+/** Dollars with up to two decimal places, including a trailing `.` while typing. */
+export const SALES_CREDIT_AMOUNT_INPUT = /^-?\d*(?:\.\d{0,2})?$/;
+
+export function isSalesCreditAmountInput(raw: string): boolean {
+  return SALES_CREDIT_AMOUNT_INPUT.test(raw);
+}
+
+export function parseSalesCreditAmount(raw: string): number | null {
+  const t = raw.trim();
+  if (!t || t === "-" || t === "." || t === "-.") return null;
+  const n = Number(t);
+  if (!Number.isFinite(n)) return null;
+  return Math.round(n * 100) / 100;
 }
 
 export function salesCreditTotal(lines: SalesCreditLine[]) {

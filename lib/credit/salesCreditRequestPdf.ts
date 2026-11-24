@@ -108,6 +108,34 @@ function drawRight(
   });
 }
 
+function drawWrappedCell(
+  page: PDFPage,
+  font: PDFFont,
+  text: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number
+) {
+  const detailLines = wrapText(font, text, 8, w - 12, 3);
+  if (detailLines.length === 1) {
+    drawLeft(page, detailLines[0] || "", font, 8, x, y, h);
+  } else if (detailLines.length > 1) {
+    const lineH = 9;
+    let ty = y + h - 11;
+    for (const dl of detailLines) {
+      page.drawText(dl, {
+        x: x + 8,
+        y: ty,
+        size: 8,
+        font,
+        color: BLACK,
+      });
+      ty -= lineH;
+    }
+  }
+}
+
 function drawLeft(
   page: PDFPage,
   text: string,
@@ -140,9 +168,10 @@ export async function buildSalesCreditRequestPdf(opts: {
   const page = pdf.addPage([PAGE_W, PAGE_H]);
 
   const tableW = PAGE_W - MARGIN * 2;
-  const col1 = 168;
-  const col2 = 118;
-  const col3 = tableW - col1 - col2;
+  const col1 = 150;
+  const col2 = 80;
+  const col3 = 168;
+  const col4 = tableW - col1 - col2 - col3;
   let y = PAGE_H - MARGIN;
 
   const headerH = 22;
@@ -164,12 +193,12 @@ export async function buildSalesCreditRequestPdf(opts: {
   for (const [label, value, isEmail] of fields) {
     y -= fieldH;
     drawCell(page, MARGIN, y, col1, fieldH, LABEL_BG);
-    drawCell(page, MARGIN + col1, y, col2 + col3, fieldH, WHITE);
+    drawCell(page, MARGIN + col1, y, col2 + col3 + col4, fieldH, WHITE);
     drawRight(page, label, bold, 9, MARGIN, y, col1, fieldH);
     if (isEmail && value) {
-      drawCentered(page, value, font, 9, MARGIN + col1, y, col2 + col3, fieldH, LINK_BLUE);
+      drawCentered(page, value, font, 9, MARGIN + col1, y, col2 + col3 + col4, fieldH, LINK_BLUE);
     } else {
-      drawCentered(page, value, font, 10, MARGIN + col1, y, col2 + col3, fieldH);
+      drawCentered(page, value, font, 10, MARGIN + col1, y, col2 + col3 + col4, fieldH);
     }
   }
 
@@ -178,9 +207,11 @@ export async function buildSalesCreditRequestPdf(opts: {
   drawCell(page, MARGIN, y, col1, reasonHeaderH, LABEL_BG);
   drawCell(page, MARGIN + col1, y, col2, reasonHeaderH, LABEL_BG);
   drawCell(page, MARGIN + col1 + col2, y, col3, reasonHeaderH, LABEL_BG);
+  drawCell(page, MARGIN + col1 + col2 + col3, y, col4, reasonHeaderH, LABEL_BG);
   drawCentered(page, "Reason for Credit", bold, 9, MARGIN, y, col1, reasonHeaderH);
   drawCentered(page, "Amount", bold, 9, MARGIN + col1, y, col2, reasonHeaderH);
-  drawCentered(page, "Item Detail (Qty) - Per Item Credit", bold, 9, MARGIN + col1 + col2, y, col3, reasonHeaderH);
+  drawCentered(page, "Item Detail (Qty) - Per Item Credit", bold, 8, MARGIN + col1 + col2, y, col3, reasonHeaderH);
+  drawCentered(page, "Memo", bold, 9, MARGIN + col1 + col2 + col3, y, col4, reasonHeaderH);
 
   const rowH = 28;
   for (const line of opts.form.lines) {
@@ -188,27 +219,13 @@ export async function buildSalesCreditRequestPdf(opts: {
     drawCell(page, MARGIN, y, col1, rowH, WHITE);
     drawCell(page, MARGIN + col1, y, col2, rowH, WHITE);
     drawCell(page, MARGIN + col1 + col2, y, col3, rowH, WHITE);
-    drawRight(page, line.reason, font, 9, MARGIN, y, col1, rowH);
+    drawCell(page, MARGIN + col1 + col2 + col3, y, col4, rowH, WHITE);
+    drawRight(page, line.reason, font, 8, MARGIN, y, col1, rowH);
     if (line.amount != null && Number.isFinite(line.amount) && String(line.amount) !== "") {
-      drawCentered(page, formatSalesCreditMoney(line.amount), font, 10, MARGIN + col1, y, col2, rowH);
+      drawCentered(page, formatSalesCreditMoney(line.amount), font, 9, MARGIN + col1, y, col2, rowH);
     }
-    const detailLines = wrapText(font, line.itemDetail, 8, col3 - 12, 3);
-    if (detailLines.length === 1) {
-      drawLeft(page, detailLines[0] || "", font, 8, MARGIN + col1 + col2, y, rowH);
-    } else if (detailLines.length > 1) {
-      const lineH = 9;
-      let ty = y + rowH - 11;
-      for (const dl of detailLines) {
-        page.drawText(dl, {
-          x: MARGIN + col1 + col2 + 8,
-          y: ty,
-          size: 8,
-          font,
-          color: BLACK,
-        });
-        ty -= lineH;
-      }
-    }
+    drawWrappedCell(page, font, line.itemDetail, MARGIN + col1 + col2, y, col3, rowH);
+    drawWrappedCell(page, font, line.memo, MARGIN + col1 + col2 + col3, y, col4, rowH);
   }
 
   const totalH = 22;
@@ -217,6 +234,7 @@ export async function buildSalesCreditRequestPdf(opts: {
   drawCell(page, MARGIN, y, col1, totalH, LABEL_BG);
   drawCell(page, MARGIN + col1, y, col2, totalH, LABEL_BG);
   drawCell(page, MARGIN + col1 + col2, y, col3, totalH, LABEL_BG);
+  drawCell(page, MARGIN + col1 + col2 + col3, y, col4, totalH, LABEL_BG);
   drawRight(page, "Total", bold, 10, MARGIN, y, col1, totalH);
   drawCentered(page, formatSalesCreditMoney(total), bold, 10, MARGIN + col1, y, col2, totalH);
 

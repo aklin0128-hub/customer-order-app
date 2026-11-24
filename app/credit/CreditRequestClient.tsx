@@ -6,6 +6,8 @@ import {
   emptySalesCreditLines,
   formatSalesCreditDate,
   formatSalesCreditMoney,
+  isSalesCreditAmountInput,
+  parseSalesCreditAmount,
   salesCreditTotal,
   SALES_CREDIT_EMAIL,
   type SalesCreditLine,
@@ -71,8 +73,17 @@ export function CreditRequestClient() {
               ? {
                   reason: row.reason,
                   amount:
-                    saved.amount == null || Number.isNaN(Number(saved.amount)) ? null : Number(saved.amount),
+                    saved.amount == null || Number.isNaN(Number(saved.amount))
+                      ? parseSalesCreditAmount(String(saved.amountInput || ""))
+                      : Number(saved.amount),
+                  amountInput:
+                    saved.amountInput != null && String(saved.amountInput) !== ""
+                      ? String(saved.amountInput)
+                      : saved.amount == null || Number.isNaN(Number(saved.amount))
+                        ? ""
+                        : String(saved.amount),
                   itemDetail: String(saved.itemDetail || ""),
+                  memo: String(saved.memo || ""),
                 }
               : row;
           })
@@ -295,6 +306,7 @@ export function CreditRequestClient() {
           <div className="scr-head">Reason for Credit</div>
           <div className="scr-head">Amount</div>
           <div className="scr-head">Item Detail (Qty) - Per Item Credit</div>
+          <div className="scr-head">Memo</div>
         </div>
 
         {lines.map((line) => (
@@ -303,10 +315,14 @@ export function CreditRequestClient() {
             <div className="scr-amount">
               <input
                 inputMode="decimal"
-                value={line.amount == null || Number.isNaN(line.amount) ? "" : String(line.amount)}
+                value={line.amountInput}
                 onChange={(e) => {
-                  const raw = e.target.value.trim();
-                  updateLine(line.reason, { amount: raw === "" ? null : Number(raw) });
+                  const raw = e.target.value;
+                  if (!isSalesCreditAmountInput(raw)) return;
+                  updateLine(line.reason, {
+                    amountInput: raw,
+                    amount: parseSalesCreditAmount(raw),
+                  });
                 }}
               />
             </div>
@@ -317,6 +333,13 @@ export function CreditRequestClient() {
                 onChange={(e) => updateLine(line.reason, { itemDetail: e.target.value })}
               />
             </div>
+            <div className="scr-memo">
+              <textarea
+                rows={2}
+                value={line.memo}
+                onChange={(e) => updateLine(line.reason, { memo: e.target.value })}
+              />
+            </div>
           </div>
         ))}
 
@@ -324,6 +347,7 @@ export function CreditRequestClient() {
           <div className="scr-reason">Total</div>
           <div className="scr-amount">{formatSalesCreditMoney(total)}</div>
           <div className="scr-detail" />
+          <div className="scr-memo" />
         </div>
 
         <div className="scr-photo-head">Photo</div>
