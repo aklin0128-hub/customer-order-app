@@ -1985,15 +1985,6 @@
   }
 }
 
-.catalog-qty-card-status-row {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 6px;
-  margin-top: 6px;
-  min-width: 0;
-}
-
 .catalog-qty-card-commerce {
   margin-top: 6px;
   display: flex;
@@ -2016,7 +2007,7 @@
 }
 
 .catalog-qty-card-last-ordered {
-  margin: 0;
+  margin: 6px 0 0;
   border: 1px solid #2dd4bf;
   background: #0f766e;
   border-radius: 999px;
@@ -2024,7 +2015,6 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  flex: 0 0 auto;
   max-width: 100%;
   text-align: left;
   cursor: pointer;
@@ -2347,18 +2337,13 @@
 
 .catalog-inventory-cue {
   display: inline-block;
-  margin-top: 0;
+  margin-top: 5px;
   padding: 2px 7px;
   border-radius: 999px;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.02em;
   line-height: 1.3;
-  white-space: nowrap;
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .catalog-inventory-cue--low {

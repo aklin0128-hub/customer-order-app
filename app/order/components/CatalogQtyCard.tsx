@@ -367,30 +367,26 @@ export function CatalogQtyCard({
           {palletLabel}: {item.palletSize}
         </div>
       ) : null}
-      {inventoryCue || lastOrderedLabel ? (
-        <div className="catalog-qty-card-status-row">
-          {inventoryCue ? (
-            <div className={`catalog-inventory-cue catalog-inventory-cue--${inventoryCue === "maybe_oos" ? "oos" : "low"}`}>
-              {inventoryCueLabel(inventoryCue, lang)}
-            </div>
-          ) : null}
-          {lastOrderedLabel && onOpenHistory ? (
-            <button
-              type="button"
-              className="catalog-qty-card-last-ordered"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenHistory(item.sku);
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              <span className="catalog-qty-card-last-ordered-text">{lastOrderedLabel}</span>
-              <span className="catalog-qty-card-last-ordered-chevron" aria-hidden="true">
-                ›
-              </span>
-            </button>
-          ) : null}
+      {inventoryCue ? (
+        <div className={`catalog-inventory-cue catalog-inventory-cue--${inventoryCue === "maybe_oos" ? "oos" : "low"}`}>
+          {inventoryCueLabel(inventoryCue, lang)}
         </div>
+      ) : null}
+      {lastOrderedLabel && onOpenHistory ? (
+        <button
+          type="button"
+          className="catalog-qty-card-last-ordered"
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenHistory(item.sku);
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <span className="catalog-qty-card-last-ordered-text">{lastOrderedLabel}</span>
+          <span className="catalog-qty-card-last-ordered-chevron" aria-hidden="true">
+            ›
+          </span>
+        </button>
       ) : null}
       {reserveInvoicePrice || invoicePrice ? (
         <div className="catalog-qty-card-commerce">
