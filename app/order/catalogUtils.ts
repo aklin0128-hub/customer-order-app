@@ -246,11 +246,12 @@ export function formatOrderNotAvailableMessage(
 }
 
 /** Cart / submit lines that the API will reject (missing catalog row or non-orderable status). */
-export function getUnavailableSubmitLines<T extends { sku: string; nhItems?: boolean; qty?: string }>(
+export function getUnavailableSubmitLines<T extends { sku: string; nhItems?: boolean; ndh?: boolean; qty?: string }>(
   items: T[]
 ): Array<T & { status: string }> {
   const out: Array<T & { status: string }> = [];
   for (const item of items) {
+    if (item.ndh) continue;
     const cleanSku = String(item.sku || "").trim().toUpperCase();
     if (!cleanSku) continue;
     const catalogItem = getCatalogItemBySku(cleanSku);

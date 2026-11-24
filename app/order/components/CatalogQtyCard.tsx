@@ -195,7 +195,7 @@ export function CatalogQtyCard({
   const comingSoon = isComingSoonNewItem(item);
   const outOfStock = hideInventoryStatus ? false : isProductOutOfStockStamp(item);
   const stamped = comingSoon || outOfStock;
-  const discontinued = isDiscontinuedStatus(item.status);
+  const discontinued = hideInventoryStatus ? false : isDiscontinuedStatus(item.status);
   const inventoryCue = hideInventoryStatus ? null : inventoryCueKindForItem(item);
   const orderingBlocked = isProductOrderingBlocked(item);
   const showNewItemExtras = Boolean(showNewProductBadge || showNewItemListPrice);

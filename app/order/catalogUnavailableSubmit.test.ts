@@ -19,6 +19,7 @@ test("getUnavailableSubmitLines flags discontinued, ready-to-order, and missing 
   const unavailable = getUnavailableSubmitLines([
     { sku: "OK1", qty: "2" },
     { sku: "DISC1", qty: "1" },
+    { sku: "DISC1", qty: "1", ndh: true, expiryDate: "2026-11-08" },
     { sku: "MISSING", qty: "3" },
     { sku: "TBD1", qty: "1" },
     { sku: "RTO1", qty: "1" },
