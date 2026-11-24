@@ -15,7 +15,7 @@ import { isValidNdhSku, ndhListingKey } from "@/lib/ndhListParse";
 export { ndhListingKey, parseNdhListingKey } from "@/lib/ndhListParse";
 
 export const NDH_KEY = "ndh:list";
-export const NDH_ORDER_EMAIL_TAG = "NDH";
+export { NDH_ORDER_EMAIL_TAG } from "@/lib/orderEmailTags";
 
 export type NdhRecord = ClearanceRecord & {
   description?: string;

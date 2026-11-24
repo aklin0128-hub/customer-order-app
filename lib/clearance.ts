@@ -9,7 +9,7 @@ export { formatClearancePriceDisplay } from "@/lib/clearanceFormat";
 export const CLEARANCE_KEY = "clearance:list";
 
 /** Appended to order email/CSV lines for active clearance items (e.g. 00003D - 5 - NH_ITEMS). */
-export const CLEARANCE_ORDER_EMAIL_TAG = "NH_ITEMS";
+export { CLEARANCE_ORDER_EMAIL_TAG } from "@/lib/orderEmailTags";
 
 export type ClearanceStatus = "active" | "scheduled" | "expired" | "sold_out";
 

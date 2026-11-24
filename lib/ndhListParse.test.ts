@@ -168,11 +168,13 @@ test("NDH pages wire upload and order tab", () => {
   assert.match(orderPage, /changeMode\("ndh"\)/);
   assert.match(orderPage, /\/api\/ndh/);
   assert.match(orderPage, /t\.ndhPrice/);
+  assert.match(orderPage, /attachNdhPrices/);
+  assert.match(orderPage, /buildOrderDownloadCsv/);
   assert.doesNotMatch(orderPage, /addAllNdhOneCase/);
   assert.match(publicPage, /ot\.ndhPrice/);
   assert.match(sendOrder, /splitOrderLinesForEmail/);
   assert.match(sendOrder, /incrementNdhSold/);
-  assert.match(sendOrder, /getNdhRecords/);
+  assert.match(sendOrder, /getNdhProducts/);
   assert.match(sendOrder, /item\?\.clearancePrice/);
 });
 
