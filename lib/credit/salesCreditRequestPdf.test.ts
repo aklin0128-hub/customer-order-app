@@ -16,7 +16,7 @@ test("sales credit request PDF starts with %PDF and includes form values", async
       invoiceDate: "11/1/2026",
       lines: emptySalesCreditLines().map((line) =>
         line.reason === "Damage"
-          ? { ...line, amount: 12.5, itemDetail: "2 cs broken" }
+          ? { ...line, amount: 12.5, amountInput: "12.50", itemDetail: "2 cs broken", memo: "store note" }
           : line
       ),
     },
