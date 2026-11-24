@@ -8,6 +8,7 @@ import {
   formatSalesCreditMoney,
   isSalesCreditAmountInput,
   parseSalesCreditAmount,
+  salesCreditRequestPdfFileName,
   salesCreditTotal,
   SALES_CREDIT_EMAIL,
   type SalesCreditLine,
@@ -209,9 +210,8 @@ export function CreditRequestClient() {
       const blob = new Blob([copy], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      const stamp = dateOfRequest || todayIso();
       a.href = url;
-      a.download = `sales-credit-request-${salesId || "S32"}-${stamp}.pdf`.replace(/[^a-zA-Z0-9._-]+/g, "-");
+      a.download = salesCreditRequestPdfFileName(customerNo);
       a.click();
       URL.revokeObjectURL(url);
       setMessage("Saved PDF.");

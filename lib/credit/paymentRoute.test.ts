@@ -17,6 +17,7 @@ test("deposit slip stays on /payment and sales credit request lives on /credit",
   assert.match(creditClient, /SALES_CREDIT_EMAIL/);
   assert.match(creditClient, /className="scr-memo"/);
   assert.match(creditClient, /isSalesCreditAmountInput/);
+  assert.match(creditClient, /salesCreditRequestPdfFileName\(customerNo\)/);
   assert.match(readFileSync(new URL("./salesCreditRequest.ts", import.meta.url), "utf8"), /ELIN@RHEEBROS\.COM/);
   assert.equal(existsSync(new URL("../../app/credit/CreditRequestClient.tsx", import.meta.url)), true);
 });

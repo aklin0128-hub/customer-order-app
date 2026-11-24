@@ -81,3 +81,12 @@ export function formatSalesCreditDate(iso: string) {
   if (!y || !m || !d) return iso;
   return `${Number(m)}/${Number(d)}/${y}`;
 }
+
+/** `sales-credit-request_FL168.pdf` from Customer #. */
+export function salesCreditRequestPdfFileName(customerNo: string) {
+  const acct = String(customerNo || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "");
+  return acct ? `sales-credit-request_${acct}.pdf` : "sales-credit-request.pdf";
+}
