@@ -52,17 +52,18 @@ test("NDH email is labeled separately from the regular order email", () => {
   assert.match(ndh.subject, /^New NDH Order -/);
   assert.match(ndh.subject, /FL111-1101-NDH/);
   assert.match(ndh.filename, /^FL111_NDH_\d{4}-\d{2}-\d{2}\.csv$/);
-  assert.match(ndh.text, /B2 - 1 - NDH \$4\.17/);
+  assert.match(ndh.text, /B2 - 1 - \$4\.17/);
   assert.doesNotMatch(ndh.text, /NDH 2026-11-08/);
   assert.doesNotMatch(ndh.csv, /2026-11-08/);
-  assert.match(ndh.csv, /B2,1,NDH \$4\.17/);
+  assert.match(ndh.csv, /^SKU,QTY,PRICE\nB2,1,\$4\.17$/m);
   assert.doesNotMatch(ndh.text, /A1 - 2/);
   assert.match(catalog.text, /separate NDH email/);
+  assert.match(catalog.csv, /^SKU,Qty,Tag\n/m);
 });
 
-test("NDH Tag column uses price instead of expiry date", () => {
-  assert.equal(lineTag({ sku: "B2", qty: "1", ndh: true, expiryDate: "2026-11-08", price: "$5.38" }), "NDH $5.38");
-  assert.equal(lineTag({ sku: "B2", qty: "1", ndh: true, expiryDate: "2026-11-08" }), "NDH");
+test("NDH order lines are SKU QTY PRICE", () => {
+  assert.equal(lineTag({ sku: "B2", qty: "1", ndh: true, expiryDate: "2026-11-08", price: "$5.38" }), "$5.38");
+  assert.equal(lineTag({ sku: "B2", qty: "1", ndh: true, expiryDate: "2026-11-08" }), "");
   assert.equal(lineTag({ sku: "C3", qty: "3", nhItems: true }), "NH_ITEMS");
 });
 
