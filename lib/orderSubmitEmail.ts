@@ -8,7 +8,7 @@ export type OrderEmailLine = {
   nhItems?: boolean;
   ndh?: boolean;
   expiryDate?: string;
-  /** NDH listing price — used in the Tag column instead of the expiry date. */
+  /** Unit/case price written to the CSV PRICE column. */
   price?: string;
 };
 
@@ -43,6 +43,40 @@ function listingPrice(row: NdhPriceListing) {
   return String(row.clearancePrice || row.price || "").trim();
 }
 
+export type CatalogPriceListing = {
+  sku?: string;
+  bp?: unknown;
+  up?: unknown;
+  price?: string;
+  newItemListPrice?: string;
+};
+
+function catalogRowPrice(row: CatalogPriceListing) {
+  return String(row.bp ?? row.price ?? row.up ?? row.newItemListPrice ?? "").trim();
+}
+
+/** Fill regular order lines from catalog BP (does not overwrite NDH prices). */
+export function attachCatalogPrices<T extends OrderEmailLine>(
+  lines: T[],
+  listings: CatalogPriceListing[]
+): T[] {
+  const bySku = new Map<string, string>();
+  for (const row of listings) {
+    const sku = String(row.sku || "").trim().toUpperCase();
+    const price = catalogRowPrice(row);
+    if (!sku || !price) continue;
+    bySku.set(sku, price);
+  }
+
+  return lines.map((item) => {
+    if (item.ndh) return item;
+    const sku = String(item.sku || "").trim().toUpperCase();
+    const listed = bySku.get(sku) || "";
+    const price = listed || String(item.price || "").trim() || undefined;
+    return { ...item, price };
+  });
+}
+
 /** Fill NDH line prices from live listings (exact sku+date, then unique sku, then existing). */
 export function attachNdhPrices<T extends OrderEmailLine>(lines: T[], listings: NdhPriceListing[]): T[] {
   const byKey = new Map<string, string>();
@@ -69,16 +103,12 @@ export function attachNdhPrices<T extends OrderEmailLine>(lines: T[], listings: 
 }
 
 export function buildOrderDownloadCsv(items: OrderEmailLine[]) {
-  if (items.some((item) => item.ndh || item.price)) return buildCsv(items, "ndh");
-  const rows = [["SKU", "Qty"]];
-  for (const item of items) {
-    rows.push([String(item.sku || "").trim().toUpperCase(), String(item.qty || "").trim()]);
-  }
-  return rows.map((row) => row.map(csvEscape).join(",")).join("\n");
+  return buildCsv(items);
 }
 
 export function lineTag(item: OrderEmailLine) {
-  if (item.ndh) return ndhTagPrice(item.price);
+  const priced = ndhTagPrice(item.price);
+  if (priced) return priced;
   if (item.nhItems) return CLEARANCE_ORDER_EMAIL_TAG;
   return "";
 }
@@ -98,14 +128,13 @@ export function formatOrderLine(item: OrderEmailLine) {
   return tag ? `${sku} - ${qty} - ${tag}` : `${sku} - ${qty}`;
 }
 
-export function buildCsv(items: OrderEmailLine[], kind: "catalog" | "ndh" = "catalog") {
-  const rows = kind === "ndh" ? [["SKU", "QTY", "PRICE"]] : [["SKU", "Qty", "Tag"]];
+export function buildCsv(items: OrderEmailLine[], _kind: "catalog" | "ndh" = "catalog") {
+  const rows = [["SKU", "QTY", "PRICE"]];
 
   for (const item of items) {
     const sku = String(item.sku || "").trim().toUpperCase();
     const qty = String(item.qty || "").trim();
-    const third = kind === "ndh" ? ndhTagPrice(item.price) : lineTag(item);
-    rows.push([sku, qty, third]);
+    rows.push([sku, qty, lineTag(item)]);
   }
 
   return rows.map((row) => row.map(csvEscape).join(",")).join("\n");
