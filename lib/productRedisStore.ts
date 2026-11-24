@@ -1,8 +1,9 @@
+import { redisSaddChunks, redisMgetChunks } from "@/lib/redisBatch";
 import { redis } from "@/lib/redis";
 
 export const PRODUCT_SKU_INDEX = "index:product:skus";
+export const PRODUCT_OVERRIDES_SNAPSHOT = "products:overrides";
 const PRODUCT_KEY_PREFIX = "product:";
-const MGET_CHUNK = 500;
 
 function normalizeSku(sku: string) {
   return String(sku || "").trim().toUpperCase();
@@ -18,19 +19,24 @@ export async function indexProductSku(sku: string) {
   await redis.sadd(PRODUCT_SKU_INDEX, normalized);
 }
 
+export async function invalidateProductOverridesSnapshot() {
+  await redis.del(PRODUCT_OVERRIDES_SNAPSHOT);
+}
+
 /** One-time rebuild when index is empty (uses KEYS — avoid calling often). */
 async function rebuildProductSkuIndex(): Promise<string[]> {
   const keys = await redis.keys(`${PRODUCT_KEY_PREFIX}*`);
-  const skus = keys
-    .map((key) => String(key).replace(/^product:/i, ""))
-    .map(normalizeSku)
-    .filter(Boolean);
+  const skus = [
+    ...new Set(
+      keys
+        .map((key) => String(key).replace(/^product:/i, ""))
+        .map(normalizeSku)
+        .filter(Boolean)
+    ),
+  ].sort();
 
-  for (const sku of skus) {
-    await redis.sadd(PRODUCT_SKU_INDEX, sku);
-  }
-
-  return [...new Set(skus)].sort();
+  await redisSaddChunks(PRODUCT_SKU_INDEX, skus);
+  return skus;
 }
 
 export async function listRedisProductSkus(): Promise<string[]> {
@@ -45,20 +51,11 @@ export async function listRedisProductSkus(): Promise<string[]> {
 }
 
 async function mgetProducts<T extends { sku?: string }>(keys: string[]): Promise<T[]> {
-  const results: T[] = [];
-
-  for (let i = 0; i < keys.length; i += MGET_CHUNK) {
-    const chunk = keys.slice(i, i + MGET_CHUNK);
-    const rows = (await redis.mget<(T | null)[]>(...chunk)) || [];
-    for (const item of rows) {
-      if (item?.sku) results.push(item);
-    }
-  }
-
-  return results;
+  const rows = await redisMgetChunks<T>(keys);
+  return rows.filter((item): item is T => Boolean(item?.sku));
 }
 
-/** Load Redis product overrides. Pass SKUs to fetch only those (2 requests: none if empty). */
+/** Load Redis product overrides. Full catalog uses one snapshot GET after the first fill. */
 export async function loadRedisProducts<T extends { sku?: string }>(
   filterSkus?: Iterable<string>
 ): Promise<T[]> {
@@ -70,14 +67,30 @@ export async function loadRedisProducts<T extends { sku?: string }>(
     return mgetProducts<T>(wanted.map(productRedisKey));
   }
 
-  const skus = await listRedisProductSkus();
-  if (!skus.length) return [];
+  const snapshot = await redis.get<T[]>(PRODUCT_OVERRIDES_SNAPSHOT);
+  if (Array.isArray(snapshot)) {
+    return snapshot.filter((item): item is T => Boolean(item?.sku));
+  }
 
-  return mgetProducts<T>(skus.map(productRedisKey));
+  const skus = await listRedisProductSkus();
+  if (!skus.length) {
+    await redis.set(PRODUCT_OVERRIDES_SNAPSHOT, []);
+    return [];
+  }
+
+  const products = await mgetProducts<T>(skus.map(productRedisKey));
+  await redis.set(PRODUCT_OVERRIDES_SNAPSHOT, products);
+  return products;
 }
 
-export async function saveRedisProduct<T extends { sku: string }>(product: T) {
+export async function saveRedisProduct<T extends { sku: string }>(
+  product: T,
+  options?: { skipSnapshotInvalidate?: boolean }
+) {
   const normalized = normalizeSku(product.sku);
   await redis.set(productRedisKey(normalized), { ...product, sku: normalized });
   await indexProductSku(normalized);
+  if (!options?.skipSnapshotInvalidate) {
+    await invalidateProductOverridesSnapshot();
+  }
 }

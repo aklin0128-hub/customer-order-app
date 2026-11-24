@@ -157,11 +157,11 @@ export default function AdminClearancePage() {
         headers: adminHeaders(),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to load clearance items.");
+      if (!res.ok) throw new Error(data?.error || "Failed to load Near Date Sale items.");
       setClearances(Array.isArray(data.clearances) ? data.clearances : []);
       setProducts(Array.isArray(data.products) ? data.products : []);
     } catch (err: any) {
-      notify(err?.message || "Failed to load clearance items.", "error");
+      notify(err?.message || "Failed to load Near Date Sale items.", "error");
     } finally {
       setBusy(false);
       setLoaded(true);
@@ -207,12 +207,12 @@ export default function AdminClearancePage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to save clearance item.");
+      if (!res.ok) throw new Error(data?.error || "Failed to save Near Date Sale item.");
       setForm(emptyForm());
-      notify(`Saved clearance ${finalSku}`);
+      notify(`Saved Near Date Sale ${finalSku}`);
       await loadClearances();
     } catch (err: any) {
-      notify(err?.message || "Failed to save clearance item.", "error");
+      notify(err?.message || "Failed to save Near Date Sale item.", "error");
     } finally {
       setBusy(false);
     }
@@ -220,7 +220,7 @@ export default function AdminClearancePage() {
 
   const removeClearance = async (targetSku: string) => {
     const finalSku = targetSku.trim().toUpperCase();
-    if (!confirm(`Remove ${finalSku} from clearance list?`)) return;
+    if (!confirm(`Remove ${finalSku} from Near Date Sale list?`)) return;
 
     setBusy(true);
     try {
@@ -229,12 +229,12 @@ export default function AdminClearancePage() {
         headers: adminHeaders(),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to remove clearance item.");
+      if (!res.ok) throw new Error(data?.error || "Failed to remove Near Date Sale item.");
       if (form.sku === finalSku) setForm(emptyForm());
       notify(`Removed ${finalSku}`);
       await loadClearances();
     } catch (err: any) {
-      notify(err?.message || "Failed to remove clearance item.", "error");
+      notify(err?.message || "Failed to remove Near Date Sale item.", "error");
     } finally {
       setBusy(false);
     }
@@ -246,11 +246,11 @@ export default function AdminClearancePage() {
   return (
     <AdminPage
       active="clearance"
-      title="Clearance — Sell as is"
+      title="Near Date Sale — Sell as is"
       subtitle="Click a row to edit · form on the right. Same fields as before."
       actions={
         <BtnSecondary onClick={() => setForm(emptyForm())} disabled={busy}>
-          + New clearance
+          + New Near Date Sale
         </BtnSecondary>
       }
     >
@@ -267,7 +267,7 @@ export default function AdminClearancePage() {
       />
 
       {!loaded && busy ? (
-        <Panel title="Loading clearance">
+        <Panel title="Loading Near Date Sale">
           <p style={{ margin: 0, fontSize: 13, color: "#c2410c", fontWeight: 800 }}>Loading…</p>
         </Panel>
       ) : null}
@@ -344,10 +344,10 @@ export default function AdminClearancePage() {
             })}
             {loaded && filteredClearances.length === 0 ? (
               <EmptyState
-                title={clearances.length === 0 ? "No clearance items yet" : "No matches"}
+                title={clearances.length === 0 ? "No Near Date Sale items yet" : "No matches"}
                 detail={
                   clearances.length === 0
-                    ? "Use + New clearance or enter a SKU on the right."
+                    ? "Use + New Near Date Sale or enter a SKU on the right."
                     : "Try another search or filter."
                 }
               />
@@ -356,7 +356,7 @@ export default function AdminClearancePage() {
         </Panel>
 
         <div style={splitForm} className="admin-catalog-form-sticky">
-          <Panel title={editingSku ? `Edit ${editingSku}` : "Add clearance item"}>
+          <Panel title={editingSku ? `Edit ${editingSku}` : "Add Near Date Sale item"}>
             <FormSection title="SKU & label">
               <div style={formGrid}>
                 <div>
@@ -392,7 +392,7 @@ export default function AdminClearancePage() {
                   />
                 </div>
                 <div>
-                  <FieldLabel required>Clearance price</FieldLabel>
+                  <FieldLabel required>Near Date Sale price</FieldLabel>
                   <input
                     value={form.clearancePrice}
                     onChange={(e) => setForm((f) => ({ ...f, clearancePrice: e.target.value }))}
@@ -459,7 +459,7 @@ export default function AdminClearancePage() {
             <div className="admin-form-actions-sticky">
               <BtnRow>
                 <BtnPrimary onClick={saveClearance} disabled={busy}>
-                  {busy ? "Saving…" : "Save clearance"}
+                  {busy ? "Saving…" : "Save Near Date Sale"}
                 </BtnPrimary>
                 <BtnSecondary onClick={() => setForm(emptyForm())} disabled={busy}>
                   Clear

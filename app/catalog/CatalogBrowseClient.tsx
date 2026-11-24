@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import type { Lang } from "@/app/order/types";
@@ -21,11 +20,8 @@ const copy = {
   en: {
     brand: "Store Portal",
     title: "SKU catalog",
-    subtitle: "Available products only, sorted by SKU number. Sign in to place orders.",
+    subtitle: "All available products, sorted by SKU number.",
     searchPlaceholder: "Search SKU, name, brand, UPC…",
-    signIn: "Sign in to order",
-    newItems: "New items",
-    promotions: "Promotions",
     showing: "Showing",
     of: "of",
     skus: "SKUs",
@@ -41,11 +37,8 @@ const copy = {
   zh: {
     brand: "门店订货",
     title: "SKU 目录",
-    subtitle: "仅显示可下单商品，按 SKU 编号排序。登录后可下单。",
+    subtitle: "显示全部可订购商品，按 SKU 编号排序。",
     searchPlaceholder: "搜索 SKU、品名、品牌、条码…",
-    signIn: "登录下单",
-    newItems: "新品",
-    promotions: "促销",
     showing: "显示",
     of: "/",
     skus: "个 SKU",
@@ -61,11 +54,8 @@ const copy = {
   ko: {
     brand: "매장 주문",
     title: "SKU 카탈로그",
-    subtitle: "주문 가능 상품만 SKU 번호순으로 표시합니다. 로그인 후 주문할 수 있습니다.",
+    subtitle: "주문 가능 상품 전체를 SKU 번호순으로 표시합니다.",
     searchPlaceholder: "SKU, 품명, 브랜드, 바코드 검색…",
-    signIn: "로그인 후 주문",
-    newItems: "신상품",
-    promotions: "프로모션",
     showing: "표시",
     of: "/",
     skus: "개 SKU",
@@ -81,11 +71,8 @@ const copy = {
   vi: {
     brand: "Cửa hàng",
     title: "Danh mục SKU",
-    subtitle: "Chỉ hiển thị SKU có thể đặt, sắp xếp theo số SKU. Đăng nhập để đặt hàng.",
+    subtitle: "Hiển thị tất cả SKU có thể đặt, sắp xếp theo số SKU.",
     searchPlaceholder: "Tìm SKU, tên, thương hiệu, mã vạch…",
-    signIn: "Đăng nhập để đặt",
-    newItems: "Hàng mới",
-    promotions: "Khuyến mãi",
     showing: "Hiển thị",
     of: "/",
     skus: "SKU",
@@ -142,7 +129,7 @@ export default function CatalogBrowseClient() {
           throw new Error(data?.error || "Failed to load catalog");
         }
         if (!cancelled) {
-          setItems(mapProductsToCatalogBrowse(data.products));
+          setItems(mapProductsToCatalogBrowse(data.products, { availableOnly: true }));
         }
       } catch (err: unknown) {
         if (!cancelled) {
@@ -194,17 +181,6 @@ export default function CatalogBrowseClient() {
         <div className="catalog-hero">
           <h1 className="catalog-title">{t.title}</h1>
           <p className="catalog-subtitle">{t.subtitle}</p>
-          <div className="catalog-hero-actions">
-            <Link href="/" className="catalog-link-btn catalog-link-btn--primary">
-              {t.signIn}
-            </Link>
-            <Link href="/new" className="catalog-link-btn">
-              {t.newItems}
-            </Link>
-            <Link href="/promo" className="catalog-link-btn">
-              {t.promotions}
-            </Link>
-          </div>
         </div>
 
         <div className="catalog-toolbar">

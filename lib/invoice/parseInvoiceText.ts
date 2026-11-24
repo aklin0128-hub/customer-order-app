@@ -164,49 +164,125 @@ function buildParsedLine(
   return { sku, qty, unitPrice, lineTotal, rawLine };
 }
 
+const INVOICE_DATE_TOKEN_RE = /(\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4})/;
+const OTHER_DATE_LABEL_RE = /\b(?:due|ship(?:ping)?|order|delivery)\s*date\b/i;
+const MONTH_NAME_DATE_RE =
+  /\b((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}(?:,)?\s+\d{2,4})\b/i;
+
+/** Normalize printed US invoice dates to YYYY-MM-DD. */
+export function normalizeInvoiceDateToken(token: string): string | null {
+  const raw = String(token || "").trim();
+  if (!raw) return null;
+
+  const numeric = raw.match(/^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})$/);
+  if (numeric) {
+    const month = Number(numeric[1]);
+    const day = Number(numeric[2]);
+    const year = numeric[3].length === 2 ? 2000 + Number(numeric[3]) : Number(numeric[3]);
+    if (month < 1 || month > 12 || day < 1 || day > 31 || year < 2000 || year > 2100) return null;
+    const date = new Date(Date.UTC(year, month - 1, day, 12));
+    if (date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return raw;
+
+  const parsed = Date.parse(raw);
+  if (!Number.isFinite(parsed)) return null;
+  const date = new Date(parsed);
+  if (Number.isNaN(date.getTime())) return null;
+  const year = date.getFullYear();
+  if (year < 2000 || year > 2100) return null;
+  return `${year}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function dateHasOtherLabelPrefix(text: string, dateIndex: number) {
+  const lineStart = text.lastIndexOf("\n", dateIndex - 1) + 1;
+  const prefix = text.slice(lineStart, dateIndex);
+  return OTHER_DATE_LABEL_RE.test(prefix);
+}
+
+/**
+ * Invoice Date from Rheebros-style headers. Ignores Due Date / Ship Date / Order Date,
+ * and reads the first date after a split "Invoice Date … Due Date" label row.
+ */
+export function extractInvoiceDate(raw: string): string | null {
+  const text = String(raw || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const label = /\binvoice\s*date\b|\binv(?:oice)?\.?\s*date\b/i.exec(text);
+  if (label) {
+    const after = text.slice(label.index + label[0].length, label.index + label[0].length + 500);
+    const firstNumeric = after.match(INVOICE_DATE_TOKEN_RE);
+    if (firstNumeric && !dateHasOtherLabelPrefix(after, firstNumeric.index ?? 0)) {
+      return normalizeInvoiceDateToken(firstNumeric[1]!);
+    }
+
+    for (const match of after.matchAll(new RegExp(INVOICE_DATE_TOKEN_RE, "g"))) {
+      if (dateHasOtherLabelPrefix(after, match.index ?? 0)) continue;
+      return normalizeInvoiceDateToken(match[1]!);
+    }
+
+    const monthName = after.match(MONTH_NAME_DATE_RE);
+    if (monthName && !dateHasOtherLabelPrefix(after, monthName.index ?? 0)) {
+      return normalizeInvoiceDateToken(monthName[1]!);
+    }
+  }
+
+  const labeled = text.match(
+    /(?<!due\s)(?<!ship(?:ping)?\s)(?<!order\s)(?<!delivery\s)\bdate\s*[:#]?\s*(\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4})/i
+  );
+  if (labeled) return normalizeInvoiceDateToken(labeled[1]!);
+
+  return null;
+}
+
+function isValidQtyMatch(normalized: string, match: RegExpExecArray) {
+  const qtyIndex = match.index ?? 0;
+  if (qtyIndex > 0 && normalized[qtyIndex - 1] === ".") return false;
+  return parseInt(match[1] || "0", 10) > 0;
+}
+
 function tryParseRheebrosPriceTail(normalized: string): {
   qty: number;
   unitCol: string;
   eachCol?: string;
   totalCol: string;
 } | null {
-  const unitWord = "(?:Case|CS|CA|EA|Each|BX|Box|PK|Pack|BG|Bag)";
-  const priceCol = "([\\d,]+(?:\\.\\d{2})?)";
+  const unitWord = "(?:Cases?|CS|CA|EA|Each|BX|Box|PK|Pack|BG|Bag)";
+  const typeWord = "(?:[A-Za-z][A-Za-z.]{0,11})";
+  const priceCol = "([\\d,]+(?:\\.\\d{1,4})?)";
 
-  const rx3 = new RegExp(
-    `(\\d{1,5})\\s+${unitWord}\\s+(\\S+)\\s+${priceCol}\\s+${priceCol}\\s+${priceCol}\\s*$`,
-    "gi"
+  const lastValid = (rx: RegExp) => {
+    let last: RegExpExecArray | null = null;
+    let match: RegExpExecArray | null;
+    rx.lastIndex = 0;
+    while ((match = rx.exec(normalized)) !== null) {
+      if (!isValidQtyMatch(normalized, match)) continue;
+      last = match;
+    }
+    return last;
+  };
+
+  const three = lastValid(
+    new RegExp(`(\\d{1,5})\\s+${unitWord}\\s+(?:${typeWord}\\s+)?${priceCol}\\s+${priceCol}\\s+${priceCol}\\s*$`, "gi")
   );
-  let last3: RegExpExecArray | null = null;
-  let match: RegExpExecArray | null;
-  while ((match = rx3.exec(normalized)) !== null) {
-    const qtyIndex = match.index ?? 0;
-    if (qtyIndex > 0 && normalized[qtyIndex - 1] === ".") continue;
-    if (!parseInt(match[1], 10)) continue;
-    last3 = match;
-  }
-  if (last3) {
+  if (three) {
     return {
-      qty: parseInt(last3[1], 10),
-      unitCol: last3[3],
-      eachCol: last3[4],
-      totalCol: last3[5],
+      qty: parseInt(three[1], 10),
+      unitCol: three[2],
+      eachCol: three[3],
+      totalCol: three[4],
     };
   }
 
-  const rx2 = new RegExp(`(\\d{1,5})\\s+${unitWord}\\s+${priceCol}\\s+${priceCol}\\s*$`, "gi");
-  let last2: RegExpExecArray | null = null;
-  while ((match = rx2.exec(normalized)) !== null) {
-    const qtyIndex = match.index ?? 0;
-    if (qtyIndex > 0 && normalized[qtyIndex - 1] === ".") continue;
-    if (!parseInt(match[1], 10)) continue;
-    last2 = match;
-  }
-  if (last2) {
+  const two = lastValid(
+    new RegExp(`(\\d{1,5})\\s+${unitWord}\\s+(?:${typeWord}\\s+)?${priceCol}\\s+${priceCol}\\s*$`, "gi")
+  );
+  if (two) {
     return {
-      qty: parseInt(last2[1], 10),
-      unitCol: last2[2],
-      totalCol: last2[3],
+      qty: parseInt(two[1], 10),
+      unitCol: two[2],
+      totalCol: two[3],
     };
   }
 
@@ -296,10 +372,7 @@ export function parseInvoiceText(raw: string): ParsedInvoice {
 
   let supplierOrderNo = text.match(/order\s*no\.?\s*[#:\s]*\s*([A-Z]{2,3}-\d{5,})/i)?.[1] ?? null;
 
-  const invoiceDate =
-    text.match(/invoice\s*date\s*[#:\s]*\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i)?.[1] ??
-    text.match(/invoice\s*date\s*\n\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i)?.[1] ??
-    null;
+  const invoiceDate = extractInvoiceDate(text);
 
   const merged = new Map<string, ParsedInvoiceLine>();
   const sectionLines = sliceInvoiceProductSectionLines(
@@ -342,6 +415,7 @@ export function parseInvoiceText(raw: string): ParsedInvoice {
   }
   if (!invoiceNo) warnings.push("Invoice number not detected — enter it if you need to de-duplicate uploads.");
   if (!accountNo) warnings.push("Customer / account number not detected — use Manual account field before applying to history.");
+  if (!invoiceDate) warnings.push("Invoice date not detected — latest prices will fall back to upload time until this is re-parsed.");
 
   return { invoiceNo, accountNo, supplierOrderNo, invoiceDate, lines, warnings };
 }

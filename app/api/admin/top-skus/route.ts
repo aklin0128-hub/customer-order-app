@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getTopSkus } from "@/lib/topSkus";
+import { getTopSkus, normalizeTopSkuRegion } from "@/lib/topSkus";
 
 export const dynamic = "force-dynamic";
 
@@ -18,10 +18,14 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const days = Number(url.searchParams.get("days") || 0);
     const limit = Number(url.searchParams.get("limit") || 100);
+    const region = normalizeTopSkuRegion(
+      url.searchParams.get("region") || url.searchParams.get("area") || "all"
+    );
 
     const result = await getTopSkus({
       days: Number.isFinite(days) && days > 0 ? days : undefined,
       limit: Number.isFinite(limit) && limit > 0 ? limit : 100,
+      region,
     });
 
     return NextResponse.json({

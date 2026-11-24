@@ -1,5 +1,6 @@
 import { loadRedisProducts } from "@/lib/productRedisStore";
 import { redis } from "@/lib/redis";
+import { isHiddenFromCustomerCatalog } from "@/lib/catalogVisibility";
 import catalogData from "@/data/catalog_sku_master_extracted.json";
 import { formatClearancePriceDisplay } from "@/lib/clearanceFormat";
 
@@ -8,7 +9,7 @@ export { formatClearancePriceDisplay } from "@/lib/clearanceFormat";
 export const CLEARANCE_KEY = "clearance:list";
 
 /** Appended to order email/CSV lines for active clearance items (e.g. 00003D - 5 - NH_ITEMS). */
-export const CLEARANCE_ORDER_EMAIL_TAG = "NH_ITEMS";
+export { CLEARANCE_ORDER_EMAIL_TAG } from "@/lib/orderEmailTags";
 
 export type ClearanceStatus = "active" | "scheduled" | "expired" | "sold_out";
 
@@ -234,6 +235,7 @@ export async function getClearanceProducts(options?: {
 
     const product = map.get(record.sku);
     if (!product) continue;
+    if (options?.activeOnly && isHiddenFromCustomerCatalog(product)) continue;
 
     products.push(recordToProduct(record, product));
   }
@@ -303,7 +305,7 @@ export function validateClearanceInput(input: {
   }
 
   if (!clearancePrice) {
-    return { error: "Clearance price is required." };
+    return { error: "Near Date Sale price is required." };
   }
 
   if (startDate && !parseDateOnly(startDate)) {

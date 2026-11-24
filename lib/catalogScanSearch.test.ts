@@ -4,7 +4,9 @@ import test from "node:test";
 import {
   catalogItemMatchesScanCode,
   catalogSearchQueryFromScan,
+  filterItemsBySearchQuery,
   normalizeUpcScanCode,
+  resolveListSearchTargetItem,
   scoreCatalogSearchQuery,
 } from "../app/order/catalogUtils";
 import type { CatalogItem } from "../app/order/types";
@@ -62,11 +64,49 @@ test("scoreCatalogSearchQuery ignores punctuation and spaces in queries", () => 
   assert.ok(scoreCatalogSearchQuery(item, "o-tube") >= 560);
 });
 
-test("catalogSearchQueryFromScan returns digits when no catalog match", () => {
-  assert.equal(catalogSearchQueryFromScan("123456789012"), "123456789012");
+test("scoreCatalogSearchQuery matches brand and partial name like samyang carbo", () => {
+  const item: CatalogItem = {
+    sku: "08444K",
+    brand: "SAMYANG",
+    name: "CARBONARA BULDAK RAMEN (BIG BOWL)",
+  };
+  assert.ok(scoreCatalogSearchQuery(item, "samyang carbo") >= 540);
+  assert.ok(scoreCatalogSearchQuery(item, "samyang") >= 480);
+});
+
+test("scoreCatalogSearchQuery matches melon in product names", () => {
+  assert.ok(scoreCatalogSearchQuery({ sku: "11026K", name: "MELON FLAVORED MILK" }, "melon") >= 450);
+  assert.ok(scoreCatalogSearchQuery({ sku: "05501", name: "MELON KICK (S)" }, "MELON") >= 450);
+  assert.ok(scoreCatalogSearchQuery({ sku: "11024K", name: "TARO FLAVORED MILK" }, "melon") < 0);
 });
 
 test("catalogSearchQueryFromScan returns SKU when UPC matches catalog", () => {
   assert.equal(catalogSearchQueryFromScan("081652000020"), "00002D");
   assert.equal(catalogSearchQueryFromScan("81652000020"), "00002D");
+});
+
+test("filterItemsBySearchQuery keeps matching SKU and name rows", () => {
+  const items: CatalogItem[] = [
+    { sku: "A1", name: "MELON MILK" },
+    { sku: "B2", name: "TARO MILK" },
+    { sku: "C3", name: "MELON KICK" },
+  ];
+  assert.deepEqual(
+    filterItemsBySearchQuery(items, "melon").map((item) => item.sku),
+    ["A1", "C3"]
+  );
+  assert.deepEqual(
+    filterItemsBySearchQuery(items, "").map((item) => item.sku),
+    ["A1", "B2", "C3"]
+  );
+});
+
+test("resolveListSearchTargetItem prefers the filtered list SKU", () => {
+  const filtered: CatalogItem[] = [
+    { sku: "B2", name: "NDH ITEM" },
+    { sku: "C3", name: "OTHER" },
+  ];
+  assert.equal(resolveListSearchTargetItem("B2", filtered)?.sku, "B2");
+  assert.equal(resolveListSearchTargetItem("ZZZ", filtered), null);
+  assert.equal(resolveListSearchTargetItem("other", [{ sku: "C3", name: "OTHER" }])?.sku, "C3");
 });

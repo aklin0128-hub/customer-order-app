@@ -29,3 +29,10 @@ test("explicit false coming soon with out of stock shows out-of-stock stamp only
   assert.equal(isComingSoonNewItem(outOnly), false);
   assert.equal(isNewItemOutOfStockStamp(outOnly), true);
 });
+
+test("general outOfStock on a new item shows stamp on new-item surfaces", () => {
+  const item = { isNew: true, outOfStock: true, newItemComingSoon: false };
+  assert.equal(isNewItemOutOfStockStamp(item), true);
+  assert.equal(isComingSoonNewItem(item), false);
+  assert.equal(isNewItemOrderingBlocked(item), true);
+});
