@@ -57,6 +57,8 @@ import {
   catalogSearchQueryFromScan,
   isOrderSearchQtyAdjustKey,
   resolveCatalogFilterTargetItem,
+  resolveListSearchTargetItem,
+  filterItemsBySearchQuery,
   resolveQuickSearchTargetItem,
   isNewItem,
   isOrderableItem,
@@ -1365,10 +1367,21 @@ export default function OrderPage() {
 
   const newItemCatalogItems = useMemo(
     () =>
-      catalogBrowseBase
-        .filter((item) => isNewItem(item))
-        .sort(compareCatalogByNewestImport),
-    [catalogBrowseBase]
+      filterItemsBySearchQuery(
+        catalogBrowseBase.filter((item) => isNewItem(item)).sort(compareCatalogByNewestImport),
+        catalogSearch
+      ),
+    [catalogBrowseBase, catalogSearch]
+  );
+
+  const visiblePromotionItems = useMemo(
+    () => filterItemsBySearchQuery(promotionItems, catalogSearch),
+    [promotionItems, catalogSearch]
+  );
+
+  const visibleNdhItems = useMemo(
+    () => filterItemsBySearchQuery(ndhItems, catalogSearch),
+    [ndhItems, catalogSearch]
   );
 
   const seasonalCatalogItems = useMemo(() => {
@@ -1979,7 +1992,7 @@ export default function OrderPage() {
       const term = catalogSearchQueryFromScan(raw);
       if (!term) return;
       setBarcodeScannerOpen(false);
-      if (mode === "catalog") {
+      if (mode === "catalog" || mode === "promotion" || mode === "ndh" || mode === "newItems") {
         setCatalogSearch(term);
         return;
       }
@@ -2094,11 +2107,17 @@ export default function OrderPage() {
 
   const handleSearchQtyKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
-    target: CatalogItem | null
+    target: (CatalogItem & { expiryDate?: string }) | null,
+    qtySource: QtySource = "normal"
   ) => {
     if (!target?.sku || !isOrderSearchQtyAdjustKey(e.key)) return false;
     e.preventDefault();
-    adjustCatalogQty(target.sku, e.key === "-" || e.key === "_" ? -1 : 1);
+    const delta = e.key === "-" || e.key === "_" ? -1 : 1;
+    if (qtySource === "ndh") {
+      adjustQtyForSku(target.sku, delta, "ndh", target.expiryDate);
+    } else {
+      adjustCatalogQty(target.sku, delta);
+    }
     return true;
   };
 
@@ -2479,18 +2498,29 @@ export default function OrderPage() {
               ? t.seasonalMode
               : t.searchMode;
 
-  const renderCatalogSearchRow = (className = "") => (
+  const shopListSearchActive =
+    mode === "catalog" || mode === "promotion" || mode === "ndh" || mode === "newItems";
+
+  const shopSearchQtyTarget = () => {
+    if (mode === "ndh") return resolveListSearchTargetItem(catalogSearch, visibleNdhItems);
+    if (mode === "promotion") return resolveListSearchTargetItem(catalogSearch, visiblePromotionItems);
+    if (mode === "newItems") return resolveListSearchTargetItem(catalogSearch, newItemCatalogItems);
+    return resolveCatalogFilterTargetItem(catalogSearch, orderableCatalogItems);
+  };
+
+  const renderCatalogSearchRow = (className = "", options?: { filters?: boolean }) => (
     <div className={`order-sticky-search-row${className ? ` ${className}` : ""}`}>
       <input
         value={catalogSearch}
         onChange={(e) => setCatalogSearch(e.target.value)}
         onKeyDown={(e) => {
-          handleSearchQtyKeyDown(e, resolveCatalogFilterTargetItem(catalogSearch, orderableCatalogItems));
+          handleSearchQtyKeyDown(e, shopSearchQtyTarget(), mode === "ndh" ? "ndh" : "normal");
         }}
         placeholder={t.catalogSearch}
         className="order-sticky-search-input"
         aria-label={t.catalogSearch}
       />
+      {options?.filters === false ? null : (
       <button
         type="button"
         onClick={() => setCatalogFiltersOpen((prev) => !prev)}
@@ -2499,6 +2529,7 @@ export default function OrderPage() {
         {catalogFiltersOpen ? t.hideFilters : t.showFilters}
         {activeCatalogFilterCount > 0 ? ` (${activeCatalogFilterCount})` : ""}
       </button>
+      )}
     </div>
   );
 
@@ -2808,7 +2839,7 @@ export default function OrderPage() {
 
       {renderMobileModeTags()}
 
-      {mode === "catalog" ? (
+      {shopListSearchActive ? (
         <div className="order-shop-search-row">
           <label className="order-shop-search-field">
             <span className="order-shop-search-icon" aria-hidden>
@@ -2821,7 +2852,7 @@ export default function OrderPage() {
               value={catalogSearch}
               onChange={(e) => setCatalogSearch(e.target.value)}
               onKeyDown={(e) => {
-                handleSearchQtyKeyDown(e, resolveCatalogFilterTargetItem(catalogSearch, orderableCatalogItems));
+                handleSearchQtyKeyDown(e, shopSearchQtyTarget(), mode === "ndh" ? "ndh" : "normal");
               }}
               placeholder={t.catalogSearch}
               className="order-shop-search-input"
@@ -2829,6 +2860,7 @@ export default function OrderPage() {
             />
           </label>
           {renderMobileScanButton()}
+          {mode === "catalog" ? (
           <button
             type="button"
             className={`order-shop-filter-btn${catalogFiltersOpen || activeCatalogFilterCount > 0 ? " is-active" : ""}`}
@@ -2849,6 +2881,7 @@ export default function OrderPage() {
               <span className="order-shop-filter-badge">{activeCatalogFilterCount}</span>
             ) : null}
           </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -2937,7 +2970,7 @@ export default function OrderPage() {
     </div>
   );
 
-  const showCatalogSearch = mode === "catalog" && stickyPanelOpen && !isMobileViewport;
+  const showCatalogSearch = shopListSearchActive && stickyPanelOpen && !isMobileViewport;
   const accountLabel = [accountNo, storeName].filter(Boolean).join(" · ");
   const collapseDesktopChrome = !isMobileViewport && !stickyPanelOpen;
 
@@ -3151,6 +3184,8 @@ export default function OrderPage() {
                 {showCatalogSearch ? renderCatalogSearchRow() : null}
                 {renderCatalogCategoryRow()}
               </div>
+            ) : showCatalogSearch ? (
+              renderCatalogSearchRow("", { filters: false })
             ) : null}
             {renderCatalogFiltersPanel()}
 
@@ -3295,8 +3330,10 @@ export default function OrderPage() {
           />
         ) : mode === "newItems" ? (
           <section className="order-shop-card">
-            {newItemCatalogItems.length === 0 ? (
+            {newItemCount === 0 ? (
               <div style={{ ...emptyStyle, border: "1px solid #fdba74", background: "#fff7ed", color: "#c2410c" }}>{t.noNewItems}</div>
+            ) : newItemCatalogItems.length === 0 ? (
+              <div style={emptyStyle}>{t.noMatches}</div>
             ) : (
               <div className="order-promo-grid order-new-items-grid">
                 {newItemCatalogItems.map((item) => {
@@ -3398,9 +3435,11 @@ export default function OrderPage() {
               <div style={{ ...emptyStyle, border: "1px solid #5eead4", background: "#f0fdfa", color: "#0f766e" }}>{t.loadingPromotions}</div>
             ) : promotionItems.length === 0 ? (
               <div style={emptyStyle}>{t.noPromotions}</div>
+            ) : visiblePromotionItems.length === 0 ? (
+              <div style={emptyStyle}>{t.noMatches}</div>
             ) : (
               <div className="order-promo-grid">
-                {promotionItems.map((item) => {
+                {visiblePromotionItems.map((item) => {
                   const sku = item.sku?.toUpperCase() || "";
                   const qty = catalogQtyMap[sku] || "";
                   const soldOut = item.remainingQty === 0;
@@ -3515,9 +3554,11 @@ export default function OrderPage() {
               <div style={{ ...emptyStyle, border: "1px solid #fda4af", background: "#fff1f2", color: "#9f1239" }}>{t.loadingNdh}</div>
             ) : ndhItems.length === 0 ? (
               <div style={emptyStyle}>{t.noNdh}</div>
+            ) : visibleNdhItems.length === 0 ? (
+              <div style={emptyStyle}>{t.noMatches}</div>
             ) : (
               <div className="order-promo-grid">
-                {ndhItems.map((item) => {
+                {visibleNdhItems.map((item) => {
                   const sku = item.sku?.toUpperCase() || "";
                   const expiryDate = item.expiryDate;
                   const qty = ndhQtyMap[ndhListingKey(sku, expiryDate)] || "";
