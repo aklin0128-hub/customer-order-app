@@ -1,4 +1,5 @@
 import { CLEARANCE_ORDER_EMAIL_TAG } from "@/lib/clearance";
+import { formatClearancePriceDisplay } from "@/lib/clearanceFormat";
 import { NDH_ORDER_EMAIL_TAG } from "@/lib/ndh";
 
 export type OrderEmailLine = {
@@ -7,6 +8,8 @@ export type OrderEmailLine = {
   nhItems?: boolean;
   ndh?: boolean;
   expiryDate?: string;
+  /** NDH listing price — used in the Tag column instead of the expiry date. */
+  price?: string;
 };
 
 export function isNdhEmailLine(item: OrderEmailLine) {
@@ -23,11 +26,14 @@ export function splitOrderLinesForEmail(items: OrderEmailLine[]) {
   return { catalog, ndh };
 }
 
+export function ndhTagPrice(price?: string) {
+  const raw = String(price || "").trim();
+  if (!raw) return "";
+  return formatClearancePriceDisplay(raw) || raw;
+}
+
 export function lineTag(item: OrderEmailLine) {
-  if (item.ndh) {
-    const exp = String(item.expiryDate || "").trim();
-    return exp ? `${NDH_ORDER_EMAIL_TAG} ${exp}` : NDH_ORDER_EMAIL_TAG;
-  }
+  if (item.ndh) return ndhTagPrice(item.price);
   if (item.nhItems) return CLEARANCE_ORDER_EMAIL_TAG;
   return "";
 }
@@ -47,13 +53,14 @@ export function formatOrderLine(item: OrderEmailLine) {
   return tag ? `${sku} - ${qty} - ${tag}` : `${sku} - ${qty}`;
 }
 
-export function buildCsv(items: OrderEmailLine[]) {
-  const rows = [["SKU", "Qty", "Tag"]];
+export function buildCsv(items: OrderEmailLine[], kind: "catalog" | "ndh" = "catalog") {
+  const rows = kind === "ndh" ? [["SKU", "QTY", "PRICE"]] : [["SKU", "Qty", "Tag"]];
 
   for (const item of items) {
     const sku = String(item.sku || "").trim().toUpperCase();
     const qty = String(item.qty || "").trim();
-    rows.push([sku, qty, lineTag(item)]);
+    const third = kind === "ndh" ? ndhTagPrice(item.price) : lineTag(item);
+    rows.push([sku, qty, third]);
   }
 
   return rows.map((row) => row.map(csvEscape).join(",")).join("\n");
@@ -105,7 +112,7 @@ export function buildOrderEmail(options: {
     subject,
     text,
     filename,
-    csv: buildCsv(items),
+    csv: buildCsv(items, kind),
     emailRef,
   };
 }

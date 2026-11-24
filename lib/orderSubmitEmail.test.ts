@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildOrderEmail, splitOrderLinesForEmail } from "./orderSubmitEmail";
+import { buildOrderEmail, lineTag, splitOrderLinesForEmail } from "./orderSubmitEmail";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sendOrder = readFileSync(join(here, "../app/api/send-order/route.ts"), "utf8");
@@ -45,16 +45,26 @@ test("NDH email is labeled separately from the regular order email", () => {
     note: "",
     orderEmail: "orders@example.com",
     orderRef: "FL111-1101",
-    items: [{ sku: "B2", qty: "1", ndh: true, expiryDate: "2026-11-08" }],
+    items: [{ sku: "B2", qty: "1", ndh: true, expiryDate: "2026-11-08", price: "4.17" }],
     companionSplit: true,
   });
   assert.match(catalog.subject, /^New Order -/);
   assert.match(ndh.subject, /^New NDH Order -/);
   assert.match(ndh.subject, /FL111-1101-NDH/);
   assert.match(ndh.filename, /^FL111_NDH_\d{4}-\d{2}-\d{2}\.csv$/);
-  assert.match(ndh.text, /B2 - 1 - NDH 2026-11-08/);
+  assert.match(ndh.text, /B2 - 1 - \$4\.17/);
+  assert.doesNotMatch(ndh.text, /NDH 2026-11-08/);
+  assert.doesNotMatch(ndh.csv, /2026-11-08/);
+  assert.match(ndh.csv, /^SKU,QTY,PRICE\nB2,1,\$4\.17$/m);
   assert.doesNotMatch(ndh.text, /A1 - 2/);
   assert.match(catalog.text, /separate NDH email/);
+  assert.match(catalog.csv, /^SKU,Qty,Tag\n/m);
+});
+
+test("NDH order lines are SKU QTY PRICE", () => {
+  assert.equal(lineTag({ sku: "B2", qty: "1", ndh: true, expiryDate: "2026-11-08", price: "$5.38" }), "$5.38");
+  assert.equal(lineTag({ sku: "B2", qty: "1", ndh: true, expiryDate: "2026-11-08" }), "");
+  assert.equal(lineTag({ sku: "C3", qty: "3", nhItems: true }), "NH_ITEMS");
 });
 
 test("send-order sends catalog and NDH emails as separate messages", () => {

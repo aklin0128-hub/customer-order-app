@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { prependOrderHistory } from "@/lib/orderHistory";
 import { incrementClearanceSold } from "@/lib/clearance";
-import { incrementNdhSold } from "@/lib/ndh";
+import { getNdhRecords, incrementNdhSold, ndhListingKey } from "@/lib/ndh";
 import { incrementPromotionSold } from "@/lib/promotions";
 import { isValidOrderEmail, resolveCustomerOrderEmail } from "@/lib/customerOrderEmail";
 import { getCustomerByAccount, upsertCustomerContact } from "@/lib/customers";
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const cleanedItems: OrderLine[] = items
+    let cleanedItems: OrderLine[] = items
       .map((item: any) => {
         const ndh = Boolean(item?.ndh);
         return {
@@ -54,9 +54,26 @@ export async function POST(req: Request) {
           ndh,
           nhItems: Boolean(item?.nhItems) && !ndh,
           expiryDate: ndh ? String(item?.expiryDate || "").trim() || undefined : undefined,
+          price: ndh ? String(item?.price || item?.clearancePrice || "").trim() || undefined : undefined,
         };
       })
       .filter((item: OrderLine) => item.sku && item.qty);
+
+    if (cleanedItems.some((item) => item.ndh)) {
+      try {
+        const ndhRecords = await getNdhRecords();
+        const priceByKey = new Map(
+          ndhRecords.map((record) => [ndhListingKey(record.sku, record.expiryDate), record.clearancePrice])
+        );
+        cleanedItems = cleanedItems.map((item) => {
+          if (!item.ndh) return item;
+          const listed = priceByKey.get(ndhListingKey(item.sku, item.expiryDate));
+          return { ...item, price: listed || item.price };
+        });
+      } catch {
+        /* keep client price if Redis lookup fails */
+      }
+    }
 
     if (cleanedItems.length === 0) {
       return NextResponse.json(
