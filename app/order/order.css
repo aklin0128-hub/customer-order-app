@@ -2447,11 +2447,11 @@
   overflow: hidden;
 }
 
-/* Out-of-stock stamp must paint outside the image box */
+/* Keep the stamp inside the photo so it does not cover neighboring cards. */
 .catalog-qty-card--price-aligned .catalog-card-image-wrap--fixed.catalog-card-image-wrap--stamped,
 .catalog-card-image-wrap--stamped {
-  overflow: visible;
-  z-index: 2;
+  overflow: hidden;
+  z-index: 1;
   margin-bottom: 6px;
 }
 

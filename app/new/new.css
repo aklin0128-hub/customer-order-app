@@ -212,11 +212,11 @@
   margin-bottom: 0;
   padding: 8px;
   box-sizing: border-box;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .new-card .showcase-card-img-wrap--stamped {
-  overflow: visible;
+  overflow: hidden;
   margin-bottom: 4px;
 }
 

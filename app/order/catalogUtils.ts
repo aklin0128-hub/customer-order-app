@@ -227,11 +227,8 @@ export function formatOrderNotAvailableMessage(
   t: { orderNotAvailable: string; statusWarning: string; unavailableMissingSku?: string }
 ) {
   const cleanSku = String(sku || "").trim().toUpperCase();
-  const rawStatus = String(status || "").trim().toUpperCase();
-  // Prefer customer-safe display status; never echo READYTOORDER.
-  const display =
-    getDisplayStatus(status) ||
-    (rawStatus && !isReadyToOrderStatus(rawStatus) ? rawStatus : "");
+  // Customer-safe labels only — never echo NORMAL / READYTOORDER warehouse codes.
+  const display = getDisplayStatus(status);
 
   if (cleanSku && display === "NOT FOUND" && t.unavailableMissingSku) {
     return t.unavailableMissingSku.replace("{sku}", cleanSku);
