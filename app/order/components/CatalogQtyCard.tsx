@@ -12,11 +12,10 @@ import {
 } from "@/lib/comingSoonBadge";
 import { isProductOrderingBlocked, isProductOutOfStockStamp } from "@/lib/productAvailability";
 import { inventoryCueKindForItem, inventoryCueLabel } from "@/lib/inventoryCue";
-import { isDiscontinuedStatus } from "@/lib/orderableCatalog";
 import { resolveNewItemStorageLabel } from "@/lib/newItemStorageLabel";
 import { CATEGORY_OPTIONS } from "@/lib/catalogMainCategories";
 import { readProductCategories } from "@/lib/productCategories";
-import { getDisplayStatus, getStatusBadgeStyle, isJustAddedItem, isOrderableItem } from "../catalogUtils";
+import { isJustAddedItem } from "../catalogUtils";
 import type { CatalogItem, Lang } from "../types";
 import {
   catalogCardStyle,
@@ -73,7 +72,6 @@ export function CatalogQtyCard({
   onRoundUpBogo,
   highlight,
   disabled,
-  unavailableNote,
   showAdminEdit,
   editLabel = "Edit",
   onAdminCategoryChange,
@@ -195,7 +193,6 @@ export function CatalogQtyCard({
   const comingSoon = isComingSoonNewItem(item);
   const outOfStock = hideInventoryStatus ? false : isProductOutOfStockStamp(item);
   const stamped = comingSoon || outOfStock;
-  const discontinued = hideInventoryStatus ? false : isDiscontinuedStatus(item.status);
   const inventoryCue = hideInventoryStatus ? null : inventoryCueKindForItem(item);
   const orderingBlocked = isProductOrderingBlocked(item);
   const showNewItemExtras = Boolean(showNewProductBadge || showNewItemListPrice);
@@ -435,34 +432,6 @@ export function CatalogQtyCard({
       {addedDateText ? (
         <div className="catalog-added-date">
           {addedDateLabel}: {addedDateText}
-        </div>
-      ) : null}
-      {!hideInventoryStatus && !isOrderableItem(item) && getDisplayStatus(item.status) ? (
-        <span
-          style={{
-            display: "inline-block",
-            marginTop: 4,
-            padding: "2px 7px",
-            borderRadius: 999,
-            fontSize: 10,
-            fontWeight: 700,
-            ...getStatusBadgeStyle(item.status),
-          }}
-        >
-          {getDisplayStatus(item.status)}
-        </span>
-      ) : null}
-      {unavailableNote && !discontinued && !hideInventoryStatus ? (
-        <div
-          style={{
-            marginTop: 4,
-            fontSize: 11,
-            fontWeight: 800,
-            color: "#b91c1c",
-            lineHeight: 1.35,
-          }}
-        >
-          {unavailableNote}
         </div>
       ) : null}
     </div>

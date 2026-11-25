@@ -17,20 +17,20 @@
 
 .coming-soon-stamp-overlay {
   position: absolute;
-  inset: -55%;
+  inset: 0;
   z-index: 5;
   pointer-events: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .coming-soon-stamp-overlay img {
-  width: 100%;
-  max-width: none;
+  width: 92%;
+  max-width: 140px;
   height: auto;
-  transform: rotate(-12deg) scale(1.55);
+  transform: rotate(-12deg) scale(1.12);
   transform-origin: center center;
   opacity: 0.98;
   filter: drop-shadow(0 2px 8px rgba(185, 28, 28, 0.28));
@@ -39,5 +39,5 @@
 
 .catalog-card-image-wrap--stamped .coming-soon-stamp-overlay img,
 .showcase-card-img-wrap--stamped .coming-soon-stamp-overlay img {
-  transform: rotate(-12deg) scale(1.65);
+  transform: rotate(-12deg) scale(1.18);
 }

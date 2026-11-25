@@ -1,19 +1,19 @@
 .out-of-stock-stamp-overlay {
   position: absolute;
-  inset: -55%;
+  inset: 0;
   z-index: 5;
   pointer-events: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .out-of-stock-stamp-overlay img {
-  width: 100%;
-  max-width: none;
+  width: 92%;
+  max-width: 140px;
   height: auto;
-  transform: rotate(-18deg) scale(1.65);
+  transform: rotate(-18deg) scale(1.12);
   transform-origin: center center;
   opacity: 0.98;
   filter: drop-shadow(0 2px 8px rgba(185, 28, 28, 0.32));
@@ -22,14 +22,14 @@
 
 .catalog-card-image-wrap--stamped .out-of-stock-stamp-overlay img,
 .showcase-card-img-wrap--stamped .out-of-stock-stamp-overlay img {
-  transform: rotate(-18deg) scale(1.75);
+  transform: rotate(-18deg) scale(1.18);
 }
 
 .catalog-card-image-wrap--stamped,
 .showcase-card-img-wrap--stamped {
   position: relative;
-  overflow: visible;
-  z-index: 2;
+  overflow: hidden;
+  z-index: 1;
 }
 
 .showcase-card-img-wrap--stamped {
@@ -37,7 +37,7 @@
 }
 
 .catalog-qty-card--out-of-stock {
-  overflow: visible;
+  overflow: hidden;
 }
 
 .catalog-qty-card--out-of-stock .catalog-card-image-wrap--stamped > :first-child,
@@ -52,22 +52,22 @@
 
 .catalog-card-image-wrap--dual-stamped .coming-soon-stamp-overlay,
 .showcase-card-img-wrap--dual-stamped .coming-soon-stamp-overlay {
-  inset: -50% -58% -62% -52%;
+  inset: 0;
   z-index: 6;
 }
 
 .catalog-card-image-wrap--dual-stamped .coming-soon-stamp-overlay img,
 .showcase-card-img-wrap--dual-stamped .coming-soon-stamp-overlay img {
-  transform: rotate(-12deg) scale(1.35) translate(-8%, -10%);
+  transform: rotate(-12deg) scale(1.08) translate(-6%, -8%);
 }
 
 .catalog-card-image-wrap--dual-stamped .out-of-stock-stamp-overlay,
 .showcase-card-img-wrap--dual-stamped .out-of-stock-stamp-overlay {
-  inset: -62% -52% -50% -58%;
+  inset: 0;
   z-index: 5;
 }
 
 .catalog-card-image-wrap--dual-stamped .out-of-stock-stamp-overlay img,
 .showcase-card-img-wrap--dual-stamped .out-of-stock-stamp-overlay img {
-  transform: rotate(-18deg) scale(1.35) translate(8%, 10%);
+  transform: rotate(-18deg) scale(1.08) translate(6%, 8%);
 }

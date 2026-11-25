@@ -107,6 +107,21 @@ test("catalog category bar stays a compact single row", () => {
   );
 });
 
+test("catalog cards do not print warehouse status under the photo", () => {
+  const cardSrc = readFileSync(join(here, "components/CatalogQtyCard.tsx"), "utf8");
+  assert.doesNotMatch(cardSrc, /unavailableNote &&/);
+  assert.doesNotMatch(cardSrc, /getDisplayStatus\(item\.status\)/);
+  const stampCss = readFileSync(join(here, "../components/out-of-stock-stamp.css"), "utf8");
+  assert.match(
+    stampCss,
+    /\.out-of-stock-stamp-overlay\s*\{[^}]*overflow:\s*hidden/
+  );
+  assert.match(
+    stampCss,
+    /\.catalog-qty-card--out-of-stock\s*\{[^}]*overflow:\s*hidden/
+  );
+});
+
 test("inventory cue is first and History is second on every card", () => {
   const cardSrc = readFileSync(join(here, "components/CatalogQtyCard.tsx"), "utf8");
   const cueIdx = cardSrc.indexOf("catalog-qty-card-cue-slot");

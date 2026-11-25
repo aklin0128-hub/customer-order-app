@@ -58,4 +58,8 @@ test("formatOrderNotAvailableMessage always includes sku when present", () => {
     formatOrderNotAvailableMessage("X1", undefined, t),
     "X1 status is UNAVAILABLE."
   );
+  assert.equal(
+    formatOrderNotAvailableMessage("20924K", "NORMAL", t),
+    "20924K status is UNAVAILABLE."
+  );
 });
